@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, TrendingUp, AlertTriangle, DollarSign, PieChart, Target, ShoppingCart, BarChart3 } from "lucide-react"
+import { Loader2, TrendingUp, AlertTriangle, DollarSign, PieChart, Target, ShoppingCart, BarChart3, Info } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
 interface VixLevel {
@@ -174,6 +174,125 @@ export function RiskCalculator() {
 
   return (
     <div className="space-y-4">
+      <Card className="shadow-sm border-gray-200">
+        <CardHeader className="bg-gray-50 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-primary" />
+                VIX Volatility Historical Scale
+              </CardTitle>
+              <p className="text-sm text-gray-600 mt-1">
+                Visual representation of volatility zones from extreme calm to extreme fear
+              </p>
+            </div>
+            <button
+              onClick={fetchVixData}
+              className="px-3 py-1.5 text-sm font-semibold bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors"
+            >
+              Refresh
+            </button>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="space-y-6">
+            <div className="relative">
+              {/* Gradient Bar - Green (low VIX) to Red (high VIX) */}
+              <div className="h-24 bg-gradient-to-r from-green-500 via-yellow-400 via-50% via-orange-500 via-75% to-red-600 rounded-lg shadow-inner" />
+
+              {/* Zone labels */}
+              <div className="absolute inset-0 flex items-center justify-between px-2 text-xs font-bold">
+                <div className="text-center text-white drop-shadow-lg">
+                  <div className="text-base">EXTREME</div>
+                  <div>GREED</div>
+                  <div className="text-[10px] mt-1">{"≤"}12</div>
+                </div>
+                <div className="text-center text-gray-800 drop-shadow">
+                  <div>GREED</div>
+                  <div className="text-[10px] mt-1">12-15</div>
+                </div>
+                <div className="text-center text-gray-800 drop-shadow">
+                  <div>NORMAL</div>
+                  <div className="text-[10px] mt-1">15-20</div>
+                </div>
+                <div className="text-center text-white drop-shadow-lg">
+                  <div>FEAR</div>
+                  <div className="text-[10px] mt-1">20-30</div>
+                </div>
+                <div className="text-center text-white drop-shadow-lg">
+                  <div className="text-base">EXTREME</div>
+                  <div>FEAR</div>
+                  <div className="text-[10px] mt-1">{"≥"}30</div>
+                </div>
+              </div>
+
+              {/* Current VIX indicator */}
+              {vixValue && (
+                <div
+                  className="absolute top-0 bottom-0 w-2 bg-black shadow-lg transition-all duration-500"
+                  style={{
+                    left: `calc(${Math.min(100, (vixValue / 50) * 100)}% - 4px)`,
+                  }}
+                >
+                  <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                    <div className="bg-black text-white px-4 py-2 rounded-lg shadow-xl">
+                      <div className="text-xs font-semibold">TODAY</div>
+                      <div className="text-2xl font-bold">{vixValue.toFixed(2)}</div>
+                      <div className="text-xs text-center">
+                        {vixValue <= 12
+                          ? "Extreme Greed"
+                          : vixValue <= 15
+                            ? "Greed"
+                            : vixValue <= 20
+                              ? "Normal"
+                              : vixValue <= 30
+                                ? "Fear"
+                                : "Extreme Fear"}
+                      </div>
+                    </div>
+                    <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-black mx-auto" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Historical Reference Points */}
+            <div className="mt-16 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+              <h4 className="text-xs font-bold text-gray-900 mb-3 flex items-center gap-2">
+                <Info className="h-4 w-4 text-primary" />
+                Historical Reference Points
+              </h4>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <span className="font-semibold text-red-600">COVID-19 Peak (Mar 2020):</span>
+                  <span className="ml-1 text-gray-700">82.69 (Extreme Fear)</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-green-600">Pre-COVID Low (Jan 2020):</span>
+                  <span className="ml-1 text-gray-700">12.10 (Extreme Greed)</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-red-600">2008 Financial Crisis:</span>
+                  <span className="ml-1 text-gray-700">89.53 (Extreme Fear)</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-green-600">2017 Bull Market:</span>
+                  <span className="ml-1 text-gray-700">9.15 (Extreme Greed)</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-red-600">2022 Bear Market:</span>
+                  <span className="ml-1 text-gray-700">36.45 (Extreme Fear)</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-green-600">AI Rally (Early 2024):</span>
+                  <span className="ml-1 text-gray-700">12.74 (Extreme Greed)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card className="shadow-sm border-gray-200">
         <CardHeader className="bg-gray-50 border-b border-gray-200">
           <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">

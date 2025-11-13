@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { RefreshCw, Target, Shield, AlertTriangle, Activity, TrendingUp } from "lucide-react"
+import { RefreshCw, Target, Shield, AlertTriangle, Activity, TrendingUp } from 'lucide-react'
 import {
   Line,
   XAxis,
@@ -199,6 +199,120 @@ export function TrendAnalysis() {
 
   return (
     <div className="space-y-4">
+      {/* Index Trend Historical Scale visual matching Fear & Greed / Panic Euphoria design */}
+      <Card className="shadow-sm border-gray-200">
+        <CardHeader className="bg-gray-50 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Index Trend Historical Scale
+              </CardTitle>
+              <CardDescription>
+                Visual representation of trend direction from extreme bearish to extreme bullish
+              </CardDescription>
+            </div>
+            <Button
+              onClick={fetchData}
+              variant="outline"
+              size="sm"
+              disabled={loading}
+              className="bg-green-50 hover:bg-green-100 border-green-200"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="relative">
+            {/* Horizontal gradient bar with labeled zones */}
+            <div className="relative h-20 rounded-lg overflow-hidden shadow-sm border border-gray-300">
+              <div className="absolute inset-0 h-24 bg-gradient-to-r from-red-600 via-red-400 via-20% via-yellow-400 via-50% via-green-400 via-80% to-green-600 rounded-lg shadow-inner" />
+              
+              {/* Zone labels */}
+              <div className="absolute inset-0 flex items-center justify-between px-2 text-xs font-bold">
+                {/* Extreme Bearish */}
+                <div className="text-center text-white drop-shadow-lg">
+                  <div className="text-base">EXTREME</div>
+                  <div>BEARISH</div>
+                  <div className="text-[10px] mt-1">0-20</div>
+                </div>
+                {/* Bearish */}
+                <div className="text-center text-white drop-shadow-lg">
+                  <div>BEARISH</div>
+                  <div className="text-[10px] mt-1">21-40</div>
+                </div>
+                {/* Neutral */}
+                <div className="text-center text-gray-800 drop-shadow">
+                  <div>NEUTRAL</div>
+                  <div className="text-[10px] mt-1">41-60</div>
+                </div>
+                {/* Bullish */}
+                <div className="text-center text-white drop-shadow-lg">
+                  <div>BULLISH</div>
+                  <div className="text-[10px] mt-1">61-80</div>
+                </div>
+                {/* Extreme Bullish */}
+                <div className="text-center text-white drop-shadow-lg">
+                  <div className="text-base">EXTREME</div>
+                  <div>BULLISH</div>
+                  <div className="text-[10px] mt-1">81-100</div>
+                </div>
+              </div>
+            </div>
+
+            <div
+              className="absolute top-0 bottom-0 w-2 bg-black shadow-lg transition-all duration-500"
+              style={{
+                left: `calc(${Math.max(0, Math.min(100, selectedItem.momentumStrength ?? 50))}% - 4px)`,
+              }}
+            >
+              <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                <div className="bg-black text-white px-4 py-2 rounded-lg shadow-xl">
+                  <div className="text-xs font-semibold">TODAY</div>
+                  <div className="text-2xl font-bold">{Math.round(selectedItem.momentumStrength ?? 50)}</div>
+                  <div className="text-xs text-center">
+                    {selectedItem.momentumStrength >= 80
+                      ? "Extreme Bullish"
+                      : selectedItem.momentumStrength >= 60
+                        ? "Bullish"
+                        : selectedItem.momentumStrength >= 40
+                          ? "Neutral"
+                          : selectedItem.momentumStrength >= 20
+                            ? "Bearish"
+                            : "Extreme Bearish"}
+                  </div>
+                </div>
+                <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-black mx-auto" />
+              </div>
+            </div>
+          </div>
+
+          {/* Context information */}
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+              <p className="text-xs font-semibold text-gray-600 mb-1">Current Reading</p>
+              <p className="text-lg font-bold text-gray-900">
+                {(selectedItem.momentumStrength ?? 0).toFixed(0)}/100
+              </p>
+              <p className="text-xs text-gray-600 mt-1">Momentum strength indicator</p>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+              <p className="text-xs font-semibold text-gray-600 mb-1">Trend Confidence</p>
+              <p className="text-lg font-bold text-gray-900">{(selectedItem.trendConfidence ?? 0).toFixed(0)}%</p>
+              <p className="text-xs text-gray-600 mt-1">Signal reliability</p>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+              <p className="text-xs font-semibold text-gray-600 mb-1">Trend Strength</p>
+              <p className={`text-lg font-bold ${getStrengthColor(selectedItem.trendStrength)}`}>
+                {selectedItem.trendStrength}
+              </p>
+              <p className="text-xs text-gray-600 mt-1">Directional power</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Price Forecast card */}
       <Card className="shadow-sm border-gray-200">
         <CardHeader className="bg-gray-50 border-b border-gray-200">
@@ -314,37 +428,6 @@ export function TrendAnalysis() {
                 </div>
               </button>
             ))}
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-              <p className="text-xs text-gray-600 mb-1">Trend</p>
-              <div className="flex items-center gap-2">
-                <span className={`px-2 py-1 rounded text-xs font-semibold border ${getTrendColor(selectedItem.trend)}`}>
-                  {selectedItem.trend}
-                </span>
-                <span className="text-xs text-gray-500">{(selectedItem.trendConfidence ?? 0).toFixed(0)}%</span>
-              </div>
-            </div>
-            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-              <p className="text-xs text-gray-600 mb-1">Strength</p>
-              <p className={`text-sm font-semibold ${getStrengthColor(selectedItem.trendStrength)}`}>
-                {selectedItem.trendStrength}
-              </p>
-            </div>
-            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-              <p className="text-xs text-gray-600 mb-1">Momentum</p>
-              <div className="flex items-center gap-1">
-                <Activity className={`h-4 w-4 ${getMomentumColor(selectedItem.momentumStrength ?? 0)}`} />
-                <span className={`text-sm font-semibold ${getMomentumColor(selectedItem.momentumStrength ?? 0)}`}>
-                  {(selectedItem.momentumStrength ?? 0).toFixed(0)}/100
-                </span>
-              </div>
-            </div>
-            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-              <p className="text-xs text-gray-600 mb-1">Volume</p>
-              <p className="text-sm font-semibold text-gray-900">{(selectedItem.volumeRatio ?? 0).toFixed(2)}x avg</p>
-            </div>
           </div>
         </CardContent>
       </Card>
