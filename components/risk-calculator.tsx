@@ -1,0 +1,422 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Loader2, TrendingUp, AlertTriangle, DollarSign, PieChart, Target, ShoppingCart, BarChart3 } from "lucide-react"
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+
+interface VixLevel {
+  range: string
+  sentiment: string
+  cashMin: number
+  cashMax: number
+  investedMin: number
+  investedMax: number
+  color: string
+  optionsAction: string
+  equityAction: string
+  marginBufferPercent: number // Percentage of total cash for margin buffer
+  opportunityPercent: number // Percentage of total cash for dip-buying
+}
+
+const VIX_LEVELS: VixLevel[] = [
+  {
+    range: "≤ 12",
+    sentiment: "Extreme Greed",
+    cashMin: 40,
+    cashMax: 50,
+    investedMin: 50,
+    investedMax: 60,
+    color: "text-green-600",
+    optionsAction: "Sell limited-risk spreads only",
+    equityAction: "Avoid new buys; trim winners",
+    marginBufferPercent: 50, // 20-25% of portfolio
+    opportunityPercent: 50, // 20-25% of portfolio
+  },
+  {
+    range: "12-15",
+    sentiment: "Greed",
+    cashMin: 30,
+    cashMax: 40,
+    investedMin: 60,
+    investedMax: 70,
+    color: "text-green-500",
+    optionsAction: "Small size, short puts on quality stocks",
+    equityAction: "Wait for pullback",
+    marginBufferPercent: 55,
+    opportunityPercent: 45,
+  },
+  {
+    range: "15-20",
+    sentiment: "Slight Fear",
+    cashMin: 20,
+    cashMax: 25,
+    investedMin: 75,
+    investedMax: 80,
+    color: "text-yellow-600",
+    optionsAction: "Regular put selling",
+    equityAction: "Start small DCA",
+    marginBufferPercent: 60,
+    opportunityPercent: 40,
+  },
+  {
+    range: "20-25",
+    sentiment: "Fear",
+    cashMin: 10,
+    cashMax: 15,
+    investedMin: 85,
+    investedMax: 90,
+    color: "text-orange-600",
+    optionsAction: "Scale up short puts / strangles",
+    equityAction: "Deploy dip cash (10-15%)",
+    marginBufferPercent: 70,
+    opportunityPercent: 30,
+  },
+  {
+    range: "25-30",
+    sentiment: "Very Fearful",
+    cashMin: 5,
+    cashMax: 10,
+    investedMin: 90,
+    investedMax: 95,
+    color: "text-red-600",
+    optionsAction: "Go heavier into short puts (still hedged)",
+    equityAction: "Aggressive DCA, nibble growth names",
+    marginBufferPercent: 80,
+    opportunityPercent: 20,
+  },
+  {
+    range: "≥ 30",
+    sentiment: "Extreme Fear",
+    cashMin: 0,
+    cashMax: 5,
+    investedMin: 95,
+    investedMax: 100,
+    color: "text-red-700",
+    optionsAction: "Massive premiums — ladder entries carefully",
+    equityAction: "Deploy remaining cash in tranches",
+    marginBufferPercent: 100,
+    opportunityPercent: 0,
+  },
+]
+
+function getVixLevel(vix: number): VixLevel {
+  if (vix <= 12) return VIX_LEVELS[0]
+  if (vix <= 15) return VIX_LEVELS[1]
+  if (vix <= 20) return VIX_LEVELS[2]
+  if (vix <= 25) return VIX_LEVELS[3]
+  if (vix <= 30) return VIX_LEVELS[4]
+  return VIX_LEVELS[5]
+}
+
+export function RiskCalculator() {
+  const [portfolioSize, setPortfolioSize] = useState<string>("")
+  const [vixValue, setVixValue] = useState<number | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [vixHistory, setVixHistory] = useState<Array<{ date: string; value: number }>>([])
+  const [chartLoading, setChartLoading] = useState(true)
+
+  useEffect(() => {
+    fetchVixData()
+    fetchVixHistory()
+  }, [])
+
+  async function fetchVixData() {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await fetch("/api/vix")
+      if (!response.ok) {
+        throw new Error("Failed to fetch VIX data")
+      }
+      const data = await response.json()
+      setVixValue(data.vix)
+    } catch (err) {
+      setError("Unable to fetch current VIX data. Please try again later.")
+      console.error("[v0] Error fetching VIX:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function fetchVixHistory() {
+    try {
+      setChartLoading(true)
+      const response = await fetch("/api/vix-history")
+      if (!response.ok) {
+        throw new Error("Failed to fetch VIX history")
+      }
+      const data = await response.json()
+      setVixHistory(data.history)
+    } catch (err) {
+      console.error("[v0] Error fetching VIX history:", err)
+    } finally {
+      setChartLoading(false)
+    }
+  }
+
+  const portfolioValue = Number.parseFloat(portfolioSize) || 0
+  const currentLevel = vixValue ? getVixLevel(vixValue) : null
+
+  const cashMin = currentLevel ? (portfolioValue * currentLevel.cashMin) / 100 : 0
+  const cashMax = currentLevel ? (portfolioValue * currentLevel.cashMax) / 100 : 0
+  const investedMin = currentLevel ? (portfolioValue * currentLevel.investedMin) / 100 : 0
+  const investedMax = currentLevel ? (portfolioValue * currentLevel.investedMax) / 100 : 0
+
+  const marginBufferMin = currentLevel ? (cashMin * currentLevel.marginBufferPercent) / 100 : 0
+  const marginBufferMax = currentLevel ? (cashMax * currentLevel.marginBufferPercent) / 100 : 0
+  const opportunityCashMin = currentLevel ? (cashMin * currentLevel.opportunityPercent) / 100 : 0
+  const opportunityCashMax = currentLevel ? (cashMax * currentLevel.opportunityPercent) / 100 : 0
+
+  return (
+    <div className="space-y-4">
+      <Card className="shadow-sm border-gray-200">
+        <CardHeader className="bg-gray-50 border-b border-gray-200">
+          <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-primary" />
+            VIX Chart (Last 6 Months)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4 pb-4">
+          {chartLoading ? (
+            <div className="flex items-center justify-center h-[400px]">
+              <div className="flex items-center gap-2 text-gray-600">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Loading chart...</span>
+              </div>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={400}>
+              <LineChart data={vixHistory} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 12 }}
+                  interval="preserveStartEnd"
+                  tickFormatter={(value) => {
+                    const date = new Date(value)
+                    return `${date.getMonth() + 1}/${date.getDate()}`
+                  }}
+                />
+                <YAxis tick={{ fontSize: 12 }} domain={["dataMin - 2", "dataMax + 2"]} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "white",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "8px",
+                    padding: "8px 12px",
+                  }}
+                  labelStyle={{ fontWeight: "bold", marginBottom: "4px" }}
+                  formatter={(value: number) => [`${value.toFixed(2)}`, "VIX"]}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="value"
+                  stroke="#00a868"
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm border-gray-200">
+        <CardHeader className="bg-gray-50 border-b border-gray-200">
+          <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <DollarSign className="h-5 w-5 text-primary" />
+            Portfolio Information
+          </CardTitle>
+          <p className="text-sm text-gray-600 mt-2">
+            Please Enter Your Portfolio Size - So we can calculate the recommended Cash on Hand Level
+          </p>
+        </CardHeader>
+        <CardContent className="pt-4 pb-4">
+          <div className="space-y-2">
+            <Label htmlFor="portfolio" className="text-sm font-semibold text-gray-700">
+              Total Portfolio Size
+            </Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">$</span>
+              <Input
+                id="portfolio"
+                type="number"
+                placeholder="100000"
+                value={portfolioSize}
+                onChange={(e) => setPortfolioSize(e.target.value)}
+                className="pl-7 h-12 text-lg border-gray-300 focus:border-primary focus:ring-primary"
+                min="0"
+                step="1000"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm border-gray-200">
+        <CardHeader className="bg-gray-50 border-b border-gray-200">
+          <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            Current VIX Level
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4 pb-4">
+          {loading ? (
+            <div className="flex items-center gap-2 text-gray-600">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Loading VIX data...</span>
+            </div>
+          ) : error ? (
+            <Alert variant="destructive" className="border-red-200 bg-red-50">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription className="text-red-800">{error}</AlertDescription>
+            </Alert>
+          ) : vixValue && currentLevel ? (
+            <div className="space-y-4">
+              <div className="flex items-baseline gap-3">
+                <span className="text-5xl font-bold text-gray-900">{vixValue.toFixed(2)}</span>
+                <span className={`text-xl font-bold ${currentLevel.color}`}>{currentLevel.sentiment}</span>
+              </div>
+              <div className="text-sm text-gray-600 font-medium">VIX Range: {currentLevel.range}</div>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {portfolioValue > 0 && currentLevel && vixValue && (
+        <Card className="shadow-md border-2 border-primary bg-gradient-to-br from-white to-green-50">
+          <CardHeader className="border-b border-green-100">
+            <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <PieChart className="h-5 w-5 text-primary" />
+              Recommended Allocation
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4 pb-4 space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2 p-4 bg-white rounded-lg border border-gray-200">
+                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">VIX-Based Cash</div>
+                <div className="text-3xl font-bold text-gray-900">
+                  ${cashMin.toLocaleString()} - ${cashMax.toLocaleString()}
+                </div>
+                <div className="text-sm text-gray-600 font-medium">
+                  {currentLevel.cashMin}% - {currentLevel.cashMax}% of portfolio
+                </div>
+              </div>
+
+              <div className="space-y-2 p-4 bg-white rounded-lg border border-gray-200">
+                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Invested Capital</div>
+                <div className="text-3xl font-bold text-gray-900">
+                  ${investedMin.toLocaleString()} - ${investedMax.toLocaleString()}
+                </div>
+                <div className="text-sm text-gray-600 font-medium">
+                  {currentLevel.investedMin}% - {currentLevel.investedMax}% of portfolio
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg border border-gray-200 p-3 space-y-3">
+              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Cash Allocation Breakdown</h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center gap-2">
+                    <Target className="h-4 w-4 text-blue-600" />
+                    <div className="text-xs font-semibold text-blue-900 uppercase">Trading Float (Margin Buffer)</div>
+                  </div>
+                  <div className="text-2xl font-bold text-blue-900">
+                    ${marginBufferMin.toLocaleString()} - ${marginBufferMax.toLocaleString()}
+                  </div>
+                  <div className="text-xs text-blue-700">{currentLevel.marginBufferPercent}% of cash reserve</div>
+                </div>
+
+                <div className="space-y-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                  <div className="flex items-center gap-2">
+                    <ShoppingCart className="h-4 w-4 text-amber-600" />
+                    <div className="text-xs font-semibold text-amber-900 uppercase">Opportunity Cash (Dip-Buy)</div>
+                  </div>
+                  <div className="text-2xl font-bold text-amber-900">
+                    ${opportunityCashMin.toLocaleString()} - ${opportunityCashMax.toLocaleString()}
+                  </div>
+                  <div className="text-xs text-amber-700">{currentLevel.opportunityPercent}% of cash reserve</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg border border-gray-200 p-3 space-y-3">
+              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Recommended Actions</h3>
+              <div className="space-y-3">
+                <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                  <div className="text-xs font-semibold text-purple-900 uppercase mb-1">Options Seller Strategy</div>
+                  <div className="text-sm text-purple-800 font-medium">{currentLevel.optionsAction}</div>
+                </div>
+                <div className="p-3 bg-teal-50 rounded-lg border border-teal-200">
+                  <div className="text-xs font-semibold text-teal-900 uppercase mb-1">Equity Buyer Strategy</div>
+                  <div className="text-sm text-teal-800 font-medium">{currentLevel.equityAction}</div>
+                </div>
+              </div>
+            </div>
+
+            <Alert className="bg-white border-gray-200">
+              <AlertDescription className="text-gray-700">
+                Based on current market volatility (VIX: {vixValue.toFixed(2)}), you should maintain{" "}
+                <strong className="text-gray-900">
+                  {currentLevel.cashMin}-{currentLevel.cashMax}% cash
+                </strong>{" "}
+                to manage risk effectively in this{" "}
+                <strong className={currentLevel.color}>{currentLevel.sentiment}</strong> environment.
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="shadow-sm border-gray-200">
+        <CardHeader className="bg-gray-50 border-b border-gray-200">
+          <CardTitle className="text-lg font-bold text-gray-900">VIX Levels Reference (2025-2026)</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4 pb-4">
+          <div className="space-y-2">
+            {VIX_LEVELS.map((level, index) => (
+              <div
+                key={index}
+                className={`p-4 rounded-lg border transition-colors ${
+                  currentLevel === level
+                    ? "border-primary bg-green-50 shadow-sm"
+                    : "border-gray-200 bg-white hover:bg-gray-50"
+                }`}
+              >
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <div className="font-mono text-sm font-bold text-gray-900">VIX {level.range}</div>
+                    <div className={`font-bold text-sm ${level.color}`}>{level.sentiment}</div>
+                    <div className="text-xs text-gray-600 font-medium mt-2">
+                      {level.cashMin}-{level.cashMax}% Cash
+                    </div>
+                    <div className="text-xs text-gray-600 font-medium">
+                      {level.investedMin}-{level.investedMax}% Invested
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="text-xs font-semibold text-purple-900 uppercase">Options Seller</div>
+                    <div className="text-sm text-gray-700">{level.optionsAction}</div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="text-xs font-semibold text-teal-900 uppercase">Equity Buyer</div>
+                    <div className="text-sm text-gray-700">{level.equityAction}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
