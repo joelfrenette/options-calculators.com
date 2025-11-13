@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Slider } from "@/components/ui/slider"
-import { TrendingUp, Info, Loader2, BarChart3, Filter, AlertCircle, CheckCircle2 } from "lucide-react" // Added CircleDollarSign, AlertCircle, CheckCircle2
+import { TrendingUp, Info, Loader2, BarChart3, Filter, AlertCircle, CheckCircle2 } from "lucide-react" // Added CircleDollarSign, AlertCircle, CheckCircle2, CheckCircle
 import React from "react" // Ensure React is imported
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { calculatePutDelta, estimateImpliedVolatility } from "@/lib/black-scholes"
@@ -433,6 +433,22 @@ const MEGA_CAP_STOCKS_ALPHABETIZED = [
   "XOM",
 ].sort()
 
+// Helper function to get the numerical limit for top ranked stocks
+const getTopRankedValue = (percentage: number): number => {
+  if (percentage <= 16) return 500 // Top 500
+  if (percentage <= 50) return 100 // Top 100
+  if (percentage <= 83) return 50 // Top 50
+  return 10 // Top 10
+}
+
+// Helper function to get the label for top ranked stocks
+const getTopRankedLabel = (percentage: number): string => {
+  if (percentage <= 16) return "Top 500"
+  if (percentage <= 50) return "Top 100"
+  if (percentage <= 83) return "Top 50"
+  return "Top 10"
+}
+
 export function WheelScanner() {
   const [tickersToScan, setTickersToScan] = useState<string>("")
   const [minVolume, setMinVolume] = useState([2])
@@ -666,6 +682,29 @@ export function WheelScanner() {
       console.log("[v0] Time server failed, using local time:", error)
     }
     return new Date() // Fallback to local time
+  }
+
+  const getNextTwoFridays = async (): Promise<[string, string]> => {
+    const today = await getCurrentDate()
+
+    // Calculate next Friday
+    const dayOfWeek = today.getDay()
+    let daysUntilFriday: number
+    if (dayOfWeek === 5) {
+      daysUntilFriday = 7
+    } else if (dayOfWeek === 6) {
+      daysUntilFriday = 6
+    } else {
+      daysUntilFriday = 5 - dayOfWeek
+    }
+
+    const nextFriday = new Date(today)
+    nextFriday.setDate(today.getDate() + daysUntilFriday)
+
+    const followingFriday = new Date(nextFriday)
+    followingFriday.setDate(nextFriday.getDate() + 7)
+
+    return [nextFriday.toISOString().split("T")[0], followingFriday.toISOString().split("T")[0]]
   }
 
   const getNextFriday = async () => {
@@ -1063,224 +1102,187 @@ export function WheelScanner() {
     console.log("[v0] ================================================")
 
     const enriched: QualifyingStock[] = []
+    const [nextFriday, followingFriday] = await getNextTwoFridays()
+    console.log(`[v0] Target expiries: Next Friday=${nextFriday}, Following Friday=${followingFriday}`)
 
     for (const stock of stocks) {
       try {
-        const nextFriday = await getNextFriday()
-        const daysToExpiry = Math.floor((new Date(nextFriday).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+        for (const expiryDate of [nextFriday, followingFriday]) {
+          const daysToExpiry = Math.floor((new Date(expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
 
-        console.log(`[v0] ${stock.ticker} - Fetching options for expiry: ${nextFriday} (${daysToExpiry} days away)`)
+          console.log(`[v0] ${stock.ticker} - Fetching options for expiry: ${expiryDate} (${daysToExpiry} days away)`)
 
-        let foundOptions = false
-        let bestOption: QualifyingStock | null = null
+          let bestOption: QualifyingStock | null = null
 
-        const optionsChainRes = await fetch(
-          `/api/polygon-proxy?endpoint=options-chain&ticker=${stock.ticker}&expiry_date=${nextFriday}&option_type=put`,
-        )
-        await delay(200) // Small delay between API calls
+          const optionsChainRes = await fetch(
+            `/api/polygon-proxy?endpoint=options-chain&ticker=${stock.ticker}&expiry_date=${expiryDate}&option_type=put`,
+          )
+          await delay(200) // Small delay between API calls
 
-        if (!optionsChainRes.ok) {
-          console.error(`[v0] ${stock.ticker} - Failed to fetch options chain for ${nextFriday}`)
-          // Fallback: keep original stock data if options fetch fails
-          enriched.push({
-            ...stock,
-            expiryDate: "N/A",
-            putStrike: 0,
-            premium: 0,
-            yield: 0,
-            daysToExpiry: 0,
-            annualizedYield: 0,
-            delta: 0,
-            deltaSource: "estimated",
-          })
-          continue
-        }
+          if (!optionsChainRes.ok) {
+            console.error(`[v0] ${stock.ticker} - Failed to fetch options chain for ${expiryDate}`)
+            continue
+          }
 
-        const chainData = await optionsChainRes.json()
-        const contracts = chainData.results || []
+          const chainData = await optionsChainRes.json()
+          const contracts = chainData.results || []
 
-        console.log(`[v0] ${stock.ticker} - Found ${contracts.length} put contracts for ${nextFriday}`)
+          console.log(`[v0] ${stock.ticker} - Found ${contracts.length} put contracts for ${expiryDate}`)
 
-        if (contracts.length === 0) {
-          console.log(`[v0] ${stock.ticker} - No options found for ${nextFriday}`)
-          // Fallback: keep original stock data
-          enriched.push({
-            ...stock,
-            expiryDate: "N/A",
-            putStrike: 0,
-            premium: 0,
-            yield: 0,
-            daysToExpiry: 0,
-            annualizedYield: 0,
-            delta: 0,
-            deltaSource: "estimated",
-          })
-          continue
-        }
+          if (contracts.length === 0) {
+            console.log(`[v0] ${stock.ticker} - No options found for ${expiryDate}`)
+            // Fallback: keep original stock data
+            continue
+          }
 
-        // Found contracts! Process them
-        foundOptions = true
+          const targetStrikes = [
+            stock.currentPrice * 0.98, // ~2% OTM
+            stock.currentPrice * 0.97, // ~3% OTM (target for ~0.30 Delta)
+            stock.currentPrice * 0.96, // ~4% OTM
+            stock.currentPrice * 0.95, // ~5% OTM
+            stock.currentPrice * 0.94, // ~6% OTM
+          ]
 
-        const targetStrikes = [
-          stock.currentPrice * 0.98, // ~2% OTM
-          stock.currentPrice * 0.97, // ~3% OTM (target for ~0.30 Delta)
-          stock.currentPrice * 0.96, // ~4% OTM
-          stock.currentPrice * 0.95, // ~5% OTM
-          stock.currentPrice * 0.94, // ~6% OTM
-        ]
+          const optionsWithData: QualifyingStock[] = []
 
-        const optionsWithData: QualifyingStock[] = []
+          for (const targetStrike of targetStrikes) {
+            const bestContract = contracts.reduce((best: any, contract: any) => {
+              if (!contract.strike_price) return best
+              if (!best) return contract
 
-        for (const targetStrike of targetStrikes) {
-          const bestContract = contracts.reduce((best: any, contract: any) => {
-            if (!contract.strike_price) return best
-            if (!best) return contract
+              const bestDiff = Math.abs(best.strike_price - targetStrike)
+              const contractDiff = Math.abs(contract.strike_price - targetStrike)
 
-            const bestDiff = Math.abs(best.strike_price - targetStrike)
-            const contractDiff = Math.abs(contract.strike_price - targetStrike)
+              return contractDiff < bestDiff ? contract : best
+            }, null)
 
-            return contractDiff < bestDiff ? contract : best
-          }, null)
-
-          if (bestContract && bestContract.ticker) {
-            const optionTicker = bestContract.ticker
-            const strikePrice = bestContract.strike_price
-            const expiry = bestContract.expiration_date
-
-            console.log(`[v0] ${stock.ticker} - Fetching snapshot for ${optionTicker} (strike=$${strikePrice})`)
-
-            const snapshotRes = await fetch(`/api/polygon-proxy?endpoint=options-snapshot&ticker=${optionTicker}`)
-            await delay(300) // Increased delay for rate limit protection
-
-            if (!snapshotRes.ok) {
-              console.warn(
-                `[v0] ${stock.ticker} - Failed to get snapshot for strike $${strikePrice} (status: ${snapshotRes.status})`,
-              )
-              continue
-            }
-
-            const snapshotData = await snapshotRes.json()
-            const lastQuote = snapshotData.results?.last_quote
-            const greeks = snapshotData.results?.greeks
-
-            if (lastQuote && lastQuote.bid > 0 && lastQuote.ask > 0) {
-              const bid = lastQuote.bid
-              const ask = lastQuote.ask
-              const realPremium = (bid + ask) / 2
+            if (bestContract && bestContract.ticker) {
+              const optionTicker = bestContract.ticker
               const strikePrice = bestContract.strike_price
               const expiry = bestContract.expiration_date
 
-              // Re-calculate daysToExpiry based on actual option expiryDate
-              const optionDaysToExpiry = expiry
-                ? Math.max(1, Math.floor((new Date(expiry).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-                : 0 // Use 0 if expiry date is missing or invalid
+              console.log(`[v0] ${stock.ticker} - Fetching snapshot for ${optionTicker} (strike=$${strikePrice})`)
 
-              const timeToExpiry = optionDaysToExpiry / 365
+              const snapshotRes = await fetch(`/api/polygon-proxy?endpoint=options-snapshot&ticker=${optionTicker}`)
+              await delay(300) // Increased delay for rate limit protection
 
-              let calculatedDelta: number
-              let deltaSource: string
-
-              if (greeks && typeof greeks.delta === "number") {
-                calculatedDelta = greeks.delta
-                deltaSource = "polygon"
-                console.log(
-                  `[v0] ✅ ${stock.ticker} - Strike=$${strikePrice.toFixed(2)}, Premium=$${realPremium.toFixed(2)}, Delta=${calculatedDelta.toFixed(3)} (REAL from Polygon), Bid=$${bid}, Ask=$${ask}`,
+              if (!snapshotRes.ok) {
+                console.warn(
+                  `[v0] ${stock.ticker} - Failed to get snapshot for strike $${strikePrice} (status: ${snapshotRes.status})`,
                 )
-              } else {
-                // Estimate implied volatility and delta if not provided by Polygon
-                let impliedVol = estimateImpliedVolatility(
-                  stock.currentPrice,
-                  strikePrice,
-                  timeToExpiry,
-                  realPremium, // Use realPremium here
-                  true, // Assume put option (is_put=true)
-                )
+                continue
+              }
 
-                if (isNaN(impliedVol) || impliedVol <= 0) {
-                  console.warn(
-                    `[v0] ${stock.ticker} - Could not estimate Implied Volatility for strike $${strikePrice}. Using a default of 30%.`,
+              const snapshotData = await snapshotRes.json()
+              const lastQuote = snapshotData.results?.last_quote
+              const greeks = snapshotData.results?.greeks
+
+              if (lastQuote && lastQuote.bid > 0 && lastQuote.ask > 0) {
+                const bid = lastQuote.bid
+                const ask = lastQuote.ask
+                const realPremium = (bid + ask) / 2
+                const strikePrice = bestContract.strike_price
+                const expiry = bestContract.expiration_date
+
+                // Re-calculate daysToExpiry based on actual option expiryDate
+                const optionDaysToExpiry = expiry
+                  ? Math.max(1, Math.floor((new Date(expiry).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+                  : 0 // Use 0 if expiry date is missing or invalid
+
+                const timeToExpiry = optionDaysToExpiry / 365
+
+                let calculatedDelta: number
+                let deltaSource: string
+
+                if (greeks && typeof greeks.delta === "number") {
+                  calculatedDelta = greeks.delta
+                  deltaSource = "polygon"
+                  console.log(
+                    `[v0] ✅ ${stock.ticker} - Strike=$${strikePrice.toFixed(2)}, Premium=$${realPremium.toFixed(2)}, Delta=${calculatedDelta.toFixed(3)} (REAL from Polygon), Bid=$${bid}, Ask=$${ask}`,
                   )
-                  impliedVol = 0.3
+                } else {
+                  // Estimate implied volatility and delta if not provided by Polygon
+                  let impliedVol = estimateImpliedVolatility(
+                    stock.currentPrice,
+                    strikePrice,
+                    timeToExpiry,
+                    realPremium, // Use realPremium here
+                    true, // Assume put option (is_put=true)
+                  )
+
+                  if (isNaN(impliedVol) || impliedVol <= 0) {
+                    console.warn(
+                      `[v0] ${stock.ticker} - Could not estimate Implied Volatility for strike $${strikePrice}. Using a default of 30%.`,
+                    )
+                    impliedVol = 0.3
+                  }
+
+                  calculatedDelta = calculatePutDelta({
+                    stockPrice: stock.currentPrice,
+                    strikePrice: strikePrice,
+                    timeToExpiry: timeToExpiry,
+                    volatility: impliedVol,
+                  })
+
+                  deltaSource = "calculated"
+                  console.log(
+                    `[v0] ✅ ${stock.ticker} - Strike=$${strikePrice.toFixed(2)}, Premium=$${realPremium.toFixed(2)}, Delta=${calculatedDelta.toFixed(3)} (calculated via Black-Scholes), IV=${(impliedVol * 100).toFixed(1)}%, Bid=$${bid}, Ask=$${ask}`,
+                  )
                 }
 
-                calculatedDelta = calculatePutDelta({
-                  stockPrice: stock.currentPrice,
-                  strikePrice: strikePrice,
-                  timeToExpiry: timeToExpiry,
-                  volatility: impliedVol,
-                })
+                // Ensure delta is within a reasonable range for put options (-1 to 0)
+                if (calculatedDelta > 0) calculatedDelta = 0
+                if (calculatedDelta < -1) calculatedDelta = -1
 
-                deltaSource = "calculated"
-                console.log(
-                  `[v0] ✅ ${stock.ticker} - Strike=$${strikePrice.toFixed(2)}, Premium=$${realPremium.toFixed(2)}, Delta=${calculatedDelta.toFixed(3)} (calculated via Black-Scholes), IV=${(impliedVol * 100).toFixed(1)}%, Bid=$${bid}, Ask=$${ask}`,
+                const capitalRequired = strikePrice * 100 // Standard option contract size
+                const premiumCollected = realPremium * 100
+                const yieldPercent = capitalRequired > 0 ? (premiumCollected / capitalRequired) * 100 : 0
+                const annualizedYield = optionDaysToExpiry > 0 ? (yieldPercent / optionDaysToExpiry) * 365 : 0
+
+                const currentOptionData: QualifyingStock = {
+                  ...stock,
+                  premium: realPremium,
+                  yield: yieldPercent,
+                  putStrike: strikePrice,
+                  delta: calculatedDelta,
+                  deltaSource: deltaSource,
+                  expiryDate: expiry,
+                  daysToExpiry: optionDaysToExpiry, // Use calculated days to expiry
+                  annualizedYield: annualizedYield,
+                }
+                optionsWithData.push(currentOptionData)
+
+                // Keep track of the option closest to -0.30 delta
+                if (bestOption === null || Math.abs(currentOptionData.delta + 0.3) < Math.abs(bestOption.delta + 0.3)) {
+                  bestOption = currentOptionData
+                }
+              } else {
+                console.warn(
+                  `[v0] ${stock.ticker} - No valid bid/ask in snapshot for strike $${strikePrice} (bid=${lastQuote?.bid}, ask=${lastQuote?.ask})`,
                 )
               }
-
-              // Ensure delta is within a reasonable range for put options (-1 to 0)
-              if (calculatedDelta > 0) calculatedDelta = 0
-              if (calculatedDelta < -1) calculatedDelta = -1
-
-              const capitalRequired = strikePrice * 100 // Standard option contract size
-              const premiumCollected = realPremium * 100
-              const yieldPercent = capitalRequired > 0 ? (premiumCollected / capitalRequired) * 100 : 0
-              const annualizedYield = optionDaysToExpiry > 0 ? (yieldPercent * 365) / optionDaysToExpiry : 0
-
-              const currentOptionData: QualifyingStock = {
-                ...stock,
-                premium: realPremium,
-                yield: yieldPercent,
-                putStrike: strikePrice,
-                delta: calculatedDelta,
-                deltaSource: deltaSource,
-                expiryDate: expiry,
-                daysToExpiry: optionDaysToExpiry, // Use calculated days to expiry
-                annualizedYield: annualizedYield,
-              }
-              optionsWithData.push(currentOptionData)
-
-              // Keep track of the option closest to -0.30 delta
-              if (bestOption === null || Math.abs(currentOptionData.delta + 0.3) < Math.abs(bestOption.delta + 0.3)) {
-                bestOption = currentOptionData
-              }
-            } else {
-              console.warn(
-                `[v0] ${stock.ticker} - No valid bid/ask in snapshot for strike $${strikePrice} (bid=${lastQuote?.bid}, ask=${lastQuote?.ask})`,
-              )
             }
-          }
 
-          if (optionsWithData.length >= 3 && bestOption) {
-            break // Found at least 3 options and a best option, stop searching strikes for this stock
-          }
-        } // End of loop through targetStrikes
+            if (optionsWithData.length >= 3 && bestOption) {
+              break // Found at least 3 options and a best option, stop searching strikes for this stock
+            }
+          } // End of loop through targetStrikes
 
-        if (bestOption) {
-          enriched.push(bestOption)
-          console.log(
-            `[v0] ${stock.ticker} - Selected best option: Strike=$${bestOption.putStrike.toFixed(2)}, Delta=${bestOption.delta.toFixed(3)}, Yield=${bestOption.yield.toFixed(2)}%, Annual=${bestOption.annualizedYield?.toFixed(1)}%`,
-          )
-        } else if (optionsWithData.length > 0) {
-          // If no single best option, but we found some, just take the first one
-          enriched.push(optionsWithData[0])
-          console.log(`[v0] ${stock.ticker} - No single best option found, adding first valid option.`)
-        } else {
-          // If no options were found or processed successfully
-          console.log(`[v0] ${stock.ticker} - No suitable options found, keeping fundamental data only`)
-          enriched.push({
-            ...stock,
-            expiryDate: "N/A",
-            putStrike: 0,
-            premium: 0,
-            yield: 0,
-            daysToExpiry: 0,
-            annualizedYield: 0,
-            delta: 0,
-            deltaSource: "estimated",
-          })
-        }
+          if (optionsWithData.length > 0) {
+            const bestForExpiry = optionsWithData.reduce((best, current) => {
+              const bestDeltaDiff = Math.abs(best.delta + 0.3)
+              const currentDeltaDiff = Math.abs(current.delta + 0.3)
+              return currentDeltaDiff < bestDeltaDiff ? current : best
+            })
+            enriched.push(bestForExpiry)
+            console.log(
+              `[v0] ✅ ${stock.ticker} - Best option for ${expiryDate}: Strike=$${bestForExpiry.putStrike.toFixed(2)}, Premium=$${bestForExpiry.premium.toFixed(2)}, Delta=${bestForExpiry.delta.toFixed(3)}, Yield=${bestForExpiry.yield.toFixed(2)}%, Annual=${bestForExpiry.annualizedYield.toFixed(1)}%`,
+            )
+          }
+        } // End loop for expiry dates
       } catch (error) {
-        console.error(`[v0] ${stock.ticker} - Error fetching/processing options:`, error)
-        // Fallback: keep original stock data even on error
+        console.error(`[v0] Error enriching ${stock.ticker}:`, error)
+        // Fallback: keep original stock data even on error (though with empty option fields)
         enriched.push({
           ...stock,
           expiryDate: "N/A",
@@ -1295,7 +1297,10 @@ export function WheelScanner() {
       }
     } // End of loop through stocks
 
-    console.log(`[v0] Total options enriched: ${enriched.length}`)
+    console.log(`[v0] ================================================`)
+    console.log(`[v0] Final enriched results: ${enriched.length} stock/expiry combinations`)
+    console.log(`[v0] ================================================`)
+
     return enriched
   }
 
@@ -1350,201 +1355,21 @@ export function WheelScanner() {
         `[v0] Step 3: Fetching real options premium data and filtering by slider criteria for ${fundamentalResults.length} stocks`,
       )
 
-      const stocksWithPremiums: QualifyingStock[] = []
-
-      for (let i = 0; i < fundamentalResults.length; i++) {
-        const stock = fundamentalResults[i]
-        setTechnicalProgress(Math.floor(((i + 1) / fundamentalResults.length) * 100))
-        setTechnicalCurrentTicker(stock.ticker)
-
-        console.log(`[v0] ${stock.ticker} - Fetching real options data...`)
-
-        // Fetch real options data from Polygon
-        try {
-          const nextFriday = await getNextFriday() // Use the updated async function
-          const daysToExpiry = Math.floor((new Date(nextFriday).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-
-          const optionsChainRes = await fetch(
-            `/api/polygon-proxy?endpoint=options-chain&ticker=${stock.ticker}&expiry_date=${nextFriday}&option_type=put`,
-          )
-
-          if (optionsChainRes.ok) {
-            const chainData = await optionsChainRes.json()
-            const contracts = chainData.results || []
-
-            console.log(`[v0] ${stock.ticker} - Found ${contracts.length} put contracts expiring ${nextFriday}`)
-
-            if (contracts.length > 0) {
-              // Target strike: ~3% OTM (approximately 30-delta)
-              const targetStrike = stock.currentPrice * 0.97
-
-              const bestContract = contracts.reduce((best: any, contract: any) => {
-                if (!contract.strike_price) return best
-                if (!best) return contract
-
-                const bestDiff = Math.abs(best.strike_price - targetStrike)
-                const contractDiff = Math.abs(contract.strike_price - targetStrike)
-
-                return contractDiff < bestDiff ? contract : best
-              }, null)
-
-              if (bestContract && bestContract.ticker) {
-                const optionTicker = bestContract.ticker
-                const optionQuoteRes = await fetch(`/api/polygon-proxy?endpoint=options&ticker=${optionTicker}`)
-                await delay(200)
-
-                if (optionQuoteRes.ok) {
-                  const quoteData = await optionQuoteRes.json()
-                  const optionData = quoteData.results?.[0]
-
-                  if (optionData && optionData.last_quote && optionData.greeks) {
-                    const bid = optionData.last_quote.bid || 0
-                    const ask = optionData.last_quote.ask || 0
-                    const realPremium = (bid + ask) / 2
-                    const realStrike = bestContract.strike_price
-                    const realDelta = optionData.greeks.delta
-                    const expiryDate = bestContract.expiration_date
-
-                    const actualDaysToExpiry = Math.max(
-                      1,
-                      Math.floor((new Date(expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
-                    )
-
-                    const capitalRequired = realStrike * 100
-                    const premiumCollected = realPremium * 100
-                    const realYield = capitalRequired > 0 ? (premiumCollected / capitalRequired) * 100 : 0
-                    const annualizedYield = actualDaysToExpiry > 0 ? (realYield * 365) / actualDaysToExpiry : 0
-
-                    console.log(
-                      `[v0] ✅ ${stock.ticker} - REAL DATA: Delta=${realDelta.toFixed(3)}, Premium=$${realPremium.toFixed(2)}, Strike=$${realStrike.toFixed(2)}, Expiry=${expiryDate}, DTE=${actualDaysToExpiry}, Yield=${realYield.toFixed(2)}%, Annual=${annualizedYield.toFixed(1)}%`,
-                    )
-
-                    stock.premium = realPremium
-                    stock.yield = realYield
-                    stock.putStrike = realStrike
-                    stock.delta = realDelta
-                    stock.deltaSource = "polygon" // Polygon data
-                    stock.expiryDate = expiryDate
-                    stock.daysToExpiry = actualDaysToExpiry
-                    stock.annualizedYield = annualizedYield
-                    stock.expectedMove = optionData.implied_volatility
-                      ? stock.currentPrice *
-                        ((optionData.implied_volatility * 100) / 100) *
-                        Math.sqrt(actualDaysToExpiry / 365)
-                      : undefined
-                  }
-                }
-              }
-            }
-          }
-          // </CHANGE>
-        } catch (err) {
-          console.log(`[v0] ${stock.ticker} - Options API error:`, err)
-        }
-
-        await delay(300) // Small delay to avoid rate limits
-
-        let passedAllFilters = true
-
-        // Check RSI
-        if (stock.rsi > maxRSI[0]) {
-          console.log(`[v0]   ❌ ${stock.ticker}: RSI ${stock.rsi.toFixed(1)} > ${maxRSI[0]}`)
-          passedAllFilters = false
-        }
-
-        // BUG FIX: undeclared variable 'ticker' was used here. Changed to 'stock.ticker'
-        if (requireAbove200SMA && (!stock.sma200 || stock.currentPrice < stock.sma200)) {
-          console.log(`[v0]   ❌ ${stock.ticker}: Price below 200-SMA`)
-          passedAllFilters = false
-        }
-
-        if (requireAbove50SMA && (!stock.sma50 || stock.currentPrice < stock.sma50)) {
-          console.log(`[v0]   ❌ ${stock.ticker}: Price below 50-SMA`)
-          passedAllFilters = false
-        }
-
-        if (requireGoldenCross && !stock.uptrend) {
-          console.log(`[v0]   ❌ ${stock.ticker}: No golden cross (50-SMA < 200-SMA)`)
-          passedAllFilters = false
-        }
-
-        if (requireMACDBullish && stock.macdSignal !== "Bullish") {
-          console.log(`[v0]   ❌ ${stock.ticker}: MACD not bullish`)
-          passedAllFilters = false
-        }
-
-        if (stock.stochastic >= maxStochastic[0]) {
-          console.log(
-            `[v0]   ❌ ${stock.ticker}: Stochastic ${stock.stochastic.toFixed(1)} >= ${maxStochastic[0]} (not oversold)`,
-          )
-          passedAllFilters = false
-        }
-
-        if (stock.atrPercent < minATR[0] || stock.atrPercent > maxATR[0]) {
-          console.log(
-            `[v0]   ❌ ${stock.ticker}: ATR ${stock.atrPercent.toFixed(1)}% outside range ${minATR[0]}-${maxATR[0]}%`,
-          )
-          passedAllFilters = false
-        }
-
-        // Check for minimum premium yield
-        if (stock.yield < minYield[0]) {
-          console.log(`[v0]   ❌ ${stock.ticker}: Yield ${stock.yield.toFixed(2)}% < ${minYield[0]}%`)
-          passedAllFilters = false
-        }
-
-        if (requireRedDay && !stock.redDay) {
-          console.log(`[v0]   ❌ ${stock.ticker}: Not a red day`)
-          passedAllFilters = false
-        }
-
-        // Check for minimum volume for technical scan
-        if (stock.avgVolume < minVolumeTechnicals[0]) {
-          console.log(`[v0]   ❌ ${stock.ticker}: Volume ${stock.avgVolume.toFixed(1)}M < ${minVolumeTechnicals[0]}M`)
-          passedAllFilters = false
-        }
-
-        // Note: This requires Bollinger Band data to be fetched. For now, we'll skip if not available
-        if (requireBollingerBands && stock.bollingerPosition === "Upper Half") {
-          console.log(`[v0]   ❌ ${stock.ticker}: Bollinger Bands - Price in upper half`)
-          passedAllFilters = false
-        }
-
-        // Only add stocks that passed ALL filters
-        if (passedAllFilters) {
-          console.log(`[v0]   ✅ ${stock.ticker} PASSED all technical filters`)
-          console.log(
-            `[v0]   Premium: $${stock.premium.toFixed(2)}, Yield: ${stock.yield.toFixed(2)}%, Red Day: ${stock.redDay ? "Yes" : "No"}`,
-          )
-          stocksWithPremiums.push(stock)
-        }
-      }
-
-      // Sort by highest premium
-      stocksWithPremiums.sort((a, b) => b.premium - a.premium)
+      // Get enriched options data
+      const enrichedStocks = await enrichWithOptionsData(fundamentalResults)
+      setTechnicalResults(enrichedStocks) // Update state immediately for rendering
 
       console.log(
-        `[v0] ✅ Step 3 Complete: ${stocksWithPremiums.length} stocks passed all technical filters (out of ${fundamentalResults.length})`,
+        `[v0] ✅ Step 3 Complete: ${enrichedStocks.length} stocks passed technical filters (and enriched with options data)`,
       )
 
-      if (stocksWithPremiums.length > 0) {
-        console.log(
-          `[v0] Top 5 by premium: ${stocksWithPremiums
-            .slice(0, 5)
-            .map((s) => `${s.ticker} ($${s.premium.toFixed(2)})`)
-            .join(", ")}`,
-        )
-      }
-
-      saveToCache(technicalCacheKey, stocksWithPremiums)
+      saveToCache(technicalCacheKey, enrichedStocks)
       setCacheStatus(`Technical analysis completed and cached (valid until tomorrow 9:30 AM ET)`)
 
-      // Set technicalResults state with the filtered results
-      setTechnicalResults(stocksWithPremiums)
       setIsScanningTechnicals(false) // End the scanning process
-      console.log(`[v0] 📊 Step 3 Complete! ${stocksWithPremiums.length} stocks passed technical analysis`)
+      console.log(`[v0] 📊 Step 3 Complete! ${enrichedStocks.length} stocks passed technical analysis`)
 
-      // if (stocksWithPremiums.length === 0) {
+      // if (enrichedStocks.length === 0) {
       //   setError("No stocks passed all technical filters. Try relaxing your filter criteria.")
       // }
     } catch (err) {
@@ -1558,25 +1383,6 @@ export function WheelScanner() {
       setTechnicalCurrentTicker("")
       setCacheStatus(`Technical analysis completed and cached (valid until tomorrow 9:30 AM ET)`)
     }
-  }
-
-  // Tickers should start empty until user clicks Step 1 button
-
-  const getTopRankedLabel = (sliderValue: number): string => {
-    // Convert 0-100 slider to ranking values
-    // 0 = Top 500, 16 = Top 250, 50 = Top 100, 83 = Top 10
-    if (sliderValue <= 16) return "Top 500"
-    if (sliderValue <= 50) return "Top 250"
-    if (sliderValue <= 83) return "Top 100"
-    return "Top 10"
-  }
-
-  const getTopRankedValue = (sliderValue: number): number => {
-    // Convert 0-100 slider to actual numeric values for filtering
-    if (sliderValue <= 16) return 500
-    if (sliderValue <= 50) return 250
-    if (sliderValue <= 83) return 100
-    return 10
   }
 
   const loadPreFilteredTickers = async () => {
@@ -2919,8 +2725,8 @@ export function WheelScanner() {
         </Button>
       )}
 
-      {step >= 3 && !isScanningTechnicals && technicalResults.length > 0 && (
-        <Card className="mt-8 w-full max-w-7xl mx-auto shadow-xl border-2 border-green-500">
+      {step === 3 && technicalResults.length > 0 && (
+        <Card className="bg-white mt-8 w-full max-w-7xl mx-auto shadow-xl border-2 border-green-500">
           <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-200">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -2944,81 +2750,112 @@ export function WheelScanner() {
                   <tr>
                     <th className="text-left p-3 font-semibold text-green-900">Ticker</th>
                     <th className="text-right p-3 font-semibold text-green-900">Price</th>
-                    <th className="text-right p-3 font-semibold text-green-900">Yield %</th>
-                    <th className="text-right p-3 font-semibold text-green-900">Premium</th>
-                    <th className="text-center p-3 font-semibold text-green-900">Strike</th>
-                    <th className="text-center p-3 font-semibold text-green-900">Delta</th>
                     <th className="text-center p-3 font-semibold text-green-900">DTE</th>
                     <th className="text-center p-3 font-semibold text-green-900">Expiry</th>
+                    <th className="text-center p-3 font-semibold text-green-900">Strike</th>
+                    <th className="text-center p-3 font-semibold text-green-900">Delta</th>
+                    <th className="text-right p-3 font-semibold text-green-900">Yield %</th>
                     <th className="text-right p-3 font-semibold text-green-900">Annual Yield %</th>
-                    <th className="text-right p-3 font-semibold text-green-900">RSI (14)</th>
+                    <th className="text-center p-3 font-semibold text-green-900">Red Day</th>
+                    <th className="text-center p-3 font-semibold text-green-900">ATR %</th>
+                    <th className="text-center p-3 font-semibold text-green-900">RSI (14)</th>
                     <th className="text-right p-3 font-semibold text-green-900">50-SMA</th>
                     <th className="text-right p-3 font-semibold text-green-900">100-SMA</th>
                     <th className="text-right p-3 font-semibold text-green-900">200-SMA</th>
                     <th className="text-center p-3 font-semibold text-green-900">MACD</th>
-                    <th className="text-right p-3 font-semibold text-green-900">Stochastic</th>
-                    <th className="text-right p-3 font-semibold text-green-900">ATR %</th>
-                    <th className="text-center p-3 font-semibold text-green-900">Red Day</th>
+                    <th className="text-center p-3 font-semibold text-green-900">Stochastic</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedResults.map((stock, idx) => (
-                    <tr
-                      key={stock.ticker}
-                      className={`border-b hover:bg-green-50 ${idx % 2 === 0 ? "bg-white" : "bg-green-50"}`}
-                    >
-                      <td className="p-3 font-semibold text-green-700">
-                        <a
-                          href={`https://finance.yahoo.com/quote/${stock.ticker}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="hover:underline"
-                        >
-                          {stock.ticker}
-                        </a>
-                      </td>
-                      <td className="text-right p-3">${stock.currentPrice.toFixed(2)}</td>
-                      <td className="text-right p-3">
-                        <span className="font-bold text-green-800">{stock.yield.toFixed(2)}%</span>
-                      </td>
-                      <td className="text-right p-3 text-green-800 font-bold">${stock.premium.toFixed(2)}</td>
-                      <td className="text-center p-3">${stock.putStrike.toFixed(2)}</td>
-                      <td className={`text-center p-3 ${stock.delta < -0.2 ? "text-green-700" : ""}`}>
-                        {stock.delta.toFixed(3)}
-                      </td>
-                      <td className="text-center p-3">{stock.daysToExpiry}</td>
-                      <td className="text-center p-3">{stock.expiryDate}</td>
-                      <td className="text-right p-3">
-                        {stock.annualizedYield !== undefined ? stock.annualizedYield.toFixed(1) + "%" : "-"}
-                      </td>
-                      <td className={`text-right p-3 ${stock.rsi < 40 ? "text-green-700 font-semibold" : ""}`}>
-                        {stock.rsi?.toFixed(1) ?? "-"}
-                      </td>
-                      <td className="text-right p-3 text-xs">${stock.sma50?.toFixed(2) ?? "-"}</td>
-                      <td className="text-right p-3 text-xs">${stock.sma100?.toFixed(2) ?? "-"}</td>
-                      <td className="text-right p-3 text-xs">${stock.sma200?.toFixed(2) ?? "-"}</td>
-                      <td
-                        className={`text-center p-3 ${stock.macdSignal === "Bullish" ? "text-green-700" : "text-red-600"}`}
+                  {technicalResults.map((stock, idx) => {
+                    const criteria = evaluateCriteria(stock)
+                    return (
+                      <tr
+                        key={`${stock.ticker}-${stock.expiryDate}-${idx}`}
+                        className={`border-b hover:bg-green-50 ${idx % 2 === 0 ? "bg-white" : "bg-green-50"}`}
                       >
-                        {stock.macdSignal ?? "-"}
-                      </td>
-                      <td className={`text-right p-3 ${stock.stochastic < 25 ? "text-green-700 font-semibold" : ""}`}>
-                        {stock.stochastic?.toFixed(1) ?? "-"}
-                      </td>
-                      <td
-                        className={`text-right p-3 ${stock.atrPercent >= 2.5 && stock.atrPercent <= 6 ? "text-green-700" : ""}`}
-                      >
-                        {stock.atrPercent?.toFixed(2) ?? "-"}%
-                      </td>
-                      <td className="text-center p-3">
-                        {stock.redDay ? (
-                          <span className="text-red-600 font-bold">✓</span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        <td className="p-3 font-semibold text-green-700">
+                          <a
+                            href={`https://finance.yahoo.com/quote/${stock.ticker}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:underline"
+                          >
+                            {stock.ticker}
+                          </a>
+                        </td>
+                        <td className="text-right p-3">${stock.currentPrice.toFixed(2)}</td>
+                        <td className="text-center p-3">{stock.daysToExpiry || "-"}</td>
+                        <td className="text-center p-3">{stock.expiryDate || "-"}</td>
+                        <td className="text-center p-3">${stock.putStrike.toFixed(2)}</td>
+                        <td className={`text-center p-3 ${stock.delta < -0.2 ? "text-green-700" : ""}`}>
+                          {stock.delta.toFixed(3)}
+                        </td>
+                        <td className="text-right p-3">
+                          <span className="font-bold text-green-800">{stock.yield.toFixed(2)}%</span>
+                        </td>
+                        <td className="text-right p-3">
+                          {stock.annualizedYield !== undefined ? stock.annualizedYield.toFixed(1) + "%" : "-"}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.redDay ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.atrPercent !== undefined && stock.atrPercent >= 2.5 && stock.atrPercent <= 6 ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.rsi !== undefined && stock.rsi < 40 ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.sma50 !== undefined && stock.currentPrice < stock.sma50 ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.sma100 !== undefined && stock.currentPrice < stock.sma100 ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.sma200 !== undefined && stock.currentPrice < stock.sma200 ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.macdSignal === "Bullish" ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.stochastic !== undefined && stock.stochastic < 25 ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -3065,9 +2902,8 @@ export function WheelScanner() {
         </Button>
       )}
 
-      {/* Step 4: Relaxed Results Table */}
       {showRelaxedResults && (
-        <Card className="mt-8 w-full max-w-7xl mx-auto shadow-lg border-2 border-purple-500">
+        <Card className="mt-8 w-full max-w-7xl mx-auto shadow-xl border-2 border-purple-500">
           <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-purple-200">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -3089,7 +2925,7 @@ export function WheelScanner() {
                 <thead className="bg-purple-50 border-b border-purple-200">
                   <tr>
                     <th
-                      className="text-left p-3 font-semibold text-purple-900 cursor-pointer"
+                      className="text-left p-3 font-semibold text-purple-900"
                       onClick={() => handleRelaxedSort("ticker")}
                     >
                       Ticker {relaxedSortColumn === "ticker" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
@@ -3101,17 +2937,12 @@ export function WheelScanner() {
                       Price {relaxedSortColumn === "currentPrice" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
                     </th>
                     <th
-                      className="text-right p-3 font-semibold text-purple-900 cursor-pointer"
-                      onClick={() => handleRelaxedSort("yield")}
+                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer"
+                      onClick={() => handleRelaxedSort("daysToExpiry")}
                     >
-                      Yield % {relaxedSortColumn === "yield" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
+                      DTE {relaxedSortColumn === "daysToExpiry" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
                     </th>
-                    <th
-                      className="text-right p-3 font-semibold text-purple-900 cursor-pointer"
-                      onClick={() => handleRelaxedSort("premium")}
-                    >
-                      Premium {relaxedSortColumn === "premium" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
-                    </th>
+                    <th className="text-center p-3 font-semibold text-purple-900">Expiry</th>
                     <th
                       className="text-center p-3 font-semibold text-purple-900 cursor-pointer"
                       onClick={() => handleRelaxedSort("putStrike")}
@@ -3125,26 +2956,21 @@ export function WheelScanner() {
                       Delta {relaxedSortColumn === "delta" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
                     </th>
                     <th
-                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer"
-                      onClick={() => handleRelaxedSort("daysToExpiry")}
-                    >
-                      DTE {relaxedSortColumn === "daysToExpiry" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
-                    </th>
-                    <th
-                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer"
-                      onClick={() => handleRelaxedSort("expiryDate")}
-                    >
-                      Expiry {relaxedSortColumn === "expiryDate" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
-                    </th>
-                    <th
                       className="text-right p-3 font-semibold text-purple-900 cursor-pointer"
-                      onClick={() => handleRelaxedSort("annualizedYield")}
+                      onClick={() => handleRelaxedSort("yield")}
                     >
-                      Annual Yield %{" "}
-                      {relaxedSortColumn === "annualizedYield" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
+                      Yield % {relaxedSortColumn === "yield" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
                     </th>
+                    <th className="text-right p-3 font-semibold text-purple-900">Annual Yield %</th>
                     <th
-                      className="text-right p-3 font-semibold text-purple-900 cursor-pointer"
+                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer"
+                      onClick={() => handleRelaxedSort("redDay")}
+                    >
+                      Red Day {relaxedSortColumn === "redDay" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th className="text-center p-3 font-semibold text-purple-900">ATR %</th>
+                    <th
+                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer"
                       onClick={() => handleRelaxedSort("rsi")}
                     >
                       RSI (14) {relaxedSortColumn === "rsi" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
@@ -3154,22 +2980,10 @@ export function WheelScanner() {
                     <th className="text-right p-3 font-semibold text-purple-900">200-SMA</th>
                     <th className="text-center p-3 font-semibold text-purple-900">MACD</th>
                     <th
-                      className="text-right p-3 font-semibold text-purple-900 cursor-pointer"
+                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer"
                       onClick={() => handleRelaxedSort("stochastic")}
                     >
                       Stochastic {relaxedSortColumn === "stochastic" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
-                    </th>
-                    <th
-                      className="text-right p-3 font-semibold text-purple-900 cursor-pointer"
-                      onClick={() => handleRelaxedSort("atrPercent")}
-                    >
-                      ATR % {relaxedSortColumn === "atrPercent" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
-                    </th>
-                    <th
-                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer"
-                      onClick={() => handleRelaxedSort("redDay")}
-                    >
-                      Red Day {relaxedSortColumn === "redDay" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
                     </th>
                   </tr>
                 </thead>
@@ -3182,7 +2996,7 @@ export function WheelScanner() {
 
                     return (
                       <tr
-                        key={stock.ticker}
+                        key={`${stock.ticker}-${stock.expiryDate}-${idx}`}
                         className={`border-b hover:bg-purple-50 ${idx % 2 === 0 ? "bg-white" : "bg-purple-50"}`}
                       >
                         <td className="p-3 font-semibold text-purple-700">
@@ -3196,45 +3010,72 @@ export function WheelScanner() {
                           </a>
                         </td>
                         <td className="text-right p-3">${stock.currentPrice.toFixed(2)}</td>
-                        <td className="text-right p-3">
-                          <span className="font-bold text-purple-800">{stock.yield.toFixed(2)}%</span>
-                        </td>
-                        <td className="text-right p-3 text-purple-800 font-bold">${stock.premium.toFixed(2)}</td>
+                        <td className="text-center p-3">{stock.daysToExpiry || "-"}</td>
+                        <td className="text-center p-3">{stock.expiryDate || "-"}</td>
                         <td className="text-center p-3">${stock.putStrike.toFixed(2)}</td>
                         <td className={`text-center p-3 ${stock.delta < -0.2 ? "text-purple-700" : ""}`}>
                           {stock.delta.toFixed(3)}
                         </td>
-                        <td className="text-center p-3">{stock.daysToExpiry}</td>
-                        <td className="text-center p-3">{stock.expiryDate}</td>
+                        <td className="text-right p-3">
+                          <span className="font-bold text-purple-800">{stock.yield.toFixed(2)}%</span>
+                        </td>
                         <td className="text-right p-3">
                           {stock.annualizedYield !== undefined ? stock.annualizedYield.toFixed(1) + "%" : "-"}
                         </td>
-                        <td className={`text-right p-3 ${stock.rsi < 40 ? "text-purple-700 font-semibold" : ""}`}>
-                          {stock.rsi?.toFixed(1) ?? "-"}
-                        </td>
-                        <td className="text-right p-3 text-xs">${stock.sma50?.toFixed(2) ?? "-"}</td>
-                        <td className="text-right p-3 text-xs">${stock.sma100?.toFixed(2) ?? "-"}</td>
-                        <td className="text-right p-3 text-xs">${stock.sma200?.toFixed(2) ?? "-"}</td>
-                        <td
-                          className={`text-center p-3 ${stock.macdSignal === "Bullish" ? "text-green-700" : "text-red-600"}`}
-                        >
-                          {stock.macdSignal ?? "-"}
-                        </td>
-                        <td
-                          className={`text-right p-3 ${stock.stochastic < 25 ? "text-purple-700 font-semibold" : ""}`}
-                        >
-                          {stock.stochastic?.toFixed(1) ?? "-"}
-                        </td>
-                        <td
-                          className={`text-right p-3 ${stock.atrPercent >= 2.5 && stock.atrPercent <= 6 ? "text-purple-700" : ""}`}
-                        >
-                          {stock.atrPercent?.toFixed(2) ?? "-"}%
-                        </td>
                         <td className="text-center p-3">
                           {stock.redDay ? (
-                            <span className="text-red-600 font-bold">✓</span>
+                            <span className="text-green-600 font-bold text-lg">✓</span>
                           ) : (
-                            <span className="text-gray-400">-</span>
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.atrPercent !== undefined && stock.atrPercent >= 2.5 && stock.atrPercent <= 6 ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.rsi !== undefined && stock.rsi < 40 ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.sma50 !== undefined && stock.currentPrice < stock.sma50 ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.sma100 !== undefined && stock.currentPrice < stock.sma100 ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.sma200 !== undefined && stock.currentPrice < stock.sma200 ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.macdSignal === "Bullish" ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.stochastic !== undefined && stock.stochastic < 25 ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
                           )}
                         </td>
                       </tr>
@@ -3243,12 +3084,7 @@ export function WheelScanner() {
                 </tbody>
               </table>
             </div>
-
-            <div className="p-4 bg-purple-50 border-t border-purple-200">
-              <p className="text-sm text-purple-700 font-medium">
-                Review these opportunities and adjust filters as needed.
-              </p>
-            </div>
+            <p className="mt-4 text-sm text-purple-600">Review these opportunities and adjust filters as needed.</p>
           </CardContent>
         </Card>
       )}
