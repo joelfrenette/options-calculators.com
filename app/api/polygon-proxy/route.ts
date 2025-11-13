@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     return Response.json({ error: "Missing endpoint" }, { status: 400 })
   }
 
-  if (endpoint !== "options-chain" && !ticker) {
+  if (endpoint !== "options-chain" && endpoint !== "options-chain-snapshot" && !ticker) {
     return Response.json({ error: "Missing ticker" }, { status: 400 })
   }
 
@@ -52,10 +52,26 @@ export async function GET(request: Request) {
     } else if (endpoint === "options") {
       url = `https://api.polygon.io/v3/snapshot/options/${ticker}?apiKey=${apiKey}`
     } else if (endpoint === "options-snapshot") {
-      // Get snapshot data for a specific options contract ticker
-      url = `https://api.polygon.io/v3/snapshot/options/${ticker}?apiKey=${apiKey}`
+      // Get the underlying ticker from query params (e.g., TSLA, AAPL, etc.)
+      const underlying = searchParams.get("underlying")
+
+      if (!underlying) {
+        return Response.json({ error: "Missing underlying ticker for options-snapshot" }, { status: 400 })
+      }
+
+      // Correct format: /v3/snapshot/options/{underlyingAsset}/{optionContract}
+      url = `https://api.polygon.io/v3/snapshot/options/${underlying}/${ticker}?apiKey=${apiKey}`
+    } else if (endpoint === "options-chain-snapshot") {
+      const expiryDate = searchParams.get("expiry_date")
+      const optionType = searchParams.get("option_type") || "put"
+
+      if (!ticker || !expiryDate) {
+        return Response.json({ error: "Missing ticker or expiry_date for options-chain-snapshot" }, { status: 400 })
+      }
+
+      // Use the snapshot endpoint that returns all options with greeks and quotes
+      url = `https://api.polygon.io/v3/snapshot/options/${ticker}?expiration_date=${expiryDate}&contract_type=${optionType}&limit=250&apiKey=${apiKey}`
     } else if (endpoint === "options-chain") {
-      // Get expiration date from query params (format: YYYY-MM-DD)
       const expiryDate = searchParams.get("expiry_date")
       const optionType = searchParams.get("option_type") || "put"
 
@@ -63,7 +79,6 @@ export async function GET(request: Request) {
         return Response.json({ error: "Missing ticker or expiry_date for options-chain" }, { status: 400 })
       }
 
-      // Use the reference options contracts endpoint to get all options for a specific expiry
       url = `https://api.polygon.io/v3/reference/options/contracts?underlying_ticker=${ticker}&contract_type=${optionType}&expiration_date=${expiryDate}&limit=250&apiKey=${apiKey}`
     } else if (endpoint === "aggregates") {
       const toDate = new Date().toISOString().split("T")[0]
@@ -78,10 +93,8 @@ export async function GET(request: Request) {
     if (!response.ok) {
       const contentType = response.headers.get("content-type") || ""
 
-      // Try to get error message as text first (safer than assuming JSON)
       const errorText = await response.text()
 
-      // Handle rate limit errors (429)
       if (response.status === 429) {
         console.error("[v0] Polygon API rate limit hit for", ticker, "-", errorText.substring(0, 100))
         return Response.json({ error: "Rate limit exceeded", ticker, status: 429 }, { status: 429 })
@@ -89,7 +102,6 @@ export async function GET(request: Request) {
 
       console.error("[v0] Polygon API error:", response.status, errorText.substring(0, 200))
 
-      // Return structured error response
       return Response.json(
         {
           error: `Polygon API error: ${response.status}`,
@@ -101,7 +113,6 @@ export async function GET(request: Request) {
       )
     }
 
-    // Only parse JSON if response was OK
     const data = await response.json()
     return Response.json(data)
   } catch (error) {

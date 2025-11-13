@@ -9,7 +9,6 @@ import { Slider } from "@/components/ui/slider"
 import { TrendingUp, Info, Loader2, BarChart3, Filter, AlertCircle, CheckCircle2 } from "lucide-react" // Added CircleDollarSign, AlertCircle, CheckCircle2, CheckCircle
 import React from "react" // Ensure React is imported
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { calculatePutDelta, estimateImpliedVolatility } from "@/lib/black-scholes"
 
 const CACHE_VERSION = "v1"
 
@@ -150,6 +149,18 @@ interface QualifyingStock {
   expiryDate?: string // Options expiration date
   daysToExpiry?: number // Days until option expiration
   annualizedYield?: number // Annualized yield percentage
+
+  // Added fields for enriched option data
+  optionStrike?: number
+  optionPremium?: number
+  optionYield?: number
+  optionAnnualizedYield?: number
+  optionDelta?: number
+  optionDaysToExpiry?: number
+  optionBid?: number
+  optionAsk?: number
+  bidPrice?: number // Added to match enrichWithOptionsData update
+  askPrice?: number // Added to match enrichWithOptionsData update
 }
 
 const MEGA_CAP_STOCKS = [
@@ -1126,217 +1137,140 @@ export function WheelScanner() {
 
       try {
         for (const expiryDate of [nextFriday, followingFriday]) {
+          if (!expiryDate) continue // Skip if expiryDate is null or undefined
+
           const daysToExpiry = Math.max(
             0,
-            Math.floor((new Date(expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
+            Math.floor((new Date(expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) + 1,
           )
 
-          console.log(`[v0] ${stock.ticker} - Fetching options for expiry: ${expiryDate} (${daysToExpiry} days away)`)
-
-          let bestOption: QualifyingStock | null = null
-
-          const optionsChainRes = await fetch(
-            `/api/polygon-proxy?endpoint=options-chain&ticker=${stock.ticker}&expiry_date=${expiryDate}&option_type=put`,
+          console.log(
+            `[v0] ${stock.ticker} - Fetching options chain snapshot for expiry: ${expiryDate} (${daysToExpiry} days away)`,
           )
-          await delay(200) // Small delay between API calls
 
-          if (!optionsChainRes.ok) {
-            console.error(`[v0] ${stock.ticker} - Failed to fetch options chain for ${expiryDate}`)
+          const chainSnapshotRes = await fetch(
+            `/api/polygon-proxy?endpoint=options-chain-snapshot&ticker=${stock.ticker}&expiry_date=${expiryDate}&option_type=put`,
+          )
+          await delay(300) // Slightly longer delay between chain snapshot calls
+
+          if (!chainSnapshotRes.ok) {
+            console.error(`[v0] ${stock.ticker} - Failed to fetch options chain snapshot for ${expiryDate}`)
             continue
           }
 
-          const chainData = await optionsChainRes.json()
-          const contracts = chainData.results || []
+          const chainSnapshotData = await chainSnapshotRes.json()
+          const contracts = chainSnapshotData.results || []
 
-          console.log(`[v0] ${stock.ticker} - Found ${contracts.length} put contracts for ${expiryDate}`)
+          console.log(`[v0] ${stock.ticker} - Found ${contracts.length} put contracts with data for ${expiryDate}`)
 
           if (contracts.length === 0) {
             console.log(`[v0] ${stock.ticker} - No options found for ${expiryDate}`)
-            // Fallback: keep original stock data
             continue
           }
 
-          const targetStrikes = [
-            stock.currentPrice * 0.98, // ~2% OTM
-            stock.currentPrice * 0.97, // ~3% OTM (target for ~0.30 Delta)
-            stock.currentPrice * 0.96, // ~4% OTM
-            stock.currentPrice * 0.95, // ~5% OTM
-            stock.currentPrice * 0.94, // ~6% OTM
-          ]
+          const relevantContracts = contracts.filter((contract: any) => {
+            const strikePrice = contract.details?.strike_price
+            if (!strikePrice) return false
+
+            const percentOfPrice = strikePrice / stock.currentPrice
+            return percentOfPrice >= 0.85 && percentOfPrice <= 1.0
+          })
+
+          console.log(
+            `[v0] ${stock.ticker} - Filtered to ${relevantContracts.length} contracts in strike range (85-100% of price)`,
+          )
 
           const optionsWithData: QualifyingStock[] = []
 
-          for (const targetStrike of targetStrikes) {
-            const bestContract = contracts.reduce((best: any, contract: any) => {
-              if (!contract.strike_price) return best
-              if (!best) return contract
+          for (const snapshot of relevantContracts) {
+            const strikePrice = snapshot.details?.strike_price
+            const optionTicker = snapshot.details?.ticker
+            const delta = snapshot.greeks?.delta || null
 
-              const bestDiff = Math.abs(best.strike_price - targetStrike)
-              const contractDiff = Math.abs(contract.strike_price - targetStrike)
-
-              return contractDiff < bestDiff ? contract : best
-            }, null)
-
-            if (bestContract && bestContract.ticker) {
-              const optionTicker = bestContract.ticker
-              const strikePrice = bestContract.strike_price
-              const expiry = bestContract.expiration_date
-
-              console.log(`[v0] ${stock.ticker} - Fetching snapshot for ${optionTicker} (strike=$${strikePrice})`)
-
-              const snapshotRes = await fetch(`/api/polygon-proxy?endpoint=options-snapshot&ticker=${optionTicker}`)
-              await delay(300) // Increased delay for rate limit protection
-
-              if (!snapshotRes.ok) {
-                console.warn(
-                  `[v0] ${stock.ticker} - Failed to get snapshot for strike $${strikePrice} (status: ${snapshotRes.status})`,
-                )
-                continue
-              }
-
-              const snapshotData = await snapshotRes.json()
-
-              console.log(`[v0] ${stock.ticker} - Full snapshot response:`, JSON.stringify(snapshotData, null, 2))
-
-              const lastQuote = snapshotData.results?.last_quote
-              const lastTrade = snapshotData.results?.last_trade
-              const dayData = snapshotData.results?.day
-              const greeks = snapshotData.results?.greeks
-
-              let bid: number | undefined
-              let ask: number | undefined
-              let pricingSource = "none"
-
-              // First try: last_quote (requires paid plan with quotes)
-              if (lastQuote && lastQuote.bid_price > 0 && lastQuote.ask_price > 0) {
-                bid = lastQuote.bid_price
-                ask = lastQuote.ask_price
-                pricingSource = "last_quote"
-              }
-              // Second try: last_trade (more commonly available)
-              else if (lastTrade && lastTrade.price > 0) {
-                // Use last trade price as both bid and ask (midpoint approximation)
-                const tradePrice = lastTrade.price
-                // Estimate a reasonable spread (~2% for options)
-                const spreadEstimate = tradePrice * 0.02
-                bid = tradePrice - spreadEstimate / 2
-                ask = tradePrice + spreadEstimate / 2
-                pricingSource = "last_trade"
-                console.log(`[v0] ${stock.ticker} - Using last_trade price: $${tradePrice.toFixed(2)}`)
-              }
-              // Third try: day close or vwap
-              else if (dayData && (dayData.close > 0 || dayData.vwap > 0)) {
-                const dayPrice = dayData.close || dayData.vwap
-                // Use closing price with estimated spread
-                const spreadEstimate = dayPrice * 0.02
-                bid = dayPrice - spreadEstimate / 2
-                ask = dayPrice + spreadEstimate / 2
-                pricingSource = "day_data"
-                console.log(
-                  `[v0] ${stock.ticker} - Using day ${dayData.close ? "close" : "vwap"} price: $${dayPrice.toFixed(2)}`,
-                )
-              }
-
-              if (bid && ask && bid > 0 && ask > 0) {
-                const realPremium = (bid + ask) / 2
-
-                const strikePrice = bestContract.strike_price
-                const expiry = bestContract.expiration_date
-
-                const optionDaysToExpiry = expiry
-                  ? Math.max(0, Math.floor((new Date(expiry).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-                  : daysToExpiry // Fallback to the original calculation if expiry is missing
-
-                const timeToExpiry = optionDaysToExpiry / 365
-
-                let calculatedDelta: number
-                let deltaSource: string
-
-                if (greeks && typeof greeks.delta === "number") {
-                  calculatedDelta = greeks.delta
-                  deltaSource = "polygon"
-                  console.log(
-                    `[v0] ✅ ${stock.ticker} - Strike=$${strikePrice.toFixed(2)}, Premium=$${realPremium.toFixed(2)}, Delta=${calculatedDelta.toFixed(3)} (REAL from Polygon), Bid=$${bid.toFixed(2)}, Ask=$${ask.toFixed(2)} [${pricingSource}]`,
-                  )
-                } else {
-                  // Estimate implied volatility and delta if not provided by Polygon
-                  let impliedVol = estimateImpliedVolatility(
-                    stock.currentPrice,
-                    strikePrice,
-                    timeToExpiry,
-                    realPremium, // Use realPremium here
-                    true, // Assume put option (is_put=true)
-                  )
-
-                  if (isNaN(impliedVol) || impliedVol <= 0) {
-                    console.warn(
-                      `[v0] ${stock.ticker} - Could not estimate Implied Volatility for strike $${strikePrice}. Using a default of 30%.`,
-                    )
-                    impliedVol = 0.3
-                  }
-
-                  calculatedDelta = calculatePutDelta({
-                    stockPrice: stock.currentPrice,
-                    strikePrice: strikePrice,
-                    timeToExpiry: timeToExpiry,
-                    volatility: impliedVol,
-                  })
-
-                  deltaSource = "calculated"
-                  console.log(
-                    `[v0] ✅ ${stock.ticker} - Strike=$${strikePrice.toFixed(2)}, Premium=$${realPremium.toFixed(2)}, Delta=${calculatedDelta.toFixed(3)} (calculated via Black-Scholes), IV=${(impliedVol * 100).toFixed(1)}%, Bid=$${bid.toFixed(2)}, Ask=$${ask.toFixed(2)} [${pricingSource}]`,
-                  )
-                }
-
-                // Ensure delta is within a reasonable range for put options (-1 to 0)
-                if (calculatedDelta > 0) calculatedDelta = 0
-                if (calculatedDelta < -1) calculatedDelta = -1
-
-                const capitalRequired = strikePrice * 100 // Standard option contract size
-                const premiumCollected = realPremium * 100
-                const yieldPercent = capitalRequired > 0 ? (premiumCollected / capitalRequired) * 100 : 0
-                const annualizedYield = optionDaysToExpiry > 0 ? (yieldPercent / optionDaysToExpiry) * 365 : 0
-
-                const currentOptionData: QualifyingStock = {
-                  ...stock,
-                  premium: realPremium,
-                  yield: yieldPercent,
-                  putStrike: strikePrice,
-                  delta: calculatedDelta,
-                  deltaSource: deltaSource,
-                  expiryDate: expiry,
-                  daysToExpiry: optionDaysToExpiry, // Use calculated days to expiry
-                  annualizedYield: annualizedYield,
-                }
-                optionsWithData.push(currentOptionData)
-
-                // Keep track of the option closest to -0.30 delta
-                if (bestOption === null || Math.abs(currentOptionData.delta + 0.3) < Math.abs(bestOption.delta + 0.3)) {
-                  bestOption = currentOptionData
-                }
-              } else {
-                console.warn(
-                  `[v0] ${stock.ticker} - No pricing data available for strike $${strikePrice}. API may require paid plan for real-time quotes.`,
-                )
-              }
+            if (!strikePrice || !optionTicker) {
+              continue
             }
 
-            if (optionsWithData.length >= 3 && bestOption) {
-              break // Found at least 3 options and a best option, stop searching strikes for this stock
+            if (!delta || delta > -0.25 || delta < -0.35) {
+              console.log(
+                `[v0] ${stock.ticker} - Skipping strike $${strikePrice}, delta ${delta?.toFixed(3)} outside range [-0.35, -0.25]`,
+              )
+              continue
             }
-          } // End of loop through targetStrikes
 
-          if (optionsWithData.length > 0) {
-            const bestForExpiry = optionsWithData.reduce((best, current) => {
-              const bestDeltaDiff = Math.abs(best.delta + 0.3)
-              const currentDeltaDiff = Math.abs(current.delta + 0.3)
-              return currentDeltaDiff < bestDeltaDiff ? current : best
-            })
-            enriched.push(bestForExpiry)
-            console.log(
-              `[v0] ✅ ${stock.ticker} - Best option for ${expiryDate}: Strike=$${bestForExpiry.putStrike.toFixed(2)}, Premium=$${bestForExpiry.premium.toFixed(2)}, Delta=${bestForExpiry.delta.toFixed(3)}, Yield=${bestForExpiry.yield.toFixed(2)}%, Annual=${bestForExpiry.annualizedYield.toFixed(1)}%`,
+            let bid: number | undefined
+            let ask: number | undefined
+            let premium: number | undefined
+            let priceSource = ""
+
+            if (snapshot.last_quote?.bid_price && snapshot.last_quote?.ask_price) {
+              bid = snapshot.last_quote.bid_price
+              ask = snapshot.last_quote.ask_price
+              premium = (bid + ask) / 2
+              priceSource = "last_quote"
+            } else if (snapshot.last_trade?.price) {
+              premium = snapshot.last_trade.price
+              bid = premium * 0.995
+              ask = premium * 1.005
+              priceSource = "last_trade"
+            } else if (snapshot.day?.close) {
+              premium = snapshot.day.close
+              bid = premium
+              ask = premium
+              priceSource = "day_data"
+            }
+
+            if (!premium || !bid || !ask) {
+              console.log(`[v0] ${stock.ticker} - No valid pricing for strike $${strikePrice} (bid=${bid}, ask=${ask})`)
+              continue
+            }
+
+            const yieldPercent = (premium * 100) / strikePrice
+            const optionDaysToExpiry = Math.max(
+              0,
+              Math.floor((new Date(expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) + 1,
             )
+            const annualizedYield = optionDaysToExpiry > 0 ? (yieldPercent * 365) / optionDaysToExpiry : 0
+
+            console.log(
+              `[v0] ✅ ${stock.ticker} - Strike=$${strikePrice.toFixed(2)}, Premium=$${premium.toFixed(2)}, Delta=${delta.toFixed(3)}, Bid=$${bid.toFixed(2)}, Ask=$${ask.toFixed(2)} [${priceSource}]`,
+            )
+
+            optionsWithData.push({
+              ...stock,
+              putStrike: strikePrice,
+              premium: premium,
+              yield: yieldPercent,
+              annualizedYield: annualizedYield,
+              delta: delta,
+              daysToExpiry: optionDaysToExpiry,
+              expiryDate,
+              bidPrice: bid,
+              askPrice: ask,
+            })
           }
+
+          if (optionsWithData.length === 0) {
+            console.log(`[v0] ${stock.ticker} - No options with valid data for ${expiryDate}`)
+            continue
+          }
+
+          optionsWithData.sort((a, b) => {
+            const aDist = Math.abs((a.delta || 0) - -0.3)
+            const bDist = Math.abs((b.delta || 0) - -0.3)
+            return aDist - bDist
+          })
+
+          const top3Options = optionsWithData.slice(0, 3)
+
+          console.log(`[v0] ✅ ${stock.ticker} - Adding ${top3Options.length} options for ${expiryDate}:`)
+          top3Options.forEach((opt) => {
+            console.log(
+              `[v0]    - Strike=$${opt.putStrike?.toFixed(2)}, Premium=$${opt.premium?.toFixed(2)}, Delta=${opt.delta?.toFixed(3)}, Yield=${opt.yield?.toFixed(2)}%, Annual=${opt.annualizedYield?.toFixed(1)}%`,
+            )
+          })
+
+          enriched.push(...top3Options)
         } // End loop for expiry dates
       } catch (error) {
         console.error(`[v0] Error enriching ${stock.ticker}:`, error)
@@ -1351,13 +1285,15 @@ export function WheelScanner() {
           annualizedYield: 0,
           delta: 0,
           deltaSource: "estimated",
+          bidPrice: 0, // Add default values
+          askPrice: 0, // Add default values
         })
       }
     } // End of loop through stocks
 
-    console.log(`[v0] ================================================`)
+    console.log("[v0] ================================================")
     console.log(`[v0] Final enriched results: ${enriched.length} stock/expiry combinations`)
-    console.log(`[v0] ================================================`)
+    console.log("[v0] ================================================")
 
     return enriched
   }
@@ -2981,7 +2917,7 @@ export function WheelScanner() {
         </Card>
       )}
 
-      {step >= 3 && !isScanningTechnicals && technicalResults.length === 0 && fundamentalResults.length > 0 && (
+      {step >= 2 && !isScanningTechnicals && technicalResults.length === 0 && fundamentalResults.length > 0 && (
         <Card className="mt-8 w-full max-w-7xl mx-auto border-2 border-yellow-500 bg-white">
           <CardHeader className="bg-gradient-to-r from-yellow-50 to-amber-50">
             <div className="flex items-center gap-2">
