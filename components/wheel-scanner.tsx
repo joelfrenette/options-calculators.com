@@ -10,7 +10,6 @@ import { TrendingUp, Info, Loader2, BarChart3, Filter, AlertCircle, CheckCircle2
 import React from "react" // Ensure React is imported
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { calculatePutDelta, estimateImpliedVolatility } from "@/lib/black-scholes"
-import { Progress } from "@/components/ui/progress" // Added Progress component
 
 const CACHE_VERSION = "v1"
 
@@ -126,6 +125,7 @@ interface QualifyingStock {
   avgVolume: number
   last4EPS: number[]
   sma50: number
+  sma100: number
   sma200: number
   uptrend: boolean
   rsi: number
@@ -149,7 +149,7 @@ interface QualifyingStock {
   debtToEquity: number // Debt-to-Equity ratio
   expiryDate?: string // Options expiration date
   daysToExpiry?: number // Days until option expiration
-  annualizedYield?: number // Annualized return percentage
+  annualizedYield?: number // Annualized yield percentage
 }
 
 const MEGA_CAP_STOCKS = [
@@ -503,6 +503,8 @@ export function WheelScanner() {
   // FIX: Added isRelaxedMode state variable
   const [isRelaxedMode, setIsRelaxedMode] = useState(false)
 
+  const [step, setStep] = useState(1) // 1=Initial, 2=After fundamental scan, 3=After technical scan, 4=Relaxed results
+
   const isScanning = loading // `loading` is for Step 2 (Fundamental Scan)
   // const isScanningTechnicals = technicalLoading // This is the correct state for technical scanning
 
@@ -750,6 +752,7 @@ export function WheelScanner() {
       setFundamentalResults(cached)
       setCacheStatus("✅ Using cached fundamental scan (saved today)")
       setLoading(false)
+      setStep(2)
       return
     }
 
@@ -940,6 +943,7 @@ export function WheelScanner() {
             const lows = historicalData.map((bar: any) => bar.l).filter((l: number) => l != null)
 
             const sma50 = calculateSMA(closes, 50)
+            const sma100 = calculateSMA(closes, 100)
             const sma200 = calculateSMA(closes, 200)
             const rsi = calculateRSI(closes, 14)
             const bb = calculateBollingerBands(closes, 20)
@@ -984,6 +988,7 @@ export function WheelScanner() {
               avgVolume: Number(volumeInMillions.toFixed(2)),
               last4EPS: eps > 0 ? [eps, eps, eps, eps] : [0, 0, 0, 0], // Use real EPS instead of placeholder
               sma50,
+              sma100,
               sma200,
               uptrend: sma50 > sma200,
               rsi: Number(rsi.toFixed(1)),
@@ -1033,13 +1038,15 @@ export function WheelScanner() {
         console.log(`[v0] Skipped tickers: ${skippedTickers.join(", ")}`)
       }
 
-      console.log("[v0] 💾 Saving results to cache with key:", cacheKey)
-      saveToCache(cacheKey, qualifyingStocks)
-      console.log("[v0] 💾 Cache saved successfully")
+      const qualified = qualifyingStocks // Alias for clarity
+      setFundamentalResults(qualified)
+      setLoading(false)
+      setScanProgress(0)
+      setCurrentTicker("")
+      setStep(2)
+      setCacheStatus("Fundamental scan completed and cached (valid until tomorrow 9:30 AM ET)")
 
-      setFundamentalResults(qualifyingStocks)
-
-      // this prevents premature error display before Step 3 scanning
+      saveToCache(cacheKey, qualified)
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred while scanning")
       console.error("[v0] Scan error:", err)
@@ -1293,6 +1300,7 @@ export function WheelScanner() {
   }
 
   const scanTechnicals = async () => {
+    setStep(3)
     setHasAttemptedTechnicalScan(true)
 
     console.log("[v0] 🟢 Run Technical Analysis (Step 3) button clicked")
@@ -1302,6 +1310,7 @@ export function WheelScanner() {
     if (fundamentalResults.length === 0) {
       // alert("Please complete Step 2 first (Scan Fundamentals)") // Use setError for consistency
       setError("Please complete Step 2 first (Scan Fundamentals)")
+      setStep(2)
       return
     }
 
@@ -1528,7 +1537,7 @@ export function WheelScanner() {
       }
 
       saveToCache(technicalCacheKey, stocksWithPremiums)
-      setCacheStatus("Technical analysis completed and cached (valid until tomorrow 9:30 AM ET)")
+      setCacheStatus(`Technical analysis completed and cached (valid until tomorrow 9:30 AM ET)`)
 
       // Set technicalResults state with the filtered results
       setTechnicalResults(stocksWithPremiums)
@@ -1547,6 +1556,7 @@ export function WheelScanner() {
       setTechnicalLoading(false) // Redundant but kept for clarity
       setTechnicalProgress(0)
       setTechnicalCurrentTicker("")
+      setCacheStatus(`Technical analysis completed and cached (valid until tomorrow 9:30 AM ET)`)
     }
   }
 
@@ -1617,6 +1627,8 @@ export function WheelScanner() {
         setPreFilterCurrentTicker("")
         console.log(`[v0] ✅ Step 1 Complete: Loaded ${tickers.length} tickers`)
         console.log(`[v0] Tickers: ${tickers.slice(0, 10).join(", ")}${tickers.length > 10 ? "..." : ""}`)
+        // Set step to 2 after step 1 completes
+        setStep(2)
       } else {
         throw new Error("No tickers returned from API")
       }
@@ -1806,9 +1818,24 @@ export function WheelScanner() {
       console.log("[v0] 📊 Showing Step 4 results...")
       // Reset enrichment flag to allow re-enrichment
       setRelaxedResultsEnriched(false)
+      setStep(4)
+    } else {
+      setStep(3)
     }
     setShowRelaxedResults(!showRelaxedResults)
   }
+
+  // Determine the current step based on state
+  const currentStep =
+    tickersToScan.trim().length === 0
+      ? 1
+      : fundamentalResults.length === 0 && !loading
+        ? 2
+        : !technicalScanAttempted || isScanningTechnicals
+          ? 3
+          : technicalResults.length > 0 || hasAttemptedTechnicalScan
+            ? 4 // This means step 3 finished and produced results (or was attempted and not yet shown)
+            : 3 // Default to step 3 if no results yet but attempted scan
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -1854,179 +1881,182 @@ export function WheelScanner() {
           </div>
         </CardHeader>
         <CardContent className="pt-4 space-y-6">
-          <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
-            <div className="flex items-start gap-2 mb-3">
-              <Info className="h-5 w-5 text-blue-700 flex-shrink-0 mt-0.5" />
-              <div>
-                <h3 className="font-bold text-gray-900 text-base">Smart Pre-Filtering (Step 1)</h3>
-                <p className="text-xs text-gray-600 mt-1">
-                  Customize your starting universe with advanced filters. All stocks are pre-qualified for active
-                  options markets.
-                </p>
+          {/* STEP 1: PRE-FILTERING */}
+          {step === 1 && (
+            <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
+              <div className="flex items-start gap-2 mb-3">
+                <Info className="h-5 w-5 text-blue-700 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-bold text-gray-900 text-base">Smart Pre-Filtering (Step 1)</h3>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Customize your starting universe with advanced filters. All stocks are pre-qualified for active
+                    options markets.
+                  </p>
+                </div>
+              </div>
+
+              <ul className="list-disc list-inside space-y-1 ml-7 text-sm text-gray-700 mb-4">
+                <li>
+                  <strong>Market Cap:</strong> Filter by company size (adjustable below)
+                </li>
+                <li>
+                  <strong>Liquidity:</strong> Minimum recent daily trading volume - uses most recent trading day data,
+                  not 30-day average (adjustable below)
+                </li>
+                <li>
+                  <strong>Top By Market Cap:</strong> Largest companies by market capitalization from S&P 500,
+                  Nasdaq-100, Dow indices (adjustable below)
+                </li>
+              </ul>
+
+              {/* Step 1 Sliders */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    Min Market Cap
+                    {tooltipsEnabled ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs bg-green-50 border-green-200 text-gray-900">
+                          <p className="font-semibold mb-1">Market Capitalization Filter</p>
+                          <p className="text-sm">
+                            Filters stocks by total company value (shares × price). For put selling:
+                          </p>
+                          <ul className="text-sm mt-1 space-y-1">
+                            <li>
+                              <strong>Higher ($10B+):</strong> More stable, liquid options, lower assignment risk
+                            </li>
+                            <li>
+                              <strong>Lower ($1B-$10B):</strong> Higher premiums but more volatility risk
+                            </li>
+                          </ul>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : null}
+                  </Label>
+                  <div className="space-y-2 p-3 rounded-lg border border-gray-200 bg-white hover:border-primary/30 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xl font-black text-gray-900 bg-blue-100 px-3 py-1 rounded border border-blue-300">
+                        {["Any", "$300M+", "$2B+", "$10B+", "$50B+"][preFilterMarketCap[0]]}
+                      </span>
+                    </div>
+                    <Slider
+                      id="preFilterMarketCap"
+                      value={preFilterMarketCap}
+                      onValueChange={setPreFilterMarketCap}
+                      min={0}
+                      max={4}
+                      step={1}
+                      className="cursor-pointer"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>Any</span>
+                      <span className="text-xs font-semibold">Company size filter</span>
+                      <span>$50B+</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    Min Recent Day Volume
+                    {tooltipsEnabled ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs bg-green-50 border-green-200 text-gray-900">
+                          <p className="font-semibold mb-1">Trading Volume Filter</p>
+                          <p className="text-sm">Daily shares traded. Critical for put sellers:</p>
+                          <ul className="text-sm mt-1 space-y-1">
+                            <li>
+                              <strong>Higher (5M+):</strong> Tighter bid-ask spreads, easier exit
+                            </li>
+                            <li>
+                              <strong>Lower (&lt;2M):</strong> Wider spreads = worse fills, harder to close
+                            </li>
+                          </ul>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : null}
+                  </Label>
+                  <div className="space-y-2 p-3 rounded-lg border border-gray-200 bg-white hover:border-primary/30 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xl font-black text-gray-900 bg-blue-100 px-3 py-1 rounded border border-blue-300">
+                        {preFilterLiquidity[0]}M
+                      </span>
+                    </div>
+                    <Slider
+                      id="preFilterLiquidity"
+                      value={preFilterLiquidity}
+                      onValueChange={setPreFilterLiquidity}
+                      min={0.5}
+                      max={50}
+                      step={0.5}
+                      className="cursor-pointer"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>0.5M</span>
+                      <span className="text-xs font-semibold">Ensure liquidity</span>
+                      <span>50M</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    Top By Market Cap
+                    {tooltipsEnabled ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs bg-green-50 border-green-200 text-gray-900">
+                          <p className="font-semibold mb-1">Top Companies Selector</p>
+                          <p className="text-sm">Limits scan to largest companies by market cap:</p>
+                          <ul className="text-sm mt-1 space-y-1">
+                            <li>
+                              <strong>Top 10-50:</strong> Blue chips, most stable, lowest premiums
+                            </li>
+                            <li>
+                              <strong>Top 100-500:</strong> Balance of safety and returns
+                            </li>
+                          </ul>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : null}
+                  </Label>
+                  <div className="space-y-2 p-3 rounded-lg border border-gray-200 bg-white hover:border-primary/30 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xl font-black text-gray-900 bg-blue-100 px-3 py-1 rounded border border-blue-300">
+                        {getTopRankedLabel(preFilterTopRanked[0])}
+                      </span>
+                    </div>
+                    <Slider
+                      id="preFilterTopRanked"
+                      value={preFilterTopRanked}
+                      onValueChange={(val) => {
+                        // Snap to specific points for better UX
+                        const snapped = val[0] <= 16 ? [0] : val[0] <= 50 ? [33] : val[0] <= 83 ? [66] : [100]
+                        setPreFilterTopRanked(snapped)
+                      }}
+                      min={0}
+                      max={100}
+                      step={1}
+                      className="cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[10px] text-gray-500">
+                      <span>Top 500</span>
+                      <span className="text-[9px]">Top By Market Cap</span>
+                      <span>Top 10</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-
-            <ul className="list-disc list-inside space-y-1 ml-7 text-sm text-gray-700 mb-4">
-              <li>
-                <strong>Market Cap:</strong> Filter by company size (adjustable below)
-              </li>
-              <li>
-                <strong>Liquidity:</strong> Minimum recent daily trading volume - uses most recent trading day data, not
-                30-day average (adjustable below)
-              </li>
-              <li>
-                <strong>Top By Market Cap:</strong> Largest companies by market capitalization from S&P 500, Nasdaq-100,
-                Dow indices (adjustable below)
-              </li>
-            </ul>
-
-            {/* Step 1 Sliders */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-3">
-                <Label className="text-sm font-medium flex items-center gap-2">
-                  Min Market Cap
-                  {tooltipsEnabled ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs bg-green-50 border-green-200 text-gray-900">
-                        <p className="font-semibold mb-1">Market Capitalization Filter</p>
-                        <p className="text-sm">
-                          Filters stocks by total company value (shares × price). For put selling:
-                        </p>
-                        <ul className="text-sm mt-1 space-y-1">
-                          <li>
-                            <strong>Higher ($10B+):</strong> More stable, liquid options, lower assignment risk
-                          </li>
-                          <li>
-                            <strong>Lower ($1B-$10B):</strong> Higher premiums but more volatility risk
-                          </li>
-                        </ul>
-                      </TooltipContent>
-                    </Tooltip>
-                  ) : null}
-                </Label>
-                <div className="space-y-2 p-3 rounded-lg border border-gray-200 bg-white hover:border-primary/30 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xl font-black text-gray-900 bg-blue-100 px-3 py-1 rounded border border-blue-300">
-                      {["Any", "$300M+", "$2B+", "$10B+", "$50B+"][preFilterMarketCap[0]]}
-                    </span>
-                  </div>
-                  <Slider
-                    id="preFilterMarketCap"
-                    value={preFilterMarketCap}
-                    onValueChange={setPreFilterMarketCap}
-                    min={0}
-                    max={4}
-                    step={1}
-                    className="cursor-pointer"
-                  />
-                  <div className="flex justify-between text-xs text-gray-500">
-                    <span>Any</span>
-                    <span className="text-xs font-semibold">Company size filter</span>
-                    <span>$50B+</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <Label className="text-sm font-medium flex items-center gap-2">
-                  Min Recent Day Volume
-                  {tooltipsEnabled ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs bg-green-50 border-green-200 text-gray-900">
-                        <p className="font-semibold mb-1">Trading Volume Filter</p>
-                        <p className="text-sm">Daily shares traded. Critical for put sellers:</p>
-                        <ul className="text-sm mt-1 space-y-1">
-                          <li>
-                            <strong>Higher (5M+):</strong> Tighter bid-ask spreads, easier exit
-                          </li>
-                          <li>
-                            <strong>Lower (&lt;2M):</strong> Wider spreads = worse fills, harder to close
-                          </li>
-                        </ul>
-                      </TooltipContent>
-                    </Tooltip>
-                  ) : null}
-                </Label>
-                <div className="space-y-2 p-3 rounded-lg border border-gray-200 bg-white hover:border-primary/30 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xl font-black text-gray-900 bg-blue-100 px-3 py-1 rounded border border-blue-300">
-                      {preFilterLiquidity[0]}M
-                    </span>
-                  </div>
-                  <Slider
-                    id="preFilterLiquidity"
-                    value={preFilterLiquidity}
-                    onValueChange={setPreFilterLiquidity}
-                    min={0.5}
-                    max={50}
-                    step={0.5}
-                    className="cursor-pointer"
-                  />
-                  <div className="flex justify-between text-xs text-gray-500">
-                    <span>0.5M</span>
-                    <span className="text-xs font-semibold">Ensure liquidity</span>
-                    <span>50M</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <Label className="text-sm font-medium flex items-center gap-2">
-                  Top By Market Cap
-                  {tooltipsEnabled ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs bg-green-50 border-green-200 text-gray-900">
-                        <p className="font-semibold mb-1">Top Companies Selector</p>
-                        <p className="text-sm">Limits scan to largest companies by market cap:</p>
-                        <ul className="text-sm mt-1 space-y-1">
-                          <li>
-                            <strong>Top 10-50:</strong> Blue chips, most stable, lowest premiums
-                          </li>
-                          <li>
-                            <strong>Top 100-500:</strong> Balance of safety and returns
-                          </li>
-                        </ul>
-                      </TooltipContent>
-                    </Tooltip>
-                  ) : null}
-                </Label>
-                <div className="space-y-2 p-3 rounded-lg border border-gray-200 bg-white hover:border-primary/30 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xl font-black text-gray-900 bg-blue-100 px-3 py-1 rounded border border-blue-300">
-                      {getTopRankedLabel(preFilterTopRanked[0])}
-                    </span>
-                  </div>
-                  <Slider
-                    id="preFilterTopRanked"
-                    value={preFilterTopRanked}
-                    onValueChange={(val) => {
-                      // Snap to specific points for better UX
-                      const snapped = val[0] <= 16 ? [0] : val[0] <= 50 ? [33] : val[0] <= 83 ? [66] : [100]
-                      setPreFilterTopRanked(snapped)
-                    }}
-                    min={0}
-                    max={100}
-                    step={1}
-                    className="cursor-pointer"
-                  />
-                  <div className="flex justify-between text-[10px] text-gray-500">
-                    <span>Top 500</span>
-                    <span className="text-[9px]">Top By Market Cap</span>
-                    <span>Top 10</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          )}
 
           <Button
             onClick={loadPreFilteredTickers}
@@ -2270,48 +2300,47 @@ export function WheelScanner() {
         </Card>
       )}
 
-      {tickersToScan.trim().length > 0 && (
-        <div className="mt-4 w-full max-w-7xl mx-auto">
-          <Button
-            onClick={scanFundamentals}
-            disabled={isScanning || isScanningTechnicals || tickersToScan.trim() === ""}
-            size="lg"
-            className="w-full bg-blue-500 hover:bg-blue-600 text-white text-lg font-bold py-6 transition-all hover:scale-105"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Scanning...
-              </>
-            ) : (
-              <>
-                <BarChart3 className="mr-2 h-5 w-5" />
-                Scan Fundamentals (Step 2)
-              </>
-            )}
-          </Button>
-
-          {/* Scan Progress */}
-          {loading && scanProgress > 0 && (
-            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-semibold text-blue-900">Scanning Fundamentals: {currentTicker}</span>
-                <span className="text-sm font-bold text-blue-900">{scanProgress}%</span>
-              </div>
-              <div className="w-full bg-blue-200 rounded-full h-3">
-                <div
-                  className="bg-blue-600 h-3 rounded-full transition-all duration-300"
-                  style={{ width: `${scanProgress}%` }}
-                ></div>
-              </div>
-            </div>
+      {/* CHANGE: Fixed button condition to show at step 1 and before technical scan */}
+      {step <= 2 && tickersToScan.trim().length > 0 && !loading && !isScanningTechnicals && (
+        <Button
+          onClick={scanFundamentals}
+          disabled={isScanning || isScanningTechnicals || tickersToScan.trim() === ""}
+          size="lg"
+          className="mt-4 w-full max-w-7xl mx-auto h-12 text-base font-semibold bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50"
+        >
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Scanning...
+            </>
+          ) : (
+            <>
+              <BarChart3 className="mr-2 h-5 w-5" />
+              Scan Fundamentals (Step 2)
+            </>
           )}
+        </Button>
+      )}
+
+      {/* Scan Progress */}
+      {loading && scanProgress > 0 && (
+        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg w-full max-w-7xl mx-auto">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm font-semibold text-blue-900">Scanning Fundamentals: {currentTicker}</span>
+            <span className="text-sm font-bold text-blue-900">{scanProgress}%</span>
+          </div>
+          <div className="w-full bg-blue-200 rounded-full h-3">
+            <div
+              className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+              style={{ width: `${scanProgress}%` }}
+            ></div>
+          </div>
         </div>
       )}
 
       {fundamentalResults.length > 0 && (
         <Card className="mt-8 w-full max-w-7xl mx-auto shadow-lg border-gray-200">
-          <CardHeader className="bg-blue-50 border-b border-blue-200">
+          <CardHeader className="bg-blue-50 border-b border-gray-200">
             <CardTitle className="text-lg font-bold text-gray-900 flex items-center justify-between">
               <span className="flex items-center gap-2">
                 <BarChart3 className="h-5 w-5 text-blue-600" />
@@ -2440,7 +2469,7 @@ export function WheelScanner() {
         </Card>
       )}
 
-      {fundamentalResults.length > 0 && (
+      {step >= 2 && fundamentalResults.length > 0 && (
         <Card className="mt-8 w-full max-w-7xl mx-auto shadow-lg border-blue-200">
           <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-200">
             <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -2870,7 +2899,7 @@ export function WheelScanner() {
         </Card>
       )}
 
-      {fundamentalResults.length > 0 && (
+      {step >= 2 && fundamentalResults.length > 0 && (
         <Button
           onClick={scanTechnicals}
           disabled={isScanningTechnicals || fundamentalResults.length === 0}
@@ -2890,17 +2919,7 @@ export function WheelScanner() {
         </Button>
       )}
 
-      {/* Progress bar for Step 3 scanning */}
-      {isScanningTechnicals && (
-        <div className="mt-4 w-full max-w-7xl mx-auto">
-          <Progress value={technicalProgress} className="h-2" />
-          <p className="text-sm text-gray-600 text-center mt-2">
-            Analyzing {technicalCurrentTicker}... ({technicalProgress.toFixed(0)}%)
-          </p>
-        </div>
-      )}
-
-      {!isScanningTechnicals && technicalResults.length > 0 && (
+      {step >= 3 && !isScanningTechnicals && technicalResults.length > 0 && (
         <Card className="mt-8 w-full max-w-7xl mx-auto shadow-xl border-2 border-green-500">
           <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-200">
             <div className="flex items-center justify-between">
@@ -2915,8 +2934,7 @@ export function WheelScanner() {
               </span>
             </div>
             <p className="text-sm text-green-700 mt-2">
-              These stocks passed ALL technical criteria - premium put-selling opportunities! Click column headers to
-              sort.
+              🎉 Congratulations! These stocks passed ALL technical criteria - premium put-selling opportunities!
             </p>
           </CardHeader>
           <CardContent className="p-0">
@@ -2933,6 +2951,13 @@ export function WheelScanner() {
                     <th className="text-center p-3 font-semibold text-green-900">DTE</th>
                     <th className="text-center p-3 font-semibold text-green-900">Expiry</th>
                     <th className="text-right p-3 font-semibold text-green-900">Annual Yield %</th>
+                    <th className="text-right p-3 font-semibold text-green-900">RSI (14)</th>
+                    <th className="text-right p-3 font-semibold text-green-900">50-SMA</th>
+                    <th className="text-right p-3 font-semibold text-green-900">100-SMA</th>
+                    <th className="text-right p-3 font-semibold text-green-900">200-SMA</th>
+                    <th className="text-center p-3 font-semibold text-green-900">MACD</th>
+                    <th className="text-right p-3 font-semibold text-green-900">Stochastic</th>
+                    <th className="text-right p-3 font-semibold text-green-900">ATR %</th>
                     <th className="text-center p-3 font-semibold text-green-900">Red Day</th>
                   </tr>
                 </thead>
@@ -2966,6 +2991,25 @@ export function WheelScanner() {
                       <td className="text-right p-3">
                         {stock.annualizedYield !== undefined ? stock.annualizedYield.toFixed(1) + "%" : "-"}
                       </td>
+                      <td className={`text-right p-3 ${stock.rsi < 40 ? "text-green-700 font-semibold" : ""}`}>
+                        {stock.rsi?.toFixed(1) ?? "-"}
+                      </td>
+                      <td className="text-right p-3 text-xs">${stock.sma50?.toFixed(2) ?? "-"}</td>
+                      <td className="text-right p-3 text-xs">${stock.sma100?.toFixed(2) ?? "-"}</td>
+                      <td className="text-right p-3 text-xs">${stock.sma200?.toFixed(2) ?? "-"}</td>
+                      <td
+                        className={`text-center p-3 ${stock.macdSignal === "Bullish" ? "text-green-700" : "text-red-600"}`}
+                      >
+                        {stock.macdSignal ?? "-"}
+                      </td>
+                      <td className={`text-right p-3 ${stock.stochastic < 25 ? "text-green-700 font-semibold" : ""}`}>
+                        {stock.stochastic?.toFixed(1) ?? "-"}
+                      </td>
+                      <td
+                        className={`text-right p-3 ${stock.atrPercent >= 2.5 && stock.atrPercent <= 6 ? "text-green-700" : ""}`}
+                      >
+                        {stock.atrPercent?.toFixed(2) ?? "-"}%
+                      </td>
                       <td className="text-center p-3">
                         {stock.redDay ? (
                           <span className="text-red-600 font-bold">✓</span>
@@ -2988,35 +3032,38 @@ export function WheelScanner() {
         </Card>
       )}
 
-      {!isScanningTechnicals &&
-        hasAttemptedTechnicalScan &&
-        technicalResults.length === 0 &&
-        fundamentalResults.length > 0 && (
-          <Card className="mt-8 w-full max-w-7xl mx-auto border-2 border-yellow-500">
-            <CardHeader className="bg-gradient-to-r from-yellow-50 to-amber-50">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-yellow-600" />
-                <CardTitle className="text-yellow-900">No Stocks Passed Technical Criteria</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6">
-              <p className="text-gray-700 mb-4">
-                The current technical filters are very strict. None of the {fundamentalResults.length} stocks from Step
-                2 passed all technical criteria.
-              </p>
-              <p className="text-gray-600 text-sm mb-4">Consider:</p>
-              <ul className="list-disc list-inside text-sm text-gray-600 space-y-1 mb-4">
-                <li>Relaxing the RSI threshold (increase from {maxRSI[0]})</li>
-                <li>Disabling some optional filters (200-day SMA, Red Day preference)</li>
-                <li>Viewing Step 4 Relaxed Results for alternative opportunities</li>
-              </ul>
-              <Button onClick={toggleRelaxedResults} className="w-full bg-yellow-500 hover:bg-yellow-600 text-white">
-                <Filter className="mr-2 h-4 w-4" />
-                View Relaxed Criteria Results (Step 4)
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+      {step >= 3 && !isScanningTechnicals && technicalResults.length === 0 && fundamentalResults.length > 0 && (
+        <Card className="mt-8 w-full max-w-7xl mx-auto border-2 border-yellow-500 bg-white">
+          <CardHeader className="bg-gradient-to-r from-yellow-50 to-amber-50">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-yellow-600" />
+              <CardTitle className="text-yellow-900">No Stocks Passed Technical Criteria</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6">
+            <p className="text-gray-700 mb-4">
+              The current technical filters are very strict. None of the {fundamentalResults.length} stocks from Step 2
+              passed all technical criteria.
+            </p>
+            <p className="text-gray-600 text-sm mb-4">Consider:</p>
+            <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
+              <li>Relaxing the RSI threshold (increase from {maxRSI[0]})</li>
+              <li>Disabling some optional filters (200-day SMA, Red Day preference)</li>
+              <li>Viewing Step 4 Relaxed Results for alternative opportunities</li>
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {step >= 3 && !isScanningTechnicals && technicalResults.length === 0 && fundamentalResults.length > 0 && (
+        <Button
+          onClick={toggleRelaxedResults}
+          className="mt-4 w-full max-w-7xl mx-auto h-12 text-base font-semibold bg-yellow-600 hover:bg-yellow-700 text-white"
+        >
+          <Filter className="mr-2 h-5 w-5" />
+          View Relaxed Criteria Results (Step 4)
+        </Button>
+      )}
 
       {/* Step 4: Relaxed Results Table */}
       {showRelaxedResults && (
@@ -3097,6 +3144,28 @@ export function WheelScanner() {
                       {relaxedSortColumn === "annualizedYield" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
                     </th>
                     <th
+                      className="text-right p-3 font-semibold text-purple-900 cursor-pointer"
+                      onClick={() => handleRelaxedSort("rsi")}
+                    >
+                      RSI (14) {relaxedSortColumn === "rsi" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th className="text-right p-3 font-semibold text-purple-900">50-SMA</th>
+                    <th className="text-right p-3 font-semibold text-purple-900">100-SMA</th>
+                    <th className="text-right p-3 font-semibold text-purple-900">200-SMA</th>
+                    <th className="text-center p-3 font-semibold text-purple-900">MACD</th>
+                    <th
+                      className="text-right p-3 font-semibold text-purple-900 cursor-pointer"
+                      onClick={() => handleRelaxedSort("stochastic")}
+                    >
+                      Stochastic {relaxedSortColumn === "stochastic" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-right p-3 font-semibold text-purple-900 cursor-pointer"
+                      onClick={() => handleRelaxedSort("atrPercent")}
+                    >
+                      ATR % {relaxedSortColumn === "atrPercent" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
                       className="text-center p-3 font-semibold text-purple-900 cursor-pointer"
                       onClick={() => handleRelaxedSort("redDay")}
                     >
@@ -3140,6 +3209,27 @@ export function WheelScanner() {
                         <td className="text-right p-3">
                           {stock.annualizedYield !== undefined ? stock.annualizedYield.toFixed(1) + "%" : "-"}
                         </td>
+                        <td className={`text-right p-3 ${stock.rsi < 40 ? "text-purple-700 font-semibold" : ""}`}>
+                          {stock.rsi?.toFixed(1) ?? "-"}
+                        </td>
+                        <td className="text-right p-3 text-xs">${stock.sma50?.toFixed(2) ?? "-"}</td>
+                        <td className="text-right p-3 text-xs">${stock.sma100?.toFixed(2) ?? "-"}</td>
+                        <td className="text-right p-3 text-xs">${stock.sma200?.toFixed(2) ?? "-"}</td>
+                        <td
+                          className={`text-center p-3 ${stock.macdSignal === "Bullish" ? "text-green-700" : "text-red-600"}`}
+                        >
+                          {stock.macdSignal ?? "-"}
+                        </td>
+                        <td
+                          className={`text-right p-3 ${stock.stochastic < 25 ? "text-purple-700 font-semibold" : ""}`}
+                        >
+                          {stock.stochastic?.toFixed(1) ?? "-"}
+                        </td>
+                        <td
+                          className={`text-right p-3 ${stock.atrPercent >= 2.5 && stock.atrPercent <= 6 ? "text-purple-700" : ""}`}
+                        >
+                          {stock.atrPercent?.toFixed(2) ?? "-"}%
+                        </td>
                         <td className="text-center p-3">
                           {stock.redDay ? (
                             <span className="text-red-600 font-bold">✓</span>
@@ -3153,6 +3243,7 @@ export function WheelScanner() {
                 </tbody>
               </table>
             </div>
+
             <div className="p-4 bg-purple-50 border-t border-purple-200">
               <p className="text-sm text-purple-700 font-medium">
                 Review these opportunities and adjust filters as needed.

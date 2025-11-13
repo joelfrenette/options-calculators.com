@@ -70,23 +70,25 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
+      <Card className="w-full max-w-md bg-white shadow-2xl">
+        <CardHeader className="space-y-1 bg-white">
           <div className="flex items-center justify-center mb-4">
             <div className="h-12 w-12 rounded-full bg-blue-600 flex items-center justify-center">
               <Lock className="h-6 w-6 text-white" />
             </div>
           </div>
-          <CardTitle className="text-2xl text-center">Admin Login</CardTitle>
-          <CardDescription className="text-center">
+          <CardTitle className="text-2xl text-center text-slate-900">Admin Login</CardTitle>
+          <CardDescription className="text-center text-slate-600">
             {resetMode ? "Enter your email to reset password" : "Enter your credentials to access the admin dashboard"}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="bg-white">
           {!resetMode ? (
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-slate-900">
+                  Email
+                </Label>
                 <Input
                   id="email"
                   type="email"
@@ -94,16 +96,20 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  className="bg-white text-slate-900 border-slate-300"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password" className="text-slate-900">
+                  Password
+                </Label>
                 <Input
                   id="password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  className="bg-white text-slate-900 border-slate-300"
                 />
               </div>
 
@@ -114,14 +120,14 @@ export default function LoginPage() {
                 </div>
               )}
 
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white" disabled={loading}>
                 {loading ? "Signing in..." : "Sign In"}
               </Button>
 
               <button
                 type="button"
                 onClick={() => setResetMode(true)}
-                className="w-full text-sm text-blue-600 hover:underline"
+                className="w-full text-sm text-blue-600 hover:underline font-medium"
               >
                 Forgot password?
               </button>
@@ -129,7 +135,9 @@ export default function LoginPage() {
           ) : (
             <form onSubmit={handlePasswordReset} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="reset-email">Email</Label>
+                <Label htmlFor="reset-email" className="text-slate-900">
+                  Email
+                </Label>
                 <Input
                   id="reset-email"
                   type="email"
@@ -137,6 +145,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  className="bg-white text-slate-900 border-slate-300"
                 />
               </div>
 
@@ -153,7 +162,7 @@ export default function LoginPage() {
                 </div>
               )}
 
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white" disabled={loading}>
                 {loading ? "Sending..." : "Send Reset Link"}
               </Button>
 
@@ -164,7 +173,7 @@ export default function LoginPage() {
                   setError("")
                   setResetMessage("")
                 }}
-                className="w-full text-sm text-blue-600 hover:underline"
+                className="w-full text-sm text-blue-600 hover:underline font-medium"
               >
                 Back to login
               </button>
