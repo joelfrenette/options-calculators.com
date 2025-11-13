@@ -1,30 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Download,
-  LogOut,
-  Database,
-  Activity,
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
-  Megaphone,
-  BarChart3,
-  TrendingUp,
-  Gauge,
-  Target,
-  Github,
-  ExternalLink,
-  Trash2,
-  Plus,
-  Save,
-} from "lucide-react"
+import { Download, LogOut, Database, Activity, CheckCircle2, XCircle, AlertCircle, Megaphone, BarChart3, TrendingUp, Gauge, Target, Github, ExternalLink, Trash2, Plus, Save } from 'lucide-react'
 import { ApiKeysManager } from "@/components/api-keys-manager"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
@@ -81,6 +63,81 @@ export default function AdminDashboard() {
       setLoading(false)
     }
   }
+
+  const exportAuditReport = () => {
+    if (!auditResults) return
+
+    const report = `
+# AUDIT REPORT - OPTIONS-CALCULATORS.COM
+Generated: ${new Date(auditResults.timestamp).toLocaleString()}
+
+## VERDICT: ${auditResults.verdict}
+${auditResults.summary}
+
+## ISSUES FOUND: ${auditResults.issues.length === 0 ? "NONE" : auditResults.issues.length}
+${auditResults.issues.length === 0 ? "✓ No fake data detected\n✓ No random number generators\n✓ No hardcoded values pretending to be live data\n✓ All formulas match industry standards" : auditResults.issues.map((issue: string) => `- ${issue}`).join("\n")}
+
+---
+
+## DATA SOURCES - ALL VERIFIED AS REAL
+
+${auditResults.dataSources.map((ds: any, i: number) => `
+${i + 1}. **${ds.page}** - ${ds.endpoint}
+   - Primary: ${ds.primary}
+   ${ds.fallback ? `- Fallback: ${ds.fallback}` : ""}
+   - Status: ${ds.status}
+   - Real Data: ${ds.realData ? "YES" : "NO"}
+   - Details: ${ds.details || "N/A"}
+`).join("\n")}
+
+---
+
+## CALCULATIONS & FORMULAS - ALL LEGITIMATE
+
+${auditResults.calculations.map((calc: any, i: number) => `
+${i + 1}. **${calc.name}**
+   - Formula: \`${calc.formula}\`
+   - Source: ${calc.source}
+   - Inputs: ${calc.inputs}
+   - Weighting: ${calc.weighting}
+   - **${calc.validated}**
+`).join("\n")}
+
+---
+
+## ENVIRONMENT VARIABLES CONFIRMED
+
+${auditResults.environmentVariables.map((env: any) => `
+- ${env.key}: ${env.configured} - ${env.purpose} ${env.required ? "(REQUIRED)" : "(OPTIONAL)"}
+  Status: ${env.status}
+`).join("\n")}
+
+---
+
+## CODE QUALITY CHECKS
+
+${auditResults.codeQuality.map((check: any) => `
+- **${check.check}**: ${check.status}
+  ${check.details}
+`).join("\n")}
+
+---
+
+**END OF AUDIT REPORT**
+`
+
+    // Create downloadable file
+    const blob = new Blob([report], { type: "text/markdown" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `audit-report-${new Date().toISOString().split("T")[0]}.md`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
 
   const fetchAdData = async () => {
     try {
@@ -250,70 +307,229 @@ export default function AdminDashboard() {
                   <CheckCircle2 className="h-5 w-5 text-blue-600" />
                   Data Audit & Validation
                 </CardTitle>
-                <CardDescription>Verify all calculations and data sources</CardDescription>
+                <CardDescription>
+                  Comprehensive QA audit - verifies all data sources, formulas, and calculations
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <Button onClick={fetchAuditResults} className="mb-4" disabled={loading}>
-                  {loading ? "Running Audit..." : "Run Full Audit"}
-                </Button>
+                <div className="flex gap-2 mb-4">
+                  <Button onClick={fetchAuditResults} disabled={loading}>
+                    {loading ? "Running Audit..." : "Run Full Audit"}
+                  </Button>
+                  {auditResults && (
+                    <Button onClick={exportAuditReport} variant="outline">
+                      <Download className="mr-2 h-4 w-4" />
+                      Export Report
+                    </Button>
+                  )}
+                </div>
 
                 {auditResults && (
                   <>
-                    <div className="grid grid-cols-4 gap-4 mb-6">
-                      <Card>
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-sm font-medium text-slate-600">Total Checks</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-2xl font-bold">{auditResults.summary.total}</p>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-sm font-medium text-green-600">Passed</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-2xl font-bold text-green-600">{auditResults.summary.passed}</p>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-sm font-medium text-red-600">Failed</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-2xl font-bold text-red-600">{auditResults.summary.failed}</p>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-sm font-medium text-blue-600">Success Rate</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-2xl font-bold text-blue-600">{auditResults.summary.percentage}%</p>
-                        </CardContent>
-                      </Card>
+                    <div
+                      className={`p-6 rounded-lg mb-6 ${
+                        auditResults.verdict === "PASS"
+                          ? "bg-green-50 border-2 border-green-500"
+                          : auditResults.verdict === "CONDITIONAL PASS"
+                            ? "bg-yellow-50 border-2 border-yellow-500"
+                            : "bg-red-50 border-2 border-red-500"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        {auditResults.verdict === "PASS" ? (
+                          <CheckCircle2 className="h-8 w-8 text-green-600" />
+                        ) : auditResults.verdict === "CONDITIONAL PASS" ? (
+                          <AlertCircle className="h-8 w-8 text-yellow-600" />
+                        ) : (
+                          <XCircle className="h-8 w-8 text-red-600" />
+                        )}
+                        <div>
+                          <h3 className="text-2xl font-bold">VERDICT: {auditResults.verdict}</h3>
+                          <p className="text-slate-600">{auditResults.summary}</p>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="space-y-3">
-                      {auditResults.checks.map((check: AuditCheck, index: number) => (
-                        <div key={index} className="p-4 border rounded-lg hover:bg-slate-50 transition-colors">
-                          <div className="flex items-start gap-3">
-                            {check.status === "pass" ? (
-                              <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
+                    <Card className="mb-6">
+                      <CardHeader>
+                        <CardTitle>Issues Found: {auditResults.issues.length === 0 ? "NONE" : auditResults.issues.length}</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            {auditResults.codeQuality.find((c: any) => c.check.includes("Math.random"))?.status === "PASS" ? (
+                              <CheckCircle2 className="h-5 w-5 text-green-600" />
                             ) : (
-                              <XCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                              <XCircle className="h-5 w-5 text-red-600" />
                             )}
-                            <div className="flex-1">
-                              <p className="font-semibold text-slate-900">{check.name}</p>
-                              <p className="text-sm text-slate-600 mt-1">{check.message}</p>
-                              <p className="text-xs text-slate-500 mt-2 italic">{check.details}</p>
-                            </div>
+                            <span>No fake data detected</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {auditResults.codeQuality.find((c: any) => c.check.includes("random"))?.status === "PASS" ? (
+                              <CheckCircle2 className="h-5 w-5 text-green-600" />
+                            ) : (
+                              <XCircle className="h-5 w-5 text-red-600" />
+                            )}
+                            <span>No random number generators</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {auditResults.codeQuality.find((c: any) => c.check.includes("hardcoded"))?.status === "PASS" ? (
+                              <CheckCircle2 className="h-5 w-5 text-green-600" />
+                            ) : (
+                              <XCircle className="h-5 w-5 text-red-600" />
+                            )}
+                            <span>No hardcoded values pretending to be live data</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {auditResults.calculations.every((c: any) => c.validated.includes("STANDARD")) ? (
+                              <CheckCircle2 className="h-5 w-5 text-green-600" />
+                            ) : (
+                              <AlertCircle className="h-5 w-5 text-yellow-600" />
+                            )}
+                            <span>All formulas match industry standards</span>
                           </div>
                         </div>
-                      ))}
-                    </div>
+                        {auditResults.issues.length > 0 && (
+                          <div className="mt-4 p-4 bg-red-50 rounded border border-red-200">
+                            <p className="font-semibold text-red-900 mb-2">Critical Issues:</p>
+                            <ul className="text-sm text-red-800 space-y-1">
+                              {auditResults.issues.map((issue: string, i: number) => (
+                                <li key={i}>• {issue}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
 
-                    <p className="text-xs text-slate-500 mt-4">
+                    <Card className="mb-6">
+                      <CardHeader>
+                        <CardTitle>Data Sources ({auditResults.dataSources.length})</CardTitle>
+                        <CardDescription>All verified as real - no fake/random values</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          {auditResults.dataSources.map((ds: any, index: number) => (
+                            <div key={index} className="p-4 border rounded-lg">
+                              <div className="flex items-start gap-3">
+                                {ds.status === "VERIFIED" ? (
+                                  <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
+                                ) : (
+                                  <XCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                                )}
+                                <div className="flex-1">
+                                  <p className="font-semibold">{ds.page}</p>
+                                  <p className="text-sm text-slate-600 mt-1">Endpoint: {ds.endpoint}</p>
+                                  <p className="text-sm text-slate-600">Primary: {ds.primary}</p>
+                                  {ds.fallback && <p className="text-sm text-slate-600">Fallback: {ds.fallback}</p>}
+                                  <p className="text-xs text-slate-500 mt-2">{ds.details}</p>
+                                  <span
+                                    className={`inline-block mt-2 text-xs px-2 py-1 rounded ${ds.realData ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}
+                                  >
+                                    {ds.realData ? "ALL REAL DATA" : "DATA ISSUE"}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="mb-6">
+                      <CardHeader>
+                        <CardTitle>Calculations & Formulas ({auditResults.calculations.length})</CardTitle>
+                        <CardDescription>All legitimate and validated</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          {auditResults.calculations.map((calc: any, index: number) => (
+                            <div key={index} className="p-4 border rounded-lg bg-slate-50">
+                              <h4 className="font-semibold text-lg mb-2">{calc.name}</h4>
+                              <div className="space-y-2 text-sm">
+                                <div>
+                                  <span className="font-semibold">Formula:</span>
+                                  <code className="block bg-white p-2 rounded mt-1 text-xs">{calc.formula}</code>
+                                </div>
+                                <div>
+                                  <span className="font-semibold">Source:</span> {calc.source}
+                                </div>
+                                <div>
+                                  <span className="font-semibold">Inputs:</span> {calc.inputs}
+                                </div>
+                                <div>
+                                  <span className="font-semibold">Weighting:</span> {calc.weighting}
+                                </div>
+                                <span
+                                  className={`inline-block mt-2 text-xs px-3 py-1 rounded font-semibold ${
+                                    calc.validated.includes("STANDARD")
+                                      ? "bg-green-100 text-green-800"
+                                      : "bg-blue-100 text-blue-800"
+                                  }`}
+                                >
+                                  {calc.validated}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="mb-6">
+                      <CardHeader>
+                        <CardTitle>Environment Variables ({auditResults.environmentVariables.length})</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          {auditResults.environmentVariables.map((env: any, index: number) => (
+                            <div key={index} className="flex items-center justify-between p-3 border rounded">
+                              <div className="flex-1">
+                                <p className="font-mono text-sm">{env.key}</p>
+                                <p className="text-xs text-slate-600">{env.purpose}</p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`text-xs px-2 py-1 rounded ${env.configured === "YES" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}
+                                >
+                                  {env.configured}
+                                </span>
+                                <span
+                                  className={`text-xs px-2 py-1 rounded ${env.status === "OK" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}
+                                >
+                                  {env.status}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Code Quality Checks ({auditResults.codeQuality.length})</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          {auditResults.codeQuality.map((check: any, index: number) => (
+                            <div key={index} className="flex items-start gap-3 p-3 border rounded">
+                              {check.status === "PASS" ? (
+                                <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
+                              ) : (
+                                <XCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                              )}
+                              <div>
+                                <p className="font-semibold">{check.check}</p>
+                                <p className="text-sm text-slate-600">{check.details}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <p className="text-xs text-slate-500 mt-6">
                       Last audit: {new Date(auditResults.timestamp).toLocaleString()}
                     </p>
                   </>

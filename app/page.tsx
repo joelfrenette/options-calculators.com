@@ -12,10 +12,12 @@ import { TrendAnalysis } from "@/components/trend-analysis"
 import { RotatingAdBanner } from "@/components/rotating-ad-banner"
 import { WheelScanner } from "@/components/wheel-scanner"
 import { CpiInflationAnalysis } from "@/components/cpi-inflation-analysis"
-import { Menu, X } from "lucide-react"
+import { CcpiDashboard } from "@/components/ccpi-dashboard"
+import { Menu, X } from 'lucide-react'
 import Image from "next/image"
 
 const TABS = [
+  { id: "ccpi", label: "CCPI: Crash Prediction Index" }, // Moved CCPI to first position
   { id: "trend-analysis", label: "Index Trend Analysis & Forecast" },
   { id: "market-sentiment", label: "Fear & Greed Index" },
   { id: "panic-euphoria", label: "Panic/Euphoria Index" },
@@ -25,11 +27,11 @@ const TABS = [
   { id: "earnings-iv-crusher", label: "Earnings EM Calculator" },
   { id: "greeks", label: "Greeks Calculator" },
   { id: "risk-rewards", label: "ROI Calculator" },
-  { id: "wheel-scanner", label: "Put Selling Scanner" }, // Updated tab name from "Stock Options Put Selling Scanner"
+  { id: "wheel-scanner", label: "Put Selling Scanner" },
 ]
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState("trend-analysis")
+  const [activeTab, setActiveTab] = useState("ccpi") // Set CCPI as default active tab
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const handleTabChange = (tabId: string) => {
@@ -118,6 +120,17 @@ export default function Home() {
 
       <main className="container mx-auto px-4 py-4">
         <div className="max-w-5xl mx-auto">
+          {activeTab === "ccpi" && (
+            <div>
+              <div className="mb-4">
+                <p className="text-lg text-gray-600 text-balance">
+                  Early-warning oracle for AI-led market corrections with regime-based options playbooks for professional traders
+                </p>
+              </div>
+              <CcpiDashboard />
+            </div>
+          )}
+
           {activeTab === "trend-analysis" && (
             <div>
               <div className="mb-4">
