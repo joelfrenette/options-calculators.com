@@ -1148,17 +1148,26 @@ export function WheelScanner() {
             `[v0] ${stock.ticker} - Fetching options chain snapshot for expiry: ${expiryDate} (${daysToExpiry} days away)`,
           )
 
-          const chainSnapshotRes = await fetch(
-            `/api/polygon-proxy?endpoint=options-chain-snapshot&ticker=${stock.ticker}&expiry_date=${expiryDate}&option_type=put`,
-          )
-          await delay(300) // Slightly longer delay between chain snapshot calls
+          let chainSnapshotData
+          try {
+            const chainSnapshotRes = await fetch(
+              `/api/polygon-proxy?endpoint=options-chain-snapshot&ticker=${stock.ticker}&expiry_date=${expiryDate}&option_type=put`,
+            )
+            await delay(300) // Slightly longer delay between chain snapshot calls
 
-          if (!chainSnapshotRes.ok) {
-            console.error(`[v0] ${stock.ticker} - Failed to fetch options chain snapshot for ${expiryDate}`)
+            if (!chainSnapshotRes.ok) {
+              console.error(
+                `[v0] ${stock.ticker} - Failed to fetch options chain snapshot for ${expiryDate}: HTTP ${chainSnapshotRes.status}`,
+              )
+              continue
+            }
+
+            chainSnapshotData = await chainSnapshotRes.json()
+          } catch (fetchError) {
+            console.error(`[v0] ${stock.ticker} - Network error fetching options chain for ${expiryDate}:`, fetchError)
             continue
           }
 
-          const chainSnapshotData = await chainSnapshotRes.json()
           const contracts = chainSnapshotData.results || []
 
           console.log(`[v0] ${stock.ticker} - Found ${contracts.length} put contracts with data for ${expiryDate}`)
@@ -1273,21 +1282,9 @@ export function WheelScanner() {
           enriched.push(...top3Options)
         } // End loop for expiry dates
       } catch (error) {
-        console.error(`[v0] Error enriching ${stock.ticker}:`, error)
-        // Fallback: keep original stock data even on error (though with empty option fields)
-        enriched.push({
-          ...stock,
-          expiryDate: "N/A",
-          putStrike: 0,
-          premium: 0,
-          yield: 0,
-          daysToExpiry: 0,
-          annualizedYield: 0,
-          delta: 0,
-          deltaSource: "estimated",
-          bidPrice: 0, // Add default values
-          askPrice: 0, // Add default values
-        })
+        console.error(`[v0] ${stock.ticker} - Error processing options data:`, error)
+        console.log(`[v0] ${stock.ticker} - Skipping due to error, continuing with next stock`)
+        continue
       }
     } // End of loop through stocks
 
@@ -2781,6 +2778,12 @@ export function WheelScanner() {
                     <th className="text-center p-3 font-semibold text-green-900">DTE</th>
                     <th className="text-center p-3 font-semibold text-green-900">Expiry</th>
                     <th className="text-center p-3 font-semibold text-green-900">Strike</th>
+                    <th
+                      className="text-right p-3 font-semibold text-green-900 cursor-pointer"
+                      onClick={() => handleSort("premium")}
+                    >
+                      Premium {sortColumn === "premium" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
                     <th className="text-center p-3 font-semibold text-green-900">Delta</th>
                     <th className="text-right p-3 font-semibold text-green-900">Yield %</th>
                     <th className="text-right p-3 font-semibold text-green-900">Annual Yield %</th>
@@ -2820,6 +2823,9 @@ export function WheelScanner() {
                         <td className="text-center p-3">{stock.daysToExpiry ?? "N/A"}</td>
                         <td className="text-center p-3">{stock.expiryDate ?? "N/A"}</td>
                         <td className="text-center p-3">${stock.putStrike.toFixed(2)}</td>
+                        <td className="text-right p-3 font-semibold text-green-700">
+                          ${stock.premium !== undefined ? stock.premium.toFixed(2) : "N/A"}
+                        </td>
                         <td className={`text-center p-3 ${stock.delta < -0.2 ? "text-green-700" : ""}`}>
                           {stock.delta.toFixed(3)}
                         </td>
@@ -3014,6 +3020,12 @@ export function WheelScanner() {
                       Strike {relaxedSortColumn === "putStrike" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
                     </th>
                     <th
+                      className="text-right p-3 font-semibold text-purple-900 cursor-pointer"
+                      onClick={() => handleRelaxedSort("premium")}
+                    >
+                      Premium {relaxedSortColumn === "premium" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
                       className="text-center p-3 font-semibold text-purple-900 cursor-pointer"
                       onClick={() => handleRelaxedSort("delta")}
                     >
@@ -3079,6 +3091,9 @@ export function WheelScanner() {
                         <td className="text-center p-3">{stock.daysToExpiry ?? "N/A"}</td>
                         <td className="text-center p-3">{stock.expiryDate ?? "N/A"}</td>
                         <td className="text-center p-3">${stock.putStrike.toFixed(2)}</td>
+                        <td className="text-right p-3 font-semibold text-purple-700">
+                          ${stock.premium !== undefined ? stock.premium.toFixed(2) : "N/A"}
+                        </td>
                         <td className={`text-center p-3 ${stock.delta < -0.2 ? "text-purple-700" : ""}`}>
                           {stock.delta.toFixed(3)}
                         </td>
