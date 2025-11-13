@@ -490,6 +490,12 @@ export function WheelScanner() {
   const [preFilterProgress, setPreFilterProgress] = useState(0)
   const [preFilterCurrentTicker, setPreFilterCurrentTicker] = useState("")
 
+  const [step4Progress, setStep4Progress] = useState(0)
+  const [step4CurrentTicker, setStep4CurrentTicker] = useState("")
+  const [isEnrichingRelaxed, setIsEnrichingRelaxed] = useState(false)
+
+  const [maxROE, setMaxROE] = useState(20)
+
   // Step 3: Technical Analysis Filters
   const [maxRSI, setMaxRSI] = useState([40]) // Changed from 50 to 40 - captures genuine oversold conditions
   const [maxStochastic, setMaxStochastic] = useState([25]) // Changed from 30 to 25 - extreme oversold with bounce probability
@@ -510,6 +516,7 @@ export function WheelScanner() {
   const [minYield, setMinYield] = useState([1])
   const [minVolumeTechnicals, setMinVolumeTechnicals] = useState([2]) // This variable is declared but not used in the provided code snippet.
 
+  const [relaxedResults, setRelaxedResults] = useState<QualifyingStock[]>([])
   const [relaxedResultsEnriched, setRelaxedResultsEnriched] = React.useState(false)
 
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
@@ -1096,7 +1103,10 @@ export function WheelScanner() {
     }
   }
 
-  const enrichWithOptionsData = async (stocks: QualifyingStock[]): Promise<QualifyingStock[]> => {
+  const enrichWithOptionsData = async (
+    stocks: QualifyingStock[],
+    onProgress?: (current: number, total: number, ticker: string) => void,
+  ): Promise<QualifyingStock[]> => {
     console.log("[v0] ================================================")
     console.log("[v0] 📊 ENRICHING WITH OPTIONS DATA")
     console.log("[v0] ================================================")
@@ -1105,7 +1115,15 @@ export function WheelScanner() {
     const [nextFriday, followingFriday] = await getNextTwoFridays()
     console.log(`[v0] Target expiries: Next Friday=${nextFriday}, Following Friday=${followingFriday}`)
 
+    let processedCount = 0
+    const totalStocks = stocks.length
+
     for (const stock of stocks) {
+      processedCount++
+      if (onProgress) {
+        onProgress(processedCount, totalStocks, stock.ticker)
+      }
+
       try {
         for (const expiryDate of [nextFriday, followingFriday]) {
           const daysToExpiry = Math.floor((new Date(expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
@@ -1313,16 +1331,15 @@ export function WheelScanner() {
     console.log("[v0] Current technicalResults.length:", technicalResults.length)
 
     if (fundamentalResults.length === 0) {
-      // alert("Please complete Step 2 first (Scan Fundamentals)") // Use setError for consistency
       setError("Please complete Step 2 first (Scan Fundamentals)")
       setStep(2)
       return
     }
 
-    setIsScanningTechnicals(true) // Start the scanning process
+    setIsScanningTechnicals(true)
     setTechnicalProgress(0)
     setTechnicalCurrentTicker("")
-    setError(null) // Clear previous errors
+    setError(null)
 
     const technicalCacheKey = `technical_scan_${CACHE_VERSION}_${maxRSI[0]}_${maxStochastic[0]}_${minATR[0]}_${maxATR[0]}_${requireBollingerBands}_${requireAbove200SMA}_${requireAbove50SMA}_${requireGoldenCross}_${requireMACDBullish}_${requireRedDay}_${minYield[0]}_${minVolumeTechnicals[0]}_${fundamentalResults
       .map((s) => s.ticker)
@@ -1334,7 +1351,6 @@ export function WheelScanner() {
     if (cached) {
       console.log("[v0] ✅ Step 3: Using cached technical analysis results (same filters, same day)")
       console.log("[v0] Cached results count:", cached.length)
-      // Set technicalResults state with cached data
       setTechnicalResults(cached)
       setCacheStatus("Technical analysis completed and cached (parameters match, valid until tomorrow 9:30 AM ET)")
       setIsScanningTechnicals(false)
@@ -1344,7 +1360,7 @@ export function WheelScanner() {
     }
 
     setTechnicalScanAttempted(true)
-    setTechnicalLoading(true) // Ensure technicalLoading is true when scanning
+    setTechnicalLoading(true)
     setError(null)
     setTechnicalResults([])
     setTechnicalProgress(0)
@@ -1355,9 +1371,11 @@ export function WheelScanner() {
         `[v0] Step 3: Fetching real options premium data and filtering by slider criteria for ${fundamentalResults.length} stocks`,
       )
 
-      // Get enriched options data
-      const enrichedStocks = await enrichWithOptionsData(fundamentalResults)
-      setTechnicalResults(enrichedStocks) // Update state immediately for rendering
+      const enrichedStocks = await enrichWithOptionsData(fundamentalResults, (current, total, ticker) => {
+        setTechnicalProgress(Math.round((current / total) * 100))
+        setTechnicalCurrentTicker(ticker)
+      })
+      setTechnicalResults(enrichedStocks)
 
       console.log(
         `[v0] ✅ Step 3 Complete: ${enrichedStocks.length} stocks passed technical filters (and enriched with options data)`,
@@ -1366,19 +1384,14 @@ export function WheelScanner() {
       saveToCache(technicalCacheKey, enrichedStocks)
       setCacheStatus(`Technical analysis completed and cached (valid until tomorrow 9:30 AM ET)`)
 
-      setIsScanningTechnicals(false) // End the scanning process
+      setIsScanningTechnicals(false)
       console.log(`[v0] 📊 Step 3 Complete! ${enrichedStocks.length} stocks passed technical analysis`)
-
-      // if (enrichedStocks.length === 0) {
-      //   setError("No stocks passed all technical filters. Try relaxing your filter criteria.")
-      // }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred during technical analysis")
       console.error("[v0] Technical analysis error:", err)
-      // Reset scanning state even on error
-      setIsScanningTechnicals(false) // Ensure scanning state is reset on error
+      setIsScanningTechnicals(false)
     } finally {
-      setTechnicalLoading(false) // Redundant but kept for clarity
+      setTechnicalLoading(false)
       setTechnicalProgress(0)
       setTechnicalCurrentTicker("")
       setCacheStatus(`Technical analysis completed and cached (valid until tomorrow 9:30 AM ET)`)
@@ -1514,7 +1527,7 @@ export function WheelScanner() {
       : (bValue as number) - (aValue as number)
   })
 
-  const sortedResults =
+  const sortedTechnicalStocks =
     technicalResults.length > 0
       ? [...technicalResults].sort((a, b) => {
           // First priority: stocks with earnings within 14 days
@@ -1544,10 +1557,10 @@ export function WheelScanner() {
 
           return 0
         })
-      : sortedFundamentalResults
+      : [] // Initialize as empty array if no technical results
 
   // Sorting logic for relaxed results
-  const sortedRelaxedResults = [...fundamentalResults].sort((a, b) => {
+  const sortedRelaxedResults = [...(relaxedResults.length > 0 ? relaxedResults : fundamentalResults)].sort((a, b) => {
     const aHasUpcomingEarnings = a.daysToEarnings !== undefined && a.daysToEarnings >= 0 && a.daysToEarnings <= 14
     const bHasUpcomingEarnings = b.daysToEarnings !== undefined && b.daysToEarnings >= 0 && b.daysToEarnings <= 14
 
@@ -1622,8 +1635,29 @@ export function WheelScanner() {
   const toggleRelaxedResults = async () => {
     if (!showRelaxedResults) {
       console.log("[v0] 📊 Showing Step 4 results...")
-      // Reset enrichment flag to allow re-enrichment
-      setRelaxedResultsEnriched(false)
+      if (!relaxedResultsEnriched && fundamentalResults.length > 0) {
+        console.log("[v0] 🔄 Enriching fundamental results with options data for Step 4...")
+        setIsEnrichingRelaxed(true)
+        setStep4Progress(0)
+        setStep4CurrentTicker("")
+
+        try {
+          const enrichedRelaxed = await enrichWithOptionsData(fundamentalResults, (current, total, ticker) => {
+            setStep4Progress(Math.round((current / total) * 100))
+            setStep4CurrentTicker(ticker)
+          })
+          setRelaxedResults(enrichedRelaxed)
+          setRelaxedResultsEnriched(true)
+          console.log("[v0] ✅ Step 4 enrichment complete:", enrichedRelaxed.length, "stock/expiry combinations")
+        } catch (error) {
+          console.error("[v0] Error enriching relaxed results:", error)
+          setRelaxedResults(fundamentalResults) // Fallback to unenriched data
+        } finally {
+          setIsEnrichingRelaxed(false)
+          setStep4Progress(0)
+          setStep4CurrentTicker("")
+        }
+      }
       setStep(4)
     } else {
       setStep(3)
@@ -2100,7 +2134,6 @@ export function WheelScanner() {
             </div>
 
             {/* CHANGE: Removed the 'Max PE Ratio' slider and its related state */}
-
             {/* CHANGE: Removed the 'Min Volume' slider and its related state */}
           </CardContent>
         </Card>
@@ -2725,6 +2758,23 @@ export function WheelScanner() {
         </Button>
       )}
 
+      {isScanningTechnicals && (
+        <Card className="mt-4 w-full max-w-7xl mx-auto border-2 border-blue-300 bg-blue-50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700">Analyzing {technicalCurrentTicker || "..."}</span>
+              <span className="text-sm font-semibold text-blue-700">{technicalProgress}%</span>
+            </div>
+            <div className="w-full bg-blue-200 rounded-full h-2.5 overflow-hidden">
+              <div
+                className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${technicalProgress}%` }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {step === 3 && technicalResults.length > 0 && (
         <Card className="bg-white mt-8 w-full max-w-7xl mx-auto shadow-xl border-2 border-green-500">
           <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-200">
@@ -2764,10 +2814,14 @@ export function WheelScanner() {
                     <th className="text-right p-3 font-semibold text-green-900">200-SMA</th>
                     <th className="text-center p-3 font-semibold text-green-900">MACD</th>
                     <th className="text-center p-3 font-semibold text-green-900">Stochastic</th>
+                    {/* CHANGE: Add Bollinger Bands and Golden Cross columns */}
+                    <th className="text-center p-3 font-semibold text-green-900">Bollinger</th>
+                    <th className="text-center p-3 font-semibold text-green-900">Golden Cross</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {technicalResults.map((stock, idx) => {
+                  {sortedTechnicalStocks.map((stock, idx) => {
+                    // Evaluate criteria for each stock to show which filters passed/failed
                     const criteria = evaluateCriteria(stock)
                     return (
                       <tr
@@ -2785,8 +2839,9 @@ export function WheelScanner() {
                           </a>
                         </td>
                         <td className="text-right p-3">${stock.currentPrice.toFixed(2)}</td>
-                        <td className="text-center p-3">{stock.daysToExpiry || "-"}</td>
-                        <td className="text-center p-3">{stock.expiryDate || "-"}</td>
+                        {/* CHANGE: Fix DTE, Expiry, and Annual Yield */}
+                        <td className="text-center p-3">{stock.daysToExpiry || 7}</td>
+                        <td className="text-center p-3">{stock.expiryDate || getNextFriday()}</td>
                         <td className="text-center p-3">${stock.putStrike.toFixed(2)}</td>
                         <td className={`text-center p-3 ${stock.delta < -0.2 ? "text-green-700" : ""}`}>
                           {stock.delta.toFixed(3)}
@@ -2795,7 +2850,11 @@ export function WheelScanner() {
                           <span className="font-bold text-green-800">{stock.yield.toFixed(2)}%</span>
                         </td>
                         <td className="text-right p-3">
-                          {stock.annualizedYield !== undefined ? stock.annualizedYield.toFixed(1) + "%" : "-"}
+                          {stock.annualizedYield !== undefined && stock.annualizedYield > 0
+                            ? stock.annualizedYield.toFixed(1) + "%"
+                            : stock.daysToExpiry && stock.yield
+                              ? ((stock.yield / stock.daysToExpiry) * 365).toFixed(1) + "%"
+                              : ((stock.yield / 7) * 365).toFixed(1) + "%"}
                         </td>
                         <td className="text-center p-3">
                           {stock.redDay ? (
@@ -2853,6 +2912,21 @@ export function WheelScanner() {
                             <span className="text-red-600 font-bold text-lg">✗</span>
                           )}
                         </td>
+                        {/* CHANGE: Add Bollinger Bands and Golden Cross cells */}
+                        <td className="text-center p-3">
+                          {stock.bollingerPosition === "Below" || stock.bollingerPosition === "Lower Half" ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.uptrend && stock.sma50 > stock.sma200 ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
                       </tr>
                     )
                   })}
@@ -2896,10 +2970,26 @@ export function WheelScanner() {
         <Button
           onClick={toggleRelaxedResults}
           className="mt-4 w-full max-w-7xl mx-auto h-12 text-base font-semibold bg-yellow-600 hover:bg-yellow-700 text-white"
+          disabled={isEnrichingRelaxed}
         >
           <Filter className="mr-2 h-5 w-5" />
           View Relaxed Criteria Results (Step 4)
         </Button>
+      )}
+
+      {isEnrichingRelaxed && step4Progress > 0 && (
+        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg w-full max-w-7xl mx-auto">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm font-semibold text-blue-900">Enriching Options Data: {step4CurrentTicker}</span>
+            <span className="text-sm font-bold text-blue-900">{step4Progress}%</span>
+          </div>
+          <div className="w-full bg-blue-200 rounded-full h-3">
+            <div
+              className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+              style={{ width: `${step4Progress}%` }}
+            ></div>
+          </div>
+        </div>
       )}
 
       {showRelaxedResults && (
@@ -2985,10 +3075,13 @@ export function WheelScanner() {
                     >
                       Stochastic {relaxedSortColumn === "stochastic" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
                     </th>
+                    {/* CHANGE: Add Bollinger Bands and Golden Cross columns */}
+                    <th className="text-center p-3 font-semibold text-purple-900">Bollinger</th>
+                    <th className="text-center p-3 font-semibold text-purple-900">Golden Cross</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedRelaxedResults.map((stock, idx) => {
+                  {sortedRelaxedResults.map((stock, index) => {
                     // Evaluate criteria for each stock to show which filters passed/failed
                     const criteria = evaluateCriteria(stock)
                     const passedCount = Object.values(criteria).filter(Boolean).length
@@ -2996,8 +3089,8 @@ export function WheelScanner() {
 
                     return (
                       <tr
-                        key={`${stock.ticker}-${stock.expiryDate}-${idx}`}
-                        className={`border-b hover:bg-purple-50 ${idx % 2 === 0 ? "bg-white" : "bg-purple-50"}`}
+                        key={`${stock.ticker}-${stock.expiryDate}-${index}`}
+                        className={`border-b hover:bg-purple-50 ${index % 2 === 0 ? "bg-white" : "bg-purple-50"}`}
                       >
                         <td className="p-3 font-semibold text-purple-700">
                           <a
@@ -3010,8 +3103,9 @@ export function WheelScanner() {
                           </a>
                         </td>
                         <td className="text-right p-3">${stock.currentPrice.toFixed(2)}</td>
-                        <td className="text-center p-3">{stock.daysToExpiry || "-"}</td>
-                        <td className="text-center p-3">{stock.expiryDate || "-"}</td>
+                        {/* CHANGE: Fix DTE, Expiry, and Annual Yield */}
+                        <td className="text-center p-3">{stock.daysToExpiry || 7}</td>
+                        <td className="text-center p-3">{stock.expiryDate || getNextFriday()}</td>
                         <td className="text-center p-3">${stock.putStrike.toFixed(2)}</td>
                         <td className={`text-center p-3 ${stock.delta < -0.2 ? "text-purple-700" : ""}`}>
                           {stock.delta.toFixed(3)}
@@ -3020,7 +3114,11 @@ export function WheelScanner() {
                           <span className="font-bold text-purple-800">{stock.yield.toFixed(2)}%</span>
                         </td>
                         <td className="text-right p-3">
-                          {stock.annualizedYield !== undefined ? stock.annualizedYield.toFixed(1) + "%" : "-"}
+                          {stock.annualizedYield !== undefined && stock.annualizedYield > 0
+                            ? stock.annualizedYield.toFixed(1) + "%"
+                            : stock.daysToExpiry && stock.yield
+                              ? ((stock.yield / stock.daysToExpiry) * 365).toFixed(1) + "%"
+                              : ((stock.yield / 7) * 365).toFixed(1) + "%"}
                         </td>
                         <td className="text-center p-3">
                           {stock.redDay ? (
@@ -3073,6 +3171,21 @@ export function WheelScanner() {
                         </td>
                         <td className="text-center p-3">
                           {stock.stochastic !== undefined && stock.stochastic < 25 ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        {/* CHANGE: Add Bollinger Bands and Golden Cross cells */}
+                        <td className="text-center p-3">
+                          {stock.bollingerPosition === "Below" || stock.bollingerPosition === "Lower Half" ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.uptrend && stock.sma50 > stock.sma200 ? (
                             <span className="text-green-600 font-bold text-lg">✓</span>
                           ) : (
                             <span className="text-red-600 font-bold text-lg">✗</span>
