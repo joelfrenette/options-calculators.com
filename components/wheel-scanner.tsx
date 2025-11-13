@@ -1126,7 +1126,10 @@ export function WheelScanner() {
 
       try {
         for (const expiryDate of [nextFriday, followingFriday]) {
-          const daysToExpiry = Math.floor((new Date(expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+          const daysToExpiry = Math.max(
+            0,
+            Math.floor((new Date(expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
+          )
 
           console.log(`[v0] ${stock.ticker} - Fetching options for expiry: ${expiryDate} (${daysToExpiry} days away)`)
 
@@ -1192,20 +1195,57 @@ export function WheelScanner() {
               }
 
               const snapshotData = await snapshotRes.json()
+
+              console.log(`[v0] ${stock.ticker} - Full snapshot response:`, JSON.stringify(snapshotData, null, 2))
+
               const lastQuote = snapshotData.results?.last_quote
+              const lastTrade = snapshotData.results?.last_trade
+              const dayData = snapshotData.results?.day
               const greeks = snapshotData.results?.greeks
 
-              if (lastQuote && lastQuote.bid > 0 && lastQuote.ask > 0) {
-                const bid = lastQuote.bid
-                const ask = lastQuote.ask
+              let bid: number | undefined
+              let ask: number | undefined
+              let pricingSource = "none"
+
+              // First try: last_quote (requires paid plan with quotes)
+              if (lastQuote && lastQuote.bid_price > 0 && lastQuote.ask_price > 0) {
+                bid = lastQuote.bid_price
+                ask = lastQuote.ask_price
+                pricingSource = "last_quote"
+              }
+              // Second try: last_trade (more commonly available)
+              else if (lastTrade && lastTrade.price > 0) {
+                // Use last trade price as both bid and ask (midpoint approximation)
+                const tradePrice = lastTrade.price
+                // Estimate a reasonable spread (~2% for options)
+                const spreadEstimate = tradePrice * 0.02
+                bid = tradePrice - spreadEstimate / 2
+                ask = tradePrice + spreadEstimate / 2
+                pricingSource = "last_trade"
+                console.log(`[v0] ${stock.ticker} - Using last_trade price: $${tradePrice.toFixed(2)}`)
+              }
+              // Third try: day close or vwap
+              else if (dayData && (dayData.close > 0 || dayData.vwap > 0)) {
+                const dayPrice = dayData.close || dayData.vwap
+                // Use closing price with estimated spread
+                const spreadEstimate = dayPrice * 0.02
+                bid = dayPrice - spreadEstimate / 2
+                ask = dayPrice + spreadEstimate / 2
+                pricingSource = "day_data"
+                console.log(
+                  `[v0] ${stock.ticker} - Using day ${dayData.close ? "close" : "vwap"} price: $${dayPrice.toFixed(2)}`,
+                )
+              }
+
+              if (bid && ask && bid > 0 && ask > 0) {
                 const realPremium = (bid + ask) / 2
+
                 const strikePrice = bestContract.strike_price
                 const expiry = bestContract.expiration_date
 
-                // Re-calculate daysToExpiry based on actual option expiryDate
                 const optionDaysToExpiry = expiry
-                  ? Math.max(1, Math.floor((new Date(expiry).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-                  : 0 // Use 0 if expiry date is missing or invalid
+                  ? Math.max(0, Math.floor((new Date(expiry).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+                  : daysToExpiry // Fallback to the original calculation if expiry is missing
 
                 const timeToExpiry = optionDaysToExpiry / 365
 
@@ -1216,7 +1256,7 @@ export function WheelScanner() {
                   calculatedDelta = greeks.delta
                   deltaSource = "polygon"
                   console.log(
-                    `[v0] ✅ ${stock.ticker} - Strike=$${strikePrice.toFixed(2)}, Premium=$${realPremium.toFixed(2)}, Delta=${calculatedDelta.toFixed(3)} (REAL from Polygon), Bid=$${bid}, Ask=$${ask}`,
+                    `[v0] ✅ ${stock.ticker} - Strike=$${strikePrice.toFixed(2)}, Premium=$${realPremium.toFixed(2)}, Delta=${calculatedDelta.toFixed(3)} (REAL from Polygon), Bid=$${bid.toFixed(2)}, Ask=$${ask.toFixed(2)} [${pricingSource}]`,
                   )
                 } else {
                   // Estimate implied volatility and delta if not provided by Polygon
@@ -1244,7 +1284,7 @@ export function WheelScanner() {
 
                   deltaSource = "calculated"
                   console.log(
-                    `[v0] ✅ ${stock.ticker} - Strike=$${strikePrice.toFixed(2)}, Premium=$${realPremium.toFixed(2)}, Delta=${calculatedDelta.toFixed(3)} (calculated via Black-Scholes), IV=${(impliedVol * 100).toFixed(1)}%, Bid=$${bid}, Ask=$${ask}`,
+                    `[v0] ✅ ${stock.ticker} - Strike=$${strikePrice.toFixed(2)}, Premium=$${realPremium.toFixed(2)}, Delta=${calculatedDelta.toFixed(3)} (calculated via Black-Scholes), IV=${(impliedVol * 100).toFixed(1)}%, Bid=$${bid.toFixed(2)}, Ask=$${ask.toFixed(2)} [${pricingSource}]`,
                   )
                 }
 
@@ -1276,7 +1316,7 @@ export function WheelScanner() {
                 }
               } else {
                 console.warn(
-                  `[v0] ${stock.ticker} - No valid bid/ask in snapshot for strike $${strikePrice} (bid=${lastQuote?.bid}, ask=${lastQuote?.ask})`,
+                  `[v0] ${stock.ticker} - No pricing data available for strike $${strikePrice}. API may require paid plan for real-time quotes.`,
                 )
               }
             }
@@ -1632,11 +1672,12 @@ export function WheelScanner() {
   }
 
   // Toggle function for showing relaxed results
-  const toggleRelaxedResults = async () => {
+  const toggleRelaxedResults = React.useCallback(async () => {
     if (!showRelaxedResults) {
       console.log("[v0] 📊 Showing Step 4 results...")
       if (!relaxedResultsEnriched && fundamentalResults.length > 0) {
         console.log("[v0] 🔄 Enriching fundamental results with options data for Step 4...")
+
         setIsEnrichingRelaxed(true)
         setStep4Progress(0)
         setStep4CurrentTicker("")
@@ -1646,6 +1687,7 @@ export function WheelScanner() {
             setStep4Progress(Math.round((current / total) * 100))
             setStep4CurrentTicker(ticker)
           })
+
           setRelaxedResults(enrichedRelaxed)
           setRelaxedResultsEnriched(true)
           console.log("[v0] ✅ Step 4 enrichment complete:", enrichedRelaxed.length, "stock/expiry combinations")
@@ -1663,7 +1705,7 @@ export function WheelScanner() {
       setStep(3)
     }
     setShowRelaxedResults(!showRelaxedResults)
-  }
+  }, [showRelaxedResults, relaxedResultsEnriched, fundamentalResults])
 
   // Determine the current step based on state
   const currentStep =
@@ -2807,16 +2849,15 @@ export function WheelScanner() {
                     <th className="text-right p-3 font-semibold text-green-900">Yield %</th>
                     <th className="text-right p-3 font-semibold text-green-900">Annual Yield %</th>
                     <th className="text-center p-3 font-semibold text-green-900">Red Day</th>
+                    <th className="text-center p-3 font-semibold text-green-900">MACD</th>
+                    <th className="text-center p-3 font-semibold text-green-900">Bollinger</th>
+                    <th className="text-center p-3 font-semibold text-green-900">Golden Cross</th>
+                    <th className="text-center p-3 font-semibold text-green-900">Stochastic</th>
                     <th className="text-center p-3 font-semibold text-green-900">ATR %</th>
                     <th className="text-center p-3 font-semibold text-green-900">RSI (14)</th>
                     <th className="text-right p-3 font-semibold text-green-900">50-SMA</th>
                     <th className="text-right p-3 font-semibold text-green-900">100-SMA</th>
                     <th className="text-right p-3 font-semibold text-green-900">200-SMA</th>
-                    <th className="text-center p-3 font-semibold text-green-900">MACD</th>
-                    <th className="text-center p-3 font-semibold text-green-900">Stochastic</th>
-                    {/* CHANGE: Add Bollinger Bands and Golden Cross columns */}
-                    <th className="text-center p-3 font-semibold text-green-900">Bollinger</th>
-                    <th className="text-center p-3 font-semibold text-green-900">Golden Cross</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2839,9 +2880,9 @@ export function WheelScanner() {
                           </a>
                         </td>
                         <td className="text-right p-3">${stock.currentPrice.toFixed(2)}</td>
-                        {/* CHANGE: Fix DTE, Expiry, and Annual Yield */}
-                        <td className="text-center p-3">{stock.daysToExpiry || 7}</td>
-                        <td className="text-center p-3">{stock.expiryDate || getNextFriday()}</td>
+                        {/* CHANGE: Display actual DTE from stock data without fallback that masks errors */}
+                        <td className="text-center p-3">{stock.daysToExpiry ?? "N/A"}</td>
+                        <td className="text-center p-3">{stock.expiryDate ?? "N/A"}</td>
                         <td className="text-center p-3">${stock.putStrike.toFixed(2)}</td>
                         <td className={`text-center p-3 ${stock.delta < -0.2 ? "text-green-700" : ""}`}>
                           {stock.delta.toFixed(3)}
@@ -2852,12 +2893,38 @@ export function WheelScanner() {
                         <td className="text-right p-3">
                           {stock.annualizedYield !== undefined && stock.annualizedYield > 0
                             ? stock.annualizedYield.toFixed(1) + "%"
-                            : stock.daysToExpiry && stock.yield
-                              ? ((stock.yield / stock.daysToExpiry) * 365).toFixed(1) + "%"
-                              : ((stock.yield / 7) * 365).toFixed(1) + "%"}
+                            : "N/A"}
                         </td>
                         <td className="text-center p-3">
                           {stock.redDay ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.macdSignal === "Bullish" ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.bollingerPosition === "Below" || stock.bollingerPosition === "Lower Half" ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.uptrend && stock.sma50 > stock.sma200 ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.stochastic !== undefined && stock.stochastic < 25 ? (
                             <span className="text-green-600 font-bold text-lg">✓</span>
                           ) : (
                             <span className="text-red-600 font-bold text-lg">✗</span>
@@ -2898,35 +2965,6 @@ export function WheelScanner() {
                             <span className="text-red-600 font-bold text-lg">✗</span>
                           )}
                         </td>
-                        <td className="text-center p-3">
-                          {stock.macdSignal === "Bullish" ? (
-                            <span className="text-green-600 font-bold text-lg">✓</span>
-                          ) : (
-                            <span className="text-red-600 font-bold text-lg">✗</span>
-                          )}
-                        </td>
-                        <td className="text-center p-3">
-                          {stock.stochastic !== undefined && stock.stochastic < 25 ? (
-                            <span className="text-green-600 font-bold text-lg">✓</span>
-                          ) : (
-                            <span className="text-red-600 font-bold text-lg">✗</span>
-                          )}
-                        </td>
-                        {/* CHANGE: Add Bollinger Bands and Golden Cross cells */}
-                        <td className="text-center p-3">
-                          {stock.bollingerPosition === "Below" || stock.bollingerPosition === "Lower Half" ? (
-                            <span className="text-green-600 font-bold text-lg">✓</span>
-                          ) : (
-                            <span className="text-red-600 font-bold text-lg">✗</span>
-                          )}
-                        </td>
-                        <td className="text-center p-3">
-                          {stock.uptrend && stock.sma50 > stock.sma200 ? (
-                            <span className="text-green-600 font-bold text-lg">✓</span>
-                          ) : (
-                            <span className="text-red-600 font-bold text-lg">✗</span>
-                          )}
-                        </td>
                       </tr>
                     )
                   })}
@@ -2948,7 +2986,7 @@ export function WheelScanner() {
           <CardHeader className="bg-gradient-to-r from-yellow-50 to-amber-50">
             <div className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-yellow-600" />
-              <CardTitle className="text-yellow-900">No Stocks Passed Technical Criteria</CardTitle>
+              <CardTitle className="text-yellow-900">Step 3: No Stocks Passed Technical Criteria</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="p-6">
@@ -3058,6 +3096,15 @@ export function WheelScanner() {
                     >
                       Red Day {relaxedSortColumn === "redDay" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
                     </th>
+                    <th className="text-center p-3 font-semibold text-purple-900">MACD</th>
+                    <th className="text-center p-3 font-semibold text-purple-900">Bollinger</th>
+                    <th className="text-center p-3 font-semibold text-purple-900">Golden Cross</th>
+                    <th
+                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer"
+                      onClick={() => handleRelaxedSort("stochastic")}
+                    >
+                      Stochastic {relaxedSortColumn === "stochastic" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
+                    </th>
                     <th className="text-center p-3 font-semibold text-purple-900">ATR %</th>
                     <th
                       className="text-center p-3 font-semibold text-purple-900 cursor-pointer"
@@ -3068,16 +3115,6 @@ export function WheelScanner() {
                     <th className="text-right p-3 font-semibold text-purple-900">50-SMA</th>
                     <th className="text-right p-3 font-semibold text-purple-900">100-SMA</th>
                     <th className="text-right p-3 font-semibold text-purple-900">200-SMA</th>
-                    <th className="text-center p-3 font-semibold text-purple-900">MACD</th>
-                    <th
-                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer"
-                      onClick={() => handleRelaxedSort("stochastic")}
-                    >
-                      Stochastic {relaxedSortColumn === "stochastic" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
-                    </th>
-                    {/* CHANGE: Add Bollinger Bands and Golden Cross columns */}
-                    <th className="text-center p-3 font-semibold text-purple-900">Bollinger</th>
-                    <th className="text-center p-3 font-semibold text-purple-900">Golden Cross</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -3103,9 +3140,8 @@ export function WheelScanner() {
                           </a>
                         </td>
                         <td className="text-right p-3">${stock.currentPrice.toFixed(2)}</td>
-                        {/* CHANGE: Fix DTE, Expiry, and Annual Yield */}
-                        <td className="text-center p-3">{stock.daysToExpiry || 7}</td>
-                        <td className="text-center p-3">{stock.expiryDate || getNextFriday()}</td>
+                        <td className="text-center p-3">{stock.daysToExpiry ?? "N/A"}</td>
+                        <td className="text-center p-3">{stock.expiryDate ?? "N/A"}</td>
                         <td className="text-center p-3">${stock.putStrike.toFixed(2)}</td>
                         <td className={`text-center p-3 ${stock.delta < -0.2 ? "text-purple-700" : ""}`}>
                           {stock.delta.toFixed(3)}
@@ -3116,12 +3152,38 @@ export function WheelScanner() {
                         <td className="text-right p-3">
                           {stock.annualizedYield !== undefined && stock.annualizedYield > 0
                             ? stock.annualizedYield.toFixed(1) + "%"
-                            : stock.daysToExpiry && stock.yield
-                              ? ((stock.yield / stock.daysToExpiry) * 365).toFixed(1) + "%"
-                              : ((stock.yield / 7) * 365).toFixed(1) + "%"}
+                            : "N/A"}
                         </td>
                         <td className="text-center p-3">
                           {stock.redDay ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.macdSignal === "Bullish" ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.bollingerPosition === "Below" || stock.bollingerPosition === "Lower Half" ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.uptrend && stock.sma50 > stock.sma200 ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.stochastic !== undefined && stock.stochastic < 25 ? (
                             <span className="text-green-600 font-bold text-lg">✓</span>
                           ) : (
                             <span className="text-red-600 font-bold text-lg">✗</span>
@@ -3157,35 +3219,6 @@ export function WheelScanner() {
                         </td>
                         <td className="text-center p-3">
                           {stock.sma200 !== undefined && stock.currentPrice < stock.sma200 ? (
-                            <span className="text-green-600 font-bold text-lg">✓</span>
-                          ) : (
-                            <span className="text-red-600 font-bold text-lg">✗</span>
-                          )}
-                        </td>
-                        <td className="text-center p-3">
-                          {stock.macdSignal === "Bullish" ? (
-                            <span className="text-green-600 font-bold text-lg">✓</span>
-                          ) : (
-                            <span className="text-red-600 font-bold text-lg">✗</span>
-                          )}
-                        </td>
-                        <td className="text-center p-3">
-                          {stock.stochastic !== undefined && stock.stochastic < 25 ? (
-                            <span className="text-green-600 font-bold text-lg">✓</span>
-                          ) : (
-                            <span className="text-red-600 font-bold text-lg">✗</span>
-                          )}
-                        </td>
-                        {/* CHANGE: Add Bollinger Bands and Golden Cross cells */}
-                        <td className="text-center p-3">
-                          {stock.bollingerPosition === "Below" || stock.bollingerPosition === "Lower Half" ? (
-                            <span className="text-green-600 font-bold text-lg">✓</span>
-                          ) : (
-                            <span className="text-red-600 font-bold text-lg">✗</span>
-                          )}
-                        </td>
-                        <td className="text-center p-3">
-                          {stock.uptrend && stock.sma50 > stock.sma200 ? (
                             <span className="text-green-600 font-bold text-lg">✓</span>
                           ) : (
                             <span className="text-red-600 font-bold text-lg">✗</span>
