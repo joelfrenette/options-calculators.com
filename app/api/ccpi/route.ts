@@ -766,28 +766,59 @@ function generateWeeklySummary(
     headline = `This week, the CCPI reads ${ccpi}${warningText}, indicating relatively low crash risk based on ${confidencePercent} percent confident analysis of market indicators.`
   }
   
-  const bullets = []
+  const bullets: string[] = []
   
-  // Specific indicator callouts
-  if (data.vix > 20) {
-    bullets.push(`VIX at ${data.vix} showing elevated volatility expectations and market uncertainty.`)
-  }
-
-  if (data.putCallRatio < 0.7) {
-    bullets.push(`Put/Call ratio at ${data.putCallRatio} suggests investor complacency with insufficient hedging.`)
+  // Sort pillars by stress level to identify top concerns
+  const pillarScores = [
+    { name: "Valuation", score: pillars.valuation, pillar: "valuation" },
+    { name: "Technical", score: pillars.technical, pillar: "technical" },
+    { name: "Macro", score: pillars.macro, pillar: "macro" },
+    { name: "Sentiment", score: pillars.sentiment, pillar: "sentiment" },
+    { name: "Flows", score: pillars.flows, pillar: "flows" },
+    { name: "Structural", score: pillars.structural, pillar: "structural" }
+  ].sort((a, b) => b.score - a.score)
+  
+  // Get high-severity canaries
+  const highSeverityCanaries = canaries.filter(c => c.severity === "high")
+  const mediumSeverityCanaries = canaries.filter(c => c.severity === "medium")
+  
+  // Bullet 1: Highlight the most stressed pillar with specific concerns
+  const topPillar = pillarScores[0]
+  if (topPillar.score >= 60) {
+    const relatedCanaries = canaries.filter(c => c.pillar.toLowerCase().includes(topPillar.pillar.toLowerCase()) && (c.severity === "high" || c.severity === "medium"))
+    if (relatedCanaries.length > 0) {
+      bullets.push(`${topPillar.name} stress at ${Math.round(topPillar.score)}/100: ${relatedCanaries[0].signal}`)
+    } else {
+      bullets.push(`${topPillar.name} pillar elevated at ${Math.round(topPillar.score)}/100, contributing most to overall crash risk assessment.`)
+    }
+  } else if (topPillar.score >= 40) {
+    bullets.push(`${topPillar.name} pillar shows moderate stress at ${Math.round(topPillar.score)}/100, worth monitoring closely.`)
   }
   
-  if (data.aaiiBullish > 50) {
-    bullets.push(`AAII sentiment at ${data.aaiiBullish}% bulls indicates potential euphoria among retail investors.`)
+  // Bullet 2: Highlight second-most stressed pillar or high-severity canary
+  const secondPillar = pillarScores[1]
+  if (secondPillar.score >= 50) {
+    const relatedCanaries = canaries.filter(c => c.pillar.toLowerCase().includes(secondPillar.pillar.toLowerCase()) && (c.severity === "high" || c.severity === "medium"))
+    if (relatedCanaries.length > 0) {
+      bullets.push(`${secondPillar.name} concerns at ${Math.round(secondPillar.score)}/100: ${relatedCanaries[0].signal}`)
+    } else {
+      bullets.push(`${secondPillar.name} pillar at ${Math.round(secondPillar.score)}/100 adding secondary stress to the system.`)
+    }
+  } else if (highSeverityCanaries.length > 0 && bullets.length < 2) {
+    bullets.push(highSeverityCanaries[0].signal)
   }
   
-  if (data.highLowIndex < 0.4) {
-    bullets.push(`High-Low Index at ${(data.highLowIndex * 100).toFixed(0)}% showing narrow market leadership and fragile breadth.`)
-  }
-  
-  if (bullets.length === 0) {
-    bullets.push("Most professional indicators remain within normal ranges with no extreme signals at this time.")
-    bullets.push("Continue monitoring VIX, sentiment surveys, and valuation metrics for any developing stress.")
+  // Bullet 3: Add actionable guidance based on risk level
+  if (ccpi >= 60) {
+    bullets.push(`Reduce net long exposure, increase hedges, and consider defensive positioning given elevated crash risk signals.`)
+  } else if (ccpi >= 40) {
+    bullets.push(`Monitor ${activeWarnings} active warning signals closely and maintain hedging strategies as precaution.`)
+  } else if (activeWarnings > 5) {
+    bullets.push(`Despite low overall CCPI, ${activeWarnings} warning signals suggest maintaining vigilance and balanced portfolio hedges.`)
+  } else if (activeWarnings > 0) {
+    bullets.push(`Continue monitoring ${activeWarnings} developing warning signals for any trend deterioration.`)
+  } else {
+    bullets.push(`Market indicators broadly healthy with no significant stress signals at this time.`)
   }
   
   return { headline, bullets }

@@ -96,11 +96,11 @@ ${i + 1}. **${ds.page}** - ${ds.endpoint}
 
 ${auditResults.calculations.map((calc: any, i: number) => `
 ${i + 1}. **${calc.name}**
-   - Formula: \`${calc.formula}\`
+   - Formula: ${calc.formula}
    - Source: ${calc.source}
    - Inputs: ${calc.inputs}
    - Weighting: ${calc.weighting}
-   - **${calc.validated}**
+   - ${calc.validated}
 `).join("\n")}
 
 ---
