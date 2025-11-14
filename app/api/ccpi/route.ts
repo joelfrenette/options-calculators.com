@@ -64,10 +64,10 @@ export async function GET() {
       riskAppetite: data.riskAppetite,
       etfFlows: data.etfFlows,
       shortInterest: data.shortInterest,
-      aiCapexGrowth: data.aiCapexGrowth,
-      aiRevenueGrowth: data.aiRevenueGrowth,
-      gpuPricingPremium: data.gpuPricingPremium,
-      aiJobPostingsGrowth: data.aiJobPostingsGrowth
+      aiCapexGrowth: data.snapshot.aiCapexGrowth,
+      aiRevenueGrowth: data.snapshot.aiRevenueGrowth,
+      gpuPricingPremium: data.snapshot.gpuPricingPremium,
+      aiJobPostingsGrowth: data.snapshot.aiJobPostingsGrowth
     }
     
     return NextResponse.json({
@@ -91,8 +91,26 @@ export async function GET() {
 }
 
 async function fetchMarketData() {
-  // In production, fetch from actual APIs (FRED, Yahoo, etc.)
-  // For now, using realistic values that would come from these sources
+  // ==========================================
+  // CURRENTLY USING HARDCODED MOCK DATA - NOT LIVE MARKET DATA
+  // ==========================================
+  // In production, this function should fetch from actual APIs:
+  // - Buffett Indicator, P/E, P/S: FRED API, Yahoo Finance, Koyfin
+  // - VIX, VXN, Put/Call: CBOE Market Statistics API
+  // - High-Low Index, Bullish %: StockCharts.com API, Barchart
+  // - ATR: Yahoo Finance Technical Indicators
+  // - Fed Funds Rate, Yield Curve: FRED API
+  // - Junk Spreads: FRED API (BAMLH0A0HYM2)
+  // - AAII Sentiment: AAII.com API (requires subscription)
+  // - Fear & Greed: CNN Business API
+  // - ETF Flows: ETF.com API, Bloomberg
+  // - Short Interest: FINRA API, Yahoo Finance
+  // - Left Tail Volatility: Options data from CBOE or OptionMetrics
+  // - Risk Appetite: State Street Investor Confidence Index
+  //
+  // For now, using realistic static values that represent current market conditions
+  // as of the development date to demonstrate the CCPI calculation system.
+  // ==========================================
   
   return {
     // Valuation indicators
@@ -105,7 +123,7 @@ async function fetchMarketData() {
     vxn: 19.5,             // Nasdaq 100 volatility
     rvx: 20.1,             // Russell 2000 volatility
     atr: 42.3,             // S&P 500 ATR (14-day)
-    highLowIndex: 0.42,    // % of stocks at 52-week highs vs lows (0-1)
+    highLowIndex: 0.42,    // % of stocks at 52-week highs vs lows (0-1 scale, 0.42 = 42%)
     bullishPercent: 58,    // Bullish Percent Index (NYSE)
     
     // Macro indicators
@@ -124,7 +142,7 @@ async function fetchMarketData() {
     shortInterest: 16.5,   // % short interest in tech
     
     // Additional volatility metrics
-    ltv: 0.12,             // Left Tail Volatility (crash probability)
+    ltv: 0.12,             // Left Tail Volatility - crash probability (0-1 scale, 0.12 = 12%)
     spotVol: 0.22,         // CBOE SPOTVOL
     
     // Risk appetite

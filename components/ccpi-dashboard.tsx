@@ -88,10 +88,36 @@ export function CcpiDashboard() {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       const result = await response.json()
+      
+      console.log("[v0] CCPI Data Loaded:", {
+        ccpi: result.ccpi,
+        certainty: result.certainty,
+        regime: result.regime.name,
+        pillars: result.pillars,
+        activeCanaries: result.canaries.filter((c: any) => c.severity === 'high' || c.severity === 'medium').length,
+        totalIndicators: 23
+      })
+      console.log("[v0] Pillar Breakdown (weighted contribution to CCPI):")
+      console.log("  Valuation:", result.pillars.valuation, "× 22% =", (result.pillars.valuation * 0.22).toFixed(1))
+      console.log("  Technical:", result.pillars.technical, "× 20% =", (result.pillars.technical * 0.20).toFixed(1))
+      console.log("  Macro:", result.pillars.macro, "× 18% =", (result.pillars.macro * 0.18).toFixed(1))
+      console.log("  Sentiment:", result.pillars.sentiment, "× 18% =", (result.pillars.sentiment * 0.18).toFixed(1))
+      console.log("  Flows:", result.pillars.flows, "× 12% =", (result.pillars.flows * 0.12).toFixed(1))
+      console.log("  Structural:", result.pillars.structural, "× 10% =", (result.pillars.structural * 0.10).toFixed(1))
+      
+      const calculatedCCPI = 
+        result.pillars.valuation * 0.22 +
+        result.pillars.technical * 0.20 +
+        result.pillars.macro * 0.18 +
+        result.pillars.sentiment * 0.18 +
+        result.pillars.flows * 0.12 +
+        result.pillars.structural * 0.10
+      console.log("  Calculated CCPI:", calculatedCCPI.toFixed(1), "| API CCPI:", result.ccpi)
+      
       setData(result)
-    } catch (error: any) {
-      console.error("[v0] Failed to fetch CCPI data:", error)
-      setError("Failed to load CCPI data. Please try again later.")
+    } catch (error) {
+      console.error("[v0] CCPI API error:", error)
+      setError(error instanceof Error ? error.message : "Failed to load CCPI data")
     } finally {
       setLoading(false)
     }
@@ -553,12 +579,12 @@ export function CcpiDashboard() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">High-Low Index</span>
-                        <span className="font-bold">{data.indicators.highLowIndex}%</span>
+                        <span className="font-bold">{(data.indicators.highLowIndex * 100).toFixed(2)}%</span>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${data.indicators.highLowIndex}%` 
+                          marginLeft: `${data.indicators.highLowIndex * 100}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
@@ -595,12 +621,12 @@ export function CcpiDashboard() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">Left Tail Volatility</span>
-                        <span className="font-bold">{data.indicators.ltv}%</span>
+                        <span className="font-bold">{(data.indicators.ltv * 100).toFixed(2)}%</span>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.ltv / 30) * 100)}%` 
+                          marginLeft: `${Math.min(100, (data.indicators.ltv * 100))}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
