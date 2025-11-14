@@ -457,7 +457,7 @@ ${auditResults.codeQuality.map((check: any) => `
                     <Card className="mb-6">
                       <CardHeader>
                         <CardTitle>Calculations & Formulas ({auditResults.calculations.length})</CardTitle>
-                        <CardDescription>All legitimate and validated</CardHeader>
+                        <CardDescription>All legitimate and validated</CardDescription>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-4">
