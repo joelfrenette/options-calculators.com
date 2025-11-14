@@ -55,6 +55,24 @@ export function CcpiDashboard() {
   const [data, setData] = useState<CCPIData | null>(null)
   const [history, setHistory] = useState<HistoricalData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const getReadableColor = (colorName: string): string => {
+    const colorMap: Record<string, string> = {
+      'green': '#16a34a',      // Green for low risk
+      'lime': '#65a30d',       // Lime for normal
+      'yellow': '#f97316',     // Orange instead of yellow for better readability
+      'orange': '#f97316',     // Orange for caution
+      'red': '#dc2626'         // Red for high alert/crash watch
+    }
+    return colorMap[colorName] || '#6b7280' // Default to gray if color not found
+  }
+
+  const getBarColor = (percentage: number): string => {
+    if (percentage <= 33) return '#22c55e' // green-500
+    if (percentage <= 66) return '#eab308' // yellow-500
+    return '#ef4444' // red-500
+  }
 
   useEffect(() => {
     fetchData()
@@ -64,11 +82,16 @@ export function CcpiDashboard() {
   const fetchData = async () => {
     try {
       setLoading(true)
+      setError(null)
       const response = await fetch("/api/ccpi")
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
       const result = await response.json()
       setData(result)
-    } catch (error) {
+    } catch (error: any) {
       console.error("[v0] Failed to fetch CCPI data:", error)
+      setError("Failed to load CCPI data. Please try again later.")
     } finally {
       setLoading(false)
     }
@@ -77,6 +100,9 @@ export function CcpiDashboard() {
   const fetchHistory = async () => {
     try {
       const response = await fetch("/api/ccpi/history")
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
       const result = await response.json()
       setHistory(result)
     } catch (error) {
@@ -84,7 +110,7 @@ export function CcpiDashboard() {
     }
   }
 
-  if (loading || !data) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
         <div className="text-center">
@@ -93,6 +119,24 @@ export function CcpiDashboard() {
         </div>
       </div>
     )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <div className="text-center">
+          <AlertTriangle className="h-8 w-8 text-red-600 mx-auto mb-2" />
+          <p className="text-sm text-red-600">{error}</p>
+          <Button variant="outline" onClick={fetchData} className="mt-4">
+            Retry
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!data) {
+    return null // Should not happen if loading/error handled
   }
 
   const getRegimeColor = (level: number) => {
@@ -139,8 +183,8 @@ export function CcpiDashboard() {
     <div className="space-y-6">
       {/* Header Controls */}
       <div className="flex items-center justify-end">
-        <Button variant="outline" size="sm" onClick={fetchData}>
-          <RefreshCw className="h-4 w-4 mr-2" />
+        <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
       </div>
@@ -217,7 +261,7 @@ export function CcpiDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center p-6 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600 mb-2">CCPI Score</p>
-              <p className="text-5xl font-bold mb-2" style={{ color: data.regime.color }}>
+              <p className="text-5xl font-bold mb-2" style={{ color: getReadableColor(data.regime.color) }}>
                 {data.ccpi}
               </p>
               <p className="text-xs text-gray-500">0 = No risk, 100 = Imminent crash</p>
@@ -225,13 +269,13 @@ export function CcpiDashboard() {
             
             <div className="text-center p-6 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600 mb-2">Certainty Score</p>
-              <p className="text-5xl font-bold mb-2 text-blue-600">{data.certainty}</p>
+              <p className="text-5xl font-bold mb-2 text-blue-600">{data.certainty}%</p>
               <p className="text-xs text-gray-500">Signal consistency & alignment</p>
             </div>
             
             <div className="text-center p-6 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600 mb-2">Current Regime</p>
-              <p className="text-2xl font-bold mb-1" style={{ color: data.regime.color }}>
+              <p className="text-2xl font-bold mb-1" style={{ color: getReadableColor(data.regime.color) }}>
                 {data.regime.name}
               </p>
               <p className="text-xs text-gray-600 px-2">{data.regime.description}</p>
@@ -387,14 +431,16 @@ export function CcpiDashboard() {
                         <span className="font-medium">Buffett Indicator (Market Cap / GDP)</span>
                         <span className="font-bold">{data.indicators.buffettIndicator}%</span>
                       </div>
-                      <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className="absolute h-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500"
-                          style={{ width: `${Math.min(100, (data.indicators.buffettIndicator / 200) * 100)}%` }}
-                        />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        {/* Gray overlay for unfilled portion */}
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${Math.min(100, (data.indicators.buffettIndicator / 200) * 100)}%` 
+                        }} />
+                        {/* Threshold markers */}
                         <div className="absolute inset-0 flex items-center">
-                          <div className="w-[60%] border-r-2 border-gray-400" />
-                          <div className="w-[20%] border-r-2 border-gray-400" />
+                          <div className="w-[60%] border-r-2 border-gray-400 opacity-30" />
+                          <div className="w-[20%] border-r-2 border-gray-400 opacity-30" />
                         </div>
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
@@ -410,17 +456,18 @@ export function CcpiDashboard() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">S&P 500 Forward P/E</span>
-                        <span className="font-bold">{data.indicators.spxPE.toFixed(1)}</span>
+                        <span className="font-bold">{data.indicators.spxPE}</span>
                       </div>
-                      <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className="absolute h-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500"
-                          style={{ width: `${Math.min(100, (data.indicators.spxPE / 30) * 100)}%` }}
-                        />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        {/* Gray overlay for unfilled portion */}
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${Math.min(100, ((data.indicators.spxPE - 10) / 15) * 100)}%` 
+                        }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
                         <span>Historical Median: 16</span>
-                        <span>Current: {data.indicators.spxPE.toFixed(1)}</span>
+                        <span>Current: {data.indicators.spxPE}</span>
                       </div>
                     </div>
                   )}
@@ -430,13 +477,14 @@ export function CcpiDashboard() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">S&P 500 Price-to-Sales</span>
-                        <span className="font-bold">{data.indicators.spxPS.toFixed(2)}</span>
+                        <span className="font-bold">{data.indicators.spxPS}</span>
                       </div>
-                      <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className="absolute h-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500"
-                          style={{ width: `${Math.min(100, (data.indicators.spxPS / 4) * 100)}%` }}
-                        />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        {/* Gray overlay for unfilled portion */}
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${Math.min(100, ((data.indicators.spxPS - 1) / 2) * 100)}%` 
+                        }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
                         <span>Normal: &lt;2.5</span>
@@ -463,19 +511,19 @@ export function CcpiDashboard() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">VIX (Volatility Index)</span>
-                        <span className="font-bold">{data.indicators.vix.toFixed(1)}</span>
+                        <span className="font-bold">{data.indicators.vix}</span>
                       </div>
-                      <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`absolute h-full ${
-                            data.indicators.vix < 15 ? 'bg-green-500' :
-                            data.indicators.vix < 25 ? 'bg-yellow-500' :
-                            data.indicators.vix < 35 ? 'bg-orange-500' : 'bg-red-500'
-                          }`}
-                          style={{ width: `${Math.min(100, (data.indicators.vix / 50) * 100)}%` }}
-                        />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${Math.min(100, ((data.indicators.vix - 10) / 30) * 100)}%` 
+                        }} />
                       </div>
-                      <p className="text-xs text-gray-600">Normal: 15-25, Crisis: &gt;35</p>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Calm: 10-15</span>
+                        <span>Elevated: 20-30</span>
+                        <span>High: &gt;30</span>
+                      </div>
                     </div>
                   )}
 
@@ -484,18 +532,19 @@ export function CcpiDashboard() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">VXN (Nasdaq Volatility)</span>
-                        <span className="font-bold">{data.indicators.vxn.toFixed(1)}</span>
+                        <span className="font-bold">{data.indicators.vxn}</span>
                       </div>
-                      <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`absolute h-full ${
-                            data.indicators.vxn < 20 ? 'bg-green-500' :
-                            data.indicators.vxn < 30 ? 'bg-yellow-500' : 'bg-red-500'
-                          }`}
-                          style={{ width: `${Math.min(100, (data.indicators.vxn / 50) * 100)}%` }}
-                        />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${Math.min(100, ((data.indicators.vxn - 10) / 30) * 100)}%` 
+                        }} />
                       </div>
-                      <p className="text-xs text-gray-600">Tech sector stress indicator</p>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Calm: 10-15</span>
+                        <span>Elevated: 20-30</span>
+                        <span>High: &gt;30</span>
+                      </div>
                     </div>
                   )}
 
@@ -503,19 +552,20 @@ export function CcpiDashboard() {
                   {data.indicators.highLowIndex !== undefined && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">High-Low Index (Breadth)</span>
-                        <span className="font-bold">{(data.indicators.highLowIndex * 100).toFixed(0)}%</span>
+                        <span className="font-medium">High-Low Index</span>
+                        <span className="font-bold">{data.indicators.highLowIndex}%</span>
                       </div>
-                      <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`absolute h-full ${
-                            data.indicators.highLowIndex > 0.7 ? 'bg-green-500' :
-                            data.indicators.highLowIndex > 0.4 ? 'bg-yellow-500' : 'bg-red-500'
-                          }`}
-                          style={{ width: `${data.indicators.highLowIndex * 100}%` }}
-                        />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${data.indicators.highLowIndex}%` 
+                        }} />
                       </div>
-                      <p className="text-xs text-gray-600">Low = narrow leadership, fragile</p>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Weak: &lt;30%</span>
+                        <span>Neutral: 30-60%</span>
+                        <span>Strong: &gt;60%</span>
+                      </div>
                     </div>
                   )}
 
@@ -526,16 +576,17 @@ export function CcpiDashboard() {
                         <span className="font-medium">Bullish Percent Index</span>
                         <span className="font-bold">{data.indicators.bullishPercent}%</span>
                       </div>
-                      <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`absolute h-full ${
-                            data.indicators.bullishPercent > 70 ? 'bg-red-500' :
-                            data.indicators.bullishPercent > 30 ? 'bg-green-500' : 'bg-orange-500'
-                          }`}
-                          style={{ width: `${data.indicators.bullishPercent}%` }}
-                        />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${data.indicators.bullishPercent}%` 
+                        }} />
                       </div>
-                      <p className="text-xs text-gray-600">&gt;70 overbought, &lt;30 oversold</p>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Oversold: &lt;30%</span>
+                        <span>Neutral: 30-70%</span>
+                        <span>Overbought: &gt;70%</span>
+                      </div>
                     </div>
                   )}
 
@@ -543,19 +594,20 @@ export function CcpiDashboard() {
                   {data.indicators.ltv !== undefined && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">Left Tail Volatility (Crash Risk)</span>
-                        <span className="font-bold">{(data.indicators.ltv * 100).toFixed(1)}%</span>
+                        <span className="font-medium">Left Tail Volatility</span>
+                        <span className="font-bold">{data.indicators.ltv}%</span>
                       </div>
-                      <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`absolute h-full ${
-                            data.indicators.ltv < 0.08 ? 'bg-green-500' :
-                            data.indicators.ltv < 0.12 ? 'bg-yellow-500' : 'bg-red-500'
-                          }`}
-                          style={{ width: `${Math.min(100, (data.indicators.ltv / 0.2) * 100)}%` }}
-                        />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${Math.min(100, (data.indicators.ltv / 30) * 100)}%` 
+                        }} />
                       </div>
-                      <p className="text-xs text-gray-600">Options-implied crash probability</p>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Low: &lt;10%</span>
+                        <span>Elevated: 10-20%</span>
+                        <span>High: &gt;20%</span>
+                      </div>
                     </div>
                   )}
 
@@ -564,18 +616,19 @@ export function CcpiDashboard() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">ATR (Average True Range)</span>
-                        <span className="font-bold">{data.indicators.atr.toFixed(1)}</span>
+                        <span className="font-bold">{data.indicators.atr}</span>
                       </div>
-                      <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`absolute h-full ${
-                            data.indicators.atr < 35 ? 'bg-green-500' :
-                            data.indicators.atr < 45 ? 'bg-yellow-500' : 'bg-red-500'
-                          }`}
-                          style={{ width: `${Math.min(100, (data.indicators.atr / 70) * 100)}%` }}
-                        />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${Math.min(100, ((data.indicators.atr - 20) / 40) * 100)}%` 
+                        }} />
                       </div>
-                      <p className="text-xs text-gray-600">Volatility expansion measure</p>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Low: 20-30</span>
+                        <span>Elevated: 40-50</span>
+                        <span>High: &gt;50</span>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -597,18 +650,19 @@ export function CcpiDashboard() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">Fed Funds Rate</span>
-                        <span className="font-bold">{data.indicators.fedFundsRate.toFixed(2)}%</span>
+                        <span className="font-bold">{data.indicators.fedFundsRate}%</span>
                       </div>
-                      <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`absolute h-full ${
-                            data.indicators.fedFundsRate < 2 ? 'bg-green-500' :
-                            data.indicators.fedFundsRate < 4 ? 'bg-yellow-500' : 'bg-red-500'
-                          }`}
-                          style={{ width: `${Math.min(100, (data.indicators.fedFundsRate / 6) * 100)}%` }}
-                        />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${Math.min(100, (data.indicators.fedFundsRate / 6) * 100)}%` 
+                        }} />
                       </div>
-                      <p className="text-xs text-gray-600">High rates = restrictive policy</p>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Accommodative: &lt;2%</span>
+                        <span>Neutral: 2-4%</span>
+                        <span>Restrictive: &gt;4.5%</span>
+                      </div>
                     </div>
                   )}
 
@@ -617,18 +671,19 @@ export function CcpiDashboard() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">Junk Bond Spread</span>
-                        <span className="font-bold">{data.indicators.junkSpread.toFixed(1)}%</span>
+                        <span className="font-bold">{data.indicators.junkSpread}%</span>
                       </div>
-                      <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`absolute h-full ${
-                            data.indicators.junkSpread < 4 ? 'bg-green-500' :
-                            data.indicators.junkSpread < 6 ? 'bg-yellow-500' : 'bg-red-500'
-                          }`}
-                          style={{ width: `${Math.min(100, (data.indicators.junkSpread / 10) * 100)}%` }}
-                        />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${Math.min(100, ((data.indicators.junkSpread - 2) / 8) * 100)}%` 
+                        }} />
                       </div>
-                      <p className="text-xs text-gray-600">Credit stress indicator</p>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Tight: &lt;3%</span>
+                        <span>Normal: 3-5%</span>
+                        <span>Wide: &gt;6%</span>
+                      </div>
                     </div>
                   )}
 
@@ -637,20 +692,19 @@ export function CcpiDashboard() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">Yield Curve (10Y-2Y)</span>
-                        <span className="font-bold">{data.indicators.yieldCurve.toFixed(2)}%</span>
+                        <span className="font-bold">{data.indicators.yieldCurve}%</span>
                       </div>
-                      <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`absolute h-full ${
-                            data.indicators.yieldCurve > 0.5 ? 'bg-green-500' :
-                            data.indicators.yieldCurve > -0.2 ? 'bg-yellow-500' : 'bg-red-500'
-                          }`}
-                          style={{ 
-                            width: `${Math.min(100, Math.max(0, ((data.indicators.yieldCurve + 1) / 2) * 100))}%` 
-                          }}
-                        />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${Math.min(100, Math.max(0, 100 - ((data.indicators.yieldCurve + 1) / 2) * 100))}%` 
+                        }} />
                       </div>
-                      <p className="text-xs text-gray-600">Inverted (&lt;0) = recession risk</p>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Normal: &gt;0.5%</span>
+                        <span>Flat: 0-0.5%</span>
+                        <span>Inverted: &lt;0%</span>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -667,43 +721,45 @@ export function CcpiDashboard() {
                 </div>
                 <div className="space-y-6">
                   
-                  {/* AAII Bulls */}
+                  {/* AAII Bullish Sentiment */}
                   {data.indicators.aaiiBullish !== undefined && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">AAII Bullish Sentiment</span>
                         <span className="font-bold">{data.indicators.aaiiBullish}%</span>
                       </div>
-                      <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`absolute h-full ${
-                            data.indicators.aaiiBullish < 35 || data.indicators.aaiiBullish > 55 ? 'bg-red-500' :
-                            'bg-green-500'
-                          }`}
-                          style={{ width: `${data.indicators.aaiiBullish}%` }}
-                        />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${data.indicators.aaiiBullish}%` 
+                        }} />
                       </div>
-                      <p className="text-xs text-gray-600">Contrarian: &gt;55% = euphoria risk</p>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Bearish: &lt;30%</span>
+                        <span>Neutral: 30-50%</span>
+                        <span>Euphoric: &gt;50%</span>
+                      </div>
                     </div>
                   )}
 
-                  {/* AAII Bears */}
+                  {/* AAII Bearish Sentiment */}
                   {data.indicators.aaiiBearish !== undefined && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">AAII Bearish Sentiment</span>
                         <span className="font-bold">{data.indicators.aaiiBearish}%</span>
                       </div>
-                      <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`absolute h-full ${
-                            data.indicators.aaiiBearish > 40 || data.indicators.aaiiBearish < 20 ? 'bg-orange-500' :
-                            'bg-green-500'
-                          }`}
-                          style={{ width: `${data.indicators.aaiiBearish}%` }}
-                        />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${data.indicators.aaiiBearish}%` 
+                        }} />
                       </div>
-                      <p className="text-xs text-gray-600">Extremes signal reversals</p>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Complacent: &lt;20%</span>
+                        <span>Normal: 20-35%</span>
+                        <span>Fearful: &gt;35%</span>
+                      </div>
                     </div>
                   )}
 
@@ -712,19 +768,19 @@ export function CcpiDashboard() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">Put/Call Ratio</span>
-                        <span className="font-bold">{data.indicators.putCallRatio.toFixed(2)}</span>
+                        <span className="font-bold">{data.indicators.putCallRatio}</span>
                       </div>
-                      <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`absolute h-full ${
-                            data.indicators.putCallRatio < 0.7 ? 'bg-red-500' :
-                            data.indicators.putCallRatio > 1.2 ? 'bg-orange-500' :
-                            'bg-green-500'
-                          }`}
-                          style={{ width: `${Math.min(100, (data.indicators.putCallRatio / 1.5) * 100)}%` }}
-                        />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${Math.min(100, (data.indicators.putCallRatio / 1.5) * 100)}%` 
+                        }} />
                       </div>
-                      <p className="text-xs text-gray-600">&lt;0.7 = complacency, &gt;1.2 = fear</p>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Complacent: &lt;0.7</span>
+                        <span>Normal: 0.7-1.0</span>
+                        <span>Fearful: &gt;1.0</span>
+                      </div>
                     </div>
                   )}
 
@@ -735,41 +791,38 @@ export function CcpiDashboard() {
                         <span className="font-medium">Fear & Greed Index</span>
                         <span className="font-bold">{data.indicators.fearGreedIndex}</span>
                       </div>
-                      <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`absolute h-full ${
-                            data.indicators.fearGreedIndex < 25 ? 'bg-red-500' :
-                            data.indicators.fearGreedIndex < 45 ? 'bg-orange-500' :
-                            data.indicators.fearGreedIndex < 55 ? 'bg-green-500' :
-                            data.indicators.fearGreedIndex < 75 ? 'bg-lime-500' : 'bg-red-500'
-                          }`}
-                          style={{ width: `${data.indicators.fearGreedIndex}%` }}
-                        />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${data.indicators.fearGreedIndex}%` 
+                        }} />
                       </div>
-                      <p className="text-xs text-gray-600">Extreme Fear (&lt;25) or Greed (&gt;75)</p>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Fear: &lt;30</span>
+                        <span>Neutral: 30-70</span>
+                        <span>Greed: &gt;70</span>
+                      </div>
                     </div>
                   )}
 
-                  {/* Risk Appetite */}
+                  {/* Risk Appetite Index */}
                   {data.indicators.riskAppetite !== undefined && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">Risk Appetite Index</span>
                         <span className="font-bold">{data.indicators.riskAppetite}</span>
                       </div>
-                      <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`absolute h-full ${
-                            data.indicators.riskAppetite < -30 ? 'bg-orange-500' :
-                            data.indicators.riskAppetite > 60 ? 'bg-red-500' :
-                            'bg-green-500'
-                          }`}
-                          style={{ 
-                            width: `${Math.min(100, Math.max(0, ((data.indicators.riskAppetite + 100) / 200) * 100))}%` 
-                          }}
-                        />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${data.indicators.riskAppetite}%` 
+                        }} />
                       </div>
-                      <p className="text-xs text-gray-600">Institutional positioning (-100 to +100)</p>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Risk-Off: &lt;30</span>
+                        <span>Neutral: 30-70</span>
+                        <span>Risk-On: &gt;70</span>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -791,21 +844,19 @@ export function CcpiDashboard() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">Tech ETF Flows (Weekly)</span>
-                        <span className="font-bold">${data.indicators.etfFlows.toFixed(1)}B</span>
+                        <span className="font-bold">${data.indicators.etfFlows}B</span>
                       </div>
-                      <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`absolute h-full ${
-                            data.indicators.etfFlows < -5 ? 'bg-red-500' :
-                            data.indicators.etfFlows < 0 ? 'bg-orange-500' :
-                            'bg-green-500'
-                          }`}
-                          style={{ 
-                            width: `${Math.min(100, Math.max(0, ((data.indicators.etfFlows + 10) / 20) * 100))}%` 
-                          }}
-                        />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.etfFlows + 5) / 10) * 100))}%` 
+                        }} />
                       </div>
-                      <p className="text-xs text-gray-600">Negative = institutional distribution</p>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Outflows: &lt;-$2B</span>
+                        <span>Neutral: -$2B to $2B</span>
+                        <span>Inflows: &gt;$2B</span>
+                      </div>
                     </div>
                   )}
 
@@ -813,20 +864,20 @@ export function CcpiDashboard() {
                   {data.indicators.shortInterest !== undefined && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">Short Interest</span>
-                        <span className="font-bold">{data.indicators.shortInterest.toFixed(1)}%</span>
+                        <span className="font-medium">Short Interest (% of Float)</span>
+                        <span className="font-bold">{data.indicators.shortInterest}%</span>
                       </div>
-                      <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`absolute h-full ${
-                            data.indicators.shortInterest < 15 ? 'bg-orange-500' :
-                            data.indicators.shortInterest > 25 ? 'bg-red-500' :
-                            'bg-green-500'
-                          }`}
-                          style={{ width: `${Math.min(100, (data.indicators.shortInterest / 35) * 100)}%` }}
-                        />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${Math.min(100, (data.indicators.shortInterest / 30) * 100)}%` 
+                        }} />
                       </div>
-                      <p className="text-xs text-gray-600">Very low = complacency risk</p>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Complacent: &lt;15%</span>
+                        <span>Normal: 15-20%</span>
+                        <span>Hedged: &gt;20%</span>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -844,64 +895,88 @@ export function CcpiDashboard() {
                 
                 <div className="space-y-6">
                   {/* AI CapEx Growth */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">AI CapEx Growth (YoY)</span>
-                      <span className="font-bold">40%</span>
+                  {data.indicators.aiCapexGrowth !== undefined && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">AI CapEx Growth (YoY)</span>
+                        <span className="font-bold">{data.indicators.aiCapexGrowth}%</span>
+                      </div>
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${Math.min(100, (data.indicators.aiCapexGrowth / 100) * 100)}%` 
+                        }} />
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Slowing: &lt;20%</span>
+                        <span>Moderate: 20-40%</span>
+                        <span>Accelerating: &gt;40%</span>
+                      </div>
                     </div>
-                    <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                      <div 
-                        className="absolute h-full bg-orange-500"
-                        style={{ width: '67%' }}
-                      />
-                    </div>
-                    <p className="text-xs text-gray-600">Elevated investment may outpace revenue generation</p>
-                  </div>
+                  )}
 
                   {/* AI Revenue Growth */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">AI Revenue Growth (YoY)</span>
-                      <span className="font-bold">15%</span>
+                  {data.indicators.aiRevenueGrowth !== undefined && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">AI Revenue Growth (YoY)</span>
+                        <span className="font-bold">{data.indicators.aiRevenueGrowth}%</span>
+                      </div>
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${Math.min(100, (data.indicators.aiRevenueGrowth / 50) * 100)}%` 
+                        }} />
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Lagging: &lt;10%</span>
+                        <span>Growing: 10-25%</span>
+                        <span>Strong: &gt;25%</span>
+                      </div>
                     </div>
-                    <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                      <div 
-                        className="absolute h-full bg-green-500"
-                        style={{ width: '30%' }}
-                      />
-                    </div>
-                    <p className="text-xs text-gray-600">CapEx/Revenue gap signals potential overcapacity</p>
-                  </div>
+                  )}
 
                   {/* GPU Pricing Premium */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">GPU Pricing Premium</span>
-                      <span className="font-bold">20%</span>
+                  {data.indicators.gpuPricingPremium !== undefined && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">GPU Pricing Premium</span>
+                        <span className="font-bold">{data.indicators.gpuPricingPremium}%</span>
+                      </div>
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${Math.min(100, (data.indicators.gpuPricingPremium / 100) * 100)}%` 
+                        }} />
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Normal: &lt;20%</span>
+                        <span>Elevated: 20-50%</span>
+                        <span>Extreme: &gt;50%</span>
+                      </div>
                     </div>
-                    <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                      <div 
-                        className="absolute h-full bg-yellow-500"
-                        style={{ width: '40%' }}
-                      />
-                    </div>
-                    <p className="text-xs text-gray-600">Elevated premiums reflect supply constraints</p>
-                  </div>
+                  )}
 
-                  {/* AI Job Postings Trend */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">AI Job Postings Growth</span>
-                      <span className="font-bold">-5%</span>
+                  {/* AI Job Postings Growth */}
+                  {data.indicators.aiJobPostingsGrowth !== undefined && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">AI Job Postings Growth</span>
+                        <span className="font-bold">{data.indicators.aiJobPostingsGrowth}%</span>
+                      </div>
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.aiJobPostingsGrowth + 20) / 60) * 100))}%` 
+                        }} />
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Declining: &lt;-10%</span>
+                        <span>Stable: -10% to 10%</span>
+                        <span>Growing: &gt;10%</span>
+                      </div>
                     </div>
-                    <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                      <div 
-                        className="absolute h-full bg-red-500"
-                        style={{ width: '45%' }}
-                      />
-                    </div>
-                    <p className="text-xs text-gray-600">Declining job posts signal potential sector cooling</p>
-                  </div>
+                  )}
                 </div>
               </div>
 

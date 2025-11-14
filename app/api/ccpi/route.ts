@@ -3,37 +3,26 @@ import { NextResponse } from "next/server"
 // This API endpoint now integrates Buffett Indicator, Put/Call Ratio, VIX suite, 
 // sentiment surveys, and other professional indicators into the pillar scoring
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const date = searchParams.get("date")
-  
+export async function GET() {
   try {
-    // Fetch external data for indicator calculations
-    const data = await fetchMarketIndicators()
-    
-    const valuation = await computeValuationStress(data)
-    const technical = await computeTechnicalFragility(data)
-    const macro = await computeMacroLiquidityRisk(data)
-    const sentiment = await computeSentimentFeedback(data)
-    const flows = await computeCapitalFlowsPositioning(data)
-    const structural = await computeStructuralAltData(data)
+    const data = await fetchMarketData()
     
     const pillars = {
-      valuation,
-      technical,
-      macro,
-      sentiment,
-      flows,
-      structural
+      valuation: await computeValuationStress(data),
+      technical: await computeTechnicalFragility(data),
+      macro: await computeMacroLiquidity(data),
+      sentiment: await computeSentiment(data),
+      flows: await computeFlows(data),
+      structural: await computeStructuralAltData(data)
     }
     
     const weights = {
-      valuation: 0.22,  // Buffett Indicator, P/E, P/S
-      technical: 0.20,  // VIX suite, Bollinger, ATR, High-Low
-      macro: 0.18,      // Fed policy, junk spreads, rates
-      sentiment: 0.18,  // AAII, Put/Call, social sentiment
-      flows: 0.12,      // ETF flows, positioning
-      structural: 0.10  // AI-specific data
+      valuation: 0.22,
+      technical: 0.20,
+      macro: 0.18,
+      sentiment: 0.18,
+      flows: 0.12,
+      structural: 0.10
     }
     
     const ccpi = Math.round(
@@ -45,12 +34,15 @@ export async function GET(request: Request) {
       pillars.structural * weights.structural
     )
     
-    const certainty = computeCertaintyScore(pillars, data)
-    const regime = determineRegime(ccpi)
-    const playbook = getPlaybook(regime)
     const canaries = getTopCanaries(pillars, data)
+    const canaryCount = canaries.filter(c => c.severity === 'high' || c.severity === 'medium').length
     
-    const summary = generateWeeklySummary(ccpi, certainty, regime, pillars, data, canaries)
+    const confidence = computeCertaintyScore(pillars, data, canaryCount)
+    
+    const regime = determineRegime(ccpi, canaryCount)
+    const playbook = getPlaybook(regime)
+    
+    const summary = generateWeeklySummary(ccpi, confidence, regime, pillars, data, canaries)
     
     const snapshot = {
       buffettIndicator: data.buffettIndicator,
@@ -71,12 +63,16 @@ export async function GET(request: Request) {
       fearGreedIndex: data.fearGreedIndex,
       riskAppetite: data.riskAppetite,
       etfFlows: data.etfFlows,
-      shortInterest: data.shortInterest
+      shortInterest: data.shortInterest,
+      aiCapexGrowth: data.aiCapexGrowth,
+      aiRevenueGrowth: data.aiRevenueGrowth,
+      gpuPricingPremium: data.gpuPricingPremium,
+      aiJobPostingsGrowth: data.aiJobPostingsGrowth
     }
     
     return NextResponse.json({
       ccpi,
-      certainty,
+      certainty: confidence,
       pillars,
       regime,
       playbook,
@@ -94,7 +90,7 @@ export async function GET(request: Request) {
   }
 }
 
-async function fetchMarketIndicators() {
+async function fetchMarketData() {
   // In production, fetch from actual APIs (FRED, Yahoo, etc.)
   // For now, using realistic values that would come from these sources
   
@@ -134,29 +130,32 @@ async function fetchMarketIndicators() {
     // Risk appetite
     riskAppetite: 35,      // State Street RAI proxy (-100 to +100)
     
-    snapshot: {} as Record<string, any> // Will populate with all values
+    snapshot: {} as Record<string, any>, // Will populate with all values
+    canaryCount: 0 // Placeholder for canary count
   }
 }
 
-async function computeValuationStress(data: Awaited<ReturnType<typeof fetchMarketIndicators>>): Promise<number> {
+async function computeValuationStress(data: Awaited<ReturnType<typeof fetchMarketData>>): Promise<number> {
   let score = 0
   
   // Buffett Indicator (Stock Market Cap / GDP)
   // Normal: 80-120%, Warning: 120-160%, Extreme: >160%
-  if (data.buffettIndicator > 200) score += 40
-  else if (data.buffettIndicator > 160) score += 30
+  if (data.buffettIndicator > 200) score += 60
+  else if (data.buffettIndicator > 180) score += 50
+  else if (data.buffettIndicator > 160) score += 40
+  else if (data.buffettIndicator > 140) score += 30
   else if (data.buffettIndicator > 120) score += 20
   else if (data.buffettIndicator < 80) score -= 10
   
-  // S&P 500 P/E Ratio
-  // Historical median ~16, current elevated
+  // S&P 500 P/E Ratio - Historical median ~16, current elevated
   const peDeviation = (data.spxPE - 16) / 16
-  score += Math.min(30, peDeviation * 50)
+  score += Math.min(40, peDeviation * 80) // Increased sensitivity
   
-  // Price-to-Sales
-  // Elevated P/S indicates stretched valuations
-  if (data.spxPS > 3.0) score += 15
-  else if (data.spxPS > 2.5) score += 10
+  // Price-to-Sales - Elevated P/S indicates stretched valuations
+  if (data.spxPS > 3.5) score += 25
+  else if (data.spxPS > 3.0) score += 20
+  else if (data.spxPS > 2.5) score += 15
+  else if (data.spxPS > 2.0) score += 10
   
   data.snapshot.buffettIndicator = data.buffettIndicator
   data.snapshot.spxPE = data.spxPE
@@ -165,36 +164,42 @@ async function computeValuationStress(data: Awaited<ReturnType<typeof fetchMarke
   return Math.min(100, Math.max(0, score))
 }
 
-async function computeTechnicalFragility(data: Awaited<ReturnType<typeof fetchMarketIndicators>>): Promise<number> {
+async function computeTechnicalFragility(data: Awaited<ReturnType<typeof fetchMarketData>>): Promise<number> {
   let score = 0
   
   // VIX Level (volatility fear gauge)
   // Low: <15 (complacency), Normal: 15-25, Elevated: 25-35, Crisis: >35
-  if (data.vix > 35) score += 35
-  else if (data.vix > 25) score += 25
-  else if (data.vix > 20) score += 15
-  else if (data.vix < 12) score += 10 // Complacency risk
+  if (data.vix > 35) score += 50
+  else if (data.vix > 25) score += 35
+  else if (data.vix > 20) score += 22
+  else if (data.vix > 17) score += 15
+  else if (data.vix < 12) score += 12 // Complacency risk
   
   // VXN (Nasdaq volatility) - tech stress
-  if (data.vxn > data.vix + 5) score += 10 // Tech leading volatility
+  if (data.vxn > data.vix + 3) score += 12 // Lowered threshold
+  else if (data.vxn > data.vix + 1) score += 6
   
-  // High-Low Index (market breadth)
+  // High-Low Index (market breadth) - CRITICAL INDICATOR
   // Low values = narrow leadership = fragile rally
-  if (data.highLowIndex < 0.3) score += 20
+  if (data.highLowIndex < 0.3) score += 30 // Increased weight
+  else if (data.highLowIndex < 0.4) score += 20
+  else if (data.highLowIndex < 0.5) score += 12
   else if (data.highLowIndex > 0.7) score -= 10 // Healthy breadth
   
   // Bullish Percent Index
-  // >70 = overbought, <30 = oversold
-  if (data.bullishPercent > 70) score += 15
-  else if (data.bullishPercent < 30) score += 10 // Extreme weakness
+  if (data.bullishPercent > 70) score += 18
+  else if (data.bullishPercent > 60) score += 12
+  else if (data.bullishPercent < 30) score += 12 // Extreme weakness
   
-  // ATR (Average True Range) - volatility expansion
-  if (data.atr > 50) score += 15
-  else if (data.atr > 40) score += 8
+  // ATR (Average True Range) - volatility expansion indicator
+  if (data.atr > 50) score += 18
+  else if (data.atr > 40) score += 12
+  else if (data.atr > 35) score += 6
   
   // Left Tail Volatility (black swan probability priced in)
-  if (data.ltv > 0.15) score += 20
-  else if (data.ltv > 0.10) score += 10
+  if (data.ltv > 0.15) score += 25
+  else if (data.ltv > 0.10) score += 15
+  else if (data.ltv > 0.08) score += 8
   
   data.snapshot.vix = data.vix
   data.snapshot.vxn = data.vxn
@@ -206,24 +211,30 @@ async function computeTechnicalFragility(data: Awaited<ReturnType<typeof fetchMa
   return Math.min(100, Math.max(0, score))
 }
 
-async function computeMacroLiquidityRisk(data: Awaited<ReturnType<typeof fetchMarketIndicators>>): Promise<number> {
+async function computeMacroLiquidity(data: Awaited<ReturnType<typeof fetchMarketData>>): Promise<number> {
   let score = 0
   
   // Fed Funds Rate (restrictive policy)
-  if (data.fedFundsRate > 5.0) score += 25
-  else if (data.fedFundsRate > 4.0) score += 15
+  if (data.fedFundsRate > 5.5) score += 35
+  else if (data.fedFundsRate > 5.0) score += 28
+  else if (data.fedFundsRate > 4.5) score += 22
+  else if (data.fedFundsRate > 4.0) score += 18
+  else if (data.fedFundsRate > 3.0) score += 10
   else if (data.fedFundsRate < 2.0) score -= 10 // Accommodative
   
   // Junk Bond Spreads (credit stress)
   // Normal: 3-5%, Stress: 5-8%, Crisis: >8%
-  if (data.junkSpread > 8) score += 35
-  else if (data.junkSpread > 5) score += 20
+  if (data.junkSpread > 8) score += 40
+  else if (data.junkSpread > 6) score += 28
+  else if (data.junkSpread > 5) score += 22
+  else if (data.junkSpread > 4) score += 15
   else if (data.junkSpread > 3.5) score += 10
   
   // Yield Curve (recession indicator)
   // Inverted (<0) signals recession risk
-  if (data.yieldCurve < -0.5) score += 25
-  else if (data.yieldCurve < 0) score += 15
+  if (data.yieldCurve < -0.5) score += 30
+  else if (data.yieldCurve < -0.2) score += 20
+  else if (data.yieldCurve < 0) score += 12
   else if (data.yieldCurve > 1.0) score -= 10 // Healthy steepness
   
   data.snapshot.fedFundsRate = data.fedFundsRate
@@ -233,32 +244,38 @@ async function computeMacroLiquidityRisk(data: Awaited<ReturnType<typeof fetchMa
   return Math.min(100, Math.max(0, score))
 }
 
-async function computeSentimentFeedback(data: Awaited<ReturnType<typeof fetchMarketIndicators>>): Promise<number> {
+async function computeSentiment(data: Awaited<ReturnType<typeof fetchMarketData>>): Promise<number> {
   let score = 0
   
   // AAII Investor Sentiment (contrarian indicator)
   // Extreme bulls (>50%) or extreme bears (>40%) signal turning points
-  if (data.aaiiBullish > 55) score += 20 // Euphoria warning
-  else if (data.aaiiBullish < 25) score += 15 // Extreme fear
+  if (data.aaiiBullish > 60) score += 28 // Extreme euphoria
+  else if (data.aaiiBullish > 50) score += 20
+  else if (data.aaiiBullish > 45) score += 12 // Getting complacent
+  else if (data.aaiiBullish < 25) score += 18 // Extreme fear
   
-  if (data.aaiiBearish > 40) score += 15 // Excessive pessimism (contrarian bullish)
-  else if (data.aaiiBearish < 20) score += 10 // Complacency
+  if (data.aaiiBearish > 45) score += 18 // Excessive pessimism
+  else if (data.aaiiBearish > 40) score += 12
+  else if (data.aaiiBearish < 20) score += 12 // Complacency
   
   // Put/Call Ratio (hedging activity)
   // Low ratio (<0.7) = complacency, High ratio (>1.2) = fear
-  if (data.putCallRatio < 0.6) score += 20 // Extreme complacency
+  if (data.putCallRatio < 0.6) score += 25 // Extreme complacency
+  else if (data.putCallRatio < 0.7) score += 18
   else if (data.putCallRatio < 0.8) score += 10
-  else if (data.putCallRatio > 1.2) score += 15 // Panic
+  else if (data.putCallRatio > 1.2) score += 18 // Panic
   
   // Fear & Greed Index
   // Extreme Greed (>75) or Extreme Fear (<25)
-  if (data.fearGreedIndex > 75) score += 15
-  else if (data.fearGreedIndex < 25) score += 10
+  if (data.fearGreedIndex > 75) score += 20
+  else if (data.fearGreedIndex > 65) score += 12
+  else if (data.fearGreedIndex < 25) score += 15
   
   // Risk Appetite Index (institutional positioning)
   // High positive = aggressive, negative = defensive
-  if (data.riskAppetite > 60) score += 15
-  else if (data.riskAppetite < -30) score += 10
+  if (data.riskAppetite > 60) score += 18
+  else if (data.riskAppetite > 40) score += 10
+  else if (data.riskAppetite < -30) score += 12
   
   data.snapshot.aaiiBullish = data.aaiiBullish
   data.snapshot.aaiiBearish = data.aaiiBearish
@@ -269,22 +286,29 @@ async function computeSentimentFeedback(data: Awaited<ReturnType<typeof fetchMar
   return Math.min(100, Math.max(0, score))
 }
 
-async function computeCapitalFlowsPositioning(data: Awaited<ReturnType<typeof fetchMarketIndicators>>): Promise<number> {
+async function computeFlows(data: Awaited<ReturnType<typeof fetchMarketData>>): Promise<number> {
   let score = 0
   
   // ETF Flows (capital allocation trends)
   // Large outflows signal distribution
-  if (data.etfFlows < -5) score += 30
-  else if (data.etfFlows < -2) score += 20
-  else if (data.etfFlows < 0) score += 10
+  if (data.etfFlows < -5) score += 35
+  else if (data.etfFlows < -3) score += 25
+  else if (data.etfFlows < -2) score += 18
+  else if (data.etfFlows < -1) score += 12
+  else if (data.etfFlows < 0) score += 8
+  else if (data.etfFlows > 5) score -= 5 // Strong inflows = risk on
   
   // Short Interest (positioning)
   // Very low short interest = complacency
-  if (data.shortInterest < 15) score += 15
-  else if (data.shortInterest > 25) score += 10 // Crowded shorts
+  if (data.shortInterest < 12) score += 22 // Extreme complacency
+  else if (data.shortInterest < 15) score += 16
+  else if (data.shortInterest < 18) score += 8
+  else if (data.shortInterest > 25) score += 12 // Crowded shorts
   
-  // Put/Call Ratio (already in sentiment, but affects positioning too)
-  if (data.putCallRatio < 0.7) score += 15 // Under-hedged
+  // Cross-check with Put/Call for positioning consistency
+  if (data.putCallRatio < 0.7 && data.shortInterest < 15) {
+    score += 15 // Double complacency warning
+  }
   
   data.snapshot.etfFlows = data.etfFlows
   data.snapshot.shortInterest = data.shortInterest
@@ -292,49 +316,73 @@ async function computeCapitalFlowsPositioning(data: Awaited<ReturnType<typeof fe
   return Math.min(100, Math.max(0, score))
 }
 
-async function computeStructuralAltData(data: Awaited<ReturnType<typeof fetchMarketIndicators>>): Promise<number> {
+async function computeStructuralAltData(data: Awaited<ReturnType<typeof fetchMarketData>>): Promise<number> {
   // AI-specific structural indicators
-  // This remains custom for AI sector analysis
+  // In real implementation, these would come from actual data sources
   
-  const capexGrowth = 40
-  const revenueGrowth = 15
-  const gpuPremium = 0.2
-  const jobPostingGrowth = -5
+  let score = 0
   
-  let score = 25
-  const growthGap = capexGrowth - revenueGrowth
-  if (growthGap > 20) score += 30
-  score += gpuPremium * 100
-  if (jobPostingGrowth < 0) score += 20
+  // CapEx Growth vs Revenue Growth gap - unsustainable if too wide
+  const capexGrowth = 40 // AI infrastructure spending YoY%
+  const revenueGrowth = 15 // AI revenue YoY%
+  const capexRevenueGap = capexGrowth - revenueGrowth
   
-  return Math.min(100, score)
+  // Large gap = overspending without monetization = bubble risk
+  if (capexRevenueGap > 30) score += 45
+  else if (capexRevenueGap > 20) score += 35
+  else if (capexRevenueGap > 15) score += 25
+  else if (capexRevenueGap > 10) score += 15
+  
+  // GPU Pricing Premium (supply/demand imbalance)
+  const gpuPremium = 0.2 // 20% premium over MSRP
+  if (gpuPremium > 0.5) score += 30 // Extreme bubble
+  else if (gpuPremium > 0.3) score += 20
+  else if (gpuPremium > 0.2) score += 15
+  else if (gpuPremium > 0.1) score += 8
+  else if (gpuPremium < 0) score -= 5 // Healthy supply
+  
+  // Job Postings Growth (hiring momentum)
+  const jobPostingGrowth = -5 // Negative = slowdown
+  if (jobPostingGrowth < -10) score += 25 // Hiring freeze
+  else if (jobPostingGrowth < -5) score += 15
+  else if (jobPostingGrowth < 0) score += 8
+  else if (jobPostingGrowth > 20) score -= 5 // Strong growth
+  
+  data.snapshot.aiCapexGrowth = capexGrowth
+  data.snapshot.aiRevenueGrowth = revenueGrowth
+  data.snapshot.gpuPricingPremium = gpuPremium * 100
+  data.snapshot.aiJobPostingsGrowth = jobPostingGrowth
+  
+  return Math.min(100, Math.max(0, score))
 }
 
 function computeCertaintyScore(
   pillars: Record<string, number>,
-  data: Awaited<ReturnType<typeof fetchMarketIndicators>>
+  data: Awaited<ReturnType<typeof fetchMarketData>>,
+  canaryCount: number
 ): number {
   const values = Object.values(pillars)
   const mean = values.reduce((a, b) => a + b) / values.length
   const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length
   const stdDev = Math.sqrt(variance)
   
-  const alignment = Math.max(0, 100 - stdDev * 2)
+  // High variance between pillars is EXPECTED when different sectors show different risk
+  const alignment = Math.max(0, 100 - stdDev * 1.5)
   
   // Cross-validate: VIX should align with other stress metrics
   const vixImpliedStress = (data.vix / 40) * 100 // VIX as % of extreme level
   const pillarMeanStress = mean
   const crossValidation = 100 - Math.abs(vixImpliedStress - pillarMeanStress)
   
-  const extremeCount = values.filter(v => v > 70 || v < 30).length
-  const clusterBonus = (extremeCount / values.length) * 20
+  // More canaries = more confident in risk assessment
+  const canaryAgreement = (canaryCount / 23) * 30
   
-  return Math.min(100, Math.round((alignment * 0.6) + (crossValidation * 0.2) + (clusterBonus * 0.2)))
+  return Math.min(100, Math.round((alignment * 0.5) + (crossValidation * 0.2) + (canaryAgreement * 0.3)))
 }
 
 function getTopCanaries(
   pillars: Record<string, number>,
-  data: Awaited<ReturnType<typeof fetchMarketIndicators>>
+  data: Awaited<ReturnType<typeof fetchMarketData>>
 ): Array<{
   signal: string
   pillar: string
@@ -608,34 +656,41 @@ function getTopCanaries(
     })
 }
 
-function determineRegime(ccpi: number): {
+function determineRegime(ccpi: number, canaryCount: number): {
   level: number
   name: string
   color: string
   description: string
 } {
-  if (ccpi >= 80) {
+  let adjustedCcpi = ccpi
+  if (canaryCount >= 12) {
+    adjustedCcpi = Math.max(ccpi, 40)  // Force minimum "Elevated Risk"
+  } else if (canaryCount >= 8) {
+    adjustedCcpi = Math.max(ccpi, 35)  // Boost score if many warnings
+  }
+  
+  if (adjustedCcpi >= 80) {
     return {
       level: 5,
       name: "Crash Watch",
       color: "red",
       description: "Extreme risk across multiple pillars. Correction or crash increasingly likely."
     }
-  } else if (ccpi >= 60) {
+  } else if (adjustedCcpi >= 60) {
     return {
       level: 4,
       name: "High Alert",
       color: "orange",
       description: "Elevated risk signals. Multiple warning indicators flashing."
     }
-  } else if (ccpi >= 40) {
+  } else if (adjustedCcpi >= 40) {
     return {
       level: 3,
       name: "Elevated Risk",
       color: "yellow",
       description: "Caution warranted. Some metrics extended, defensive moves prudent."
     }
-  } else if (ccpi >= 20) {
+  } else if (adjustedCcpi >= 20) {
     return {
       level: 2,
       name: "Normal",
@@ -712,9 +767,9 @@ function getPlaybook(regime: ReturnType<typeof determineRegime>) {
       ],
       allocation: {
         equities: "20-40% (defensive sectors only)",
-        defensive: "30-40% (gold, bonds, defensive)",
+        defensive: "30-40% (gold, bonds, cash equivalents)",
         cash: "30-40%",
-        alternatives: "10-20% (gold, BTC per risk tolerance)"
+        alternatives: "5-10% (optional BTC lottery ticket)"
       }
     },
     5: {
@@ -740,16 +795,16 @@ function getPlaybook(regime: ReturnType<typeof determineRegime>) {
 
 function generateWeeklySummary(
   ccpi: number,
-  certainty: number,
+  confidence: number,
   regime: ReturnType<typeof determineRegime>,
   pillars: Record<string, number>,
-  data: Awaited<ReturnType<typeof fetchMarketIndicators>>,
+  data: Awaited<ReturnType<typeof fetchMarketData>>,
   canaries: Array<{ signal: string; pillar: string; severity: "high" | "medium" | "low" }>
 ): {
   headline: string
   bullets: string[]
 } {
-  const confidencePercent = certainty
+  const confidencePercent = confidence
   const riskPercent = ccpi
   
   const activeWarnings = canaries.filter(c => c.severity === "high" || c.severity === "medium").length
