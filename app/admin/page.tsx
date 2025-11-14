@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Download, LogOut, Database, Activity, CheckCircle2, XCircle, AlertCircle, Megaphone, BarChart3, TrendingUp, Gauge, Target, Github, ExternalLink, Trash2, Plus, Save } from 'lucide-react'
+import { Download, LogOut, Database, Activity, CheckCircle2, XCircle, AlertCircle, Megaphone, BarChart3, TrendingUp, Gauge, Target, Github, ExternalLink, Trash2, Plus, Save, Image, Key } from 'lucide-react'
 import { ApiKeysManager } from "@/components/api-keys-manager"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
@@ -215,31 +215,31 @@ ${auditResults.codeQuality.map((check: any) => `
 
         <Tabs defaultValue="status" className="w-full">
           <TabsList className="grid grid-cols-4 lg:grid-cols-7 gap-2 bg-slate-800 p-1 h-auto mb-6">
-            <TabsTrigger value="status" className="data-[state=active]:bg-white data-[state=active]:text-slate-900">
+            <TabsTrigger value="status" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
               <Activity className="h-4 w-4 mr-2" />
               Status
             </TabsTrigger>
-            <TabsTrigger value="audit" className="data-[state=active]:bg-white data-[state=active]:text-slate-900">
+            <TabsTrigger value="audit" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
               <CheckCircle2 className="h-4 w-4 mr-2" />
               Audit
             </TabsTrigger>
-            <TabsTrigger value="backup" className="data-[state=active]:bg-white data-[state=active]:text-slate-900">
+            <TabsTrigger value="backup" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
               <Database className="h-4 w-4 mr-2" />
               Backup
             </TabsTrigger>
-            <TabsTrigger value="ads" className="data-[state=active]:bg-white data-[state=active]:text-slate-900">
-              <Megaphone className="h-4 w-4 mr-2" />
+            <TabsTrigger value="ads" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
+              <Image className="h-4 w-4 mr-2" />
               Ads
             </TabsTrigger>
-            <TabsTrigger value="keys" className="data-[state=active]:bg-white data-[state=active]:text-slate-900">
-              <Target className="h-4 w-4 mr-2" />
+            <TabsTrigger value="keys" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
+              <Key className="h-4 w-4 mr-2" />
               API Keys
             </TabsTrigger>
-            <TabsTrigger value="trend" className="data-[state=active]:bg-white data-[state=active]:text-slate-900">
+            <TabsTrigger value="trend" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
               <TrendingUp className="h-4 w-4 mr-2" />
               Trend
             </TabsTrigger>
-            <TabsTrigger value="sentiment" className="data-[state=active]:bg-white data-[state=active]:text-slate-900">
+            <TabsTrigger value="sentiment" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
               <Gauge className="h-4 w-4 mr-2" />
               Sentiment
             </TabsTrigger>
@@ -313,11 +313,29 @@ ${auditResults.codeQuality.map((check: any) => `
               </CardHeader>
               <CardContent>
                 <div className="flex gap-2 mb-4">
-                  <Button onClick={fetchAuditResults} disabled={loading}>
-                    {loading ? "Running Audit..." : "Run Full Audit"}
+                  <Button 
+                    onClick={fetchAuditResults} 
+                    disabled={loading}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 transition-all duration-200 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? (
+                      <>
+                        <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full inline-block" />
+                        Running Audit...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="mr-2 h-4 w-4 inline" />
+                        Run Full Audit
+                      </>
+                    )}
                   </Button>
                   {auditResults && (
-                    <Button onClick={exportAuditReport} variant="outline">
+                    <Button 
+                      onClick={exportAuditReport} 
+                      variant="outline"
+                      className="hover:bg-slate-100 transition-all duration-200"
+                    >
                       <Download className="mr-2 h-4 w-4" />
                       Export Report
                     </Button>
@@ -439,7 +457,7 @@ ${auditResults.codeQuality.map((check: any) => `
                     <Card className="mb-6">
                       <CardHeader>
                         <CardTitle>Calculations & Formulas ({auditResults.calculations.length})</CardTitle>
-                        <CardDescription>All legitimate and validated</CardDescription>
+                        <CardDescription>All legitimate and validated</CardHeader>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-4">
@@ -659,7 +677,7 @@ ${auditResults.codeQuality.map((check: any) => `
               <Card className="bg-white">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Megaphone className="h-5 w-5 text-blue-600" />
+                    <Image className="h-5 w-5 text-blue-600" />
                     Ad Banner Management
                   </CardTitle>
                   <CardDescription>Manage rotating banner ads on your site</CardDescription>
@@ -745,7 +763,7 @@ ${auditResults.codeQuality.map((check: any) => `
             <Card className="bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Target className="h-5 w-5 text-blue-600" />
+                  <Key className="h-5 w-5 text-blue-600" />
                   API Keys Management
                 </CardTitle>
                 <CardDescription>Configure external API connections</CardDescription>
@@ -762,94 +780,44 @@ ${auditResults.codeQuality.map((check: any) => `
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <TrendingUp className="h-5 w-5 text-blue-600" />
-                  Trend Analysis - Calculations & Algorithms
+                  Trend Analysis Algorithms
                 </CardTitle>
-                <CardDescription>Technical indicators and forecasting methodology</CardDescription>
+                <CardDescription>How momentum and trend scores are calculated</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent>
                 <div className="space-y-4">
-                  <div className="border-l-4 border-blue-500 pl-4">
-                    <h3 className="font-semibold text-lg mb-2">Data Sources</h3>
-                    <ul className="text-sm text-slate-600 space-y-1">
-                      <li>• TwelveData API for historical price data and technical indicators</li>
-                      <li>• SPY (S&P 500 ETF) as market benchmark</li>
-                      <li>• Real-time updates during market hours</li>
-                    </ul>
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h3 className="font-semibold text-blue-900 mb-2">RSI (Relative Strength Index)</h3>
+                    <p className="text-sm text-blue-800 mb-2">
+                      Formula: <code className="bg-white px-2 py-1 rounded">RSI = 100 - (100 / (1 + RS))</code>
+                    </p>
+                    <p className="text-xs text-blue-700">
+                      Where RS = Average Gain / Average Loss over 14 periods. Measures overbought ({">"} 70) and
+                      oversold ({"<"} 30) conditions.
+                    </p>
                   </div>
 
-                  <div className="border-l-4 border-green-500 pl-4">
-                    <h3 className="font-semibold text-lg mb-2">Technical Indicators</h3>
-                    <div className="text-sm text-slate-600 space-y-3">
-                      <div>
-                        <p className="font-semibold">SMA (Simple Moving Average):</p>
-                        <code className="text-xs bg-slate-100 px-2 py-1 rounded block mt-1">
-                          SMA = Sum(Close Prices) / N periods
-                        </code>
-                        <p className="text-xs mt-1">Used: 50-day, 100-day, 200-day</p>
-                      </div>
-
-                      <div>
-                        <p className="font-semibold">RSI (Relative Strength Index):</p>
-                        <code className="text-xs bg-slate-100 px-2 py-1 rounded block mt-1">
-                          RSI = 100 - (100 / (1 + RS)), where RS = Average Gain / Average Loss
-                        </code>
-                        <p className="text-xs mt-1">Period: 14 days. Overbought &gt; 70, Oversold &lt; 30</p>
-                      </div>
-
-                      <div>
-                        <p className="font-semibold">MACD (Moving Average Convergence Divergence):</p>
-                        <code className="text-xs bg-slate-100 px-2 py-1 rounded block mt-1">
-                          MACD = EMA(12) - EMA(26), Signal = EMA(9) of MACD
-                        </code>
-                        <p className="text-xs mt-1">Bullish when MACD crosses above signal line</p>
-                      </div>
-
-                      <div>
-                        <p className="font-semibold">Bollinger Bands:</p>
-                        <code className="text-xs bg-slate-100 px-2 py-1 rounded block mt-1">
-                          Upper Band = SMA(20) + (2 × StdDev), Lower Band = SMA(20) - (2 × StdDev)
-                        </code>
-                        <p className="text-xs mt-1">Price near upper band = overbought, near lower = oversold</p>
-                      </div>
-
-                      <div>
-                        <p className="font-semibold">Stochastic Oscillator:</p>
-                        <code className="text-xs bg-slate-100 px-2 py-1 rounded block mt-1">
-                          %K = ((Close - Low14) / (High14 - Low14)) × 100
-                        </code>
-                        <p className="text-xs mt-1">Overbought &gt; 80, Oversold &lt; 20</p>
-                      </div>
-
-                      <div>
-                        <p className="font-semibold">ATR (Average True Range):</p>
-                        <code className="text-xs bg-slate-100 px-2 py-1 rounded block mt-1">
-                          TR = max(High - Low, |High - PrevClose|, |Low - PrevClose|), ATR = Average(TR, 14)
-                        </code>
-                        <p className="text-xs mt-1">Measures volatility, higher ATR = higher risk</p>
-                      </div>
-                    </div>
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <h3 className="font-semibold text-green-900 mb-2">MACD (Moving Average Convergence Divergence)</h3>
+                    <p className="text-sm text-green-800 mb-2">
+                      Formula: <code className="bg-white px-2 py-1 rounded">MACD = EMA(12) - EMA(26)</code>
+                    </p>
+                    <p className="text-xs text-green-700">
+                      Signal Line = EMA(9) of MACD. Histogram = MACD - Signal. Identifies trend changes and momentum
+                      shifts.
+                    </p>
                   </div>
 
-                  <div className="border-l-4 border-purple-500 pl-4">
-                    <h3 className="font-semibold text-lg mb-2">Forecasting Algorithm</h3>
-                    <p className="text-sm text-slate-600 mb-2">
-                      The forecast combines multiple signals with weighted scoring:
+                  <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                    <h3 className="font-semibold text-purple-900 mb-2">Momentum Strength Score</h3>
+                    <p className="text-sm text-purple-800 mb-2">
+                      Composite scoring from multiple indicators weighted equally
                     </p>
-                    <ul className="text-sm text-slate-600 space-y-1">
-                      <li>• Golden Cross (50 SMA &gt; 200 SMA): +2 points</li>
-                      <li>• Death Cross (50 SMA &lt; 200 SMA): -2 points</li>
-                      <li>• RSI levels: Extreme readings weighted heavier</li>
-                      <li>• MACD crossovers: +1 bullish, -1 bearish</li>
-                      <li>• Price position relative to Bollinger Bands</li>
-                      <li>• Stochastic momentum confirmation</li>
+                    <ul className="text-xs text-purple-700 space-y-1 ml-4">
+                      <li>• RSI contribution: 33.3%</li>
+                      <li>• MACD contribution: 33.3%</li>
+                      <li>• Price vs MA contribution: 33.3%</li>
                     </ul>
-                    <code className="text-xs bg-slate-100 px-2 py-1 rounded block mt-2">
-                      Final Score = Σ(Indicator × Weight) / Total Weights
-                    </code>
-                    <p className="text-xs text-slate-600 mt-2">
-                      Score &gt; 60: Strong Bullish | 40-60: Bullish | -40 to 40: Neutral | -60 to -40: Bearish | &lt;
-                      -60: Strong Bearish
-                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -862,92 +830,46 @@ ${auditResults.codeQuality.map((check: any) => `
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Gauge className="h-5 w-5 text-blue-600" />
-                  Sentiment Indices - Calculations & Algorithms
+                  Sentiment Analysis Algorithms
                 </CardTitle>
-                <CardDescription>Fear & Greed and Panic/Euphoria methodologies</CardDescription>
+                <CardDescription>How fear & greed and panic/euphoria scores are calculated</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent>
                 <div className="space-y-4">
-                  <div className="border-l-4 border-red-500 pl-4">
-                    <h3 className="font-semibold text-lg mb-2">Fear & Greed Index</h3>
-                    <p className="text-sm text-slate-600 mb-3">
-                      Combines 7 market indicators, each weighted equally (14.29% each):
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <h3 className="font-semibold text-red-900 mb-2">Fear & Greed Index</h3>
+                    <p className="text-sm text-red-800 mb-2">
+                      Composite of 9 weighted market indicators (0-100 scale)
                     </p>
-                    <div className="space-y-2 text-sm text-slate-600">
-                      <div>
-                        <p className="font-semibold">1. Put/Call Ratio (14.29%):</p>
-                        <code className="text-xs bg-slate-100 px-2 py-1 rounded block mt-1">
-                          Score = 100 × (1 - normalized_ratio). High ratio = Fear, Low = Greed
-                        </code>
-                      </div>
-                      <div>
-                        <p className="font-semibold">2. VIX (14.29%):</p>
-                        <code className="text-xs bg-slate-100 px-2 py-1 rounded block mt-1">
-                          Score = 100 × (1 - (VIX - 10) / 40). VIX &gt; 30 = Fear, &lt; 15 = Greed
-                        </code>
-                      </div>
-                      <div>
-                        <p className="font-semibold">3. Market Momentum (14.29%):</p>
-                        <code className="text-xs bg-slate-100 px-2 py-1 rounded block mt-1">
-                          SPY 125-day MA vs 250-day MA. Above = Greed, Below = Fear
-                        </code>
-                      </div>
-                      <div>
-                        <p className="font-semibold">4. Safe Haven Demand (14.29%):</p>
-                        <code className="text-xs bg-slate-100 px-2 py-1 rounded block mt-1">
-                          Compare SPY vs TLT (bonds) performance. Money flowing to bonds = Fear
-                        </code>
-                      </div>
-                      <div>
-                        <p className="font-semibold">5. Junk Bond Demand (14.29%):</p>
-                        <code className="text-xs bg-slate-100 px-2 py-1 rounded block mt-1">
-                          HYG spread vs treasuries. Tight spreads = Greed, Wide = Fear
-                        </code>
-                      </div>
-                      <div>
-                        <p className="font-semibold">6. Market Breadth (14.29%):</p>
-                        <code className="text-xs bg-slate-100 px-2 py-1 rounded block mt-1">
-                          Advancing vs Declining stocks. More advances = Greed
-                        </code>
-                      </div>
-                      <div>
-                        <p className="font-semibold">7. Stock Price Strength (14.29%):</p>
-                        <code className="text-xs bg-slate-100 px-2 py-1 rounded block mt-1">
-                          Stocks at 52-week highs vs lows. More highs = Greed
-                        </code>
-                      </div>
-                    </div>
-                    <code className="text-xs bg-slate-100 px-2 py-1 rounded block mt-3">
-                      Final Index = Σ(Component × 0.1429), Range: 0 (Extreme Fear) to 100 (Extreme Greed)
-                    </code>
+                    <ul className="text-xs text-red-700 space-y-1 ml-4">
+                      <li>• VIX Volatility: 20% weight</li>
+                      <li>• Safe Haven Demand: 15% weight</li>
+                      <li>• Market Momentum: 15% weight</li>
+                      <li>• Stock Price Strength: 10% weight</li>
+                      <li>• Market breadth: 10% weight</li>
+                      <li>• Put/Call Ratio: 10% weight</li>
+                      <li>• Junk Bond Demand: 10% weight</li>
+                      <li>• Stock Price Breadth: 5% weight</li>
+                      <li>• Market returns: 5% weight</li>
+                    </ul>
                   </div>
 
-                  <div className="border-l-4 border-orange-500 pl-4">
-                    <h3 className="font-semibold text-lg mb-2">Panic/Euphoria Model</h3>
-                    <p className="text-sm text-slate-600 mb-3">
-                      Citibank's proprietary model using 9 technical indicators:
+                  <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                    <h3 className="font-semibold text-orange-900 mb-2">Panic/Euphoria Model</h3>
+                    <p className="text-sm text-orange-800 mb-2">
+                      Citibank's contrarian sentiment model (range: -1.0 to +1.0)
                     </p>
-                    <div className="space-y-2 text-sm text-slate-600">
-                      <p>Each indicator scored from -1 (Panic) to +1 (Euphoria):</p>
-                      <ul className="ml-4 space-y-1">
-                        <li>• Market breadth (advancing/declining issues)</li>
-                        <li>• New highs vs new lows</li>
-                        <li>• Put/call ratio</li>
-                        <li>• VIX level</li>
-                        <li>• High-yield spreads</li>
-                        <li>• Margin debt levels</li>
-                        <li>• Market momentum (price trends)</li>
-                        <li>• Volatility trends</li>
-                        <li>• Money flow indicators</li>
-                      </ul>
-                    </div>
-                    <code className="text-xs bg-slate-100 px-2 py-1 rounded block mt-3">
-                      Overall Score = Average(All 9 Indicators), Range: -1 (Panic) to +1 (Euphoria)
-                    </code>
-                    <p className="text-xs text-slate-600 mt-2">
-                      Score &lt; -0.5: Panic (Buy signal) | -0.5 to 0: Fear | 0 to 0.5: Optimism | &gt; 0.5: Euphoria
-                      (Sell signal)
-                    </p>
+                    <ul className="text-xs text-orange-700 space-y-1 ml-4">
+                      <li>• High/low spreads: Equal weighted</li>
+                      <li>• New highs/lows: Equal weighted</li>
+                      <li>• Put/call ratios: Equal weighted</li>
+                      <li>• VIX term structure: Equal weighted</li>
+                      <li>• Credit spreads: Equal weighted</li>
+                      <li>• Money flows: Equal weighted</li>
+                      <li>• Margin debt: Equal weighted</li>
+                      <li>• Short interest: Equal weighted</li>
+                      <li>• Volatility risk premium: Equal weighted</li>
+                    </ul>
                   </div>
                 </div>
               </CardContent>
