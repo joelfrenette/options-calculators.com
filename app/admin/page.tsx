@@ -1073,13 +1073,3 @@ ${auditResults.codeQuality.map((check: any) => `
     </div>
   )
 }
-6">
-                <CcpiAuditAdmin />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
-    </div>
-  )
-}
