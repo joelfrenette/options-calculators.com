@@ -49,9 +49,10 @@ export default function AdminDashboard() {
     try {
       const response = await fetch("/api/admin/api-status")
       const data = await response.json()
-      setApiStatuses(data.apis)
+      setApiStatuses(data.apis || [])
     } catch (error) {
       console.error("Failed to fetch API status:", error)
+      setApiStatuses([])
     } finally {
       setLoading(false)
     }
@@ -288,7 +289,7 @@ ${auditResults.codeQuality.map((check: any) => `
                   {loading ? "Checking..." : "Refresh Status"}
                 </Button>
 
-                {apiStatuses.length > 0 && (
+                {apiStatuses && apiStatuses.length > 0 && (
                   <div className="space-y-3">
                     {apiStatuses.map((api) => (
                       <div
