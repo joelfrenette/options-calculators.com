@@ -240,6 +240,10 @@ ${auditResults.codeQuality.map((check: any) => `
               <Activity className="h-4 w-4 mr-2" />
               Status
             </TabsTrigger>
+            <TabsTrigger value="ccpi-audit" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              CCPI Audit
+            </TabsTrigger>
             <TabsTrigger value="audit" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
               <CheckCircle2 className="h-4 w-4 mr-2" />
               Audit
@@ -267,10 +271,6 @@ ${auditResults.codeQuality.map((check: any) => `
             <TabsTrigger value="sources" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
               <Database className="h-4 w-4 mr-2" />
               Data Sources
-            </TabsTrigger>
-            <TabsTrigger value="ccpi-audit" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              CCPI Audit
             </TabsTrigger>
           </TabsList>
 
@@ -324,6 +324,26 @@ ${auditResults.codeQuality.map((check: any) => `
                     ))}
                   </div>
                 )}
+                {(!apiStatuses || apiStatuses.length === 0) && !loading && (
+                  <p className="text-slate-500 text-sm">No API status data available. Click "Refresh Status" to check all APIs.</p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="ccpi-audit">
+            <Card className="bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-blue-600" />
+                  CCPI Audit Dashboard
+                </CardTitle>
+                <CardDescription>
+                  Complete transparency for all 23 indicators, pillar formulas, and CCPI calculation
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <CcpiAuditAdmin />
               </CardContent>
             </Card>
           </TabsContent>
@@ -1067,6 +1087,15 @@ ${auditResults.codeQuality.map((check: any) => `
 
           <TabsContent value="ccpi-audit">
             <Card className="bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-blue-600" />
+                  CCPI Audit Dashboard
+                </CardTitle>
+                <CardDescription>
+                  Complete transparency for all 23 indicators, pillar formulas, and CCPI calculation
+                </CardDescription>
+              </CardHeader>
               <CardContent className="pt-6">
                 <CcpiAuditAdmin />
               </CardContent>
