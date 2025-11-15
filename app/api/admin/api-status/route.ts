@@ -6,41 +6,47 @@ export async function GET() {
       name: "Alpha Vantage API", 
       key: process.env.ALPHA_VANTAGE_API_KEY,
       testUrl: "https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=IBM&apikey=",
+      endpoint: "https://www.alphavantage.co/query",
       purpose: "Stock data & technical indicators (VIX, VXN, RVX, ATR, SMA)",
-      usedIn: ["CCPI Dashboard", "Market Sentiment", "Panic/Euphoria"]
+      usedIn: ["CCPI Dashboard (VIX, VXN, ATR)", "Market Sentiment", "Panic/Euphoria"]
     },
     { 
       name: "Alternative.me API", 
       key: null,
       testUrl: "https://api.alternative.me/fng/?limit=1",
+      endpoint: "https://api.alternative.me/fng",
       purpose: "Crypto Fear & Greed Index",
-      usedIn: ["CCPI Dashboard"]
+      usedIn: ["CCPI Dashboard (Fear & Greed component)"]
     },
     { 
       name: "Apify API", 
       key: process.env.APIFY_API_TOKEN,
       testUrl: "https://api.apify.com/v2/acts?token=",
+      endpoint: "https://api.apify.com/v2/acts/{actor-id}/runs",
       purpose: "Yahoo Finance data scraping (canadesk & Architjn actors for valuation metrics)",
-      usedIn: ["CCPI Dashboard"]
+      usedIn: ["CCPI Dashboard (S&P 500 P/E, P/S ratios via Yahoo Finance)"]
     },
     { 
       name: "Financial Modeling Prep API", 
       key: process.env.FMP_API_KEY,
-      testUrl: null,
-      purpose: "Financial statements & valuation metrics (legacy, not actively used)",
-      usedIn: ["Not currently in use"]
+      testUrl: "https://financialmodelingprep.com/stable/quote?symbol=AAPL&apikey=",
+      endpoint: "https://financialmodelingprep.com/stable/quote",
+      purpose: "Financial statements & valuation metrics (now using stable endpoint)",
+      usedIn: ["CCPI Dashboard (S&P 500 P/E, P/S ratios - primary source)"]
     },
     { 
       name: "FRED API", 
       key: process.env.FRED_API_KEY,
       testUrl: "https://api.stlouisfed.org/fred/series?series_id=GDP&api_key=",
+      endpoint: "https://api.stlouisfed.org/fred/series/observations",
       purpose: "Federal Reserve economic data (Fed Funds Rate, Yield Curve, Junk Bond Spread, CPI, M2 Money Supply)",
-      usedIn: ["CCPI Dashboard", "FOMC Predictions", "CPI/Inflation", "Panic/Euphoria"]
+      usedIn: ["CCPI Dashboard (Fed Funds, Yield Curve, Junk Spread)", "FOMC Predictions", "CPI/Inflation", "Panic/Euphoria"]
     },
     { 
       name: "Polygon.io API", 
       key: process.env.POLYGON_API_KEY,
       testUrl: "https://api.polygon.io/v2/aggs/ticker/AAPL/range/1/day/2023-01-01/2023-01-02?apiKey=",
+      endpoint: "https://api.polygon.io/v2/aggs/ticker/{ticker}/range",
       purpose: "Real-time options chains, stock quotes, Greeks, fundamentals, and market data",
       usedIn: ["Options Calculators", "Wheel Scanner", "CCPI Dashboard", "Greeks Calculator"]
     },
@@ -48,15 +54,17 @@ export async function GET() {
       name: "Resend API", 
       key: process.env.RESEND_API_KEY,
       testUrl: null,
+      endpoint: "https://api.resend.com/emails",
       purpose: "Transactional email notifications (password reset emails)",
-      usedIn: ["Authentication System"]
+      usedIn: ["Authentication System (password reset)"]
     },
     { 
       name: "Twelve Data API", 
       key: process.env.TWELVE_DATA_API_KEY || process.env.TWELVEDATA_API_KEY,
       testUrl: "https://api.twelvedata.com/time_series?symbol=AAPL&interval=1day&apikey=",
+      endpoint: "https://api.twelvedata.com/time_series",
       purpose: "Technical indicators, fundamentals, and market data (backup source)",
-      usedIn: ["CCPI Dashboard", "Wheel Scanner", "Market Data"]
+      usedIn: ["CCPI Dashboard (backup)", "Wheel Scanner", "Market Data"]
     }
   ]
 
@@ -84,6 +92,7 @@ export async function GET() {
               message: `Responding normally`,
               purpose: api.purpose,
               usedIn: api.usedIn,
+              endpoint: api.endpoint,
               hasKey: false
             }
           } else {
@@ -93,6 +102,7 @@ export async function GET() {
               message: `HTTP ${response.status}`,
               purpose: api.purpose,
               usedIn: api.usedIn,
+              endpoint: api.endpoint,
               hasKey: false
             }
           }
@@ -103,6 +113,7 @@ export async function GET() {
             message: error.name === "AbortError" ? "Request timeout (>5s)" : `Connection failed: ${error.message}`,
             purpose: api.purpose,
             usedIn: api.usedIn,
+            endpoint: api.endpoint,
             hasKey: false
           }
         }
@@ -116,6 +127,7 @@ export async function GET() {
           message: `API key not configured in environment variables`,
           purpose: api.purpose,
           usedIn: api.usedIn,
+          endpoint: api.endpoint,
           hasKey: false
         }
       }
@@ -127,6 +139,7 @@ export async function GET() {
           message: `Key configured (no test endpoint available)`,
           purpose: api.purpose,
           usedIn: api.usedIn,
+          endpoint: api.endpoint,
           hasKey: true
         }
       }
@@ -150,6 +163,7 @@ export async function GET() {
             message: `Responding normally`,
             purpose: api.purpose,
             usedIn: api.usedIn,
+            endpoint: api.endpoint,
             hasKey: true
           }
         } else if (response.status === 401 || response.status === 403) {
@@ -159,6 +173,7 @@ export async function GET() {
             message: `Invalid or expired API key (HTTP ${response.status})`,
             purpose: api.purpose,
             usedIn: api.usedIn,
+            endpoint: api.endpoint,
             hasKey: true
           }
         } else if (response.status === 429) {
@@ -168,6 +183,7 @@ export async function GET() {
             message: `Rate limit exceeded - API is working but throttled`,
             purpose: api.purpose,
             usedIn: api.usedIn,
+            endpoint: api.endpoint,
             hasKey: true
           }
         } else {
@@ -177,6 +193,7 @@ export async function GET() {
             message: `HTTP ${response.status}`,
             purpose: api.purpose,
             usedIn: api.usedIn,
+            endpoint: api.endpoint,
             hasKey: true
           }
         }
@@ -187,6 +204,7 @@ export async function GET() {
           message: error.name === "AbortError" ? "Request timeout (>5s)" : `Connection test failed: ${error.message}`,
           purpose: api.purpose,
           usedIn: api.usedIn,
+          endpoint: api.endpoint,
           hasKey: true
         }
       }

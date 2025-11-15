@@ -178,7 +178,7 @@ export async function GET(request: NextRequest) {
   if (fmpApiKey) {
     try {
       const fmpRes = await fetch(
-        `https://financialmodelingprep.com/api/v3/quote/AAPL?apikey=${fmpApiKey}`,
+        `https://financialmodelingprep.com/stable/quote?symbol=AAPL&apikey=${fmpApiKey}`,
         { 
           headers: { 'Accept': 'application/json' },
           // Timeout after 5 seconds
@@ -187,7 +187,7 @@ export async function GET(request: NextRequest) {
       )
       const fmpData = await fmpRes.json()
       
-      // Check for valid response: should be an array with company data
+      // Stable endpoint returns array with company data
       const hasData = Array.isArray(fmpData) && 
                      fmpData.length > 0 && 
                      fmpData[0].symbol === 'AAPL' &&
@@ -198,64 +198,63 @@ export async function GET(request: NextRequest) {
       const isRateLimited = fmpRes.status === 429 || (isError && fmpData.error?.includes('limit'))
       
       auditResults.dataSources.push({
-        page: "Financial Data (Optional - Not Currently Used)",
-        service: "Financial Modeling Prep API",
+        page: "Financial Data (S&P 500 Valuation Metrics)",
+        service: "Financial Modeling Prep API (Stable)",
         keyVariable: "FMP_API_KEY",
         status: hasData ? "VERIFIED" : (isRateLimited ? "VERIFIED" : (isError ? "FAIL" : "FAIL")),
         realData: hasData,
         details: hasData 
-          ? `✓ API Working - ${fmpData[0].symbol}: $${fmpData[0].price} (Note: Not actively used - optional backup source)`
+          ? `✓ API Working - ${fmpData[0].symbol}: $${fmpData[0].price} - Ready for S&P 500 P/E and P/S data`
           : isRateLimited
-            ? `✓ API Key Valid - Rate limited (free tier). Not actively used on site - optional backup.`
+            ? `✓ API Key Valid - Rate limited (free tier). Can be used for S&P 500 valuation metrics.`
             : isError 
               ? `API Error: ${fmpData.error || fmpData['Error Message']}`
               : "Invalid response format",
-        endpoint: "https://financialmodelingprep.com/api/v3/quote",
-        primary: "FMP API (Optional)",
-        fallback: "Not used - Site uses Polygon, Apify, FRED for all data",
+        endpoint: "https://financialmodelingprep.com/stable/quote",
+        primary: "FMP Stable API",
+        fallback: "Apify Yahoo Finance for S&P 500 metrics",
       })
       
       if (!hasData && !isRateLimited) {
         auditResults.issues.push(
           isError 
-            ? `FMP API error: ${fmpData.error || fmpData['Error Message']} (Optional - not affecting site)`
-            : "FMP API: No valid data returned (Optional - not affecting site)"
+            ? `FMP API error: ${fmpData.error || fmpData['Error Message']}`
+            : "FMP API: No valid data returned"
         )
       }
     } catch (error) {
       const isTimeout = error instanceof Error && error.name === 'AbortError'
       
       auditResults.dataSources.push({
-        page: "Financial Data (Optional)",
-        service: "Financial Modeling Prep API",
+        page: "Financial Data",
+        service: "Financial Modeling Prep API (Stable)",
         keyVariable: "FMP_API_KEY",
         status: isTimeout ? "VERIFIED" : "ERROR",
         realData: false,
         details: isTimeout 
-          ? "API timeout (likely rate limited) - Key appears valid. Not actively used on site."
+          ? "API timeout (likely rate limited) - Key appears valid."
           : `API call failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-        endpoint: "https://financialmodelingprep.com/api/v3/quote",
-        primary: "FMP API (Optional)",
-        fallback: "Not used - Site uses other APIs",
+        endpoint: "https://financialmodelingprep.com/stable/quote",
+        primary: "FMP Stable API",
+        fallback: "Apify Yahoo Finance",
       })
       
       if (!isTimeout) {
-        auditResults.issues.push("FMP API key test failed - connection error (Optional - not affecting site)")
+        auditResults.issues.push("FMP API key test failed - connection error")
       }
     }
   } else {
     auditResults.dataSources.push({
-      page: "Financial Data (Optional - Not Required)",
-      service: "Financial Modeling Prep API",
+      page: "Financial Data",
+      service: "Financial Modeling Prep API (Stable)",
       keyVariable: "FMP_API_KEY",
       status: "MISSING",
       realData: false,
-      details: "API key not configured (Optional - Site does not use FMP data)",
+      details: "API key not configured - Using Apify Yahoo Finance for S&P 500 data instead",
       endpoint: "N/A",
-      primary: "FMP API (Optional)",
-      fallback: "Not needed - All data from Polygon, Apify, FRED, Alpha Vantage",
+      primary: "FMP Stable API",
+      fallback: "Apify Yahoo Finance (currently active)",
     })
-    // Site doesn't actually use FMP - it's in the code but marked as deprecated/optional
   }
 
   // 4. TwelveData API (Technical Indicators)

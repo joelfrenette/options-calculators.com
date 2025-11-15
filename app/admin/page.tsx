@@ -13,9 +13,11 @@ import { CcpiAuditAdmin } from "@/components/ccpi-audit-admin"
 
 interface ApiStatus {
   name: string
-  status: "online" | "error" | "unknown"
+  status: "online" | "error" | "unknown" | "warning"
   message: string
   hasKey: boolean
+  endpoint?: string
+  usedIn?: string[]
 }
 
 interface AuditCheck {
@@ -299,8 +301,27 @@ ${auditResults.codeQuality.map((check: any) => `
                       {apiStatuses.map((api) => (
                         <div
                           key={api.name}
-                          className="flex items-start justify-between p-5 border rounded-lg hover:bg-slate-50 transition-colors"
+                          className="flex items-start gap-4 p-5 border rounded-lg hover:bg-slate-50 transition-colors"
                         >
+                          <div className="flex-shrink-0">
+                            {api.status === "online" ? (
+                              <div className="relative">
+                                <div className="w-6 h-6 bg-green-500 rounded-full animate-pulse" />
+                                <div className="absolute inset-0 w-6 h-6 bg-green-400 rounded-full blur-sm" />
+                              </div>
+                            ) : api.status === "warning" ? (
+                              <div className="relative">
+                                <div className="w-6 h-6 bg-yellow-500 rounded-full animate-pulse" />
+                                <div className="absolute inset-0 w-6 h-6 bg-yellow-400 rounded-full blur-sm" />
+                              </div>
+                            ) : (
+                              <div className="relative">
+                                <div className="w-6 h-6 bg-red-500 rounded-full animate-pulse" />
+                                <div className="absolute inset-0 w-6 h-6 bg-red-400 rounded-full blur-sm" />
+                              </div>
+                            )}
+                          </div>
+
                           <div className="flex items-start gap-4 flex-1">
                             {api.status === "online" ? (
                               <CheckCircle2 className="h-6 w-6 text-green-600 mt-1 flex-shrink-0" />
@@ -311,7 +332,7 @@ ${auditResults.codeQuality.map((check: any) => `
                             )}
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
-                                <p className="font-bold text-slate-900">{api.name} API</p>
+                                <p className="font-bold text-slate-900">{api.name}</p>
                                 {api.hasKey ? (
                                   <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded font-semibold">
                                     ✓ KEY SAVED
@@ -326,15 +347,29 @@ ${auditResults.codeQuality.map((check: any) => `
                                   </span>
                                 )}
                               </div>
+                              
+                              {api.endpoint && (
+                                <p className="text-xs text-slate-600 mb-2 font-mono bg-slate-100 px-2 py-1 rounded">
+                                  <span className="font-semibold text-slate-700">Endpoint:</span> {api.endpoint}
+                                </p>
+                              )}
+                              
                               <p className="text-sm text-slate-700 mb-2">
                                 <span className="font-semibold">Purpose:</span> {api.message.split(' - ')[1] || api.message}
                               </p>
+                              
+                              {api.usedIn && api.usedIn.length > 0 && (
+                                <p className="text-sm text-slate-600 mb-2">
+                                  <span className="font-semibold">Used in:</span> {api.usedIn.join(", ")}
+                                </p>
+                              )}
+                              
                               <p className="text-sm text-slate-600">
                                 <span className="font-semibold">Status:</span>{' '}
                                 <span className={
-                                  api.status === "online" ? "text-green-600" :
-                                  api.status === "error" ? "text-red-600" :
-                                  "text-yellow-600"
+                                  api.status === "online" ? "text-green-600 font-semibold" :
+                                  api.status === "error" ? "text-red-600 font-semibold" :
+                                  "text-yellow-600 font-semibold"
                                 }>
                                   {api.message.split(' - ')[0] || api.message}
                                 </span>

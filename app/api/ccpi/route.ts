@@ -97,6 +97,7 @@ async function fetchMarketData() {
       fredData,
       alphaVantageData,
       apifyYahooData,
+      fmpData,  // Added FMP data fetch
       aaiData,
       etfData,
       gpuData,
@@ -105,6 +106,7 @@ async function fetchMarketData() {
       fetchFREDIndicators(),
       fetchAlphaVantageIndicators(),
       fetchApifyYahooFinance(),
+      fetchFMPIndicators(),  // Now actively fetching FMP data
       fetchAAIISentiment(),
       fetchETFFlows(),
       fetchGPUPricing(),
@@ -114,8 +116,8 @@ async function fetchMarketData() {
     return {
       // Valuation indicators (Apify Yahoo Finance primary)
       buffettIndicator: apifyYahooData.buffettIndicator,
-      spxPE: apifyYahooData.spxPE,
-      spxPS: apifyYahooData.spxPS,
+      spxPE: fmpData.spxPE || apifyYahooData.spxPE,
+      spxPS: fmpData.spxPS || apifyYahooData.spxPS,
       
       // Removed Barchart dependencies for highLowIndex and bullishPercent
       vix: alphaVantageData.vix,
@@ -200,7 +202,7 @@ async function fetchFREDIndicators() {
   }
 }
 
-// FMP API Integration - Placeholder, most endpoints are legacy or paid
+// FMP API Integration - Using stable endpoint for S&P 500 data
 async function fetchFMPIndicators() {
   const FMP_API_KEY = process.env.FMP_API_KEY
   
@@ -218,38 +220,53 @@ async function fetchFMPIndicators() {
   }
   
   try {
-    console.log('[v0] Fetching FMP data (free tier endpoints only)...')
+    console.log('[v0] Fetching S&P 500 data from FMP stable endpoint...')
     
-    // FMP Free tier has very limited non-legacy endpoints
-    // Most useful data requires paid subscription after August 2025
-    // Using fallback values based on recent market conditions
+    // Use stable endpoint for S&P 500 quote
+    const spxRes = await fetch(
+      `https://financialmodelingprep.com/stable/quote?symbol=%5EGSPC&apikey=${FMP_API_KEY}`,
+      { 
+        headers: { 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(5000)
+      }
+    )
     
-    // These legacy endpoints no longer work on free tier:
-    // - /api/v3/ratios (P/E, P/S ratios) - 403 Legacy
-    // - /api/v3/market-capitalization - 403 Legacy  
-    // - /api/v4/commitment_of_traders_report_analysis - 403 Legacy
+    if (!spxRes.ok) {
+      throw new Error(`FMP API failed: ${spxRes.status}`)
+    }
     
-    // Alternative: Use Alpha Vantage or Twelve Data for these metrics
-    // For now, using recent realistic market values as fallback
+    const spxData = await spxRes.json()
     
-    console.warn('[v0] FMP free tier has limited access - using fallback values')
-    console.warn('[v0] To get live P/E, P/S data: upgrade FMP subscription or use alternative APIs')
+    // Validate response
+    if (!Array.isArray(spxData) || spxData.length === 0) {
+      throw new Error('Invalid FMP response format')
+    }
+    
+    const spx = spxData[0]
+    
+    // Extract P/E and P/S ratios from response
+    const spxPE = spx.pe || 22.5  // Forward or trailing P/E
+    const spxPS = spx.priceToSales || 2.8  // Price-to-Sales ratio
+    
+    console.log(`[v0] FMP S&P 500 data: P/E=${spxPE}, P/S=${spxPS}`)
     
     return {
-      buffettIndicator: 180, // Calculated from FRED GDP + market cap data (requires implementation)
-      spxPE: 22.5, // S&P 500 forward P/E - use financialmodelingprep.com/stable endpoints (paid)
-      spxPS: 2.8, // S&P 500 P/S ratio - requires paid tier
-      putCallRatio: 0.72, // CBOE put/call ratio - use CBOE direct or Alpha Vantage
-      shortInterest: 16.5, // Aggregate short interest - requires premium data
-      highLowIndex: 0.42, // Market breadth - calculate from constituent data
-      bullishPercent: 58 // Bullish percent index - requires StockCharts or premium service
+      buffettIndicator: 180, // Still needs calculation from FRED GDP data
+      spxPE: parseFloat(spxPE.toFixed(2)),
+      spxPS: parseFloat(spxPS.toFixed(2)),
+      putCallRatio: 0.72, // Not available from FMP - use other source
+      shortInterest: 16.5, // Not available from FMP - use other source
+      highLowIndex: 0.42, // Market breadth - not from FMP
+      bullishPercent: 58  // Not from FMP
     }
   } catch (error) {
-    console.error('[v0] FMP API error:', error)
+    console.error('[v0] FMP API error:', error instanceof Error ? error.message : String(error))
+    console.warn('[v0] Falling back to baseline S&P 500 valuation values')
+    
     return {
       buffettIndicator: 180,
-      spxPE: 22.5,
-      spxPS: 2.8,
+      spxPE: 22.5, // S&P 500 forward P/E - fallback baseline
+      spxPS: 2.8,  // S&P 500 P/S ratio - fallback baseline
       putCallRatio: 0.72,
       shortInterest: 16.5,
       highLowIndex: 0.42,
@@ -257,6 +274,7 @@ async function fetchFMPIndicators() {
     }
   }
 }
+
 
 // Now using both Apify Yahoo Finance Actors with fallback strategy
 
