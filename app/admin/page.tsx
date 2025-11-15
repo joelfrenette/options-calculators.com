@@ -119,15 +119,6 @@ ${i + 1}. **${calc.name}**
 
 ---
 
-## ENVIRONMENT VARIABLES CONFIRMED
-
-${auditResults.environmentVariables.map((env: any) => `
-- ${env.key}: ${env.configured} - ${env.purpose} ${env.required ? "(REQUIRED)" : "(OPTIONAL)"}
-  Status: ${env.status}
-`).join("\n")}
-
----
-
 ## CODE QUALITY CHECKS
 
 ${auditResults.codeQuality.map((check: any) => `
@@ -584,35 +575,6 @@ ${auditResults.codeQuality.map((check: any) => `
                       </CardContent>
                     </Card>
 
-                    <Card className="mb-6">
-                      <CardHeader>
-                        <CardTitle>Environment Variables ({auditResults.environmentVariables.length})</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          {auditResults.environmentVariables.map((env: any, index: number) => (
-                            <div key={index} className="flex items-center justify-between p-3 border rounded">
-                              <div className="flex-1">
-                                <p className="font-mono text-sm">{env.key}</p>
-                                <p className="text-xs text-slate-600">{env.purpose}</p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className={`text-xs px-2 py-1 rounded ${env.configured === "YES" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}
-                                >
-                                  {env.configured}
-                                </span>
-                                <span
-                                  className={`text-xs px-2 py-1 rounded ${env.status === "OK" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}
-                                >
-                                  {env.status}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
 
                     <Card>
                       <CardHeader>
