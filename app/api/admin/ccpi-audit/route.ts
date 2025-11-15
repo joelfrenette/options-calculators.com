@@ -104,9 +104,9 @@ async function auditAllIndicators() {
       name: "High-Low Index (Market Breadth)",
       pillar: "Pillar 2: Technical Fragility",
       source_url: "https://api.polygon.io/v2/aggs/ticker/$NH and $NL",
-      api_endpoint: "/api/market-breadth (Polygon → FMP → AlphaVantage)",
-      fetch_method: "Polygon $NH/$NL tickers or FMP highs_lows endpoint",
-      status: await testMarketBreadthAPI() ? "Live" : "Baseline",
+      api_endpoint: "/api/market-breadth → lib/market-breadth.ts (Polygon free plan limitation)",
+      fetch_method: "Attempted Polygon $NH/$NL tickers → Falls back to baseline (0.42) due to API plan restrictions",
+      status: await testMarketBreadthAPI(),
       last_fetched_at: new Date().toISOString(),
       raw_sample: { value: 0.42, unit: "ratio" },
       threshold: { weak: "<30%", neutral: "30-60%", strong: ">60%" }
@@ -620,13 +620,21 @@ async function testMarketBreadthAPI() {
       signal: AbortSignal.timeout(5000)
     })
     
-    if (!response.ok) return false
+    if (!response.ok) return "Failed"
     
     const data = await response.json()
     
-    // Check if we got live data (not baseline/stale)
-    return data.source !== 'baseline' && !data.stale
+    // "Live" = actually got live data from API
+    // "Baseline (API integrated)" = API code exists but returning baseline due to limitations
+    // "Baseline" = No API integration at all
+    if (data.source === 'live') {
+      return "Live"
+    } else if (data.source === 'baseline') {
+      return "Baseline (API integrated, plan limitation)"
+    } else {
+      return "Baseline"
+    }
   } catch {
-    return false
+    return "Failed"
   }
 }
