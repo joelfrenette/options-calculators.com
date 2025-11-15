@@ -930,13 +930,14 @@ export function CcpiDashboard() {
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.aiCapexGrowth / 100) * 100)}%` 
+                          // Map: 0% → 0 (left), 60% → 100 (right)
+                          marginLeft: `${Math.min(100, Math.max(0, (data.indicators.aiCapexGrowth / 60) * 100))}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Slowing: &lt;20%</span>
+                        <span>Sustainable: &lt;20%</span>
                         <span>Moderate: 20-40%</span>
-                        <span>Accelerating: &gt;40%</span>
+                        <span>Overspending: &gt;40%</span>
                       </div>
                     </div>
                   )}
@@ -951,13 +952,14 @@ export function CcpiDashboard() {
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.aiRevenueGrowth / 50) * 100)}%` 
+                          // Map: 40% → 0 (left), 0% → 100 (right)
+                          marginLeft: `${Math.min(100, Math.max(0, (1 - (data.indicators.aiRevenueGrowth / 40)) * 100))}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Lagging: &lt;10%</span>
-                        <span>Growing: 10-25%</span>
                         <span>Strong: &gt;25%</span>
+                        <span>Growing: 10-25%</span>
+                        <span>Lagging: &lt;10%</span>
                       </div>
                     </div>
                   )}
@@ -993,13 +995,14 @@ export function CcpiDashboard() {
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.aiJobPostingsGrowth + 20) / 60) * 100))}%` 
+                          // Map: +30% → 0 (left), -20% → 100 (right)
+                          marginLeft: `${Math.min(100, Math.max(0, (1 - ((data.indicators.aiJobPostingsGrowth + 20) / 50)) * 100))}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Declining: &lt;-10%</span>
-                        <span>Stable: -10% to 10%</span>
                         <span>Growing: &gt;10%</span>
+                        <span>Stable: -10% to 10%</span>
+                        <span>Declining: &lt;-10%</span>
                       </div>
                     </div>
                   )}

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Download, LogOut, Database, Activity, CheckCircle2, XCircle, AlertCircle, Megaphone, BarChart3, TrendingUp, Gauge, Target, Github, ExternalLink, Trash2, Plus, Save, Image, Key } from 'lucide-react'
 import { ApiKeysManager } from "@/components/api-keys-manager"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { CcpiAuditAdmin } from "@/components/ccpi-audit-admin"
 
 interface ApiStatus {
   name: string
@@ -32,6 +33,8 @@ export default function AdminDashboard() {
   const [adImages, setAdImages] = useState<string[]>([])
   const [adUrl, setAdUrl] = useState("")
   const [newAdImage, setNewAdImage] = useState("")
+  const [dataSourceStatus, setDataSourceStatus] = useState<any>(null)
+
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" })
@@ -199,6 +202,20 @@ ${auditResults.codeQuality.map((check: any) => `
     }
   }
 
+  const fetchDataSourceStatus = async () => {
+    setLoading(true)
+    try {
+      const response = await fetch("/api/admin/api-status")
+      const data = await response.json()
+      setDataSourceStatus(data)
+    } catch (error) {
+      console.error("Failed to fetch data source status:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
       <div className="max-w-7xl mx-auto">
@@ -214,7 +231,7 @@ ${auditResults.codeQuality.map((check: any) => `
         </div>
 
         <Tabs defaultValue="status" className="w-full">
-          <TabsList className="grid grid-cols-4 lg:grid-cols-7 gap-2 bg-slate-800 p-1 h-auto mb-6">
+          <TabsList className="grid grid-cols-4 lg:grid-cols-9 gap-2 bg-slate-800 p-1 h-auto mb-6">
             <TabsTrigger value="status" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
               <Activity className="h-4 w-4 mr-2" />
               Status
@@ -242,6 +259,14 @@ ${auditResults.codeQuality.map((check: any) => `
             <TabsTrigger value="sentiment" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
               <Gauge className="h-4 w-4 mr-2" />
               Sentiment
+            </TabsTrigger>
+            <TabsTrigger value="sources" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
+              <Database className="h-4 w-4 mr-2" />
+              Data Sources
+            </TabsTrigger>
+            <TabsTrigger value="ccpi-audit" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              CCPI Audit
             </TabsTrigger>
           </TabsList>
 
@@ -872,6 +897,184 @@ ${auditResults.codeQuality.map((check: any) => `
                     </ul>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="sources">
+            <Card className="bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Database className="h-5 w-5 text-blue-600" />
+                  CCPI Data Sources - All 23 Indicators
+                </CardTitle>
+                <CardDescription>
+                  Primary, secondary, and tertiary data sources with fallback chains. Green = online, Yellow = using fallback, Red = offline.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button onClick={fetchDataSourceStatus} className="mb-4" disabled={loading}>
+                  {loading ? "Checking..." : "Check All Data Sources"}
+                </Button>
+
+                {dataSourceStatus && (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                      <Card className="bg-green-50 border-green-200">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-lg text-green-900">Online</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-3xl font-bold text-green-600">{dataSourceStatus.summary.online}</p>
+                          <p className="text-xs text-green-700">of {dataSourceStatus.summary.total} sources</p>
+                        </CardContent>
+                      </Card>
+                      
+                      <Card className="bg-yellow-50 border-yellow-200">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-lg text-yellow-900">Using Fallback</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-3xl font-bold text-yellow-600">{dataSourceStatus.summary.usingFallback}</p>
+                          <p className="text-xs text-yellow-700">sources switched</p>
+                        </CardContent>
+                      </Card>
+                      
+                      <Card className="bg-red-50 border-red-200">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-lg text-red-900">Offline</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-3xl font-bold text-red-600">{dataSourceStatus.summary.offline}</p>
+                          <p className="text-xs text-red-700">sources down</p>
+                        </CardContent>
+                      </Card>
+                      
+                      <Card className="bg-blue-50 border-blue-200">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-lg text-blue-900">Coverage</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-3xl font-bold text-blue-600">
+                            {Math.round((dataSourceStatus.summary.online / dataSourceStatus.summary.total) * 100)}%
+                          </p>
+                          <p className="text-xs text-blue-700">real data coverage</p>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    <div className="space-y-4">
+                      {["Valuation", "Technical", "Macro", "Sentiment", "Flows", "Structural"].map((pillar) => {
+                        const pillarSources = dataSourceStatus.dataSources.filter((s: any) => s.pillar === pillar)
+                        
+                        return (
+                          <Card key={pillar} className="bg-slate-50">
+                            <CardHeader className="pb-3">
+                              <CardTitle className="text-lg">
+                                {pillar} Pillar ({pillarSources.length} indicators)
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-3">
+                                {pillarSources.map((source: any, idx: number) => (
+                                  <div key={idx} className="border rounded-lg p-4 bg-white">
+                                    <div className="flex items-start justify-between mb-3">
+                                      <h4 className="font-semibold text-slate-900">{source.indicator}</h4>
+                                      <span className={`text-xs px-3 py-1 rounded-full font-semibold ${
+                                        source.overallStatus === "online" 
+                                          ? "bg-green-100 text-green-800"
+                                          : "bg-red-100 text-red-800"
+                                      }`}>
+                                        {source.overallStatus === "online" ? "✓ LIVE" : "✗ OFFLINE"}
+                                      </span>
+                                    </div>
+                                    
+                                    <div className="space-y-2 text-sm">
+                                      {/* Primary Source */}
+                                      <div className="flex items-center gap-2">
+                                        {source.primary.status === "online" ? (
+                                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                        ) : (
+                                          <XCircle className="h-4 w-4 text-red-600" />
+                                        )}
+                                        <span className="font-semibold">Primary:</span>
+                                        <span className="text-slate-600">{source.primary.name}</span>
+                                        <span className="text-xs text-slate-500">({source.primary.message})</span>
+                                        {source.activeSource === "primary" && (
+                                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">ACTIVE</span>
+                                        )}
+                                      </div>
+                                      
+                                      {/* Secondary Source */}
+                                      {source.secondary && (
+                                        <div className="flex items-center gap-2 ml-4">
+                                          {source.secondary.status === "online" ? (
+                                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                          ) : source.secondary.status === "error" ? (
+                                            <XCircle className="h-4 w-4 text-red-600" />
+                                          ) : (
+                                            <AlertCircle className="h-4 w-4 text-gray-400" />
+                                          )}
+                                          <span className="font-semibold">Fallback:</span>
+                                          <span className="text-slate-600">{source.secondary.name}</span>
+                                          {source.secondary.message && (
+                                            <span className="text-xs text-slate-500">({source.secondary.message})</span>
+                                          )}
+                                          {source.activeSource === "secondary" && (
+                                            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">ACTIVE</span>
+                                          )}
+                                        </div>
+                                      )}
+                                      
+                                      {/* Tertiary Source */}
+                                      {source.tertiary && (
+                                        <div className="flex items-center gap-2 ml-8">
+                                          {source.tertiary.status === "online" ? (
+                                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                          ) : source.tertiary.status === "error" ? (
+                                            <XCircle className="h-4 w-4 text-red-600" />
+                                          ) : (
+                                            <AlertCircle className="h-4 w-4 text-gray-400" />
+                                          )}
+                                          <span className="font-semibold">Backup:</span>
+                                          <span className="text-slate-600">{source.tertiary.name}</span>
+                                          {source.tertiary.message && (
+                                            <span className="text-xs text-slate-500">({source.tertiary.message})</span>
+                                          )}
+                                          {source.activeSource === "tertiary" && (
+                                            <span className="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded">ACTIVE</span>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="ccpi-audit">
+            <Card className="bg-white">
+              <CardContent className="pt-6">
+                <CcpiAuditAdmin />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  )
+}
+6">
+                <CcpiAuditAdmin />
               </CardContent>
             </Card>
           </TabsContent>
