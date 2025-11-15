@@ -17,7 +17,7 @@ interface AuditData {
   summary: {
     totalIndicators: number
     liveIndicators: number
-    staleIndicators: number
+    baselineIndicators: number
     failedIndicators: number
   }
 }
@@ -52,7 +52,7 @@ Generated: ${new Date(auditData.timestamp).toLocaleString()}
 ## Summary
 - Total Indicators: ${auditData.summary.totalIndicators}
 - Live Data: ${auditData.summary.liveIndicators}
-- Stale/Baseline: ${auditData.summary.staleIndicators}
+- Baseline Fallback: ${auditData.summary.baselineIndicators}
 - Failed: ${auditData.summary.failedIndicators}
 - Coverage: ${Math.round((auditData.summary.liveIndicators / auditData.summary.totalIndicators) * 100)}%
 
@@ -158,7 +158,7 @@ ${auditData.canaries.alert_levels.map((alert: any) => `
         <>
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="bg-blue-50 border-blue-200">
+            <Card className="bg-white border-blue-200">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg text-blue-900">Total Indicators</CardTitle>
               </CardHeader>
@@ -167,7 +167,7 @@ ${auditData.canaries.alert_levels.map((alert: any) => `
               </CardContent>
             </Card>
             
-            <Card className="bg-green-50 border-green-200">
+            <Card className="bg-white border-green-200">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg text-green-900">Live Data</CardTitle>
               </CardHeader>
@@ -177,17 +177,17 @@ ${auditData.canaries.alert_levels.map((alert: any) => `
               </CardContent>
             </Card>
             
-            <Card className="bg-yellow-50 border-yellow-200">
+            <Card className="bg-white border-yellow-200">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg text-yellow-900">Baseline Values</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold text-yellow-600">{auditData.summary.staleIndicators}</p>
-                <p className="text-xs text-yellow-700">Historical averages</p>
+                <p className="text-3xl font-bold text-yellow-600">{auditData.summary.baselineIndicators}</p>
+                <p className="text-xs text-yellow-700">Historical averages (fallback)</p>
               </CardContent>
             </Card>
             
-            <Card className="bg-red-50 border-red-200">
+            <Card className="bg-white border-red-200">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg text-red-900">Failed</CardTitle>
               </CardHeader>
