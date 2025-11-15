@@ -133,9 +133,9 @@ ${auditData.canaries.alert_levels.map((alert: any) => `
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between bg-white rounded-lg p-6 border">
         <div>
-          <h2 className="text-2xl font-bold">CCPI Audit Dashboard</h2>
+          <h2 className="text-2xl font-bold text-gray-900">CCPI Audit Dashboard</h2>
           <p className="text-sm text-gray-600">
             Complete transparency for all 23 indicators, pillar formulas, and CCPI calculation
           </p>
@@ -224,14 +224,14 @@ ${auditData.canaries.alert_levels.map((alert: any) => `
 
             {/* Tab 1: All 23 Indicators */}
             <TabsContent value="indicators">
-              <Card>
-                <CardHeader>
-                  <CardTitle>All 23 Indicators - Live Data Sources</CardTitle>
-                  <CardDescription>
+              <Card className="bg-white">
+                <CardHeader className="bg-white">
+                  <CardTitle className="text-gray-900">All 23 Indicators - Live Data Sources</CardTitle>
+                  <CardDescription className="text-gray-600">
                     Comprehensive list of every indicator with API endpoints, fetch methods, and current values
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="bg-white">
                   <div className="space-y-4">
                     {["Valuation Stress", "Technical Fragility", "Macro & Liquidity Risk", "Sentiment & Media Feedback", "Capital Flows & Positioning", "Structural"].map((pillar) => {
                       const pillarIndicators = auditData.indicators.filter((ind: any) => ind.pillar === pillar)
@@ -303,14 +303,14 @@ ${auditData.canaries.alert_levels.map((alert: any) => `
 
             {/* Tab 2: Pillar Formulas */}
             <TabsContent value="pillars">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Pillar Score Formulas - Full Transparency</CardTitle>
-                  <CardDescription>
+              <Card className="bg-white">
+                <CardHeader className="bg-white">
+                  <CardTitle className="text-gray-900">Pillar Score Formulas - Full Transparency</CardTitle>
+                  <CardDescription className="text-gray-600">
                     Exact formulas, weights, and scoring logic for each of the 6 pillars
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="bg-white">
                   <div className="space-y-4">
                     {auditData.pillars.map((pillar: any, index: number) => (
                       <Card key={index} className="bg-blue-50">
@@ -349,14 +349,14 @@ ${auditData.canaries.alert_levels.map((alert: any) => `
 
             {/* Tab 3: CCPI Aggregation */}
             <TabsContent value="aggregation">
-              <Card>
-                <CardHeader>
-                  <CardTitle>CCPI Final Score - Weighted Pillar Aggregation</CardTitle>
-                  <CardDescription>
+              <Card className="bg-white">
+                <CardHeader className="bg-white">
+                  <CardTitle className="text-gray-900">CCPI Final Score - Weighted Pillar Aggregation</CardTitle>
+                  <CardDescription className="text-gray-600">
                     How the 6 pillar scores combine into the final CCPI score (0-100)
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="bg-white">
                   <div className="space-y-6">
                     <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                       <h3 className="font-semibold text-blue-900 mb-2">Formula</h3>
@@ -401,14 +401,14 @@ ${auditData.canaries.alert_levels.map((alert: any) => `
 
             {/* Tab 4: Confidence & Certainty */}
             <TabsContent value="confidence">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Confidence & Certainty Score</CardTitle>
-                  <CardDescription>
+              <Card className="bg-white">
+                <CardHeader className="bg-white">
+                  <CardTitle className="text-gray-900">Confidence & Certainty Score</CardTitle>
+                  <CardDescription className="text-gray-600">
                     How certainty is calculated from data freshness, pillar alignment, and indicator consistency
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="bg-white">
                   <div className="space-y-6">
                     <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                       <h3 className="font-semibold text-blue-900 mb-2">Formula</h3>
@@ -440,14 +440,14 @@ ${auditData.canaries.alert_levels.map((alert: any) => `
 
             {/* Tab 5: Canary Signals */}
             <TabsContent value="canaries">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Canary Signals - Early Warning System</CardTitle>
-                  <CardDescription>
+              <Card className="bg-white">
+                <CardHeader className="bg-white">
+                  <CardTitle className="text-gray-900">Canary Signals - Early Warning System</CardTitle>
+                  <CardDescription className="text-gray-600">
                     How the system triggers warnings based on indicator thresholds
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="bg-white">
                   <div className="space-y-6">
                     <div className="grid grid-cols-3 gap-4">
                       <Card className="bg-blue-50 border-blue-200">
