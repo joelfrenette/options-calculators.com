@@ -240,6 +240,10 @@ ${auditResults.codeQuality.map((check: any) => `
               <Activity className="h-4 w-4 mr-2" />
               Status
             </TabsTrigger>
+            <TabsTrigger value="keys" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
+              <Key className="h-4 w-4 mr-2" />
+              API Keys
+            </TabsTrigger>
             <TabsTrigger value="ccpi-audit" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
               <CheckCircle2 className="h-4 w-4 mr-2" />
               CCPI Audit
@@ -255,10 +259,6 @@ ${auditResults.codeQuality.map((check: any) => `
             <TabsTrigger value="ads" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
               <Image className="h-4 w-4 mr-2" />
               Ads
-            </TabsTrigger>
-            <TabsTrigger value="keys" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
-              <Key className="h-4 w-4 mr-2" />
-              API Keys
             </TabsTrigger>
             <TabsTrigger value="trend" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
               <TrendingUp className="h-4 w-4 mr-2" />
@@ -807,7 +807,7 @@ ${auditResults.codeQuality.map((check: any) => `
             </div>
           </TabsContent>
 
-          {/* API Keys Tab */}
+          {/* API Keys Tab - now in position 2 */}
           <TabsContent value="keys">
             <Card className="bg-white">
               <CardHeader>
