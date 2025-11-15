@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -25,6 +25,10 @@ interface AuditData {
 export function CcpiAuditAdmin() {
   const [loading, setLoading] = useState(false)
   const [auditData, setAuditData] = useState<AuditData | null>(null)
+
+  useEffect(() => {
+    fetchAudit()
+  }, [])
 
   const fetchAudit = async () => {
     setLoading(true)

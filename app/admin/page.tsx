@@ -375,20 +375,7 @@ ${auditResults.codeQuality.map((check: any) => `
           </TabsContent>
 
           <TabsContent value="ccpi-audit">
-            <Card className="bg-white">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-blue-600" />
-                  CCPI Audit Dashboard
-                </CardTitle>
-                <CardDescription>
-                  Complete transparency for all 23 indicators, pillar formulas, and CCPI calculation
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <CcpiAuditAdmin />
-              </CardContent>
-            </Card>
+            <CcpiAuditAdmin />
           </TabsContent>
 
           {/* Audit Tab */}
