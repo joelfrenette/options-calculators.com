@@ -48,6 +48,12 @@ export default function AdminDashboard() {
     }
   }, [activeTab, auditResults])
 
+  useEffect(() => {
+    if (activeTab === "sources") {
+      fetchDataSourceStatus()
+    }
+  }, [activeTab])
+
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" })
     router.push("/login")
@@ -971,18 +977,22 @@ ${auditResults.codeQuality.map((check: any) => `
           <TabsContent value="sources">
             <Card className="bg-white">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Database className="h-5 w-5 text-blue-600" />
-                  CCPI Data Sources - All 23 Indicators
-                </CardTitle>
-                <CardDescription>
-                  Primary, secondary, and tertiary data sources with fallback chains. Green = online, Yellow = using fallback, Red = offline.
-                </CardDescription>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Database className="h-5 w-5 text-blue-600" />
+                      CCPI Data Sources - All 23 Indicators
+                    </CardTitle>
+                    <CardDescription>
+                      Primary, secondary, and tertiary data sources with fallback chains. Green = online, Yellow = using fallback, Red = offline.
+                    </CardDescription>
+                  </div>
+                  <Button onClick={fetchDataSourceStatus} disabled={loading}>
+                    {loading ? "Checking..." : "Refresh Status"}
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
-                <Button onClick={fetchDataSourceStatus} className="mb-4" disabled={loading}>
-                  {loading ? "Checking..." : "Check All Data Sources"}
-                </Button>
 
                 {dataSourceStatus && dataSourceStatus.summary && (
                   <>
@@ -1023,7 +1033,7 @@ ${auditResults.codeQuality.map((check: any) => `
                         </CardHeader>
                         <CardContent>
                           <p className="text-3xl font-bold text-blue-600">
-                            {dataSourceStatus.summary.total > 0 
+                            {dataSourceStatus.summary.total > 0
                               ? Math.round((dataSourceStatus.summary.online / dataSourceStatus.summary.total) * 100)
                               : 0}%
                           </p>
