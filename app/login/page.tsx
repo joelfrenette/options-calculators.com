@@ -3,12 +3,12 @@
 import type React from "react"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { AlertCircle, Lock } from "lucide-react"
+import { AlertCircle, Lock } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -56,13 +56,23 @@ export default function LoginPage() {
         body: JSON.stringify({ email }),
       })
 
-      if (!response.ok) {
-        throw new Error("Reset failed")
-      }
+      const data = await response.json()
 
-      setResetMessage("Password reset email sent! Check your inbox.")
+      if (!response.ok) {
+        if (response.status === 503 && data.details?.includes("domain needs to be verified")) {
+          setError(
+            "Email service needs configuration. Please verify the domain at resend.com/domains or contact the site administrator."
+          )
+        } else {
+          throw new Error(data.error || "Reset failed")
+        }
+      } else {
+        setResetMessage("Password reset email sent! Check your inbox.")
+      }
     } catch (err) {
-      setError("Failed to send reset email")
+      if (!error) {
+        setError("Failed to send reset email")
+      }
     } finally {
       setLoading(false)
     }

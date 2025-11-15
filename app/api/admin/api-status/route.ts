@@ -1,56 +1,62 @@
 import { NextResponse } from "next/server"
 
-
 export async function GET() {
-  // List of all APIs used on the website
   const apis = [
     { 
-      name: "Alpha Vantage", 
+      name: "Alpha Vantage API", 
       key: process.env.ALPHA_VANTAGE_API_KEY,
       testUrl: "https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=IBM&apikey=",
-      purpose: "Stock data & technical indicators (VIX, VXN, ATR)"
+      purpose: "Stock data & technical indicators (VIX, VXN, RVX, ATR, SMA)",
+      usedIn: ["CCPI Dashboard", "Market Sentiment", "Panic/Euphoria"]
     },
     { 
-      name: "FRED (Federal Reserve)", 
-      key: process.env.FRED_API_KEY,
-      testUrl: "https://api.stlouisfed.org/fred/series?series_id=GDP&api_key=",
-      purpose: "Economic data (Fed Funds, Yield Curve, Junk Bond Spread)"
-    },
-    { 
-      name: "Apify", 
-      key: process.env.APIFY_API_TOKEN,
-      testUrl: "https://api.apify.com/v2/acts",
-      purpose: "Yahoo Finance data scraping actors"
-    },
-    { 
-      name: "Twelve Data", 
-      key: process.env.TWELVE_DATA_API_KEY || process.env.TWELVEDATA_API_KEY,
-      testUrl: "https://api.twelvedata.com/time_series?symbol=AAPL&interval=1day&apikey=",
-      purpose: "Market data backup source"
-    },
-    { 
-      name: "Polygon.io", 
-      key: process.env.POLYGON_API_KEY,
-      testUrl: "https://api.polygon.io/v2/aggs/ticker/AAPL/range/1/day/2023-01-01/2023-01-02?apiKey=",
-      purpose: "Real-time market data backup"
-    },
-    { 
-      name: "Financial Modeling Prep", 
-      key: process.env.FMP_API_KEY,
-      testUrl: "https://financialmodelingprep.com/api/v3/quote/AAPL?apikey=",
-      purpose: "Financial statements & valuation metrics"
-    },
-    { 
-      name: "Alternative.me", 
+      name: "Alternative.me API", 
       key: null,
       testUrl: "https://api.alternative.me/fng/?limit=1",
-      purpose: "Fear & Greed Index (no key required)"
+      purpose: "Crypto Fear & Greed Index",
+      usedIn: ["CCPI Dashboard"]
     },
     { 
-      name: "Resend", 
+      name: "Apify API", 
+      key: process.env.APIFY_API_TOKEN,
+      testUrl: "https://api.apify.com/v2/acts?token=",
+      purpose: "Yahoo Finance data scraping (canadesk & Architjn actors for valuation metrics)",
+      usedIn: ["CCPI Dashboard"]
+    },
+    { 
+      name: "Financial Modeling Prep API", 
+      key: process.env.FMP_API_KEY,
+      testUrl: null,
+      purpose: "Financial statements & valuation metrics (legacy, not actively used)",
+      usedIn: ["Not currently in use"]
+    },
+    { 
+      name: "FRED API", 
+      key: process.env.FRED_API_KEY,
+      testUrl: "https://api.stlouisfed.org/fred/series?series_id=GDP&api_key=",
+      purpose: "Federal Reserve economic data (Fed Funds Rate, Yield Curve, Junk Bond Spread, CPI, M2 Money Supply)",
+      usedIn: ["CCPI Dashboard", "FOMC Predictions", "CPI/Inflation", "Panic/Euphoria"]
+    },
+    { 
+      name: "Polygon.io API", 
+      key: process.env.POLYGON_API_KEY,
+      testUrl: "https://api.polygon.io/v2/aggs/ticker/AAPL/range/1/day/2023-01-01/2023-01-02?apiKey=",
+      purpose: "Real-time options chains, stock quotes, Greeks, fundamentals, and market data",
+      usedIn: ["Options Calculators", "Wheel Scanner", "CCPI Dashboard", "Greeks Calculator"]
+    },
+    { 
+      name: "Resend API", 
       key: process.env.RESEND_API_KEY,
       testUrl: null,
-      purpose: "Email notifications"
+      purpose: "Transactional email notifications (password reset emails)",
+      usedIn: ["Authentication System"]
+    },
+    { 
+      name: "Twelve Data API", 
+      key: process.env.TWELVE_DATA_API_KEY || process.env.TWELVEDATA_API_KEY,
+      testUrl: "https://api.twelvedata.com/time_series?symbol=AAPL&interval=1day&apikey=",
+      purpose: "Technical indicators, fundamentals, and market data (backup source)",
+      usedIn: ["CCPI Dashboard", "Wheel Scanner", "Market Data"]
     }
   ]
 
@@ -63,11 +69,11 @@ export async function GET() {
       if (api.key === null && api.testUrl) {
         try {
           const controller = new AbortController()
-          const timeoutId = setTimeout(() => controller.abort(), 3000)
+          const timeoutId = setTimeout(() => controller.abort(), 5000)
           
           const response = await fetch(api.testUrl, {
             signal: controller.signal,
-            headers: { 'User-Agent': 'Mozilla/5.0' }
+            headers: { 'User-Agent': 'OPTIONS-CALCULATORS.COM/1.0' }
           })
           clearTimeout(timeoutId)
           
@@ -75,14 +81,18 @@ export async function GET() {
             return {
               name: api.name,
               status: "online" as const,
-              message: `${api.purpose} - Responding normally`,
+              message: `Responding normally`,
+              purpose: api.purpose,
+              usedIn: api.usedIn,
               hasKey: false
             }
           } else {
             return {
               name: api.name,
               status: "error" as const,
-              message: `HTTP ${response.status} - ${api.purpose}`,
+              message: `HTTP ${response.status}`,
+              purpose: api.purpose,
+              usedIn: api.usedIn,
               hasKey: false
             }
           }
@@ -90,7 +100,9 @@ export async function GET() {
           return {
             name: api.name,
             status: "error" as const,
-            message: `${error.name === "AbortError" ? "Timeout" : "Connection failed"} - ${api.purpose}`,
+            message: error.name === "AbortError" ? "Request timeout (>5s)" : `Connection failed: ${error.message}`,
+            purpose: api.purpose,
+            usedIn: api.usedIn,
             hasKey: false
           }
         }
@@ -101,62 +113,82 @@ export async function GET() {
         return {
           name: api.name,
           status: "error" as const,
-          message: `API key not configured - ${api.purpose}`,
+          message: `API key not configured in environment variables`,
+          purpose: api.purpose,
+          usedIn: api.usedIn,
           hasKey: false
         }
       }
       
-      // Test API with key
-      if (api.testUrl) {
-        try {
-          const controller = new AbortController()
-          const timeoutId = setTimeout(() => controller.abort(), 3000)
-          
-          const testEndpoint = api.testUrl + api.key
-          const response = await fetch(testEndpoint, {
-            signal: controller.signal,
-            headers: { 'User-Agent': 'Mozilla/5.0' }
-          })
-          clearTimeout(timeoutId)
-          
-          if (response.ok) {
-            return {
-              name: api.name,
-              status: "online" as const,
-              message: `${api.purpose} - Responding normally`,
-              hasKey: true
-            }
-          } else if (response.status === 401 || response.status === 403) {
-            return {
-              name: api.name,
-              status: "error" as const,
-              message: `Invalid API key - ${api.purpose}`,
-              hasKey: true
-            }
-          } else {
-            return {
-              name: api.name,
-              status: "error" as const,
-              message: `HTTP ${response.status} - ${api.purpose}`,
-              hasKey: true
-            }
-          }
-        } catch (error: any) {
-          return {
-            name: api.name,
-            status: "unknown" as const,
-            message: `${error.name === "AbortError" ? "Timeout" : "Connection test failed"} - ${api.purpose}`,
-            hasKey: true
-          }
+      if (!api.testUrl) {
+        return {
+          name: api.name,
+          status: "online" as const,
+          message: `Key configured (no test endpoint available)`,
+          purpose: api.purpose,
+          usedIn: api.usedIn,
+          hasKey: true
         }
       }
       
-      // If no test URL, just confirm key is configured
-      return {
-        name: api.name,
-        status: "online" as const,
-        message: `${api.purpose} - Key configured`,
-        hasKey: true
+      // Test API with key
+      try {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 5000)
+        
+        const testEndpoint = api.testUrl + api.key
+        const response = await fetch(testEndpoint, {
+          signal: controller.signal,
+          headers: { 'User-Agent': 'OPTIONS-CALCULATORS.COM/1.0' }
+        })
+        clearTimeout(timeoutId)
+        
+        if (response.ok) {
+          return {
+            name: api.name,
+            status: "online" as const,
+            message: `Responding normally`,
+            purpose: api.purpose,
+            usedIn: api.usedIn,
+            hasKey: true
+          }
+        } else if (response.status === 401 || response.status === 403) {
+          return {
+            name: api.name,
+            status: "error" as const,
+            message: `Invalid or expired API key (HTTP ${response.status})`,
+            purpose: api.purpose,
+            usedIn: api.usedIn,
+            hasKey: true
+          }
+        } else if (response.status === 429) {
+          return {
+            name: api.name,
+            status: "warning" as const,
+            message: `Rate limit exceeded - API is working but throttled`,
+            purpose: api.purpose,
+            usedIn: api.usedIn,
+            hasKey: true
+          }
+        } else {
+          return {
+            name: api.name,
+            status: "error" as const,
+            message: `HTTP ${response.status}`,
+            purpose: api.purpose,
+            usedIn: api.usedIn,
+            hasKey: true
+          }
+        }
+      } catch (error: any) {
+        return {
+          name: api.name,
+          status: "unknown" as const,
+          message: error.name === "AbortError" ? "Request timeout (>5s)" : `Connection test failed: ${error.message}`,
+          purpose: api.purpose,
+          usedIn: api.usedIn,
+          hasKey: true
+        }
       }
     })
   )
