@@ -18,6 +18,8 @@ interface CCPIData {
     sentiment: number
     flows: number
     structural: number
+    // Added qqqTechnicals to interface
+    qqqTechnicals?: number
   }
   regime: {
     level: number
@@ -193,14 +195,23 @@ export function CcpiDashboard() {
     return { color: "bg-red-500", status: "High Risk" }
   }
 
+  // Updated pillarData to include QQQ Technicals and renumbered
   const pillarData = [
-    { name: "Pillar 1 - Valuation", value: data.pillars.valuation, icon: DollarSign },
-    { name: "Pillar 2 - Technical", value: data.pillars.technical, icon: Activity },
-    { name: "Pillar 3 - Macro", value: data.pillars.macro, icon: TrendingDown },
-    { name: "Pillar 4 - Sentiment", value: data.pillars.sentiment, icon: Users },
-    { name: "Pillar 5 - Flows", value: data.pillars.flows, icon: TrendingDown },
-    { name: "Pillar 6 - Structural", value: data.pillars.structural, icon: Database }
+    { name: "Pillar 1 - QQQ Momentum", value: data.pillars.qqqTechnicals || 0, icon: Activity },
+    { name: "Pillar 2 - Valuation", value: data.pillars.valuation, icon: DollarSign },
+    { name: "Pillar 3 - Technical", value: data.pillars.technical, icon: Activity },
+    { name: "Pillar 4 - Macro", value: data.pillars.macro, icon: TrendingDown },
+    { name: "Pillar 5 - Sentiment", value: data.pillars.sentiment, icon: Users },
+    { name: "Pillar 6 - Flows", value: data.pillars.flows, icon: TrendingDown },
+    { name: "Pillar 7 - Structural", value: data.pillars.structural, icon: Database }
   ]
+
+  const pillarChartData = pillarData.map((pillar, index) => ({
+    name: `Pillar ${index + 1}`,
+    fullName: pillar.name,
+    value: pillar.value,
+    icon: pillar.icon
+  }))
 
   const zone = getRegimeZone(data.ccpi)
   const ccpiScore = data.ccpi
@@ -392,12 +403,12 @@ export function CcpiDashboard() {
       <div className="grid grid-cols-1 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Six Pillar Breakdown</CardTitle>
+            <CardTitle>Seven Pillar Breakdown</CardTitle>
             <CardDescription>Individual stress scores (0-100) across all risk dimensions</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={pillarData}>
+              <BarChart data={pillarChartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
                 <YAxis domain={[0, 100]} />
@@ -439,12 +450,153 @@ export function CcpiDashboard() {
           <CardContent>
             <div className="space-y-6">
               
-              {/* Pillar 1 - Valuation Stress */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-cyan-600" />
+                    Pillar 1 - QQQ Momentum (30% weight)
+                  </h3>
+                  <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.qqqTechnicals || 0)}/100</span>
+                </div>
+                <div className="space-y-6">
+                  
+                  {/* QQQ Daily Return */}
+                  {data.indicators?.qqqDailyReturn !== undefined && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">QQQ Daily Return (5× downside amplifier)</span>
+                        <span className="font-bold">{data.indicators.qqqDailyReturn}</span>
+                      </div>
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${Math.min(100, Math.max(0, (parseFloat(data.indicators.qqqDailyReturn) + 2) / 4 * 100))}%` 
+                        }} />
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Down: &lt;-1%</span>
+                        <span>Flat: -0.5% to +0.5%</span>
+                        <span>Up: &gt;+1%</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Consecutive Down Days */}
+                  {data.indicators?.qqqConsecDown !== undefined && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">QQQ Consecutive Down Days</span>
+                        <span className="font-bold">{data.indicators.qqqConsecDown} days</span>
+                      </div>
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${Math.min(100, (data.indicators.qqqConsecDown / 5) * 100)}%` 
+                        }} />
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Healthy: 0-1 days</span>
+                        <span>Warning: 2-3 days</span>
+                        <span>Danger: 4+ days</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Below SMA20 */}
+                  {data.indicators?.qqqBelowSMA20 !== undefined && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">QQQ Below 20-Day SMA</span>
+                        <span className={`font-bold ${data.indicators.qqqBelowSMA20 ? 'text-red-600' : 'text-green-600'}`}>
+                          {data.indicators.qqqBelowSMA20 ? 'YES' : 'NO'}
+                        </span>
+                      </div>
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: data.indicators.qqqBelowSMA20 ? '100%' : '0%' 
+                        }} />
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Bullish: Above SMA20</span>
+                        <span>Bearish: Below SMA20</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Below SMA50 */}
+                  {data.indicators?.qqqBelowSMA50 !== undefined && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">QQQ Below 50-Day SMA</span>
+                        <span className={`font-bold ${data.indicators.qqqBelowSMA50 ? 'text-red-600' : 'text-green-600'}`}>
+                          {data.indicators.qqqBelowSMA50 ? 'YES' : 'NO'}
+                        </span>
+                      </div>
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: data.indicators.qqqBelowSMA50 ? '100%' : '0%' 
+                        }} />
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Bullish: Above SMA50</span>
+                        <span>Bearish: Below SMA50</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Below Bollinger Band (Lower) */}
+                  {data.indicators?.qqqBelowBollinger !== undefined && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">QQQ Below Bollinger Band (Lower)</span>
+                        <span className={`font-bold ${data.indicators.qqqBelowBollinger ? 'text-red-600' : 'text-green-600'}`}>
+                          {data.indicators.qqqBelowBollinger ? 'YES - OVERSOLD' : 'NO'}
+                        </span>
+                      </div>
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: data.indicators.qqqBelowBollinger ? '100%' : '0%' 
+                        }} />
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Normal: Within bands</span>
+                        <span>Oversold: Below lower band</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Death Cross */}
+                  {data.indicators?.qqqDeathCross !== undefined && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">QQQ Death Cross (SMA50 &lt; SMA200)</span>
+                        <span className={`font-bold ${data.indicators.qqqDeathCross ? 'text-red-600' : 'text-green-600'}`}>
+                          {data.indicators.qqqDeathCross ? 'YES - DANGER' : 'NO'}
+                        </span>
+                      </div>
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: data.indicators.qqqDeathCross ? '100%' : '0%' 
+                        }} />
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Golden Cross: Bullish</span>
+                        <span>Death Cross: Bearish</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="space-y-4 border-t pt-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold flex items-center gap-2">
                     <DollarSign className="h-5 w-5 text-blue-600" />
-                    Pillar 1 - Valuation Stress (22% weight)
+                    Pillar 2 - Valuation Stress (20% weight)
                   </h3>
                   <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.valuation)}/100</span>
                 </div>
@@ -521,12 +673,11 @@ export function CcpiDashboard() {
                 </div>
               </div>
 
-              {/* Pillar 2 - Technical Fragility */}
               <div className="space-y-4 border-t pt-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold flex items-center gap-2">
                     <Activity className="h-5 w-5 text-purple-600" />
-                    Pillar 2 - Technical Fragility (20% weight)
+                    Pillar 3 - Technical Fragility (10% weight)
                   </h3>
                   <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.technical)}/100</span>
                 </div>
@@ -660,12 +811,11 @@ export function CcpiDashboard() {
                 </div>
               </div>
 
-              {/* Pillar 3 - Macro & Liquidity Risk */}
               <div className="space-y-4 border-t pt-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold flex items-center gap-2">
                     <TrendingDown className="h-5 w-5 text-orange-600" />
-                    Pillar 3 - Macro & Liquidity Risk (18% weight)
+                    Pillar 4 - Macro & Liquidity Risk (10% weight)
                   </h3>
                   <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.macro)}/100</span>
                 </div>
@@ -736,12 +886,11 @@ export function CcpiDashboard() {
                 </div>
               </div>
 
-              {/* Pillar 4 - Sentiment & Media Feedback */}
               <div className="space-y-4 border-t pt-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold flex items-center gap-2">
                     <Users className="h-5 w-5 text-green-600" />
-                    Pillar 4 - Sentiment & Media Feedback (18% weight)
+                    Pillar 5 - Sentiment & Media Feedback (10% weight)
                   </h3>
                   <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.sentiment)}/100</span>
                 </div>
@@ -854,12 +1003,11 @@ export function CcpiDashboard() {
                 </div>
               </div>
 
-              {/* Pillar 5 - Capital Flows & Positioning */}
               <div className="space-y-4 border-t pt-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold flex items-center gap-2">
                     <TrendingDown className="h-5 w-5 text-teal-600" />
-                    Pillar 5 - Capital Flows & Positioning (12% weight)
+                    Pillar 6 - Capital Flows & Positioning (10% weight)
                   </h3>
                   <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.flows)}/100</span>
                 </div>
@@ -909,12 +1057,11 @@ export function CcpiDashboard() {
                 </div>
               </div>
 
-              {/* Pillar 6 - Structural */}
               <div className="space-y-4 border-t pt-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold flex items-center gap-2">
                     <Database className="h-5 w-5 text-indigo-600" />
-                    Pillar 6 - Structural (10% weight)
+                    Pillar 7 - Structural (10% weight)
                   </h3>
                   <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.structural)}/100</span>
                 </div>
@@ -1009,29 +1156,33 @@ export function CcpiDashboard() {
                 </div>
               </div>
 
-              {/* Formula Weight Summary */}
+              {/* Updated formula weights to include QQQ Technicals and renumbered */}
               <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <h4 className="font-semibold text-sm mb-3 text-blue-900">CCPI Formula Weights</h4>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-blue-700">Valuation:</span>
-                    <span className="font-bold text-blue-900">22%</span>
+                    <span className="text-blue-700">QQQ Technicals:</span>
+                    <span className="font-bold text-blue-900">30%</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-blue-700">Technical:</span>
+                    <span className="text-blue-700">Valuation:</span>
                     <span className="font-bold text-blue-900">20%</span>
                   </div>
                   <div className="flex items-center justify-between">
+                    <span className="text-blue-700">Technical:</span>
+                    <span className="font-bold text-blue-900">10%</span>
+                  </div>
+                  <div className="flex items-center justify-between">
                     <span className="text-blue-700">Macro:</span>
-                    <span className="font-bold text-blue-900">18%</span>
+                    <span className="font-bold text-blue-900">10%</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-blue-700">Sentiment:</span>
-                    <span className="font-bold text-blue-900">18%</span>
+                    <span className="font-bold text-blue-900">10%</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-blue-700">Flows:</span>
-                    <span className="font-bold text-blue-900">12%</span>
+                    <span className="font-bold text-blue-900">10%</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-blue-700">Structural:</span>
@@ -1269,7 +1420,7 @@ export function CcpiDashboard() {
                   cash: "5-10%",
                   description: "Aggressive growth allocation with maximum equity exposure",
                   rationale: [
-                    "Deploy capital aggressively into quality tech growth stocks",
+                    "Deploy capital<bos>aggressively into quality tech growth stocks",
                     "Allocate 15-20% to options strategies for leverage and income",
                     "Hold 8-12% crypto for asymmetric upside (BTC/ETH)",
                     "Minimal cash reserves needed in low-risk environment",

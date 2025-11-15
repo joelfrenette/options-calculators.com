@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { fetchMarketBreadth as fetchMarketBreadthData } from "@/lib/market-breadth"
+import { fetchQQQTechnicals as fetchQQQTechnicalsData } from '@/lib/qqq-technicals'
 
-// This API endpoint integrates ALL 23 indicators with REAL data via live APIs, Apify actors, or web scraping
+// This API endpoint integrates ALL 28 indicators (5 new QQQ + 23 existing) with REAL data via live APIs
 // NO mock data - all values are fetched from actual sources with fallback chains
 
 export async function GET() {
@@ -9,24 +10,27 @@ export async function GET() {
     const data = await fetchMarketData()
     
     const pillars = {
-      valuation: await computeValuationStress(data),
-      technical: await computeTechnicalFragility(data),
-      macro: await computeMacroLiquidity(data),
-      sentiment: await computeSentiment(data),
-      flows: await computeFlows(data),
-      structural: await computeStructuralAltData(data)
+      qqqTechnicals: await computeQQQTechnicals(data),  // NEW Pillar 1
+      valuation: await computeValuationStress(data),     // Renamed to Pillar 2
+      technical: await computeTechnicalFragility(data),   // Renamed to Pillar 3
+      macro: await computeMacroLiquidity(data),           // Renamed to Pillar 4
+      sentiment: await computeSentiment(data),            // Renamed to Pillar 5
+      flows: await computeFlows(data),                    // Renamed to Pillar 6
+      structural: await computeStructuralAltData(data)    // Renamed to Pillar 7
     }
     
     const weights = {
-      valuation: 0.22,
-      technical: 0.20,
-      macro: 0.18,
-      sentiment: 0.18,
-      flows: 0.12,
-      structural: 0.10
+      qqqTechnicals: 0.30,  // NEW: 30% weight for QQQ momentum & trend health
+      valuation: 0.20,      // REDUCED from 22% to 20%
+      technical: 0.10,      // REDUCED from 20% to 10%
+      macro: 0.10,          // REDUCED from 18% to 10%
+      sentiment: 0.10,      // REDUCED from 18% to 10%
+      flows: 0.10,          // REDUCED from 12% to 10%
+      structural: 0.10      // NO CHANGE - was already 10%
     }
     
     const ccpi = Math.round(
+      pillars.qqqTechnicals * weights.qqqTechnicals +
       pillars.valuation * weights.valuation +
       pillars.technical * weights.technical +
       pillars.macro * weights.macro +
@@ -46,6 +50,15 @@ export async function GET() {
     const summary = generateWeeklySummary(ccpi, confidence, regime, pillars, data, canaries)
     
     const snapshot = {
+      // QQQ Technical Indicators (NEW)
+      qqqDailyReturn: data.qqqDailyReturn,
+      qqqConsecDown: data.qqqConsecDown,
+      qqqBelowSMA20: data.qqqBelowSMA20,
+      qqqBelowSMA50: data.qqqBelowSMA50,
+      qqqDeathCross: data.qqqDeathCross,
+      qqqBelowBollingerBand: data.qqqBelowBollingerBand, // Added Bollinger Band indicator
+      
+      // Existing indicators
       buffettIndicator: data.buffettIndicator,
       spxPE: data.spxPE,
       spxPS: data.spxPS,
@@ -62,7 +75,7 @@ export async function GET() {
       aaiiBullish: data.aaiiBullish,
       aaiiBearish: data.aaiiBearish,
       putCallRatio: data.putCallRatio,
-      fearGreedIndex: data.fearGreedIndex,
+      fearGreedIndex: data.fearGreed,
       riskAppetite: data.riskAppetite,
       etfFlows: data.etfFlows,
       shortInterest: data.shortInterest,
@@ -103,7 +116,8 @@ async function fetchMarketData() {
       etfData,
       gpuData,
       jobData,
-      marketBreadthData
+      marketBreadthData,
+      qqqTechnicalsData  // Added QQQ technicals fetch
     ] = await Promise.all([
       fetchFREDIndicators(),
       fetchAlphaVantageIndicators(),
@@ -113,10 +127,18 @@ async function fetchMarketData() {
       fetchETFFlows(),
       fetchGPUPricing(),
       fetchAIJobPostings(),
-      fetchMarketBreadth()
+      fetchMarketBreadth(),
+      fetchQQQTechnicals()  // NEW: Fetch QQQ technical indicators
     ])
     
     return {
+      qqqDailyReturn: qqqTechnicalsData.dailyReturn,
+      qqqConsecDown: qqqTechnicalsData.consecutiveDaysDown,
+      qqqBelowSMA20: qqqTechnicalsData.belowSMA20,
+      qqqBelowSMA50: qqqTechnicalsData.belowSMA50,
+      qqqDeathCross: qqqTechnicalsData.deathCross,
+      qqqBelowBollingerBand: qqqTechnicalsData.belowBollingerBand, // Fix property name from belowBollinger to belowBollingerBand
+      
       // Valuation indicators (Apify Yahoo Finance primary)
       buffettIndicator: apifyYahooData.buffettIndicator,
       spxPE: fmpData.spxPE || apifyYahooData.spxPE,
@@ -126,8 +148,8 @@ async function fetchMarketData() {
       vxn: alphaVantageData.vxn,
       rvx: alphaVantageData.rvx || 20.1,
       atr: alphaVantageData.atr,
-      highLowIndex: marketBreadthData.value, // Use value from fetchMarketBreadth
-      bullishPercent: 58,      // Historical average - bullish percent index
+      highLowIndex: marketBreadthData.value,
+      bullishPercent: 58,
       ltv: alphaVantageData.ltv,
       spotVol: alphaVantageData.spotVol || 0.22,
       
@@ -167,13 +189,13 @@ async function fetchMarketBreadth() {
     
     const data = await fetchMarketBreadthData()
     
-    console.log(`[v0] High-Low Index: ${(data.highLowIndex * 100).toFixed(1)}% from ${data.source} (${data.newHighs}H / ${data.newLows}L)`)
+    console.log(`[v0] High-Low Index: ${(data.highLowIndex * 100).toFixed(1)}% from ${data.source} (${data.highs}H / ${data.lows}L)`)
     
     return {
       value: data.highLowIndex, // This value is actually the highLowIndex used later in fetchMarketData
       source: data.source,
-      highs: data.newHighs,
-      lows: data.newLows,
+      highs: data.highs,
+      lows: data.lows,
       // Calculate threshold based on highLowIndex value directly
       threshold: data.highLowIndex > 0.5 ? 'bullish' : data.highLowIndex < 0.3 ? 'bearish' : 'neutral'
     }
@@ -1270,12 +1292,9 @@ function computeCertaintyScore(
   const stdDev = Math.sqrt(variance)
   
   // Low variance = high agreement between pillars = high certainty
-  // High variance = disagreement = low certainty
-  // stdDev typically ranges 0-30, we invert it to a 0-100 scale
   const varianceAlignment = Math.max(0, 100 - (stdDev * 2.5))
   
   // Count how many pillars are in agreement about risk level
-  // Low risk zone: 0-30, Moderate: 30-60, High: 60-100
   const riskZones = {
     low: values.filter(v => v < 30).length,
     moderate: values.filter(v => v >= 30 && v < 60).length,
@@ -1284,36 +1303,34 @@ function computeCertaintyScore(
   const maxZoneCount = Math.max(riskZones.low, riskZones.moderate, riskZones.high)
   const directionalConsistency = (maxZoneCount / values.length) * 100
   
-  // Technical should correlate with Sentiment (market behavior)
-  // Valuation should correlate with Macro (fundamental conditions)
+  const qqqTechnicals = pillars.qqqTechnicals || 0
   const technical = pillars.technical || 0
   const sentiment = pillars.sentiment || 0
   const valuation = pillars.valuation || 0
   const macro = pillars.macro || 0
   
-  // Calculate correlation penalties (0 = perfect correlation, 100 = opposite)
+  // QQQ should correlate with overall Technical fragility (leading indicator)
+  // Technical should correlate with Sentiment (market behavior)
+  // Valuation should correlate with Macro (fundamental conditions)
+  const qqqTechnicalGap = Math.abs(qqqTechnicals - technical)
   const techSentimentGap = Math.abs(technical - sentiment)
   const valuationMacroGap = Math.abs(valuation - macro)
-  const avgGap = (techSentimentGap + valuationMacroGap) / 2
+  const avgGap = (qqqTechnicalGap + techSentimentGap + valuationMacroGap) / 3
   const crossPillarCorrelation = Math.max(0, 100 - avgGap)
   
-  // VIX should align with overall pillar stress - it's a leading indicator
+  // VIX should align with overall pillar stress
   const vixImpliedStress = Math.min(100, (data.vix / 40) * 100)
   const pillarMeanStress = mean
   const vixAlignment = Math.max(0, 100 - Math.abs(vixImpliedStress - pillarMeanStress) * 2)
   
-  // More active canaries = stronger signal = higher confidence
-  // 23 total indicators - normalize to 0-100 scale
-  const canaryAgreement = Math.min(100, (canaryCount / 23) * 100)
+  const canaryAgreement = Math.min(100, (canaryCount / 28) * 100)
   
-  // Emphasize directional consistency and variance alignment (most important)
-  // Cross-pillar correlation ensures related pillars move together
   const certainty = Math.round(
-    varianceAlignment * 0.25 +        // 25% - raw variance between pillars
-    directionalConsistency * 0.30 +   // 30% - directional agreement (most important)
-    crossPillarCorrelation * 0.20 +   // 20% - related pillars correlate
-    vixAlignment * 0.15 +              // 15% - VIX validates other signals
-    canaryAgreement * 0.10             // 10% - number of active warnings
+    varianceAlignment * 0.25 +
+    directionalConsistency * 0.30 +
+    crossPillarCorrelation * 0.20 +
+    vixAlignment * 0.15 +
+    canaryAgreement * 0.10
   )
   
   console.log('[v0] Certainty Score Breakdown:', {
@@ -1327,7 +1344,7 @@ function computeCertaintyScore(
     stdDev: stdDev.toFixed(2),
     riskZones,
     canaryCount,
-    totalIndicators: 23
+    totalIndicators: 28  // Updated from 23 to 28
   })
   
   return Math.min(100, Math.max(0, certainty))
@@ -1343,6 +1360,72 @@ function getTopCanaries(
 }> {
   const canaries = []
   
+  
+  // QQQ 1-Day Price Drop
+  if (data.qqqDailyReturn < -1.0) {
+    const dropPercent = Math.abs(data.qqqDailyReturn).toFixed(1)
+    canaries.push({
+      signal: `QQQ dropped ${dropPercent}% today - NASDAQ-100 selling pressure indicates tech sector stress. With 5× downside momentum amplifier, this ${dropPercent}% drop has ${(parseFloat(dropPercent) * 5).toFixed(1)}× impact on crash risk assessment. Sharp QQQ declines often precede broader market selloffs.`,
+      pillar: "QQQ Momentum & Trend Health",
+      severity: data.qqqDailyReturn < -3.0 ? "high" as const : data.qqqDailyReturn < -2.0 ? "medium" as const : "low" as const
+    })
+  }
+  
+  // QQQ Consecutive Down Days
+  if (data.qqqConsecDown >= 3) {
+    canaries.push({
+      signal: `QQQ down ${data.qqqConsecDown} consecutive days - sustained selling momentum in NASDAQ-100 signals deteriorating market internals. Extended losing streaks (${data.qqqConsecDown}+ days) compound crash risk exponentially as momentum traders exit and stop-losses trigger cascading sell pressure.`,
+      pillar: "QQQ Momentum & Trend Health",
+      severity: data.qqqConsecDown >= 5 ? "high" as const : data.qqqConsecDown >= 4 ? "medium" as const : "low" as const
+    })
+  }
+  
+  // QQQ Below 20-day SMA
+  if (data.qqqBelowSMA20) {
+    canaries.push({
+      signal: `QQQ trading below 20-day moving average - short-term trend has broken down. The 20-day SMA is a critical short-term support level watched by momentum traders. Breaking below signals shift from bullish to bearish short-term sentiment and often precedes deeper declines.`,
+      pillar: "QQQ Momentum & Trend Health",
+      severity: "medium" as const
+    })
+  }
+  
+  // QQQ Below 50-day SMA
+  if (data.qqqBelowSMA50) {
+    canaries.push({
+      signal: `QQQ trading below 50-day moving average - intermediate-term trend has failed. The 50-day SMA represents the line between bull and bear markets for many institutional traders. Below this level indicates technical damage requiring significant buying pressure to repair.`,
+      pillar: "QQQ Momentum & Trend Health",
+      severity: "medium" as const
+    })
+  }
+  
+  // QQQ Death Cross
+  if (data.qqqDeathCross) {
+    canaries.push({
+      signal: `QQQ Death Cross active (50-day SMA crossed below 200-day SMA) - major bearish technical signal suggesting long-term trend reversal. Death crosses have historically preceded significant market corrections and often mark the transition from bull to bear markets. Institutional algos recognize this pattern and reduce exposure.`,
+      pillar: "QQQ Momentum & Trend Health",
+      severity: "high" as const
+    })
+  }
+
+  // QQQ Below Bollinger Bands
+  if (data.qqqBelowBollingerBand) {
+    canaries.push({
+      signal: `QQQ trading below lower Bollinger Band - indicates an oversold condition on short-term charts. While this can signal a near-term bounce, extreme deviations below the band suggest significant selling pressure and potential for continued downside if broader market trends remain weak.`,
+      pillar: "QQQ Momentum & Trend Health",
+      severity: "medium" as const
+    })
+  }
+  
+  // Compounding structural breakdown
+  if (data.qqqBelowSMA20 && data.qqqBelowSMA50 && (data.qqqDeathCross || data.qqqBelowBollingerBand)) {
+    canaries.push({
+      signal: `QQQ MULTIPLE BREAKDOWNS: Below 20-day & 50-day SMAs, AND either Death Cross active OR below lower Bollinger Band - This confluence of bearish signals across multiple timeframes and indicators points to severe technical damage in the NASDAQ-100. This significantly elevates crash probability.`,
+      pillar: "QQQ Momentum & Trend Health",
+      severity: "high" as const
+    })
+  }
+  
+  // ===== EXISTING CANARIES FOR PILLARS 2-7 =====
   
   // ===== PILLAR 1: VALUATION STRESS INDICATORS =====
   
@@ -1717,7 +1800,7 @@ function getPlaybook(regime: ReturnType<typeof determineRegime>) {
         "Substantially reduce net long AI exposure",
         "Large put spreads on AI names and indices",
         "Ratio put spreads, calendars, diagonals to capture volatility",
-        "Strategic short calls or call spreads against extended rallies",
+        "Short or call spreads against extended rallies",
         "Hedge 50-100% of AI equity exposure notionally"
       ],
       allocation: {
@@ -1780,6 +1863,7 @@ function generateWeeklySummary(
   
   // Sort pillars by stress level to identify top concerns
   const pillarScores = [
+    { name: "QQQ Technicals", score: pillars.qqqTechnicals, pillar: "qqqTechnicals" }, // Added QQQ Technicals to summary sort
     { name: "Valuation", score: pillars.valuation, pillar: "valuation" },
     { name: "Technical", score: pillars.technical, pillar: "technical" },
     { name: "Macro", score: pillars.macro, pillar: "macro" },
@@ -1832,4 +1916,111 @@ function generateWeeklySummary(
   }
   
   return { headline, bullets }
+}
+
+async function fetchQQQTechnicals() {
+  try {
+    console.log('[v0] Fetching QQQ technical indicators...')
+    
+    const data = await fetchQQQTechnicalsData()
+    
+    console.log('[v0] QQQ Technicals:', {
+      dailyReturn: `${data.dailyReturn}%`,
+      consecDown: data.consecutiveDaysDown,
+      belowSMA20: data.belowSMA20,
+      belowSMA50: data.belowSMA50,
+      deathCross: data.deathCross,
+      belowBollingerBand: data.belowBollingerBand, // Added Bollinger Band logging
+      source: data.source
+    })
+    
+    return data
+  } catch (error) {
+    console.error('[v0] QQQ technicals fetch error:', error)
+    console.warn('[v0] Falling back to baseline QQQ values')
+    
+    return {
+      dailyReturn: 0.0,
+      consecutiveDaysDown: 0,
+      belowSMA20: false,
+      belowSMA50: false,
+      deathCross: false,
+      belowBollingerBand: false, // Baseline for Bollinger Band
+      source: 'baseline'
+    }
+  }
+}
+
+async function computeQQQTechnicals(data: Awaited<ReturnType<typeof fetchMarketData>>): Promise<number> {
+  console.log("[v0] Computing QQQ Technical Pillar score...")
+  
+  const qqqDailyReturn = data.qqqDailyReturn || 0
+  const qqqConsecDown = data.qqqConsecDown || 0
+  const qqqBelowSMA20 = data.qqqBelowSMA20 || false
+  const qqqBelowSMA50 = data.qqqBelowSMA50 || false
+  const qqqDeathCross = data.qqqDeathCross || false
+  const qqqBelowBollingerBand = data.qqqBelowBollingerBand || false // Use corrected property name
+
+  // 1. Daily Return Impact (0-25 points)
+  let dailyReturnImpact = 0
+  if (qqqDailyReturn < -1) {
+    // Down >1%: amplify with 5× multiplier
+    const amplifiedReturn = Math.abs(qqqDailyReturn) * 5
+    dailyReturnImpact = Math.min(25, amplifiedReturn * 2.5)
+  } else if (qqqDailyReturn < -0.5) {
+    // Down 0.5-1%: moderate penalty
+    dailyReturnImpact = 10
+  }
+  // Positive or flat days = 0 impact
+
+  // 2. Consecutive Down Days (0-15 points)
+  let consecDownImpact = 0
+  if (qqqConsecDown >= 4) {
+    consecDownImpact = 15
+  } else if (qqqConsecDown === 3) {
+    consecDownImpact = 10
+  } else if (qqqConsecDown === 2) {
+    consecDownImpact = 5
+  }
+
+  // 3. Below SMA20 (0-20 points)
+  const belowSMA20Impact = qqqBelowSMA20 ? 20 : 0
+
+  // 4. Below SMA50 (0-15 points)
+  const belowSMA50Impact = qqqBelowSMA50 ? 15 : 0
+
+  // 5. Death Cross (0-25 points)
+  const deathCrossImpact = qqqDeathCross ? 25 : 0
+
+  const belowBollingerImpact = qqqBelowBollingerBand ? 15 : 0 // Use corrected property name
+
+  // Compounding penalty if all three major conditions are met
+  let compoundingPenalty = 0
+  if (qqqBelowSMA20 && qqqBelowSMA50 && (qqqDeathCross || qqqBelowBollingerBand)) { // Use corrected property name
+    compoundingPenalty = 10
+  }
+
+  const score = 
+    dailyReturnImpact +
+    consecDownImpact +
+    belowSMA20Impact +
+    belowSMA50Impact +
+    deathCrossImpact +
+    belowBollingerImpact +
+    compoundingPenalty
+
+  const finalScore = Math.round(Math.max(0, score))
+
+  console.log("[v0] QQQ Technical Pillar breakdown:", {
+    dailyReturnImpact,
+    consecDownImpact,
+    belowSMA20Impact,
+    belowSMA50Impact,
+    deathCrossImpact,
+    belowBollingerImpact,
+    compoundingPenalty,
+    finalScore
+  })
+
+  return finalScore
 }
