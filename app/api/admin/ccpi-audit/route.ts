@@ -40,7 +40,7 @@ async function auditAllIndicators() {
     {
       id: 1,
       name: "Buffett Indicator (Market Cap / GDP)",
-      pillar: "Valuation Stress",
+      pillar: "Pillar 1: Valuation Stress",
       source_url: "https://fred.stlouisfed.org/series/WILSHIRE5000IND",
       api_endpoint: "/api/ccpi",
       fetch_method: "Calculated from FRED Wilshire 5000 and GDP data",
@@ -52,7 +52,7 @@ async function auditAllIndicators() {
     {
       id: 2,
       name: "S&P 500 Forward P/E Ratio",
-      pillar: "Valuation Stress",
+      pillar: "Pillar 1: Valuation Stress",
       source_url: "https://finance.yahoo.com/quote/%5EGSPC",
       api_endpoint: "/api/ccpi (via Apify Yahoo Finance)",
       fetch_method: "Apify Yahoo Finance actors (canadesk + Architjn)",
@@ -64,7 +64,7 @@ async function auditAllIndicators() {
     {
       id: 3,
       name: "S&P 500 Price-to-Sales Ratio",
-      pillar: "Valuation Stress",
+      pillar: "Pillar 1: Valuation Stress",
       source_url: "https://finance.yahoo.com/quote/%5EGSPC/key-statistics",
       api_endpoint: "/api/ccpi (via Apify Yahoo Finance)",
       fetch_method: "Apify Yahoo Finance actors",
@@ -74,11 +74,11 @@ async function auditAllIndicators() {
       threshold: { normal: "<2.5", elevated: "2.5-3.0", extreme: ">3.0" }
     },
     
-    // PILLAR 2: TECHNICAL FRAGILITY (6 indicators)
+    // PILLAR 2: TECHNICAL FRAGILITY (6 indicators) - Removed RVX (ID 6) to match actual CCPI calculation (23 total)
     {
       id: 4,
       name: "VIX (Volatility Index)",
-      pillar: "Technical Fragility",
+      pillar: "Pillar 2: Technical Fragility",
       source_url: "https://www.alphavantage.co/query?function=VIX",
       api_endpoint: "/api/ccpi (via Alpha Vantage)",
       fetch_method: "Alpha Vantage VIX_90DAY endpoint",
@@ -90,7 +90,7 @@ async function auditAllIndicators() {
     {
       id: 5,
       name: "VXN (Nasdaq Volatility)",
-      pillar: "Technical Fragility",
+      pillar: "Pillar 2: Technical Fragility",
       source_url: "https://www.alphavantage.co/query?function=VXN",
       api_endpoint: "/api/ccpi (via Alpha Vantage)",
       fetch_method: "Alpha Vantage VXN_90DAY endpoint",
@@ -101,20 +101,8 @@ async function auditAllIndicators() {
     },
     {
       id: 6,
-      name: "RVX (Russell 2000 Volatility)",
-      pillar: "Technical Fragility",
-      source_url: "https://www.alphavantage.co/query?function=RVX",
-      api_endpoint: "/api/ccpi (via Alpha Vantage)",
-      fetch_method: "Alpha Vantage RVX_90DAY endpoint",
-      status: await testAlphaVantageAPI() ? "Live" : "Failed",
-      last_fetched_at: new Date().toISOString(),
-      raw_sample: { value: 20.1, unit: "index" },
-      threshold: { calm: "<15", normal: "15-20", elevated: "20-30", crisis: ">35" }
-    },
-    {
-      id: 7,
       name: "High-Low Index (Market Breadth)",
-      pillar: "Technical Fragility",
+      pillar: "Pillar 2: Technical Fragility",
       source_url: "Baseline (historical average)",
       api_endpoint: "/api/ccpi (baseline value)",
       fetch_method: "Historical average: 42%",
@@ -124,9 +112,9 @@ async function auditAllIndicators() {
       threshold: { weak: "<30%", neutral: "30-60%", strong: ">60%" }
     },
     {
-      id: 8,
+      id: 7,
       name: "Bullish Percent Index",
-      pillar: "Technical Fragility",
+      pillar: "Pillar 2: Technical Fragility",
       source_url: "Baseline (historical average)",
       api_endpoint: "/api/ccpi (baseline value)",
       fetch_method: "Historical average: 58%",
@@ -136,9 +124,9 @@ async function auditAllIndicators() {
       threshold: { oversold: "<30%", neutral: "30-70%", overbought: ">70%" }
     },
     {
-      id: 9,
+      id: 8,
       name: "ATR (Average True Range)",
-      pillar: "Technical Fragility",
+      pillar: "Pillar 2: Technical Fragility",
       source_url: "https://www.alphavantage.co/query?function=SMA&symbol=SPY",
       api_endpoint: "/api/ccpi (via Alpha Vantage)",
       fetch_method: "Alpha Vantage SMA endpoint for SPY",
@@ -148,9 +136,9 @@ async function auditAllIndicators() {
       threshold: { low: "20-30", normal: "30-40", elevated: "40-50", high: ">50" }
     },
     {
-      id: 10,
+      id: 9,
       name: "Left Tail Volatility (Crash Probability)",
-      pillar: "Technical Fragility",
+      pillar: "Pillar 2: Technical Fragility",
       source_url: "Derived from VIX level",
       api_endpoint: "/api/ccpi (calculated from VIX)",
       fetch_method: "Calculated: VIX > 25 ? 0.18 : VIX > 20 ? 0.14 : VIX > 15 ? 0.11 : 0.08",
@@ -162,9 +150,9 @@ async function auditAllIndicators() {
     
     // PILLAR 3: MACRO & LIQUIDITY RISK (3 indicators)
     {
-      id: 11,
+      id: 10,
       name: "Fed Funds Rate",
-      pillar: "Macro & Liquidity Risk",
+      pillar: "Pillar 3: Macro & Liquidity Risk",
       source_url: "https://fred.stlouisfed.org/series/DFF",
       api_endpoint: "/api/ccpi (via FRED)",
       fetch_method: "FRED series DFF (Federal Funds Rate)",
@@ -174,9 +162,9 @@ async function auditAllIndicators() {
       threshold: { accommodative: "<2%", neutral: "2-4%", restrictive: ">4.5%" }
     },
     {
-      id: 12,
+      id: 11,
       name: "Junk Bond Spread (High-Yield Credit)",
-      pillar: "Macro & Liquidity Risk",
+      pillar: "Pillar 3: Macro & Liquidity Risk",
       source_url: "https://fred.stlouisfed.org/series/BAMLH0A0HYM2",
       api_endpoint: "/api/ccpi (via FRED)",
       fetch_method: "FRED series BAMLH0A0HYM2 (ICE BofA High Yield spread)",
@@ -186,9 +174,9 @@ async function auditAllIndicators() {
       threshold: { tight: "<3%", normal: "3-5%", stress: "5-8%", crisis: ">8%" }
     },
     {
-      id: 13,
+      id: 12,
       name: "Yield Curve (10Y-2Y Spread)",
-      pillar: "Macro & Liquidity Risk",
+      pillar: "Pillar 3: Macro & Liquidity Risk",
       source_url: "https://fred.stlouisfed.org/series/T10Y2Y",
       api_endpoint: "/api/ccpi (via FRED)",
       fetch_method: "FRED series T10Y2Y (10-Year minus 2-Year Treasury spread)",
@@ -200,9 +188,9 @@ async function auditAllIndicators() {
     
     // PILLAR 4: SENTIMENT & MEDIA FEEDBACK (5 indicators)
     {
-      id: 14,
+      id: 13,
       name: "AAII Bullish Sentiment",
-      pillar: "Sentiment & Media Feedback",
+      pillar: "Pillar 4: Sentiment & Media Feedback",
       source_url: "Baseline (historical average)",
       api_endpoint: "/api/ccpi (baseline value)",
       fetch_method: "Historical average: 42% (AAII blocks scraping)",
@@ -212,9 +200,9 @@ async function auditAllIndicators() {
       threshold: { bearish: "<30%", neutral: "30-50%", euphoric: ">50%" }
     },
     {
-      id: 15,
+      id: 14,
       name: "AAII Bearish Sentiment",
-      pillar: "Sentiment & Media Feedback",
+      pillar: "Pillar 4: Sentiment & Media Feedback",
       source_url: "Baseline (historical average)",
       api_endpoint: "/api/ccpi (baseline value)",
       fetch_method: "Historical average: 28%",
@@ -224,9 +212,9 @@ async function auditAllIndicators() {
       threshold: { complacent: "<20%", normal: "20-35%", fearful: ">35%" }
     },
     {
-      id: 16,
+      id: 15,
       name: "Put/Call Ratio",
-      pillar: "Sentiment & Media Feedback",
+      pillar: "Pillar 4: Sentiment & Media Feedback",
       source_url: "https://finance.yahoo.com/quote/SPY/options",
       api_endpoint: "/api/ccpi (via Apify Yahoo Finance)",
       fetch_method: "Apify Yahoo Finance actors - SPY options volume",
@@ -236,9 +224,9 @@ async function auditAllIndicators() {
       threshold: { complacent: "<0.7", normal: "0.7-1.0", fearful: ">1.0" }
     },
     {
-      id: 17,
+      id: 16,
       name: "Fear & Greed Index",
-      pillar: "Sentiment & Media Feedback",
+      pillar: "Pillar 4: Sentiment & Media Feedback",
       source_url: "https://api.alternative.me/fng/",
       api_endpoint: "/api/ccpi (via alternative.me)",
       fetch_method: "Alternative.me Fear & Greed API (crypto proxy for market sentiment)",
@@ -248,9 +236,9 @@ async function auditAllIndicators() {
       threshold: { fear: "<30", neutral: "30-70", greed: ">70" }
     },
     {
-      id: 18,
+      id: 17,
       name: "Risk Appetite Index",
-      pillar: "Sentiment & Media Feedback",
+      pillar: "Pillar 4: Sentiment & Media Feedback",
       source_url: "Baseline (calculated from other sentiment metrics)",
       api_endpoint: "/api/ccpi (baseline value)",
       fetch_method: "Baseline: 35 (calculated from sentiment composite)",
@@ -262,9 +250,9 @@ async function auditAllIndicators() {
     
     // PILLAR 5: CAPITAL FLOWS & POSITIONING (2 indicators)
     {
-      id: 19,
+      id: 18,
       name: "Tech ETF Flows (Weekly)",
-      pillar: "Capital Flows & Positioning",
+      pillar: "Pillar 5: Capital Flows & Positioning",
       source_url: "Baseline (recent reports)",
       api_endpoint: "/api/ccpi (baseline value)",
       fetch_method: "Baseline: -$1.8B weekly (from public reports)",
@@ -274,9 +262,9 @@ async function auditAllIndicators() {
       threshold: { outflows: "<-$2B", neutral: "-$2B to $2B", inflows: ">$2B" }
     },
     {
-      id: 20,
+      id: 19,
       name: "Short Interest (% of Float)",
-      pillar: "Capital Flows & Positioning",
+      pillar: "Pillar 5: Capital Flows & Positioning",
       source_url: "https://finance.yahoo.com/quote/SPY/key-statistics",
       api_endpoint: "/api/ccpi (via Apify Yahoo Finance)",
       fetch_method: "Apify Yahoo Finance actors - SPY short interest",
@@ -288,9 +276,9 @@ async function auditAllIndicators() {
     
     // PILLAR 6: STRUCTURAL (4 indicators)
     {
-      id: 21,
+      id: 20,
       name: "AI CapEx Growth (YoY)",
-      pillar: "Structural",
+      pillar: "Pillar 6: Structural",
       source_url: "Baseline (alt data)",
       api_endpoint: "/api/ccpi (baseline value)",
       fetch_method: "Baseline: 40% (alternative data)",
@@ -300,9 +288,9 @@ async function auditAllIndicators() {
       threshold: { sustainable: "<20%", moderate: "20-40%", overspending: ">40%" }
     },
     {
-      id: 22,
+      id: 21,
       name: "AI Revenue Growth (YoY)",
-      pillar: "Structural",
+      pillar: "Pillar 6: Structural",
       source_url: "Baseline (alt data)",
       api_endpoint: "/api/ccpi (baseline value)",
       fetch_method: "Baseline: 15% (alternative data)",
@@ -312,9 +300,9 @@ async function auditAllIndicators() {
       threshold: { lagging: "<10%", growing: "10-25%", strong: ">25%" }
     },
     {
-      id: 23,
+      id: 22,
       name: "GPU Pricing Premium",
-      pillar: "Structural",
+      pillar: "Pillar 6: Structural",
       source_url: "https://www.ebay.com/sch/ (GPU sold listings)",
       api_endpoint: "/api/ccpi (scraped from eBay)",
       fetch_method: "Scrape eBay H100 sold listings vs MSRP",
@@ -324,9 +312,9 @@ async function auditAllIndicators() {
       threshold: { normal: "<20%", elevated: "20-50%", extreme: ">50%" }
     },
     {
-      id: 24,
+      id: 23,
       name: "AI Job Postings Growth",
-      pillar: "Structural",
+      pillar: "Pillar 6: Structural",
       source_url: "Baseline (manual updates)",
       api_endpoint: "/api/ccpi (baseline value)",
       fetch_method: "Baseline: -5% (job sites have bot protection)",
