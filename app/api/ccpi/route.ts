@@ -56,7 +56,8 @@ export async function GET() {
       qqqBelowSMA20: data.qqqBelowSMA20,
       qqqBelowSMA50: data.qqqBelowSMA50,
       qqqDeathCross: data.qqqDeathCross,
-      qqqBelowBollingerBand: data.qqqBelowBollingerBand, // Added Bollinger Band indicator
+      // </CHANGE> Fixed property name from qqqBelowBollingerBand to qqqBelowBollinger to match dashboard
+      qqqBelowBollinger: data.qqqBelowBollinger, 
       
       // Existing indicators
       buffettIndicator: data.buffettIndicator,
@@ -131,13 +132,14 @@ async function fetchMarketData() {
       fetchQQQTechnicals()  // NEW: Fetch QQQ technical indicators
     ])
     
+    // Corrected property name for qqqBelowBollingerBand to qqqBelowBollinger
     return {
       qqqDailyReturn: qqqTechnicalsData.dailyReturn,
       qqqConsecDown: qqqTechnicalsData.consecutiveDaysDown,
       qqqBelowSMA20: qqqTechnicalsData.belowSMA20,
       qqqBelowSMA50: qqqTechnicalsData.belowSMA50,
       qqqDeathCross: qqqTechnicalsData.deathCross,
-      qqqBelowBollingerBand: qqqTechnicalsData.belowBollingerBand, // Fix property name from belowBollinger to belowBollingerBand
+      qqqBelowBollinger: qqqTechnicalsData.belowBollingerBand, 
       
       // Valuation indicators (Apify Yahoo Finance primary)
       buffettIndicator: apifyYahooData.buffettIndicator,
@@ -1408,7 +1410,7 @@ function getTopCanaries(
   }
 
   // QQQ Below Bollinger Bands
-  if (data.qqqBelowBollingerBand) {
+  if (data.qqqBelowBollinger) { // Use corrected property name qqqBelowBollinger
     canaries.push({
       signal: `QQQ trading below lower Bollinger Band - indicates an oversold condition on short-term charts. While this can signal a near-term bounce, extreme deviations below the band suggest significant selling pressure and potential for continued downside if broader market trends remain weak.`,
       pillar: "QQQ Momentum & Trend Health",
@@ -1417,7 +1419,7 @@ function getTopCanaries(
   }
   
   // Compounding structural breakdown
-  if (data.qqqBelowSMA20 && data.qqqBelowSMA50 && (data.qqqDeathCross || data.qqqBelowBollingerBand)) {
+  if (data.qqqBelowSMA20 && data.qqqBelowSMA50 && (data.qqqDeathCross || data.qqqBelowBollinger)) { // Use corrected property name
     canaries.push({
       signal: `QQQ MULTIPLE BREAKDOWNS: Below 20-day & 50-day SMAs, AND either Death Cross active OR below lower Bollinger Band - This confluence of bearish signals across multiple timeframes and indicators points to severe technical damage in the NASDAQ-100. This significantly elevates crash probability.`,
       pillar: "QQQ Momentum & Trend Health",
@@ -1959,7 +1961,7 @@ async function computeQQQTechnicals(data: Awaited<ReturnType<typeof fetchMarketD
   const qqqBelowSMA20 = data.qqqBelowSMA20 || false
   const qqqBelowSMA50 = data.qqqBelowSMA50 || false
   const qqqDeathCross = data.qqqDeathCross || false
-  const qqqBelowBollingerBand = data.qqqBelowBollingerBand || false // Use corrected property name
+  const qqqBelowBollingerBand = data.qqqBelowBollinger || false // Use corrected property name
 
   // 1. Daily Return Impact (0-25 points)
   let dailyReturnImpact = 0

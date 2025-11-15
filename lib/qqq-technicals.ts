@@ -15,16 +15,15 @@ export async function fetchQQQTechnicals() {
   }
   
   try {
-    // Fetch QQQ historical data (90 days for SMA calculations)
     const today = new Date()
-    const ninetyDaysAgo = new Date(today)
-    ninetyDaysAgo.setDate(today.getDate() - 90)
+    const pastDate = new Date(today)
+    pastDate.setDate(today.getDate() - 250)
     
-    const fromDate = ninetyDaysAgo.toISOString().split('T')[0]
+    const fromDate = pastDate.toISOString().split('T')[0]
     const toDate = today.toISOString().split('T')[0]
     
     const response = await fetch(
-      `https://api.polygon.io/v2/aggs/ticker/QQQ/range/1/day/${fromDate}/${toDate}?adjusted=true&sort=asc&limit=90&apiKey=${POLYGON_API_KEY}`,
+      `https://api.polygon.io/v2/aggs/ticker/QQQ/range/1/day/${fromDate}/${toDate}?adjusted=true&sort=asc&limit=250&apiKey=${POLYGON_API_KEY}`,
       { signal: AbortSignal.timeout(10000) }
     )
     
@@ -42,6 +41,8 @@ export async function fetchQQQTechnicals() {
     const currentPrice = prices[prices.length - 1]
     const prevClose = prices[prices.length - 2]
     
+    console.log(`[v0] QQQ Data: Fetched ${prices.length} days of historical data`)
+    
     // Calculate 1-day % return
     const dailyReturn = ((currentPrice - prevClose) / prevClose) * 100
     
@@ -56,24 +57,33 @@ export async function fetchQQQTechnicals() {
       }
     }
     
-    // Calculate SMAs
-    const sma20 = prices.length >= 20 
-      ? prices.slice(-20).reduce((a: number, b: number) => a + b, 0) / 20
-      : currentPrice
+    let sma20 = currentPrice
+    let sma50 = currentPrice
+    let sma200 = currentPrice
+    let hasSMA20 = false
+    let hasSMA50 = false
+    let hasSMA200 = false
+    
+    if (prices.length >= 20) {
+      sma20 = prices.slice(-20).reduce((a: number, b: number) => a + b, 0) / 20
+      hasSMA20 = true
+    }
       
-    const sma50 = prices.length >= 50 
-      ? prices.slice(-50).reduce((a: number, b: number) => a + b, 0) / 50
-      : currentPrice
+    if (prices.length >= 50) {
+      sma50 = prices.slice(-50).reduce((a: number, b: number) => a + b, 0) / 50
+      hasSMA50 = true
+    }
       
-    const sma200 = prices.length >= 90 // We only have 90 days, approximate
-      ? prices.reduce((a: number, b: number) => a + b, 0) / prices.length
-      : currentPrice
+    if (prices.length >= 200) {
+      sma200 = prices.slice(-200).reduce((a: number, b: number) => a + b, 0) / 200
+      hasSMA200 = true
+    }
     
     let bollingerLower = sma20
     let bollingerUpper = sma20
     let belowBollingerBand = false
     
-    if (prices.length >= 20) {
+    if (hasSMA20) {
       const last20Prices = prices.slice(-20)
       // Calculate standard deviation
       const squaredDiffs = last20Prices.map((price: number) => Math.pow(price - sma20, 2))
@@ -85,23 +95,24 @@ export async function fetchQQQTechnicals() {
       belowBollingerBand = currentPrice < bollingerLower
     }
     
-    const belowSMA20 = currentPrice < sma20
-    const belowSMA50 = currentPrice < sma50
-    const deathCross = sma50 < sma200
+    const belowSMA20 = hasSMA20 ? currentPrice < sma20 : false
+    const belowSMA50 = hasSMA50 ? currentPrice < sma50 : false
+    const deathCross = (hasSMA50 && hasSMA200) ? sma50 < sma200 : false
     
-    console.log("[v0] QQQ Technicals:", {
+    console.log("[v0] QQQ Technicals (LIVE DATA):", {
       currentPrice: currentPrice.toFixed(2),
       dailyReturn: dailyReturn.toFixed(2) + "%",
       consecutiveDaysDown,
-      sma20: sma20.toFixed(2),
-      sma50: sma50.toFixed(2),
-      sma200: sma200.toFixed(2),
+      sma20: hasSMA20 ? sma20.toFixed(2) : "N/A",
+      sma50: hasSMA50 ? sma50.toFixed(2) : "N/A",
+      sma200: hasSMA200 ? sma200.toFixed(2) : "N/A",
       bollingerLower: bollingerLower.toFixed(2),
       bollingerUpper: bollingerUpper.toFixed(2),
-      belowSMA20,
-      belowSMA50,
-      deathCross,
-      belowBollingerBand
+      belowSMA20: belowSMA20 ? "YES (bearish)" : "NO (bullish)",
+      belowSMA50: belowSMA50 ? "YES (bearish)" : "NO (bullish)",
+      deathCross: deathCross ? "YES (bearish)" : "NO (bullish)",
+      belowBollingerBand: belowBollingerBand ? "YES (oversold)" : "NO",
+      dataQuality: `${hasSMA20 ? '20d✓' : '20d✗'} ${hasSMA50 ? '50d✓' : '50d✗'} ${hasSMA200 ? '200d✓' : '200d✗'}`
     })
     
     return {

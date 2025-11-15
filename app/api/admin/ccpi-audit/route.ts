@@ -36,11 +36,85 @@ export async function GET() {
 
 async function auditAllIndicators() {
   const indicators = [
-    // PILLAR 1: VALUATION STRESS (3 indicators)
+    // PILLAR 1: QQQ Momentum (6 indicators)
     {
       id: 1,
+      name: "QQQ Daily Return (5× downside amplifier)",
+      pillar: "Pillar 1: QQQ Momentum",
+      source_url: "https://api.polygon.io/v2/aggs/ticker/QQQ",
+      api_endpoint: "/api/qqq-technicals → lib/qqq-technicals.ts",
+      fetch_method: "Polygon.io real-time QQQ data",
+      status: await testPolygonAPI() ? "Live" : "Failed",
+      last_fetched_at: new Date().toISOString(),
+      raw_sample: { value: 0.08, unit: "percent" },
+      threshold: { bullish: ">+1%", neutral: "-0.5% to +0.5%", bearish: "<-1%", danger: "<-2%" }
+    },
+    {
+      id: 2,
+      name: "QQQ Consecutive Down Days",
+      pillar: "Pillar 1: QQQ Momentum",
+      source_url: "https://api.polygon.io/v2/aggs/ticker/QQQ (calculated)",
+      api_endpoint: "/api/qqq-technicals → lib/qqq-technicals.ts",
+      fetch_method: "Calculated from 250-day QQQ price history",
+      status: await testPolygonAPI() ? "Live" : "Failed",
+      last_fetched_at: new Date().toISOString(),
+      raw_sample: { value: 0, unit: "days" },
+      threshold: { healthy: "0-1 days", warning: "2-3 days", danger: "4+ days" }
+    },
+    {
+      id: 3,
+      name: "QQQ Below 20-Day SMA",
+      pillar: "Pillar 1: QQQ Momentum",
+      source_url: "https://api.polygon.io/v2/aggs/ticker/QQQ (calculated)",
+      api_endpoint: "/api/qqq-technicals → lib/qqq-technicals.ts",
+      fetch_method: "Calculated from 20-day QQQ price history",
+      status: await testPolygonAPI() ? "Live" : "Failed",
+      last_fetched_at: new Date().toISOString(),
+      raw_sample: { value: true, unit: "boolean" },
+      threshold: { bullish: "Above SMA20", bearish: "Below SMA20" }
+    },
+    {
+      id: 4,
+      name: "QQQ Below 50-Day SMA",
+      pillar: "Pillar 1: QQQ Momentum",
+      source_url: "https://api.polygon.io/v2/aggs/ticker/QQQ (calculated)",
+      api_endpoint: "/api/qqq-technicals → lib/qqq-technicals.ts",
+      fetch_method: "Calculated from 50-day QQQ price history",
+      status: await testPolygonAPI() ? "Live" : "Failed",
+      last_fetched_at: new Date().toISOString(),
+      raw_sample: { value: false, unit: "boolean" },
+      threshold: { bullish: "Above SMA50", bearish: "Below SMA50" }
+    },
+    {
+      id: 5,
+      name: "QQQ Below Bollinger Band (Lower)",
+      pillar: "Pillar 1: QQQ Momentum",
+      source_url: "https://api.polygon.io/v2/aggs/ticker/QQQ (calculated)",
+      api_endpoint: "/api/qqq-technicals → lib/qqq-technicals.ts",
+      fetch_method: "Calculated: 20-day SMA - (2 × standard deviation)",
+      status: await testPolygonAPI() ? "Live" : "Failed",
+      last_fetched_at: new Date().toISOString(),
+      raw_sample: { value: false, unit: "boolean" },
+      threshold: { normal: "Within bands", oversold: "Below lower band (SMA20 - 2σ)" }
+    },
+    {
+      id: 6,
+      name: "QQQ Death Cross (SMA50 < SMA200)",
+      pillar: "Pillar 1: QQQ Momentum",
+      source_url: "https://api.polygon.io/v2/aggs/ticker/QQQ (calculated)",
+      api_endpoint: "/api/qqq-technicals → lib/qqq-technicals.ts",
+      fetch_method: "Calculated from 250-day QQQ price history (requires 200d+ data)",
+      status: await testPolygonAPI() ? "Live" : "Failed",
+      last_fetched_at: new Date().toISOString(),
+      raw_sample: { value: false, unit: "boolean" },
+      threshold: { golden_cross: "SMA50 > SMA200 (bullish)", death_cross: "SMA50 < SMA200 (bearish)" }
+    },
+    
+    // PILLAR 2: VALUATION STRESS (3 indicators)
+    {
+      id: 7,
       name: "Buffett Indicator (Market Cap / GDP)",
-      pillar: "Pillar 1: Valuation Stress",
+      pillar: "Pillar 2: Valuation Stress",
       source_url: "https://fred.stlouisfed.org/series/WILSHIRE5000IND",
       api_endpoint: "/api/ccpi",
       fetch_method: "Calculated from FRED Wilshire 5000 and GDP data",
@@ -50,9 +124,9 @@ async function auditAllIndicators() {
       threshold: { normal: "80-120%", warning: "120-160%", extreme: ">160%" }
     },
     {
-      id: 2,
+      id: 8,
       name: "S&P 500 Forward P/E Ratio",
-      pillar: "Pillar 1: Valuation Stress",
+      pillar: "Pillar 2: Valuation Stress",
       source_url: "https://finance.yahoo.com/quote/%5EGSPC",
       api_endpoint: "/api/ccpi (via Apify Yahoo Finance)",
       fetch_method: "Apify Yahoo Finance actors (canadesk + Architjn)",
@@ -62,9 +136,9 @@ async function auditAllIndicators() {
       threshold: { median: "16x", normal: "<18x", elevated: "18-25x", extreme: ">25x" }
     },
     {
-      id: 3,
+      id: 9,
       name: "S&P 500 Price-to-Sales Ratio",
-      pillar: "Pillar 1: Valuation Stress",
+      pillar: "Pillar 2: Valuation Stress",
       source_url: "https://finance.yahoo.com/quote/%5EGSPC/key-statistics",
       api_endpoint: "/api/ccpi (via Apify Yahoo Finance)",
       fetch_method: "Apify Yahoo Finance actors",
@@ -74,11 +148,11 @@ async function auditAllIndicators() {
       threshold: { normal: "<2.5", elevated: "2.5-3.0", extreme: ">3.0" }
     },
     
-    // PILLAR 2: TECHNICAL FRAGILITY (6 indicators) - Removed RVX (ID 6) to match actual CCPI calculation (23 total)
+    // PILLAR 3: TECHNICAL FRAGILITY (6 indicators) - Removed RVX (ID 6) to match actual CCPI calculation (23 total)
     {
-      id: 4,
+      id: 10,
       name: "VIX (Volatility Index)",
-      pillar: "Pillar 2: Technical Fragility",
+      pillar: "Pillar 3: Technical Fragility",
       source_url: "https://www.alphavantage.co/query?function=VIX",
       api_endpoint: "/api/ccpi (via Alpha Vantage)",
       fetch_method: "Alpha Vantage VIX_90DAY endpoint",
@@ -88,9 +162,9 @@ async function auditAllIndicators() {
       threshold: { calm: "<15", normal: "15-20", elevated: "20-30", crisis: ">35" }
     },
     {
-      id: 5,
+      id: 11,
       name: "VXN (Nasdaq Volatility)",
-      pillar: "Pillar 2: Technical Fragility",
+      pillar: "Pillar 3: Technical Fragility",
       source_url: "https://www.alphavantage.co/query?function=VXN",
       api_endpoint: "/api/ccpi (via Alpha Vantage)",
       fetch_method: "Alpha Vantage VXN_90DAY endpoint",
@@ -100,21 +174,21 @@ async function auditAllIndicators() {
       threshold: { calm: "<15", normal: "15-20", elevated: "20-30", crisis: ">35" }
     },
     {
-      id: 6,
+      id: 12,
       name: "High-Low Index (Market Breadth)",
-      pillar: "Pillar 2: Technical Fragility",
-      source_url: "https://api.polygon.io/v2/aggs/ticker/$NH and $NL",
-      api_endpoint: "/api/market-breadth → lib/market-breadth.ts (Polygon free plan limitation)",
-      fetch_method: "Attempted Polygon $NH/$NL tickers → Falls back to baseline (0.42) due to API plan restrictions",
-      status: await testMarketBreadthAPI(),
+      pillar: "Pillar 3: Technical Fragility",
+      source_url: "Baseline (historical average)",
+      api_endpoint: "/api/market-breadth → lib/market-breadth.ts",
+      fetch_method: "Baseline: 42% (historical S&P 500 new highs/lows ratio)",
+      status: "Baseline",
       last_fetched_at: new Date().toISOString(),
       raw_sample: { value: 0.42, unit: "ratio" },
       threshold: { weak: "<30%", neutral: "30-60%", strong: ">60%" }
     },
     {
-      id: 7,
+      id: 13,
       name: "Bullish Percent Index",
-      pillar: "Pillar 2: Technical Fragility",
+      pillar: "Pillar 3: Technical Fragility",
       source_url: "Baseline (historical average)",
       api_endpoint: "/api/ccpi (baseline value)",
       fetch_method: "Historical average: 58%",
@@ -124,9 +198,9 @@ async function auditAllIndicators() {
       threshold: { oversold: "<30%", neutral: "30-70%", overbought: ">70%" }
     },
     {
-      id: 8,
+      id: 14,
       name: "ATR (Average True Range)",
-      pillar: "Pillar 2: Technical Fragility",
+      pillar: "Pillar 3: Technical Fragility",
       source_url: "https://www.alphavantage.co/query?function=SMA&symbol=SPY",
       api_endpoint: "/api/ccpi (via Alpha Vantage)",
       fetch_method: "Alpha Vantage SMA endpoint for SPY",
@@ -136,9 +210,9 @@ async function auditAllIndicators() {
       threshold: { low: "20-30", normal: "30-40", elevated: "40-50", high: ">50" }
     },
     {
-      id: 9,
+      id: 15,
       name: "Left Tail Volatility (Crash Probability)",
-      pillar: "Pillar 2: Technical Fragility",
+      pillar: "Pillar 3: Technical Fragility",
       source_url: "Derived from VIX level",
       api_endpoint: "/api/ccpi (calculated from VIX)",
       fetch_method: "Calculated: VIX > 25 ? 0.18 : VIX > 20 ? 0.14 : VIX > 15 ? 0.11 : 0.08",
@@ -148,11 +222,11 @@ async function auditAllIndicators() {
       threshold: { low: "<10%", moderate: "10-15%", high: ">15%" }
     },
     
-    // PILLAR 3: MACRO & LIQUIDITY RISK (3 indicators)
+    // PILLAR 4: MACRO & LIQUIDITY RISK (3 indicators)
     {
-      id: 10,
+      id: 16,
       name: "Fed Funds Rate",
-      pillar: "Pillar 3: Macro & Liquidity Risk",
+      pillar: "Pillar 4: Macro & Liquidity Risk",
       source_url: "https://fred.stlouisfed.org/series/DFF",
       api_endpoint: "/api/ccpi (via FRED)",
       fetch_method: "FRED series DFF (Federal Funds Rate)",
@@ -162,9 +236,9 @@ async function auditAllIndicators() {
       threshold: { accommodative: "<2%", neutral: "2-4%", restrictive: ">4.5%" }
     },
     {
-      id: 11,
+      id: 17,
       name: "Junk Bond Spread (High-Yield Credit)",
-      pillar: "Pillar 3: Macro & Liquidity Risk",
+      pillar: "Pillar 4: Macro & Liquidity Risk",
       source_url: "https://fred.stlouisfed.org/series/BAMLH0A0HYM2",
       api_endpoint: "/api/ccpi (via FRED)",
       fetch_method: "FRED series BAMLH0A0HYM2 (ICE BofA High Yield spread)",
@@ -174,9 +248,9 @@ async function auditAllIndicators() {
       threshold: { tight: "<3%", normal: "3-5%", stress: "5-8%", crisis: ">8%" }
     },
     {
-      id: 12,
+      id: 18,
       name: "Yield Curve (10Y-2Y Spread)",
-      pillar: "Pillar 3: Macro & Liquidity Risk",
+      pillar: "Pillar 4: Macro & Liquidity Risk",
       source_url: "https://fred.stlouisfed.org/series/T10Y2Y",
       api_endpoint: "/api/ccpi (via FRED)",
       fetch_method: "FRED series T10Y2Y (10-Year minus 2-Year Treasury spread)",
@@ -186,11 +260,11 @@ async function auditAllIndicators() {
       threshold: { inverted: "<0%", flat: "0-0.5%", normal: ">0.5%" }
     },
     
-    // PILLAR 4: SENTIMENT & MEDIA FEEDBACK (5 indicators)
+    // PILLAR 5: SENTIMENT & MEDIA FEEDBACK (5 indicators)
     {
-      id: 13,
+      id: 19,
       name: "AAII Bullish Sentiment",
-      pillar: "Pillar 4: Sentiment & Media Feedback",
+      pillar: "Pillar 5: Sentiment & Media Feedback",
       source_url: "Baseline (historical average)",
       api_endpoint: "/api/ccpi (baseline value)",
       fetch_method: "Historical average: 42% (AAII blocks scraping)",
@@ -200,9 +274,9 @@ async function auditAllIndicators() {
       threshold: { bearish: "<30%", neutral: "30-50%", euphoric: ">50%" }
     },
     {
-      id: 14,
+      id: 20,
       name: "AAII Bearish Sentiment",
-      pillar: "Pillar 4: Sentiment & Media Feedback",
+      pillar: "Pillar 5: Sentiment & Media Feedback",
       source_url: "Baseline (historical average)",
       api_endpoint: "/api/ccpi (baseline value)",
       fetch_method: "Historical average: 28%",
@@ -212,9 +286,9 @@ async function auditAllIndicators() {
       threshold: { complacent: "<20%", normal: "20-35%", fearful: ">35%" }
     },
     {
-      id: 15,
+      id: 21,
       name: "Put/Call Ratio",
-      pillar: "Pillar 4: Sentiment & Media Feedback",
+      pillar: "Pillar 5: Sentiment & Media Feedback",
       source_url: "https://finance.yahoo.com/quote/SPY/options",
       api_endpoint: "/api/ccpi (via Apify Yahoo Finance)",
       fetch_method: "Apify Yahoo Finance actors - SPY options volume",
@@ -224,9 +298,9 @@ async function auditAllIndicators() {
       threshold: { complacent: "<0.7", normal: "0.7-1.0", fearful: ">1.0" }
     },
     {
-      id: 16,
+      id: 22,
       name: "Fear & Greed Index",
-      pillar: "Pillar 4: Sentiment & Media Feedback",
+      pillar: "Pillar 5: Sentiment & Media Feedback",
       source_url: "https://api.alternative.me/fng/",
       api_endpoint: "/api/ccpi (via alternative.me)",
       fetch_method: "Alternative.me Fear & Greed API (crypto proxy for market sentiment)",
@@ -236,9 +310,9 @@ async function auditAllIndicators() {
       threshold: { fear: "<30", neutral: "30-70", greed: ">70" }
     },
     {
-      id: 17,
+      id: 23,
       name: "Risk Appetite Index",
-      pillar: "Pillar 4: Sentiment & Media Feedback",
+      pillar: "Pillar 5: Sentiment & Media Feedback",
       source_url: "Baseline (calculated from other sentiment metrics)",
       api_endpoint: "/api/ccpi (baseline value)",
       fetch_method: "Baseline: 35 (calculated from sentiment composite)",
@@ -248,11 +322,11 @@ async function auditAllIndicators() {
       threshold: { risk_off: "<30", neutral: "30-70", risk_on: ">70" }
     },
     
-    // PILLAR 5: CAPITAL FLOWS & POSITIONING (2 indicators)
+    // PILLAR 6: CAPITAL FLOWS & POSITIONING (2 indicators)
     {
-      id: 18,
+      id: 24,
       name: "Tech ETF Flows (Weekly)",
-      pillar: "Pillar 5: Capital Flows & Positioning",
+      pillar: "Pillar 6: Capital Flows & Positioning",
       source_url: "Baseline (recent reports)",
       api_endpoint: "/api/ccpi (baseline value)",
       fetch_method: "Baseline: -$1.8B weekly (from public reports)",
@@ -262,9 +336,9 @@ async function auditAllIndicators() {
       threshold: { outflows: "<-$2B", neutral: "-$2B to $2B", inflows: ">$2B" }
     },
     {
-      id: 19,
+      id: 25,
       name: "Short Interest (% of Float)",
-      pillar: "Pillar 5: Capital Flows & Positioning",
+      pillar: "Pillar 6: Capital Flows & Positioning",
       source_url: "https://finance.yahoo.com/quote/SPY/key-statistics",
       api_endpoint: "/api/ccpi (via Apify Yahoo Finance)",
       fetch_method: "Apify Yahoo Finance actors - SPY short interest",
@@ -274,11 +348,11 @@ async function auditAllIndicators() {
       threshold: { complacent: "<15%", normal: "15-20%", hedged: ">20%" }
     },
     
-    // PILLAR 6: STRUCTURAL (4 indicators)
+    // PILLAR 7: STRUCTURAL (4 indicators)
     {
-      id: 20,
+      id: 26,
       name: "AI CapEx Growth (YoY)",
-      pillar: "Pillar 6: Structural",
+      pillar: "Pillar 7: Structural",
       source_url: "Baseline (alt data)",
       api_endpoint: "/api/ccpi (baseline value)",
       fetch_method: "Baseline: 40% (alternative data)",
@@ -288,9 +362,9 @@ async function auditAllIndicators() {
       threshold: { sustainable: "<20%", moderate: "20-40%", overspending: ">40%" }
     },
     {
-      id: 21,
+      id: 27,
       name: "AI Revenue Growth (YoY)",
-      pillar: "Pillar 6: Structural",
+      pillar: "Pillar 7: Structural",
       source_url: "Baseline (alt data)",
       api_endpoint: "/api/ccpi (baseline value)",
       fetch_method: "Baseline: 15% (alternative data)",
@@ -300,9 +374,9 @@ async function auditAllIndicators() {
       threshold: { lagging: "<10%", growing: "10-25%", strong: ">25%" }
     },
     {
-      id: 22,
+      id: 28,
       name: "GPU Pricing Premium",
-      pillar: "Pillar 6: Structural",
+      pillar: "Pillar 7: Structural",
       source_url: "https://www.ebay.com/sch/ (GPU sold listings)",
       api_endpoint: "/api/ccpi (scraped from eBay)",
       fetch_method: "Scrape eBay H100 sold listings vs MSRP",
@@ -312,9 +386,9 @@ async function auditAllIndicators() {
       threshold: { normal: "<20%", elevated: "20-50%", extreme: ">50%" }
     },
     {
-      id: 23,
+      id: 29,
       name: "AI Job Postings Growth",
-      pillar: "Pillar 6: Structural",
+      pillar: "Pillar 7: Structural",
       source_url: "Baseline (manual updates)",
       api_endpoint: "/api/ccpi (baseline value)",
       fetch_method: "Baseline: -5% (job sites have bot protection)",
@@ -330,9 +404,54 @@ async function auditAllIndicators() {
 
 async function auditPillarFormulas() {
   return [
+    // PILLAR 1: QQQ Momentum
     {
-      pillar: "Pillar 1: Valuation Stress",
-      weight: 0.22,
+      pillar: "Pillar 1: QQQ Momentum",
+      weight: 0.30,
+      formula: "Score = dailyReturnImpact + consecDownImpact + belowSMA20Impact + belowSMA50Impact + deathCrossImpact + belowBollingerImpact + compoundingPenalty",
+      indicators: [
+        {
+          name: "QQQ Daily Return",
+          weight: "Variable (5× downside amplifier)",
+          scoring: "Positive days: 0pts. Negative days: |(return%)| × 5 (e.g., -2% = 10pts crash risk)"
+        },
+        {
+          name: "Consecutive Down Days",
+          weight: "10 pts per day",
+          scoring: "0 days = 0pts, 1 day = 10pts, 2 days = 20pts, 3+ days = 30pts"
+        },
+        {
+          name: "Below SMA20",
+          weight: "20 pts",
+          scoring: "Below 20-day = 20pts, Above = 0pts"
+        },
+        {
+          name: "Below SMA50",
+          weight: "25 pts",
+          scoring: "Below 50-day = 25pts, Above = 0pts"
+        },
+        {
+          name: "Below Bollinger Band",
+          weight: "15 pts",
+          scoring: "Below lower band (SMA20 - 2σ) = 15pts, Within/Above = 0pts"
+        },
+        {
+          name: "Death Cross",
+          weight: "30 pts",
+          scoring: "SMA50 < SMA200 = 30pts, Golden Cross = 0pts"
+        },
+        {
+          name: "Compounding Penalty",
+          weight: "+20 pts bonus",
+          scoring: "If ALL THREE: Below SMA20 AND Below SMA50 AND (Death Cross OR Below Bollinger), add +20pts"
+        }
+      ],
+      calculation: "Sum of impacts, capped at 100. Heavy downside bias via 5× amplifier on negative days."
+    },
+    // PILLAR 2: VALUATION STRESS
+    {
+      pillar: "Pillar 2: Valuation Stress",
+      weight: 0.20,
       formula: "Score = Σ(Indicator_i × Weight_i)",
       indicators: [
         {
@@ -353,9 +472,10 @@ async function auditPillarFormulas() {
       ],
       calculation: "Weighted sum of normalized scores (0-100 scale)"
     },
+    // PILLAR 3: TECHNICAL FRAGILITY
     {
-      pillar: "Pillar 2: Technical Fragility",
-      weight: 0.20,
+      pillar: "Pillar 3: Technical Fragility",
+      weight: 0.10,
       formula: "Score = Σ(Indicator_i × Weight_i)",
       indicators: [
         {
@@ -391,9 +511,10 @@ async function auditPillarFormulas() {
       ],
       calculation: "Weighted sum with emphasis on market breadth and volatility"
     },
+    // PILLAR 4: MACRO & LIQUIDITY RISK
     {
-      pillar: "Pillar 3: Macro & Liquidity Risk",
-      weight: 0.18,
+      pillar: "Pillar 4: Macro & Liquidity Risk",
+      weight: 0.10,
       formula: "Score = Σ(Indicator_i × Weight_i)",
       indicators: [
         {
@@ -414,9 +535,10 @@ async function auditPillarFormulas() {
       ],
       calculation: "Focuses on monetary policy restrictiveness and credit stress"
     },
+    // PILLAR 5: SENTIMENT & MEDIA FEEDBACK
     {
-      pillar: "Pillar 4: Sentiment & Media Feedback",
-      weight: 0.18,
+      pillar: "Pillar 5: Sentiment & Media Feedback",
+      weight: 0.10,
       formula: "Score = Σ(Indicator_i × Weight_i)",
       indicators: [
         {
@@ -447,9 +569,10 @@ async function auditPillarFormulas() {
       ],
       calculation: "Contrarian indicators - extreme optimism or pessimism both add risk"
     },
+    // PILLAR 6: CAPITAL FLOWS & POSITIONING
     {
-      pillar: "Pillar 5: Capital Flows & Positioning",
-      weight: 0.12,
+      pillar: "Pillar 6: Capital Flows & Positioning",
+      weight: 0.10,
       formula: "Score = Σ(Indicator_i × Weight_i)",
       indicators: [
         {
@@ -465,8 +588,9 @@ async function auditPillarFormulas() {
       ],
       calculation: "Tracks institutional money movement and hedging levels"
     },
+    // PILLAR 7: STRUCTURAL
     {
-      pillar: "Pillar 6: Structural",
+      pillar: "Pillar 7: Structural",
       weight: 0.10,
       formula: "Score = Σ(Indicator_i × Weight_i)",
       indicators: [
@@ -498,13 +622,14 @@ async function auditPillarFormulas() {
 
 async function auditCCPIAggregation() {
   return {
-    formula: "CCPI = (P1×0.22) + (P2×0.20) + (P3×0.18) + (P4×0.18) + (P5×0.12) + (P6×0.10)",
+    formula: "CCPI = (P1×0.30) + (P2×0.20) + (P3×0.10) + (P4×0.10) + (P5×0.10) + (P6×0.10) + (P7×0.10)",
     weights: {
-      valuation: 0.22,
-      technical: 0.20,
-      macro: 0.18,
-      sentiment: 0.18,
-      flows: 0.12,
+      qqqTechnicals: 0.30,
+      valuation: 0.20,
+      technical: 0.10,
+      macro: 0.10,
+      sentiment: 0.10,
+      flows: 0.10,
       structural: 0.10
     },
     validation: "Sum of weights = 1.00 ✓",
@@ -554,7 +679,7 @@ async function auditConfidenceLogic() {
 
 async function auditCanarySignals() {
   return {
-    total_possible: 23,
+    total_possible: 28,
     logic: "Each indicator has specific thresholds. When breached, generates canary signal.",
     severity_levels: {
       high: "Critical threshold breached (e.g., VIX > 30, Buffett > 160%)",
@@ -562,17 +687,22 @@ async function auditCanarySignals() {
       low: "Watch threshold breached (minor warnings)"
     },
     trigger_conditions: [
+      { indicator: "QQQ Daily Return", high: "<-2%", medium: "<-1%", low: "<-0.5%" },
+      { indicator: "QQQ Consecutive Down", high: "4+ days", medium: "2-3 days", low: "1 day" },
+      { indicator: "QQQ Below SMA20", high: "Yes + downtrend", medium: "Yes", low: "Approaching" },
+      { indicator: "QQQ Below SMA50", high: "Yes + downtrend", medium: "Yes", low: "Approaching" },
+      { indicator: "QQQ Below Bollinger", high: "Yes + volatility spike", medium: "Yes", low: "Approaching" },
+      { indicator: "QQQ Death Cross", high: "Yes + accelerating", medium: "Yes", low: "Approaching" },
       { indicator: "Buffett Indicator", high: ">160%", medium: ">120%", low: ">100%" },
       { indicator: "S&P P/E", high: ">25x", medium: ">18x", low: ">16x" },
       { indicator: "VIX", high: ">30", medium: ">20", low: ">17" },
       { indicator: "Yield Curve", high: "<-0.3%", medium: "<0%", low: "<0.2%" }
-      // ... all 23 indicators have thresholds
     ],
     alert_levels: [
-      { canaries: "0-5", alert: "Normal", action: "Monitor" },
-      { canaries: "6-11", alert: "Elevated", action: "Increase hedges" },
-      { canaries: "12-17", alert: "High Alert", action: "Defensive positioning" },
-      { canaries: "18-23", alert: "Maximum", action: "Full defense mode" }
+      { canaries: "0-7", alert: "Normal", action: "Monitor" },
+      { canaries: "8-14", alert: "Elevated", action: "Increase hedges" },
+      { canaries: "15-21", alert: "High Alert", action: "Defensive positioning" },
+      { canaries: "22-28", alert: "Maximum", action: "Full defense mode" }
     ]
   }
 }
@@ -615,26 +745,19 @@ async function testApifyAPI() {
 }
 
 async function testMarketBreadthAPI() {
+  return "Baseline"
+}
+
+async function testPolygonAPI() {
+  const POLYGON_API_KEY = process.env.POLYGON_API_KEY
+  if (!POLYGON_API_KEY) return false
+  
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/market-breadth`, {
+    const response = await fetch(`https://api.polygon.io/v2/aggs/ticker/QQQ/range/1/day/2025-01-01/2025-01-02?apiKey=${POLYGON_API_KEY}`, {
       signal: AbortSignal.timeout(5000)
     })
-    
-    if (!response.ok) return "Failed"
-    
-    const data = await response.json()
-    
-    // "Live" = actually got live data from API
-    // "Baseline (API integrated)" = API code exists but returning baseline due to limitations
-    // "Baseline" = No API integration at all
-    if (data.source === 'live') {
-      return "Live"
-    } else if (data.source === 'baseline') {
-      return "Baseline (API integrated, plan limitation)"
-    } else {
-      return "Baseline"
-    }
+    return response.ok
   } catch {
-    return "Failed"
+    return false
   }
 }
