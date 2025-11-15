@@ -34,10 +34,17 @@ export default function AdminDashboard() {
   const [adUrl, setAdUrl] = useState("")
   const [newAdImage, setNewAdImage] = useState("")
   const [dataSourceStatus, setDataSourceStatus] = useState<any>(null)
+  const [activeTab, setActiveTab] = useState("status")
 
   useEffect(() => {
     fetchApiStatus()
   }, [])
+
+  useEffect(() => {
+    if (activeTab === "audit" && !auditResults) {
+      fetchAuditResults()
+    }
+  }, [activeTab, auditResults])
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" })
@@ -234,7 +241,7 @@ ${auditResults.codeQuality.map((check: any) => `
           </Button>
         </div>
 
-        <Tabs defaultValue="status" className="w-full">
+        <Tabs defaultValue="status" className="w-full" onValueChange={setActiveTab}>
           <TabsList className="grid grid-cols-4 lg:grid-cols-8 gap-2 bg-slate-800 p-1 h-auto mb-6">
             <TabsTrigger value="status" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
               <Activity className="h-4 w-4 mr-2" />
@@ -286,8 +293,8 @@ ${auditResults.codeQuality.map((check: any) => `
                     <Button onClick={fetchApiStatus} disabled={loading}>
                       {loading ? "Checking..." : "Refresh Status"}
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       onClick={() => window.open('https://vercel.com/joelfrenettes/options-calculators-com/settings/environment-variables', '_blank')}
                       className="bg-transparent"
                     >
@@ -382,44 +389,48 @@ ${auditResults.codeQuality.map((check: any) => `
           <TabsContent value="audit">
             <Card className="bg-white">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-blue-600" />
-                  Data Audit & Validation
-                </CardTitle>
-                <CardDescription>
-                  Comprehensive QA audit - verifies all data sources, formulas, and calculations
-                </CardDescription>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <CheckCircle2 className="h-5 w-5 text-blue-600" />
+                      Data Audit & Validation
+                    </CardTitle>
+                    <CardDescription>
+                      Comprehensive QA audit - verifies all data sources, formulas, and calculations
+                    </CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={fetchAuditResults}
+                      disabled={loading}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 transition-all duration-200 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loading ? (
+                        <>
+                          <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full inline-block" />
+                          Running...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="mr-2 h-4 w-4 inline" />
+                          Run Full Audit
+                        </>
+                      )}
+                    </Button>
+                    {auditResults && (
+                      <Button
+                        onClick={exportAuditReport}
+                        variant="outline"
+                        className="hover:bg-slate-100 transition-all duration-200"
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Export Report
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="flex gap-2 mb-4">
-                  <Button
-                    onClick={fetchAuditResults}
-                    disabled={loading}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 transition-all duration-200 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loading ? (
-                      <>
-                        <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full inline-block" />
-                        Running Audit...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="mr-2 h-4 w-4 inline" />
-                        Run Full Audit
-                      </>
-                    )}
-                  </Button>
-                  {auditResults && (
-                    <Button
-                      onClick={exportAuditReport}
-                      variant="outline"
-                      className="hover:bg-slate-100 transition-all duration-200"
-                    >
-                      <Download className="mr-2 h-4 w-4" />
-                      Export Report
-                    </Button>
-                  )}
-                </div>
 
                 {auditResults && (
                   <>
@@ -983,7 +994,7 @@ ${auditResults.codeQuality.map((check: any) => `
                           <p className="text-xs text-green-700">of {dataSourceStatus.summary.total} sources</p>
                         </CardContent>
                       </Card>
-                      
+
                       <Card className="bg-yellow-50 border-yellow-200">
                         <CardHeader className="pb-2">
                           <CardTitle className="text-lg text-yellow-900">Using Fallback</CardTitle>
@@ -993,7 +1004,7 @@ ${auditResults.codeQuality.map((check: any) => `
                           <p className="text-xs text-yellow-700">sources switched</p>
                         </CardContent>
                       </Card>
-                      
+
                       <Card className="bg-red-50 border-red-200">
                         <CardHeader className="pb-2">
                           <CardTitle className="text-lg text-red-900">Offline</CardTitle>
@@ -1003,7 +1014,7 @@ ${auditResults.codeQuality.map((check: any) => `
                           <p className="text-xs text-red-700">sources down</p>
                         </CardContent>
                       </Card>
-                      
+
                       <Card className="bg-blue-50 border-blue-200">
                         <CardHeader className="pb-2">
                           <CardTitle className="text-lg text-blue-900">Coverage</CardTitle>
@@ -1020,7 +1031,7 @@ ${auditResults.codeQuality.map((check: any) => `
                     <div className="space-y-4">
                       {["Valuation", "Technical", "Macro", "Sentiment", "Flows", "Structural"].map((pillar) => {
                         const pillarSources = dataSourceStatus.dataSources.filter((s: any) => s.pillar === pillar)
-                        
+
                         return (
                           <Card key={pillar} className="bg-slate-50">
                             <CardHeader className="pb-3">
@@ -1035,14 +1046,14 @@ ${auditResults.codeQuality.map((check: any) => `
                                     <div className="flex items-start justify-between mb-3">
                                       <h4 className="font-semibold text-slate-900">{source.indicator}</h4>
                                       <span className={`text-xs px-3 py-1 rounded-full font-semibold ${
-                                        source.overallStatus === "online" 
+                                        source.overallStatus === "online"
                                           ? "bg-green-100 text-green-800"
                                           : "bg-red-100 text-red-800"
                                       }`}>
                                         {source.overallStatus === "online" ? "✓ LIVE" : "✗ OFFLINE"}
                                       </span>
                                     </div>
-                                    
+
                                     <div className="space-y-2 text-sm">
                                       {/* Primary Source */}
                                       <div className="flex items-center gap-2">
@@ -1058,7 +1069,7 @@ ${auditResults.codeQuality.map((check: any) => `
                                           <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">ACTIVE</span>
                                         )}
                                       </div>
-                                      
+
                                       {/* Secondary Source */}
                                       {source.secondary && (
                                         <div className="flex items-center gap-2 ml-4">
@@ -1079,7 +1090,7 @@ ${auditResults.codeQuality.map((check: any) => `
                                           )}
                                         </div>
                                       )}
-                                      
+
                                       {/* Tertiary Source */}
                                       {source.tertiary && (
                                         <div className="flex items-center gap-2 ml-8">
