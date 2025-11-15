@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -35,6 +35,9 @@ export default function AdminDashboard() {
   const [newAdImage, setNewAdImage] = useState("")
   const [dataSourceStatus, setDataSourceStatus] = useState<any>(null)
 
+  useEffect(() => {
+    fetchApiStatus()
+  }, [])
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" })
@@ -338,8 +341,8 @@ ${auditResults.codeQuality.map((check: any) => `
               </CardHeader>
               <CardContent>
                 <div className="flex gap-2 mb-4">
-                  <Button 
-                    onClick={fetchAuditResults} 
+                  <Button
+                    onClick={fetchAuditResults}
                     disabled={loading}
                     className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 transition-all duration-200 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -356,8 +359,8 @@ ${auditResults.codeQuality.map((check: any) => `
                     )}
                   </Button>
                   {auditResults && (
-                    <Button 
-                      onClick={exportAuditReport} 
+                    <Button
+                      onClick={exportAuditReport}
                       variant="outline"
                       className="hover:bg-slate-100 transition-all duration-200"
                     >
