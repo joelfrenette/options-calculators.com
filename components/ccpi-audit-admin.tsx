@@ -56,7 +56,7 @@ Generated: ${new Date(auditData.timestamp).toLocaleString()}
 - Failed: ${auditData.summary.failedIndicators}
 - Coverage: ${Math.round((auditData.summary.liveIndicators / auditData.summary.totalIndicators) * 100)}%
 
-## All 23 Indicators
+## All ${auditData.summary.totalIndicators} Indicators
 ${auditData.indicators.map((ind: any, i: number) => `
 ${i + 1}. **${ind.name}**
    - Pillar: ${ind.pillar}
@@ -137,7 +137,7 @@ ${auditData.canaries.alert_levels.map((alert: any) => `
         <div>
           <h2 className="text-2xl font-bold text-gray-900">CCPI Audit Dashboard</h2>
           <p className="text-sm text-gray-600">
-            Complete transparency for all 23 indicators, pillar formulas, and CCPI calculation
+            Complete transparency for all 24 indicators, pillar formulas, and CCPI calculation
           </p>
         </div>
         <div className="flex gap-2">
@@ -202,7 +202,7 @@ ${auditData.canaries.alert_levels.map((alert: any) => `
             <TabsList className="grid grid-cols-5 gap-2 bg-gray-100 p-1">
               <TabsTrigger value="indicators">
                 <Database className="h-4 w-4 mr-2" />
-                Indicators (23)
+                Indicators ({auditData.summary.totalIndicators})
               </TabsTrigger>
               <TabsTrigger value="pillars">
                 <Activity className="h-4 w-4 mr-2" />
@@ -222,24 +222,24 @@ ${auditData.canaries.alert_levels.map((alert: any) => `
               </TabsTrigger>
             </TabsList>
 
-            {/* Tab 1: All 23 Indicators */}
+            {/* Tab 1: All 24 Indicators */}
             <TabsContent value="indicators">
               <Card className="bg-white">
                 <CardHeader className="bg-white">
-                  <CardTitle className="text-gray-900">All 23 Indicators - Live Data Sources</CardTitle>
+                  <CardTitle className="text-gray-900">All {auditData.summary.totalIndicators} Indicators - Live Data Sources</CardTitle>
                   <CardDescription className="text-gray-600">
                     Comprehensive list of every indicator with API endpoints, fetch methods, and current values
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="bg-white">
                   <div className="space-y-4">
-                    {["Valuation Stress", "Technical Fragility", "Macro & Liquidity Risk", "Sentiment & Media Feedback", "Capital Flows & Positioning", "Structural"].map((pillar) => {
-                      const pillarIndicators = auditData.indicators.filter((ind: any) => ind.pillar === pillar)
+                    {auditData.pillars.map((pillar: any) => {
+                      const pillarIndicators = auditData.indicators.filter((ind: any) => ind.pillar === pillar.pillar)
                       
                       return (
-                        <Card key={pillar} className="bg-gray-50">
+                        <Card key={pillar.pillar} className="bg-gray-50">
                           <CardHeader className="pb-3">
-                            <CardTitle className="text-lg">{pillar} ({pillarIndicators.length})</CardTitle>
+                            <CardTitle className="text-lg">{pillar.pillar} ({pillarIndicators.length})</CardTitle>
                           </CardHeader>
                           <CardContent>
                             <div className="space-y-3">
@@ -307,7 +307,7 @@ ${auditData.canaries.alert_levels.map((alert: any) => `
                 <CardHeader className="bg-white">
                   <CardTitle className="text-gray-900">Pillar Score Formulas - Full Transparency</CardTitle>
                   <CardDescription className="text-gray-600">
-                    Exact formulas, weights, and scoring logic for each of the 6 pillars
+                    Exact formulas, weights, and scoring logic for each of the pillars
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="bg-white">
@@ -353,7 +353,7 @@ ${auditData.canaries.alert_levels.map((alert: any) => `
                 <CardHeader className="bg-white">
                   <CardTitle className="text-gray-900">CCPI Final Score - Weighted Pillar Aggregation</CardTitle>
                   <CardDescription className="text-gray-600">
-                    How the 6 pillar scores combine into the final CCPI score (0-100)
+                    How the pillar scores combine into the final CCPI score (0-100)
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="bg-white">

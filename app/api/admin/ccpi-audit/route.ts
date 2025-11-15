@@ -21,7 +21,7 @@ export async function GET() {
       summary: {
         totalIndicators: indicators.length,
         liveIndicators: indicators.filter((i: any) => i.status === "Live").length,
-        staleIndicators: indicators.filter((i: any) => i.status === "Stale").length,
+        baselineIndicators: indicators.filter((i: any) => i.status === "Baseline").length,
         failedIndicators: indicators.filter((i: any) => i.status === "Failed").length
       }
     })
