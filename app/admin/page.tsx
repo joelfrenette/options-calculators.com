@@ -235,14 +235,10 @@ ${auditResults.codeQuality.map((check: any) => `
         </div>
 
         <Tabs defaultValue="status" className="w-full">
-          <TabsList className="grid grid-cols-4 lg:grid-cols-9 gap-2 bg-slate-800 p-1 h-auto mb-6">
+          <TabsList className="grid grid-cols-4 lg:grid-cols-8 gap-2 bg-slate-800 p-1 h-auto mb-6">
             <TabsTrigger value="status" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
               <Activity className="h-4 w-4 mr-2" />
-              Status
-            </TabsTrigger>
-            <TabsTrigger value="keys" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
-              <Key className="h-4 w-4 mr-2" />
-              API Keys
+              API Status
             </TabsTrigger>
             <TabsTrigger value="ccpi-audit" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
               <CheckCircle2 className="h-4 w-4 mr-2" />
@@ -276,59 +272,106 @@ ${auditResults.codeQuality.map((check: any) => `
 
           {/* Status Tab */}
           <TabsContent value="status">
-            <Card className="bg-white">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5 text-blue-600" />
-                  API Status Monitor
-                </CardTitle>
-                <CardDescription>Real-time status of all external APIs</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button onClick={fetchApiStatus} className="mb-4" disabled={loading}>
-                  {loading ? "Checking..." : "Refresh Status"}
-                </Button>
+            <div className="space-y-6">
+              <Card className="bg-white">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-blue-600" />
+                    API Status & Key Management
+                  </CardTitle>
+                  <CardDescription>Monitor all external APIs and manage configuration</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-2 mb-6">
+                    <Button onClick={fetchApiStatus} disabled={loading}>
+                      {loading ? "Checking..." : "Refresh Status"}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => window.open('https://vercel.com/joelfrenettes/options-calculators-com/settings/environment-variables', '_blank')}
+                      className="bg-transparent"
+                    >
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Update Keys in Vercel
+                    </Button>
+                  </div>
 
-                {apiStatuses && apiStatuses.length > 0 && (
-                  <div className="space-y-3">
-                    {apiStatuses.map((api) => (
-                      <div
-                        key={api.name}
-                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-slate-50 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          {api.status === "online" ? (
-                            <CheckCircle2 className="h-5 w-5 text-green-600" />
-                          ) : api.status === "error" ? (
-                            <XCircle className="h-5 w-5 text-red-600" />
-                          ) : (
-                            <AlertCircle className="h-5 w-5 text-yellow-600" />
-                          )}
-                          <div>
-                            <p className="font-semibold text-slate-900">{api.name} API</p>
-                            <p className="text-sm text-slate-600">{api.message}</p>
+                  {apiStatuses && apiStatuses.length > 0 && (
+                    <div className="space-y-3">
+                      {apiStatuses.map((api) => (
+                        <div
+                          key={api.name}
+                          className="flex items-start justify-between p-5 border rounded-lg hover:bg-slate-50 transition-colors"
+                        >
+                          <div className="flex items-start gap-4 flex-1">
+                            {api.status === "online" ? (
+                              <CheckCircle2 className="h-6 w-6 text-green-600 mt-1 flex-shrink-0" />
+                            ) : api.status === "error" ? (
+                              <XCircle className="h-6 w-6 text-red-600 mt-1 flex-shrink-0" />
+                            ) : (
+                              <AlertCircle className="h-6 w-6 text-yellow-600 mt-1 flex-shrink-0" />
+                            )}
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <p className="font-bold text-slate-900">{api.name} API</p>
+                                {api.hasKey ? (
+                                  <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded font-semibold">
+                                    ✓ KEY SAVED
+                                  </span>
+                                ) : api.status === "online" ? (
+                                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-semibold">
+                                    NO KEY REQUIRED
+                                  </span>
+                                ) : (
+                                  <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded font-semibold">
+                                    ✗ KEY MISSING
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm text-slate-700 mb-2">
+                                <span className="font-semibold">Purpose:</span> {api.message.split(' - ')[1] || api.message}
+                              </p>
+                              <p className="text-sm text-slate-600">
+                                <span className="font-semibold">Status:</span>{' '}
+                                <span className={
+                                  api.status === "online" ? "text-green-600" :
+                                  api.status === "error" ? "text-red-600" :
+                                  "text-yellow-600"
+                                }>
+                                  {api.message.split(' - ')[0] || api.message}
+                                </span>
+                              </p>
+                              {!api.hasKey && api.status === "error" && (
+                                <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+                                  <strong>Action Required:</strong> Add this API key to your Vercel environment variables
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {api.hasKey ? (
-                            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                              Key Configured
-                            </span>
-                          ) : (
-                            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                              {api.status === "online" ? "No Key Required" : "Key Missing"}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                  )}
+                  {(!apiStatuses || apiStatuses.length === 0) && !loading && (
+                    <div className="text-center py-8 text-slate-500">
+                      <Key className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                      <p className="text-sm">No API status data available. Click "Refresh Status" to check all APIs.</p>
+                    </div>
+                  )}
+
+                  <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h4 className="font-semibold text-blue-900 mb-2">How to Update API Keys:</h4>
+                    <ol className="text-sm text-blue-800 space-y-1 ml-4">
+                      <li>1. Click "Update Keys in Vercel" button above</li>
+                      <li>2. Find the environment variable you want to update</li>
+                      <li>3. Click "Edit" and paste your new API key</li>
+                      <li>4. Save changes and redeploy if necessary</li>
+                      <li>5. Return here and click "Refresh Status" to verify</li>
+                    </ol>
                   </div>
-                )}
-                {(!apiStatuses || apiStatuses.length === 0) && !loading && (
-                  <p className="text-slate-500 text-sm">No API status data available. Click "Refresh Status" to check all APIs.</p>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="ccpi-audit">
@@ -1081,23 +1124,6 @@ ${auditResults.codeQuality.map((check: any) => `
                     </div>
                   </>
                 )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="ccpi-audit">
-            <Card className="bg-white">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-blue-600" />
-                  CCPI Audit Dashboard
-                </CardTitle>
-                <CardDescription>
-                  Complete transparency for all 23 indicators, pillar formulas, and CCPI calculation
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <CcpiAuditAdmin />
               </CardContent>
             </Card>
           </TabsContent>
