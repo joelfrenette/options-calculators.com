@@ -275,26 +275,30 @@ ${auditResults.codeQuality.map((check: any) => `
             <div className="space-y-6">
               <Card className="bg-white">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5 text-blue-600" />
-                    API Status & Key Management
-                  </CardTitle>
-                  <CardDescription>Monitor all external APIs and manage configuration</CardDescription>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Activity className="h-5 w-5 text-blue-600" />
+                        API Status & Key Management
+                      </CardTitle>
+                      <CardDescription>Monitor all external APIs and manage configuration</CardDescription>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button onClick={fetchApiStatus} disabled={loading}>
+                        {loading ? "Checking..." : "Refresh Status"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => window.open('https://vercel.com/joelfrenettes/options-calculators-com/settings/environment-variables', '_blank')}
+                        className="bg-transparent"
+                      >
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        Update Keys in Vercel
+                      </Button>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex gap-2 mb-6">
-                    <Button onClick={fetchApiStatus} disabled={loading}>
-                      {loading ? "Checking..." : "Refresh Status"}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => window.open('https://vercel.com/joelfrenettes/options-calculators-com/settings/environment-variables', '_blank')}
-                      className="bg-transparent"
-                    >
-                      <ExternalLink className="mr-2 h-4 w-4" />
-                      Update Keys in Vercel
-                    </Button>
-                  </div>
 
                   {apiStatuses && apiStatuses.length > 0 && (
                     <div className="space-y-3">
@@ -303,80 +307,81 @@ ${auditResults.codeQuality.map((check: any) => `
                           key={api.name}
                           className="flex items-start gap-4 p-5 border rounded-lg hover:bg-slate-50 transition-colors"
                         >
-                          <div className="flex-shrink-0">
-                            {api.status === "online" ? (
-                              <div className="relative">
-                                <div className="w-6 h-6 bg-green-500 rounded-full animate-pulse" />
-                                <div className="absolute inset-0 w-6 h-6 bg-green-400 rounded-full blur-sm" />
-                              </div>
-                            ) : api.status === "warning" ? (
-                              <div className="relative">
-                                <div className="w-6 h-6 bg-yellow-500 rounded-full animate-pulse" />
-                                <div className="absolute inset-0 w-6 h-6 bg-yellow-400 rounded-full blur-sm" />
-                              </div>
-                            ) : (
-                              <div className="relative">
-                                <div className="w-6 h-6 bg-red-500 rounded-full animate-pulse" />
-                                <div className="absolute inset-0 w-6 h-6 bg-red-400 rounded-full blur-sm" />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="font-bold text-slate-900">{api.name}</p>
+                              {api.hasKey ? (
+                                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded font-semibold">
+                                  ✓ KEY SAVED
+                                </span>
+                              ) : api.status === "online" ? (
+                                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-semibold">
+                                  NO KEY REQUIRED
+                                </span>
+                              ) : (
+                                <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded font-semibold">
+                                  ✗ KEY MISSING
+                                </span>
+                              )}
+                            </div>
+                            
+                            {api.endpoint && (
+                              <p className="text-xs text-slate-600 mb-2 font-mono bg-slate-100 px-2 py-1 rounded">
+                                <span className="font-semibold text-slate-700">Endpoint:</span> {api.endpoint}
+                              </p>
+                            )}
+                            
+                            <p className="text-sm text-slate-700 mb-2">
+                              <span className="font-semibold">Purpose:</span> {api.message.split(' - ')[1] || api.message}
+                            </p>
+                            
+                            {api.usedIn && api.usedIn.length > 0 && (
+                              <p className="text-sm text-slate-600 mb-2">
+                                <span className="font-semibold">Used in:</span> {api.usedIn.join(", ")}
+                              </p>
+                            )}
+                            
+                            <p className="text-sm text-slate-600">
+                              <span className="font-semibold">Status:</span>{' '}
+                              <span className={
+                                api.status === "online" ? "text-green-600 font-semibold" :
+                                api.status === "error" ? "text-red-600 font-semibold" :
+                                "text-yellow-600 font-semibold"
+                              }>
+                                {api.message.split(' - ')[0] || api.message}
+                              </span>
+                            </p>
+                            {!api.hasKey && api.status === "error" && (
+                              <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+                                <strong>Action Required:</strong> Add this API key to your Vercel environment variables
                               </div>
                             )}
                           </div>
 
-                          <div className="flex items-start gap-4 flex-1">
+                          <div className="flex items-center gap-3 flex-shrink-0">
                             {api.status === "online" ? (
-                              <CheckCircle2 className="h-6 w-6 text-green-600 mt-1 flex-shrink-0" />
+                              <CheckCircle2 className="h-8 w-8 text-green-600" />
                             ) : api.status === "error" ? (
-                              <XCircle className="h-6 w-6 text-red-600 mt-1 flex-shrink-0" />
+                              <XCircle className="h-8 w-8 text-red-600" />
                             ) : (
-                              <AlertCircle className="h-6 w-6 text-yellow-600 mt-1 flex-shrink-0" />
+                              <AlertCircle className="h-8 w-8 text-yellow-600" />
                             )}
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <p className="font-bold text-slate-900">{api.name}</p>
-                                {api.hasKey ? (
-                                  <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded font-semibold">
-                                    ✓ KEY SAVED
-                                  </span>
-                                ) : api.status === "online" ? (
-                                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-semibold">
-                                    NO KEY REQUIRED
-                                  </span>
-                                ) : (
-                                  <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded font-semibold">
-                                    ✗ KEY MISSING
-                                  </span>
-                                )}
-                              </div>
-                              
-                              {api.endpoint && (
-                                <p className="text-xs text-slate-600 mb-2 font-mono bg-slate-100 px-2 py-1 rounded">
-                                  <span className="font-semibold text-slate-700">Endpoint:</span> {api.endpoint}
-                                </p>
-                              )}
-                              
-                              <p className="text-sm text-slate-700 mb-2">
-                                <span className="font-semibold">Purpose:</span> {api.message.split(' - ')[1] || api.message}
-                              </p>
-                              
-                              {api.usedIn && api.usedIn.length > 0 && (
-                                <p className="text-sm text-slate-600 mb-2">
-                                  <span className="font-semibold">Used in:</span> {api.usedIn.join(", ")}
-                                </p>
-                              )}
-                              
-                              <p className="text-sm text-slate-600">
-                                <span className="font-semibold">Status:</span>{' '}
-                                <span className={
-                                  api.status === "online" ? "text-green-600 font-semibold" :
-                                  api.status === "error" ? "text-red-600 font-semibold" :
-                                  "text-yellow-600 font-semibold"
-                                }>
-                                  {api.message.split(' - ')[0] || api.message}
-                                </span>
-                              </p>
-                              {!api.hasKey && api.status === "error" && (
-                                <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
-                                  <strong>Action Required:</strong> Add this API key to your Vercel environment variables
+                            
+                            <div className="flex-shrink-0">
+                              {api.status === "online" ? (
+                                <div className="relative">
+                                  <div className="w-8 h-8 bg-green-500 rounded-full animate-pulse" />
+                                  <div className="absolute inset-0 w-8 h-8 bg-green-400 rounded-full blur-sm" />
+                                </div>
+                              ) : api.status === "warning" ? (
+                                <div className="relative">
+                                  <div className="w-8 h-8 bg-yellow-500 rounded-full animate-pulse" />
+                                  <div className="absolute inset-0 w-8 h-8 bg-yellow-400 rounded-full blur-sm" />
+                                </div>
+                              ) : (
+                                <div className="relative">
+                                  <div className="w-8 h-8 bg-red-500 rounded-full animate-pulse" />
+                                  <div className="absolute inset-0 w-8 h-8 bg-red-400 rounded-full blur-sm" />
                                 </div>
                               )}
                             </div>
