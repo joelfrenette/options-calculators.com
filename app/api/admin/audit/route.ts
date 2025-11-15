@@ -6,12 +6,11 @@ export async function GET(request: NextRequest) {
     verdict: "PASS" as "PASS" | "FAIL" | "CONDITIONAL PASS",
     summary: "",
     issues: [] as string[],
-    pages: [] as any[], // Added page-by-page audit coverage
+    pages: [] as any[],
     dataSources: [] as any[],
     calculations: [] as any[],
-    algorithms: [] as any[], // Added algorithms section
-    scoring: [] as any[], // Added scoring methodologies
-    environmentVariables: [] as any[],
+    algorithms: [] as any[],
+    scoring: [] as any[],
     codeQuality: [] as any[],
     timestamp: new Date().toISOString(),
   }
@@ -181,22 +180,38 @@ export async function GET(request: NextRequest) {
         `https://financialmodelingprep.com/api/v3/profile/AAPL?apikey=${fmpApiKey}`
       )
       const fmpData = await fmpRes.json()
-      const hasData = Array.isArray(fmpData) && fmpData.length > 0 && fmpData[0].symbol
+      
+      // Check for valid response: should be an array with company data
+      const hasData = Array.isArray(fmpData) && 
+                     fmpData.length > 0 && 
+                     fmpData[0].symbol === 'AAPL' &&
+                     fmpData[0].companyName
+      
+      // Also check if we got an error response
+      const isError = fmpData.error || (fmpData['Error Message'] !== undefined)
       
       auditResults.dataSources.push({
         page: "Financial Data (Fundamentals, Ratios)",
         service: "Financial Modeling Prep API",
         keyVariable: "FMP_API_KEY",
-        status: hasData ? "VERIFIED" : "FAIL",
+        status: hasData ? "VERIFIED" : (isError ? "FAIL" : "FAIL"),
         realData: hasData,
-        details: hasData ? `Test: AAPL Profile - ${fmpData[0].companyName}` : "No valid data returned or API limit reached",
+        details: hasData 
+          ? `✓ Active - Test: ${fmpData[0].companyName} (${fmpData[0].symbol}) - Price: $${fmpData[0].price}`
+          : isError 
+            ? `API Error: ${fmpData.error || fmpData['Error Message']}`
+            : "Invalid response format or rate limit exceeded",
         endpoint: "https://financialmodelingprep.com/api/v3/",
         primary: "FMP API",
         fallback: "Baseline values for unavailable metrics",
       })
       
       if (!hasData) {
-        auditResults.issues.push("FMP API key invalid, rate limited, or no financial data available")
+        auditResults.issues.push(
+          isError 
+            ? `FMP API error: ${fmpData.error || fmpData['Error Message']}`
+            : "FMP API: No valid data returned (possible rate limit)"
+        )
       }
     } catch (error) {
       auditResults.dataSources.push({
@@ -210,7 +225,7 @@ export async function GET(request: NextRequest) {
         primary: "FMP API",
         fallback: "Baseline values",
       })
-      auditResults.issues.push("FMP API key test failed")
+      auditResults.issues.push("FMP API key test failed - connection error")
     }
   } else {
     auditResults.dataSources.push({
@@ -491,34 +506,6 @@ export async function GET(request: NextRequest) {
       dataPoints: "Fundamentals (40%), Technicals (30%), Options metrics (30%)",
     },
   ]
-
-  // ====================
-  // PART 3: ENVIRONMENT VARIABLES
-  // ====================
-
-  const envVars = [
-    { name: "FRED_API_KEY", value: process.env.FRED_API_KEY, required: true, key: "FRED_API_KEY", purpose: "Economic data (VIX, rates, inflation)", configured: process.env.FRED_API_KEY ? "YES" : "NO", status: process.env.FRED_API_KEY ? "OK" : "MISSING" },
-    { name: "FMP_API_KEY", value: process.env.FMP_API_KEY, required: true, key: "FMP_API_KEY", purpose: "Financial fundamentals and ratios", configured: process.env.FMP_API_KEY ? "YES" : "NO", status: process.env.FMP_API_KEY ? "OK" : "MISSING" },
-    { name: "TWELVEDATA_API_KEY", value: process.env.TWELVEDATA_API_KEY || process.env.TWELVE_DATA_API_KEY, required: true, key: "TWELVEDATA_API_KEY", purpose: "Technical indicators and market data backup", configured: (process.env.TWELVEDATA_API_KEY || process.env.TWELVE_DATA_API_KEY) ? "YES" : "NO", status: (process.env.TWELVEDATA_API_KEY || process.env.TWELVE_DATA_API_KEY) ? "OK" : "MISSING" },
-    { name: "POLYGON_API_KEY", value: process.env.POLYGON_API_KEY, required: true, key: "POLYGON_API_KEY", purpose: "Real-time market data and options chains", configured: process.env.POLYGON_API_KEY ? "YES" : "NO", status: process.env.POLYGON_API_KEY ? "OK" : "MISSING" },
-    { name: "APIFY_API_TOKEN", value: process.env.APIFY_API_TOKEN, required: false, key: "APIFY_API_TOKEN", purpose: "Web scraping for sentiment indicators", configured: process.env.APIFY_API_TOKEN ? "YES" : "NO", status: process.env.APIFY_API_TOKEN ? "OK" : "Optional/Info" },
-    { name: "RESEND_API_KEY", value: process.env.RESEND_API_KEY, required: false, key: "RESEND_API_KEY", purpose: "Password reset emails", configured: process.env.RESEND_API_KEY ? "YES" : "NO", status: process.env.RESEND_API_KEY ? "OK" : "Optional/Info" },
-    { name: "ENCRYPTION_KEY", value: process.env.ENCRYPTION_KEY, required: false, key: "ENCRYPTION_KEY", purpose: "Secure data encryption", configured: process.env.ENCRYPTION_KEY ? "YES" : "NO", status: process.env.ENCRYPTION_KEY ? "OK" : "Optional/Info" },
-  ]
-
-  envVars.forEach((env) => {
-    auditResults.environmentVariables.push({
-      name: env.name,
-      status: env.status,
-      required: env.required,
-      key: env.key,
-      purpose: env.purpose,
-      configured: env.configured,
-    })
-    if (env.required && !env.value) {
-      auditResults.issues.push(`Required environment variable ${env.name} is missing`)
-    }
-  })
 
   // ====================
   // PART 4: CODE QUALITY CHECKS
