@@ -103,10 +103,10 @@ async function auditAllIndicators() {
       id: 6,
       name: "High-Low Index (Market Breadth)",
       pillar: "Pillar 2: Technical Fragility",
-      source_url: "Baseline (historical average)",
-      api_endpoint: "/api/ccpi (baseline value)",
-      fetch_method: "Historical average: 42%",
-      status: "Baseline",
+      source_url: "https://api.polygon.io/v2/aggs/ticker/$NH and $NL",
+      api_endpoint: "/api/market-breadth (Polygon → FMP → AlphaVantage)",
+      fetch_method: "Polygon $NH/$NL tickers or FMP highs_lows endpoint",
+      status: await testMarketBreadthAPI() ? "Live" : "Baseline",
       last_fetched_at: new Date().toISOString(),
       raw_sample: { value: 0.42, unit: "ratio" },
       threshold: { weak: "<30%", neutral: "30-60%", strong: ">60%" }
@@ -612,4 +612,21 @@ async function testApifyAPI() {
   
   // Don't actually call Apify in audit (expensive), just check if token exists
   return true
+}
+
+async function testMarketBreadthAPI() {
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/market-breadth`, {
+      signal: AbortSignal.timeout(5000)
+    })
+    
+    if (!response.ok) return false
+    
+    const data = await response.json()
+    
+    // Check if we got live data (not baseline/stale)
+    return data.source !== 'baseline' && !data.stale
+  } catch {
+    return false
+  }
 }

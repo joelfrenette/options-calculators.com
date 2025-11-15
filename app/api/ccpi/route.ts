@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { fetchMarketBreadth as fetchMarketBreadthData } from "@/lib/market-breadth"
 
 // This API endpoint integrates ALL 23 indicators with REAL data via live APIs, Apify actors, or web scraping
 // NO mock data - all values are fetched from actual sources with fallback chains
@@ -97,20 +98,22 @@ async function fetchMarketData() {
       fredData,
       alphaVantageData,
       apifyYahooData,
-      fmpData,  // Added FMP data fetch
+      fmpData,
       aaiData,
       etfData,
       gpuData,
-      jobData
+      jobData,
+      marketBreadthData
     ] = await Promise.all([
       fetchFREDIndicators(),
       fetchAlphaVantageIndicators(),
       fetchApifyYahooFinance(),
-      fetchFMPIndicators(),  // Now actively fetching FMP data
+      fetchFMPIndicators(),
       fetchAAIISentiment(),
       fetchETFFlows(),
       fetchGPUPricing(),
-      fetchAIJobPostings()
+      fetchAIJobPostings(),
+      fetchMarketBreadth()
     ])
     
     return {
@@ -119,12 +122,11 @@ async function fetchMarketData() {
       spxPE: fmpData.spxPE || apifyYahooData.spxPE,
       spxPS: fmpData.spxPS || apifyYahooData.spxPS,
       
-      // Removed Barchart dependencies for highLowIndex and bullishPercent
       vix: alphaVantageData.vix,
       vxn: alphaVantageData.vxn,
       rvx: alphaVantageData.rvx || 20.1,
       atr: alphaVantageData.atr,
-      highLowIndex: 0.42,      // Historical average - market breadth
+      highLowIndex: marketBreadthData.value, // Use value from fetchMarketBreadth
       bullishPercent: 58,      // Historical average - bullish percent index
       ltv: alphaVantageData.ltv,
       spotVol: alphaVantageData.spotVol || 0.22,
@@ -138,7 +140,7 @@ async function fetchMarketData() {
       aaiiBearish: aaiData.bearish,
       putCallRatio: apifyYahooData.putCallRatio,
       fearGreedIndex: aaiData.fearGreed,
-      riskAppetite: 35,         // Baseline - calculated from other sentiment metrics
+      riskAppetite: 35,
       
       // Flow indicators (ETF.com + Yahoo Finance)
       etfFlows: etfData.techETFFlows,
@@ -155,6 +157,37 @@ async function fetchMarketData() {
   } catch (error) {
     console.error('[v0] Error fetching market data:', error)
     throw error
+  }
+}
+
+
+async function fetchMarketBreadth() {
+  try {
+    console.log('[v0] Fetching live High-Low Index from market breadth function...')
+    
+    const data = await fetchMarketBreadthData()
+    
+    console.log(`[v0] High-Low Index: ${(data.highLowIndex * 100).toFixed(1)}% from ${data.source} (${data.newHighs}H / ${data.newLows}L)`)
+    
+    return {
+      value: data.highLowIndex, // This value is actually the highLowIndex used later in fetchMarketData
+      source: data.source,
+      highs: data.newHighs,
+      lows: data.newLows,
+      // Calculate threshold based on highLowIndex value directly
+      threshold: data.highLowIndex > 0.5 ? 'bullish' : data.highLowIndex < 0.3 ? 'bearish' : 'neutral'
+    }
+  } catch (error) {
+    console.error('[v0] Market breadth fetch error:', error)
+    console.warn('[v0] Falling back to baseline High-Low Index value')
+    
+    return {
+      value: 0.42, // Baseline high-low index
+      source: 'baseline',
+      highs: 0,
+      lows: 0,
+      threshold: 'neutral'
+    }
   }
 }
 
@@ -279,7 +312,7 @@ async function fetchFMPIndicators() {
 // Now using both Apify Yahoo Finance Actors with fallback strategy
 
 async function fetchApifyYahooFinance() {
-  const APIFY_API_TOKEN = process.env.APIFY_API_TOKEN
+  const APIFY_API_TOKEN = process.env.APIFY_API_KEY
   
   if (!APIFY_API_TOKEN) {
     console.warn('[v0] APIFY_API_TOKEN not set, using baseline values')
