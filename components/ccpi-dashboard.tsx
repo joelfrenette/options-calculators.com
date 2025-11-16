@@ -791,6 +791,36 @@ export function CcpiDashboard() {
                     </div>
                   )}
 
+                  {/* VIX Term Structure */}
+                  {(data.indicators.vixTermStructure !== undefined || data.indicators.vixTermInverted !== undefined) && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">VIX Term Structure (Curve Slope)</span>
+                        <span className="font-bold">
+                          {data.indicators.vixTermInverted 
+                            ? 'INVERTED' 
+                            : data.indicators.vixTermStructure?.toFixed(2) || 'N/A'}
+                        </span>
+                      </div>
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 to-yellow-500" />
+                        <div 
+                          className="absolute inset-0 bg-gray-200" 
+                          style={{ 
+                            marginLeft: data.indicators.vixTermInverted 
+                              ? '0%' 
+                              : `${Math.min(100, Math.max(0, ((data.indicators.vixTermStructure || 0) / 3) * 100))}%` 
+                          }} 
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Inverted: &lt;0</span>
+                        <span>Normal: 1.0-2.0</span>
+                        <span>Steep: &gt;2.0</span>
+                      </div>
+                    </div>
+                  )}
+
                   {/* High-Low Index */}
                   {data.indicators.highLowIndex !== undefined && (
                     <div className="space-y-2">
@@ -1079,7 +1109,7 @@ export function CcpiDashboard() {
                 </div>
                 <div className="space-y-6">
                   
-                  {/* ETF Flows */}
+                  {/* Tech ETF Flows */}
                   {data.indicators.etfFlows !== undefined && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
