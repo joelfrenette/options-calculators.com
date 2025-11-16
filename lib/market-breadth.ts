@@ -1,5 +1,4 @@
 export interface MarketBreadthData {
-  highLowIndex: number
   newHighs: number
   newLows: number
   source: 'baseline'
@@ -7,12 +6,11 @@ export interface MarketBreadthData {
 }
 
 export async function fetchMarketBreadth(): Promise<MarketBreadthData> {
-  // Baseline market breadth (42%)
-  // Historical average from S&P 500 new highs/lows ratio
-  console.log('[v0] High-Low Index: 42.0% from baseline (undefinedH / undefinedL)')
+  // Market breadth data no longer used in CCPI
+  // Replaced by VIX Term Structure for better crash prediction
+  console.log('[v0] Market Breadth: Deprecated (replaced by VIX Term Structure)')
   
   return {
-    highLowIndex: 0.42,
     newHighs: 0,
     newLows: 0,
     source: 'baseline',

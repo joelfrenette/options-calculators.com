@@ -341,7 +341,7 @@ export function CcpiDashboard() {
               Canaries in the Coal Mine - Active Warning Signals
             </div>
             <span className="text-2xl font-bold text-red-600">
-              {data.canaries.filter(c => c.severity === "high" || c.severity === "medium").length}/23
+              {data.canaries.filter(c => c.severity === "high" || c.severity === "medium").length}
             </span>
           </CardTitle>
           <CardDescription>Executive summary of medium and high severity red flags across all indicators</CardDescription>
@@ -464,13 +464,17 @@ export function CcpiDashboard() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">QQQ Daily Return (5× downside amplifier)</span>
-                        <span className="font-bold">{data.indicators.qqqDailyReturn}</span>
+                        <span className="font-bold">{data.indicators.qqqDailyReturn}%</span>
                       </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                      <div className="relative w-full h-3 rounded-full overflow-hidden bg-gray-200">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, Math.max(0, (parseFloat(data.indicators.qqqDailyReturn) + 2) / 4 * 100))}%` 
-                        }} />
+                        {/* Position indicator at the correct spot on the gradient */}
+                        <div 
+                          className="absolute top-0 bottom-0 w-1 bg-black"
+                          style={{ 
+                            left: `${Math.min(100, Math.max(0, ((parseFloat(data.indicators.qqqDailyReturn) + 2) / 4) * 100))}%` 
+                          }}
+                        />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
                         <span>Down: &lt;-1%</span>
@@ -487,11 +491,13 @@ export function CcpiDashboard() {
                         <span className="font-medium">QQQ Consecutive Down Days</span>
                         <span className="font-bold">{data.indicators.qqqConsecDown} days</span>
                       </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.qqqConsecDown / 5) * 100)}%` 
-                        }} />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden bg-gray-200">
+                        <div 
+                          className="absolute inset-y-0 left-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500"
+                          style={{ 
+                            width: `${Math.min(100, (data.indicators.qqqConsecDown / 5) * 100)}%` 
+                          }}
+                        />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
                         <span>Healthy: 0-1 days</span>
@@ -517,11 +523,13 @@ export function CcpiDashboard() {
                           </span>
                         </div>
                       </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${data.indicators?.qqqSMA20Proximity || 0}%`
-                        }} />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden bg-gray-200">
+                        <div 
+                          className="absolute inset-y-0 left-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500"
+                          style={{ 
+                            width: `${data.indicators?.qqqSMA20Proximity || 0}%`
+                          }}
+                        />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
                         <span>Safe: 0% (far above)</span>
@@ -547,11 +555,13 @@ export function CcpiDashboard() {
                           </span>
                         </div>
                       </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${data.indicators?.qqqSMA50Proximity || 0}%`
-                        }} />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden bg-gray-200">
+                        <div 
+                          className="absolute inset-y-0 left-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500"
+                          style={{ 
+                            width: `${data.indicators?.qqqSMA50Proximity || 0}%`
+                          }}
+                        />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
                         <span>Safe: 0% (far above)</span>
@@ -576,11 +586,13 @@ export function CcpiDashboard() {
                           </span>
                         </div>
                       </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${data.indicators?.qqqSMA200Proximity || 0}%`
-                        }} />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden bg-gray-200">
+                        <div 
+                          className="absolute inset-y-0 left-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500"
+                          style={{ 
+                            width: `${data.indicators?.qqqSMA200Proximity || 0}%`
+                          }}
+                        />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
                         <span>Safe: 0% (far above)</span>
@@ -606,11 +618,13 @@ export function CcpiDashboard() {
                           </span>
                         </div>
                       </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${data.indicators?.qqqBollingerProximity || 0}%`
-                        }} />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden bg-gray-200">
+                        <div 
+                          className="absolute inset-y-0 left-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500"
+                          style={{ 
+                            width: `${data.indicators?.qqqBollingerProximity || 0}%`
+                          }}
+                        />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
                         <span>Safe: 0% (at middle band)</span>

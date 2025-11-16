@@ -90,7 +90,7 @@ async function auditAllIndicators() {
       name: "QQQ Below Bollinger Band (Lower)",
       pillar: "Pillar 1: QQQ Momentum",
       source_url: "https://api.polygon.io/v2/aggs/ticker/QQQ (calculated)",
-      api_endpoint: "/api/qqq-technicals → lib/qqq-technicals.ts",
+      api_endpoint: "/api/ccpi",
       fetch_method: "Calculated: 20-day SMA - (2 × standard deviation)",
       status: await testPolygonAPI() ? "Live" : "Failed",
       last_fetched_at: new Date().toISOString(),
@@ -102,7 +102,7 @@ async function auditAllIndicators() {
       name: "QQQ Below 200-Day SMA",
       pillar: "Pillar 1: QQQ Momentum",
       source_url: "https://api.polygon.io/v2/aggs/ticker/QQQ (calculated)",
-      api_endpoint: "/api/qqq-technicals → lib/qqq-technicals.ts",
+      api_endpoint: "/api/ccpi (via Apify Yahoo Finance)",
       fetch_method: "Calculated from 200-day QQQ price history with proximity tracking",
       status: await testPolygonAPI() ? "Live" : "Failed",
       last_fetched_at: new Date().toISOString(),
@@ -175,15 +175,15 @@ async function auditAllIndicators() {
     },
     {
       id: 12,
-      name: "High-Low Index (Market Breadth)",
+      name: "VIX Term Structure (Curve Slope)",
       pillar: "Pillar 3: Technical Fragility",
-      source_url: "Baseline (historical average)",
-      api_endpoint: "/api/market-breadth → lib/market-breadth.ts",
-      fetch_method: "Baseline: 42% (historical S&P 500 new highs/lows ratio)",
-      status: "Baseline",
+      source_url: "https://fred.stlouisfed.org/series/VIXCLS",
+      api_endpoint: "/api/ccpi → lib/vix-term-structure.ts",
+      fetch_method: "FRED VIX spot + calculated 1M future slope",
+      status: await testFREDAPI() ? "Live" : "Baseline",
       last_fetched_at: new Date().toISOString(),
-      raw_sample: { value: 0.42, unit: "ratio" },
-      threshold: { weak: "<30%", neutral: "30-60%", strong: ">60%" }
+      raw_sample: { value: 1.5, unit: "points", inverted: false },
+      threshold: { inverted: "<0 (backwardation)", flat: "0-0.5", normal: "1-2", steep: ">2 (complacency)" }
     },
     {
       id: 13,
@@ -439,14 +439,14 @@ async function auditPillarFormulas() {
           scoring: "VXN > VIX+3 = 12pts, VXN > VIX+1 = 6pts"
         },
         {
-          name: "High-Low Index",
+          name: "VIX Term Structure",
           weight: 0.25,
-          scoring: "<0.3 = 30pts, <0.4 = 20pts, <0.5 = 12pts, >0.7 = -10pts (healthy)"
+          scoring: "Inverted: <0 (backwardation) = 30pts, Flat: 0-0.5 = 20pts, Normal: 1-2 = 12pts, Steep: >2 (complacency) = 0pts"
         },
         {
           name: "Bullish Percent",
           weight: 0.15,
-          scoring: ">70% = 18pts, >60% = 12pts, <30% = 12pts (oversold)"
+          scoring: ">70% = 18pts, >60% = 12pts, >45% = 12pts, <25% = 18pts (extreme fear)"
         },
         {
           name: "ATR",

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { fetchMarketBreadth as fetchMarketBreadthData } from "@/lib/market-breadth"
+import { fetchVIXTermStructure } from "@/lib/vix-term-structure"
 import { fetchQQQTechnicals as fetchQQQTechnicalsData } from '@/lib/qqq-technicals'
 
 // This API endpoint integrates ALL 28 indicators (5 new QQQ + 23 existing) with REAL data via live APIs
@@ -84,7 +85,10 @@ export async function GET() {
       aiCapexGrowth: data.snapshot.aiCapexGrowth,
       aiRevenueGrowth: data.snapshot.aiRevenueGrowth,
       gpuPricingPremium: data.snapshot.gpuPricingPremium,
-      aiJobPostingsGrowth: data.snapshot.aiJobPostingsGrowth
+      aiJobPostingsGrowth: data.snapshot.aiJobPostingsGrowth,
+
+      vixTermStructure: data.vixTermStructure,
+      vixTermInverted: data.vixTermInverted,
     }
     
     return NextResponse.json({
@@ -110,6 +114,9 @@ export async function GET() {
 async function fetchMarketData() {
   try {
     const results = await Promise.allSettled([
+      fetchMarketBreadthData(),
+      fetchQQQTechnicalsData(),
+      fetchVIXTermStructure(),
       fetchFREDIndicators(),
       fetchAlphaVantageIndicators(),
       fetchApifyYahooFinance(),
@@ -118,40 +125,41 @@ async function fetchMarketData() {
       fetchETFFlows(),
       fetchGPUPricing(),
       fetchAIJobPostings(),
-      fetchMarketBreadth(),
-      fetchQQQTechnicals()
     ])
     
     // Extract values or use fallbacks
-    const fredData = results[0].status === 'fulfilled' ? results[0].value : { fedFundsRate: 5.33, junkSpread: 3.5, yieldCurve: 0.25 }
-    const alphaVantageData = results[1].status === 'fulfilled' ? results[1].value : { vix: 16, vxn: 18, rvx: 20.1, ltv: 0.15, atr: 35, spotVol: 0.22 }
-    const apifyYahooData = results[2].status === 'fulfilled' ? results[2].value : { buffettIndicator: 180, spxPE: 21.5, spxPS: 2.9, putCallRatio: 0.72, shortInterest: 18 }
-    const fmpData = results[3].status === 'fulfilled' ? results[3].value : { spxPE: 21.5, spxPS: 2.9 }
-    const aaiData = results[4].status === 'fulfilled' ? results[4].value : { bullish: 35, bearish: 28, fearGreed: 50 }
-    const etfData = results[5].status === 'fulfilled' ? results[5].value : { techETFFlows: -1.8 }
-    const gpuData = results[6].status === 'fulfilled' ? results[6].value : { premium: 20 }
-    const jobData = results[7].status === 'fulfilled' ? results[7].value : { growth: -5 }
-    const marketBreadthData = results[8].status === 'fulfilled' ? results[8].value : { value: 0.42 }
-    const qqqTechnicalsData = results[9].status === 'fulfilled' ? results[9].value : { 
+    const marketBreadthData = results[0].status === 'fulfilled' ? results[0].value : { highLowIndex: 0.42, source: 'baseline' }
+    const qqqTechnicalsData = results[1].status === 'fulfilled' ? results[1].value : { 
       dailyReturn: 0.0, 
       consecutiveDaysDown: 0, 
       belowSMA20: false, 
       belowSMA50: false, 
+      belowSMA200: false,
       belowBollingerBand: false,
       source: 'baseline' 
     }
+    const vixTermData = results[2].status === 'fulfilled' ? results[2].value : { termStructure: 1.5, isInverted: false, source: 'baseline' }
+    const fredData = results[3].status === 'fulfilled' ? results[3].value : { fedFundsRate: 5.33, junkSpread: 3.5, yieldCurve: 0.25 }
+    const alphaVantageData = results[4].status === 'fulfilled' ? results[4].value : { vix: 16, vxn: 18, rvx: 20.1, ltv: 0.15, atr: 35, spotVol: 0.22 }
+    const apifyYahooData = results[5].status === 'fulfilled' ? results[5].value : { buffettIndicator: 180, spxPE: 21.5, spxPS: 2.9, putCallRatio: 0.72, shortInterest: 18 }
+    const fmpData = results[6].status === 'fulfilled' ? results[6].value : { spxPE: 21.5, spxPS: 2.9 }
+    const aaiData = results[7].status === 'fulfilled' ? results[7].value : { bullish: 35, bearish: 28, fearGreed: 50 }
+    const etfData = results[8].status === 'fulfilled' ? results[8].value : { techETFFlows: -1.8 }
+    const gpuData = results[9].status === 'fulfilled' ? results[9].value : { premium: 20 }
+    const jobData = results[10].status === 'fulfilled' ? results[10].value : { growth: -5 }
     
     console.log('[v0] Market data fetch results:', {
-      fred: results[0].status,
-      alphaVantage: results[1].status,
-      apifyYahoo: results[2].status,
-      fmp: results[3].status,
-      aaii: results[4].status,
-      etf: results[5].status,
-      gpu: results[6].status,
-      jobs: results[7].status,
-      breadth: results[8].status,
-      qqq: results[9].status
+      breadth: results[0].status,
+      qqq: results[1].status,
+      vixTerm: results[2].status,
+      fred: results[3].status,
+      alphaVantage: results[4].status,
+      apifyYahoo: results[5].status,
+      fmp: results[6].status,
+      aaii: results[7].status,
+      etf: results[8].status,
+      gpu: results[9].status,
+      jobs: results[10].status,
     })
     
     // Corrected property name for qqqBelowBollingerBand to qqqBelowBollinger
@@ -176,7 +184,7 @@ async function fetchMarketData() {
       vxn: alphaVantageData.vxn,
       rvx: alphaVantageData.rvx || 20.1,
       atr: alphaVantageData.atr,
-      highLowIndex: marketBreadthData.value,
+      highLowIndex: marketBreadthData.highLowIndex,
       bullishPercent: 58,
       ltv: alphaVantageData.ltv,
       spotVol: alphaVantageData.spotVol || 0.22,
@@ -196,6 +204,9 @@ async function fetchMarketData() {
       etfFlows: etfData.techETFFlows,
       shortInterest: apifyYahooData.shortInterest,
       
+      vixTermStructure: vixTermData.termStructure,
+      vixTermInverted: vixTermData.isInverted,
+
       snapshot: {
         aiCapexGrowth: 40,
         aiRevenueGrowth: 15,
@@ -1141,6 +1152,18 @@ async function computeTechnicalFragility(data: Awaited<ReturnType<typeof fetchMa
   if (data.vxn > data.vix + 3) score += 12 // Lowered threshold
   else if (data.vxn > data.vix + 1) score += 6
   
+  // VIX Term Structure (volatility curve slope)
+  // Backwardation (inverted) = immediate fear priced in
+  if (data.vixTermInverted || data.vixTermStructure < 0) {
+    score += 30 // Maximum risk - inverted curve
+  } else if (data.vixTermStructure < 0.5) {
+    score += 20 // Flattening curve - fear building
+  } else if (data.vixTermStructure < 1.0) {
+    score += 12 // Slight compression
+  } else if (data.vixTermStructure > 2.0) {
+    score -= 10 // Steep contango - complacency
+  }
+  
   // High-Low Index (market breadth) - CRITICAL INDICATOR
   // Low values = narrowERSHIP = fragile rally
   if (data.highLowIndex < 0.3) score += 30 // Increased weight
@@ -1386,7 +1409,7 @@ function getTopCanaries(
   pillar: string
   severity: "high" | "medium" | "low"
 }> {
-  const canaries = []
+  const canaries: Array<{ signal: string; pillar: string; severity: "high" | "medium" | "low" }> = []
   
   
   // QQQ 1-Day Price Drop
@@ -1545,6 +1568,21 @@ function getTopCanaries(
     })
   }
   
+  // VIX Term Structure (Volatility Curve)
+  if (data.vixTermInverted || data.vixTermStructure < 0) {
+    canaries.push({
+      signal: `VIX Term Structure INVERTED at ${data.vixTermStructure.toFixed(2)} - the volatility curve is in backwardation, meaning spot VIX is higher than futures. This indicates immediate fear and panic hedging, often preceding sharp selloffs within days/weeks.`,
+      pillar: "Technical Fragility",
+      severity: "high" as const
+    })
+  } else if (data.vixTermStructure < 0.5) {
+    canaries.push({
+      signal: `VIX Term Structure at ${data.vixTermStructure.toFixed(2)} - the volatility curve is flattening significantly (normal is 1.5-2.0). Fear is building as near-term volatility expectations rise relative to longer-term, suggesting market stress ahead.`,
+      pillar: "Technical Fragility",
+      severity: "medium" as const
+    })
+  }
+  
   // High-Low Index (Market Breadth)
   if (data.highLowIndex < 0.40) {
     canaries.push({
@@ -1554,7 +1592,7 @@ function getTopCanaries(
     })
   }
   
-  // Bullish Percent Index - measures overbought/oversold conditions
+  // Bullish Percent Index
   if (data.bullishPercent > 65) {
     canaries.push({
       signal: `Bullish Percent Index at ${data.bullishPercent}% - ${data.bullishPercent}% of stocks are on point-and-figure buy signals (normal range: 30-70%). Above 70% signals an overbought market where most stocks have already made their move, leaving limited upside and high reversal risk.`,
