@@ -229,23 +229,22 @@ export function CcpiDashboard() {
       <Card className="border-2 shadow-lg">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-2xl">CCPI: Crash & Correction Prediction Index</CardTitle>
-              <CardDescription>AI-led market correction early warning oracle for options traders</CardDescription>
+            <div className="flex items-center gap-3">
+              <Activity className="h-6 w-6 text-primary" />
+              <div>
+                <CardTitle className="text-xl">CCPI: Crash & Correction Prediction Index</CardTitle>
+                <CardDescription>AI-led market correction early warning oracle for options traders</CardDescription>
+              </div>
             </div>
-            <Badge variant={zone.color === "red" ? "destructive" : "secondary"} className="text-lg px-4 py-2">
-              {zone.label}
-            </Badge>
+            <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
           <div className="mb-6">
-            <h3 className="text-sm font-semibold mb-2 text-gray-700">CCPI Historical Scale</h3>
-            <p className="text-xs text-gray-500 mb-3">
-              Visual representation of crash risk zones from low risk to crash watch
-            </p>
             
-            <div className="pt-16">
+            <div className="pt-8">
               <div className="relative">
                 {/* Gradient bar */}
                 <div className="h-16 bg-gradient-to-r from-green-600 via-[20%] via-lime-500 via-[40%] via-yellow-500 via-[60%] via-orange-500 via-[80%] via-red-500 to-[100%] to-red-700 rounded-lg shadow-inner" />
