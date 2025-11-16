@@ -202,8 +202,7 @@ export function CcpiDashboard() {
     { name: "Pillar 3 - Technical", value: data.pillars.technical, icon: Activity },
     { name: "Pillar 4 - Macro", value: data.pillars.macro, icon: TrendingDown },
     { name: "Pillar 5 - Sentiment", value: data.pillars.sentiment, icon: Users },
-    { name: "Pillar 6 - Flows", value: data.pillars.flows, icon: TrendingDown },
-    { name: "Pillar 7 - Structural", value: data.pillars.structural, icon: Database }
+    { name: "Pillar 6 - Flows", value: data.pillars.flows, icon: TrendingDown }
   ]
 
   const pillarChartData = pillarData.map((pillar, index) => ({
@@ -507,19 +506,27 @@ export function CcpiDashboard() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">QQQ Below 20-Day SMA</span>
-                        <span className={`font-bold ${data.indicators.qqqBelowSMA20 ? 'text-red-600' : 'text-green-600'}`}>
-                          {data.indicators.qqqBelowSMA20 ? 'YES' : 'NO'}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {data.indicators?.qqqSMA20Proximity !== undefined && (
+                            <span className="text-xs font-semibold text-orange-600">
+                              {data.indicators.qqqSMA20Proximity.toFixed(0)}% proximity
+                            </span>
+                          )}
+                          <span className={`font-bold ${data.indicators.qqqBelowSMA20 ? 'text-red-600' : 'text-green-600'}`}>
+                            {data.indicators.qqqBelowSMA20 ? 'YES' : 'NO'}
+                          </span>
+                        </div>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: data.indicators.qqqBelowSMA20 ? '100%' : '0%' 
+                          marginLeft: `${data.indicators?.qqqSMA20Proximity || 0}%`
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Bullish: Above SMA20</span>
-                        <span>Bearish: Below SMA20</span>
+                        <span>Safe: 0% (far above)</span>
+                        <span>Warning: 50%</span>
+                        <span>Danger: 100% (breached)</span>
                       </div>
                     </div>
                   )}
@@ -529,19 +536,56 @@ export function CcpiDashboard() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">QQQ Below 50-Day SMA</span>
-                        <span className={`font-bold ${data.indicators.qqqBelowSMA50 ? 'text-red-600' : 'text-green-600'}`}>
-                          {data.indicators.qqqBelowSMA50 ? 'YES' : 'NO'}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {data.indicators?.qqqSMA50Proximity !== undefined && (
+                            <span className="text-xs font-semibold text-orange-600">
+                              {data.indicators.qqqSMA50Proximity.toFixed(0)}% proximity
+                            </span>
+                          )}
+                          <span className={`font-bold ${data.indicators.qqqBelowSMA50 ? 'text-red-600' : 'text-green-600'}`}>
+                            {data.indicators.qqqBelowSMA50 ? 'YES' : 'NO'}
+                          </span>
+                        </div>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: data.indicators.qqqBelowSMA50 ? '100%' : '0%' 
+                          marginLeft: `${data.indicators?.qqqSMA50Proximity || 0}%`
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Bullish: Above SMA50</span>
-                        <span>Bearish: Below SMA50</span>
+                        <span>Safe: 0% (far above)</span>
+                        <span>Warning: 50%</span>
+                        <span>Danger: 100% (breached)</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {data.indicators?.qqqBelowSMA200 !== undefined && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">QQQ Below 200-Day SMA</span>
+                        <div className="flex items-center gap-2">
+                          {data.indicators?.qqqSMA200Proximity !== undefined && (
+                            <span className="text-xs font-semibold text-orange-600">
+                              {data.indicators.qqqSMA200Proximity.toFixed(0)}% proximity
+                            </span>
+                          )}
+                          <span className={`font-bold ${data.indicators.qqqBelowSMA200 ? 'text-red-600' : 'text-green-600'}`}>
+                            {data.indicators.qqqBelowSMA200 ? 'YES' : 'NO'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${data.indicators?.qqqSMA200Proximity || 0}%`
+                        }} />
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Safe: 0% (far above)</span>
+                        <span>Warning: 50%</span>
+                        <span>Danger: 100% (breached)</span>
                       </div>
                     </div>
                   )}
@@ -551,19 +595,27 @@ export function CcpiDashboard() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">QQQ Below Bollinger Band (Lower)</span>
-                        <span className={`font-bold ${data.indicators.qqqBelowBollinger ? 'text-red-600' : 'text-green-600'}`}>
-                          {data.indicators.qqqBelowBollinger ? 'YES - OVERSOLD' : 'NO'}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {data.indicators?.qqqBollingerProximity !== undefined && (
+                            <span className="text-xs font-semibold text-orange-600">
+                              {data.indicators.qqqBollingerProximity.toFixed(0)}% proximity
+                            </span>
+                          )}
+                          <span className={`font-bold ${data.indicators.qqqBelowBollinger ? 'text-red-600' : 'text-green-600'}`}>
+                            {data.indicators.qqqBelowBollinger ? 'YES - OVERSOLD' : 'NO'}
+                          </span>
+                        </div>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: data.indicators.qqqBelowBollinger ? '100%' : '0%' 
+                          marginLeft: `${data.indicators?.qqqBollingerProximity || 0}%`
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Normal: Within bands</span>
-                        <span>Oversold: Below lower band</span>
+                        <span>Safe: 0% (at middle band)</span>
+                        <span>Warning: 50%</span>
+                        <span>Oversold: 100% (breached)</span>
                       </div>
                     </div>
                   )}
@@ -1057,105 +1109,6 @@ export function CcpiDashboard() {
                 </div>
               </div>
 
-              <div className="space-y-4 border-t pt-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <Database className="h-5 w-5 text-indigo-600" />
-                    Pillar 7 - Structural (10% weight)
-                  </h3>
-                  <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.structural)}/100</span>
-                </div>
-                
-                <div className="space-y-6">
-                  {/* AI CapEx Growth */}
-                  {data.indicators.aiCapexGrowth !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">AI CapEx Growth (YoY)</span>
-                        <span className="font-bold">{data.indicators.aiCapexGrowth}%</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          // Map: 0% → 0 (left), 60% → 100 (right)
-                          marginLeft: `${Math.min(100, Math.max(0, (data.indicators.aiCapexGrowth / 60) * 100))}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Sustainable: &lt;20%</span>
-                        <span>Moderate: 20-40%</span>
-                        <span>Overspending: &gt;40%</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* AI Revenue Growth */}
-                  {data.indicators.aiRevenueGrowth !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">AI Revenue Growth (YoY)</span>
-                        <span className="font-bold">{data.indicators.aiRevenueGrowth}%</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          // Map: 40% → 0 (left), 0% → 100 (right)
-                          marginLeft: `${Math.min(100, Math.max(0, (1 - (data.indicators.aiRevenueGrowth / 40)) * 100))}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Strong: &gt;25%</span>
-                        <span>Growing: 10-25%</span>
-                        <span>Lagging: &lt;10%</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* GPU Pricing Premium */}
-                  {data.indicators.gpuPricingPremium !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">GPU Pricing Premium</span>
-                        <span className="font-bold">{data.indicators.gpuPricingPremium}%</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.gpuPricingPremium / 100) * 100)}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Normal: &lt;20%</span>
-                        <span>Elevated: 20-50%</span>
-                        <span>Extreme: &gt;50%</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* AI Job Postings Growth */}
-                  {data.indicators.aiJobPostingsGrowth !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">AI Job Postings Growth</span>
-                        <span className="font-bold">{data.indicators.aiJobPostingsGrowth}%</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          // Map: +30% → 0 (left), -20% → 100 (right)
-                          marginLeft: `${Math.min(100, Math.max(0, (1 - ((data.indicators.aiJobPostingsGrowth + 20) / 50)) * 100))}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Growing: &gt;10%</span>
-                        <span>Stable: -10% to 10%</span>
-                        <span>Declining: &lt;-10%</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
               {/* Updated formula weights to include QQQ Technicals and renumbered */}
               <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <h4 className="font-semibold text-sm mb-3 text-blue-900">CCPI Formula Weights</h4>
@@ -1166,27 +1119,23 @@ export function CcpiDashboard() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-blue-700">Valuation:</span>
-                    <span className="font-bold text-blue-900">20%</span>
+                    <span className="font-bold text-blue-900">23%</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-blue-700">Technical:</span>
-                    <span className="font-bold text-blue-900">10%</span>
+                    <span className="font-bold text-blue-900">12%</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-blue-700">Macro:</span>
-                    <span className="font-bold text-blue-900">10%</span>
+                    <span className="font-bold text-blue-900">12%</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-blue-700">Sentiment:</span>
-                    <span className="font-bold text-blue-900">10%</span>
+                    <span className="font-bold text-blue-900">12%</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-blue-700">Flows:</span>
-                    <span className="font-bold text-blue-900">10%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-blue-700">Structural:</span>
-                    <span className="font-bold text-blue-900">10%</span>
+                    <span className="font-bold text-blue-900">11%</span>
                   </div>
                 </div>
                 <p className="text-xs text-blue-700 mt-3">

@@ -8,8 +8,12 @@ export async function fetchQQQTechnicals() {
       consecutiveDaysDown: 0,
       belowSMA20: false,
       belowSMA50: false,
-      deathCross: false,
+      belowSMA200: false,
       belowBollingerBand: false,
+      sma20Proximity: 0,
+      sma50Proximity: 0,
+      sma200Proximity: 0,
+      bollingerProximity: 0,
       source: "baseline"
     }
   }
@@ -97,8 +101,61 @@ export async function fetchQQQTechnicals() {
     
     const belowSMA20 = hasSMA20 ? currentPrice < sma20 : false
     const belowSMA50 = hasSMA50 ? currentPrice < sma50 : false
-    const deathCross = (hasSMA50 && hasSMA200) ? sma50 < sma200 : false
+    const belowSMA200 = hasSMA200 ? currentPrice < sma200 : false
     
+    // Proximity shows how close to danger zone (0% = safe, 100% = breached)
+    
+    // SMA20 Proximity: 0% when 5%+ above SMA20, 100% when at/below SMA20
+    let sma20Proximity = 0
+    if (hasSMA20) {
+      const distanceFromSMA20 = ((currentPrice - sma20) / sma20) * 100
+      if (distanceFromSMA20 <= 0) {
+        // Already below - maximum danger
+        sma20Proximity = 100
+      } else if (distanceFromSMA20 < 5) {
+        // Within 5% above - graduated danger scale
+        sma20Proximity = 100 - (distanceFromSMA20 / 5 * 100)
+      }
+      // else stays 0 (safe distance)
+    }
+    
+    // SMA50 Proximity: 0% when 8%+ above SMA50, 100% when at/below SMA50  
+    let sma50Proximity = 0
+    if (hasSMA50) {
+      const distanceFromSMA50 = ((currentPrice - sma50) / sma50) * 100
+      if (distanceFromSMA50 <= 0) {
+        sma50Proximity = 100
+      } else if (distanceFromSMA50 < 8) {
+        sma50Proximity = 100 - (distanceFromSMA50 / 8 * 100)
+      }
+    }
+    
+    // SMA200 Proximity: 0% when 10%+ above SMA200, 100% when at/below SMA200
+    let sma200Proximity = 0
+    if (hasSMA200) {
+      const distanceFromSMA200 = ((currentPrice - sma200) / sma200) * 100
+      if (distanceFromSMA200 <= 0) {
+        // Already below - maximum danger
+        sma200Proximity = 100
+      } else if (distanceFromSMA200 < 10) {
+        // Within 10% above - graduated danger scale  
+        sma200Proximity = 100 - (distanceFromSMA200 / 10 * 100)
+      }
+      // else stays 0 (safe distance)
+    }
+    
+    // Bollinger Band Proximity: 0% when at middle/upper band, 100% at/below lower band
+    let bollingerProximity = 0
+    if (hasSMA20) {
+      const distanceFromLower = ((currentPrice - bollingerLower) / bollingerLower) * 100
+      if (distanceFromLower <= 0) {
+        bollingerProximity = 100
+      } else if (distanceFromLower < 3) {
+        // Within 3% of lower band
+        bollingerProximity = 100 - (distanceFromLower / 3 * 100)
+      }
+    }
+
     console.log("[v0] QQQ Technicals (LIVE DATA):", {
       currentPrice: currentPrice.toFixed(2),
       dailyReturn: dailyReturn.toFixed(2) + "%",
@@ -110,8 +167,12 @@ export async function fetchQQQTechnicals() {
       bollingerUpper: bollingerUpper.toFixed(2),
       belowSMA20: belowSMA20 ? "YES (bearish)" : "NO (bullish)",
       belowSMA50: belowSMA50 ? "YES (bearish)" : "NO (bullish)",
-      deathCross: deathCross ? "YES (bearish)" : "NO (bullish)",
+      belowSMA200: belowSMA200 ? "YES (bearish)" : "NO (bullish)",
       belowBollingerBand: belowBollingerBand ? "YES (oversold)" : "NO",
+      sma20Proximity: sma20Proximity.toFixed(1) + "% danger",
+      sma50Proximity: sma50Proximity.toFixed(1) + "% danger",
+      sma200Proximity: sma200Proximity.toFixed(1) + "% danger",
+      bollingerProximity: bollingerProximity.toFixed(1) + "% danger",
       dataQuality: `${hasSMA20 ? '20d✓' : '20d✗'} ${hasSMA50 ? '50d✓' : '50d✗'} ${hasSMA200 ? '200d✓' : '200d✗'}`
     })
     
@@ -120,8 +181,12 @@ export async function fetchQQQTechnicals() {
       consecutiveDaysDown,
       belowSMA20,
       belowSMA50,
-      deathCross,
+      belowSMA200,
       belowBollingerBand,
+      sma20Proximity: parseFloat(sma20Proximity.toFixed(1)),
+      sma50Proximity: parseFloat(sma50Proximity.toFixed(1)),
+      sma200Proximity: parseFloat(sma200Proximity.toFixed(1)),
+      bollingerProximity: parseFloat(bollingerProximity.toFixed(1)),
       currentPrice: parseFloat(currentPrice.toFixed(2)),
       sma20: parseFloat(sma20.toFixed(2)),
       sma50: parseFloat(sma50.toFixed(2)),
@@ -139,8 +204,12 @@ export async function fetchQQQTechnicals() {
       consecutiveDaysDown: 0,
       belowSMA20: false,
       belowSMA50: false,
-      deathCross: false,
+      belowSMA200: false,
       belowBollingerBand: false,
+      sma20Proximity: 0,
+      sma50Proximity: 0,
+      sma200Proximity: 0,
+      bollingerProximity: 0,
       source: "baseline"
     }
   }

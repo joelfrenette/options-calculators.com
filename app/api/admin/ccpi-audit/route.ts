@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-// CCPI Audit API - Complete transparency for all 23 indicators
+// CCPI Audit API - Complete transparency for all 25 indicators
 // Validates data sources, formulas, and calculations
 
 export async function GET() {
@@ -99,15 +99,15 @@ async function auditAllIndicators() {
     },
     {
       id: 6,
-      name: "QQQ Death Cross (SMA50 < SMA200)",
+      name: "QQQ Below 200-Day SMA",
       pillar: "Pillar 1: QQQ Momentum",
       source_url: "https://api.polygon.io/v2/aggs/ticker/QQQ (calculated)",
       api_endpoint: "/api/qqq-technicals → lib/qqq-technicals.ts",
-      fetch_method: "Calculated from 250-day QQQ price history (requires 200d+ data)",
+      fetch_method: "Calculated from 200-day QQQ price history with proximity tracking",
       status: await testPolygonAPI() ? "Live" : "Failed",
       last_fetched_at: new Date().toISOString(),
-      raw_sample: { value: false, unit: "boolean" },
-      threshold: { golden_cross: "SMA50 > SMA200 (bullish)", death_cross: "SMA50 < SMA200 (bearish)" }
+      raw_sample: { value: false, unit: "boolean", proximity: 0 },
+      threshold: { bullish: "Above SMA200", bearish: "Below SMA200", proximity: "0-100% danger scale" }
     },
     
     // PILLAR 2: VALUATION STRESS (3 indicators)
@@ -346,56 +346,6 @@ async function auditAllIndicators() {
       last_fetched_at: new Date().toISOString(),
       raw_sample: { value: 16.5, unit: "percent" },
       threshold: { complacent: "<15%", normal: "15-20%", hedged: ">20%" }
-    },
-    
-    // PILLAR 7: STRUCTURAL (4 indicators)
-    {
-      id: 26,
-      name: "AI CapEx Growth (YoY)",
-      pillar: "Pillar 7: Structural",
-      source_url: "Baseline (alt data)",
-      api_endpoint: "/api/ccpi (baseline value)",
-      fetch_method: "Baseline: 40% (alternative data)",
-      status: "Baseline",
-      last_fetched_at: new Date().toISOString(),
-      raw_sample: { value: 40, unit: "percent" },
-      threshold: { sustainable: "<20%", moderate: "20-40%", overspending: ">40%" }
-    },
-    {
-      id: 27,
-      name: "AI Revenue Growth (YoY)",
-      pillar: "Pillar 7: Structural",
-      source_url: "Baseline (alt data)",
-      api_endpoint: "/api/ccpi (baseline value)",
-      fetch_method: "Baseline: 15% (alternative data)",
-      status: "Baseline",
-      last_fetched_at: new Date().toISOString(),
-      raw_sample: { value: 15, unit: "percent" },
-      threshold: { lagging: "<10%", growing: "10-25%", strong: ">25%" }
-    },
-    {
-      id: 28,
-      name: "GPU Pricing Premium",
-      pillar: "Pillar 7: Structural",
-      source_url: "https://www.ebay.com/sch/ (GPU sold listings)",
-      api_endpoint: "/api/ccpi (scraped from eBay)",
-      fetch_method: "Scrape eBay H100 sold listings vs MSRP",
-      status: "Live",
-      last_fetched_at: new Date().toISOString(),
-      raw_sample: { value: 20, unit: "percent" },
-      threshold: { normal: "<20%", elevated: "20-50%", extreme: ">50%" }
-    },
-    {
-      id: 29,
-      name: "AI Job Postings Growth",
-      pillar: "Pillar 7: Structural",
-      source_url: "Baseline (manual updates)",
-      api_endpoint: "/api/ccpi (baseline value)",
-      fetch_method: "Baseline: -5% (job sites have bot protection)",
-      status: "Baseline",
-      last_fetched_at: new Date().toISOString(),
-      raw_sample: { value: -5, unit: "percent" },
-      threshold: { declining: "<-10%", stable: "-10% to 10%", growing: ">10%" }
     }
   ]
   
@@ -408,7 +358,7 @@ async function auditPillarFormulas() {
     {
       pillar: "Pillar 1: QQQ Momentum",
       weight: 0.30,
-      formula: "Score = dailyReturnImpact + consecDownImpact + belowSMA20Impact + belowSMA50Impact + deathCrossImpact + belowBollingerImpact + compoundingPenalty",
+      formula: "Score = dailyReturnImpact + consecDownImpact + belowSMA20Impact + belowSMA50Impact + belowBollingerImpact + belowSMA200Impact + compoundingPenalty",
       indicators: [
         {
           name: "QQQ Daily Return",
@@ -436,14 +386,14 @@ async function auditPillarFormulas() {
           scoring: "Below lower band (SMA20 - 2σ) = 15pts, Within/Above = 0pts"
         },
         {
-          name: "Death Cross",
-          weight: "30 pts",
-          scoring: "SMA50 < SMA200 = 30pts, Golden Cross = 0pts"
+          name: "Below SMA200",
+          weight: "10 pts (proximity-based)",
+          scoring: "Graduated: 0% proximity = 0pts, 50% = 5pts, 100% = 10pts"
         },
         {
           name: "Compounding Penalty",
-          weight: "+20 pts bonus",
-          scoring: "If ALL THREE: Below SMA20 AND Below SMA50 AND (Death Cross OR Below Bollinger), add +20pts"
+          weight: "+10 pts bonus",
+          scoring: "If ALL FOUR: SMA20 AND SMA50 AND SMA200 AND Bollinger proximity >50%, add +10pts"
         }
       ],
       calculation: "Sum of impacts, capped at 100. Heavy downside bias via 5× amplifier on negative days."
@@ -451,7 +401,7 @@ async function auditPillarFormulas() {
     // PILLAR 2: VALUATION STRESS
     {
       pillar: "Pillar 2: Valuation Stress",
-      weight: 0.20,
+      weight: 0.23,
       formula: "Score = Σ(Indicator_i × Weight_i)",
       indicators: [
         {
@@ -475,7 +425,7 @@ async function auditPillarFormulas() {
     // PILLAR 3: TECHNICAL FRAGILITY
     {
       pillar: "Pillar 3: Technical Fragility",
-      weight: 0.10,
+      weight: 0.12,
       formula: "Score = Σ(Indicator_i × Weight_i)",
       indicators: [
         {
@@ -514,7 +464,7 @@ async function auditPillarFormulas() {
     // PILLAR 4: MACRO & LIQUIDITY RISK
     {
       pillar: "Pillar 4: Macro & Liquidity Risk",
-      weight: 0.10,
+      weight: 0.12,
       formula: "Score = Σ(Indicator_i × Weight_i)",
       indicators: [
         {
@@ -538,7 +488,7 @@ async function auditPillarFormulas() {
     // PILLAR 5: SENTIMENT & MEDIA FEEDBACK
     {
       pillar: "Pillar 5: Sentiment & Media Feedback",
-      weight: 0.10,
+      weight: 0.12,
       formula: "Score = Σ(Indicator_i × Weight_i)",
       indicators: [
         {
@@ -572,7 +522,7 @@ async function auditPillarFormulas() {
     // PILLAR 6: CAPITAL FLOWS & POSITIONING
     {
       pillar: "Pillar 6: Capital Flows & Positioning",
-      weight: 0.10,
+      weight: 0.11,
       formula: "Score = Σ(Indicator_i × Weight_i)",
       indicators: [
         {
@@ -587,50 +537,20 @@ async function auditPillarFormulas() {
         }
       ],
       calculation: "Tracks institutional money movement and hedging levels"
-    },
-    // PILLAR 7: STRUCTURAL
-    {
-      pillar: "Pillar 7: Structural",
-      weight: 0.10,
-      formula: "Score = Σ(Indicator_i × Weight_i)",
-      indicators: [
-        {
-          name: "CapEx-Revenue Gap",
-          weight: 0.35,
-          scoring: ">30% = 45pts, >20% = 35pts, >15% = 25pts, >10% = 15pts"
-        },
-        {
-          name: "Revenue Growth",
-          weight: 0.25,
-          scoring: "<5% = 30pts, <10% = 20pts, <15% = 12pts, >30% = -10pts (healthy)"
-        },
-        {
-          name: "GPU Pricing Premium",
-          weight: 0.20,
-          scoring: ">50% = 30pts, >30% = 20pts, >20% = 15pts, >10% = 8pts"
-        },
-        {
-          name: "Job Postings Growth",
-          weight: 0.20,
-          scoring: "<-15% = 35pts, <-10% = 25pts, <-5% = 15pts, <0% = 8pts"
-        }
-      ],
-      calculation: "AI-specific structural health indicators"
     }
   ]
 }
 
 async function auditCCPIAggregation() {
   return {
-    formula: "CCPI = (P1×0.30) + (P2×0.20) + (P3×0.10) + (P4×0.10) + (P5×0.10) + (P6×0.10) + (P7×0.10)",
+    formula: "CCPI = (P1×0.30) + (P2×0.23) + (P3×0.12) + (P4×0.12) + (P5×0.12) + (P6×0.11)",
     weights: {
       qqqTechnicals: 0.30,
-      valuation: 0.20,
-      technical: 0.10,
-      macro: 0.10,
-      sentiment: 0.10,
-      flows: 0.10,
-      structural: 0.10
+      valuation: 0.23,
+      technical: 0.12,
+      macro: 0.12,
+      sentiment: 0.12,
+      flows: 0.11
     },
     validation: "Sum of weights = 1.00 ✓",
     interpretation: [
@@ -679,7 +599,7 @@ async function auditConfidenceLogic() {
 
 async function auditCanarySignals() {
   return {
-    total_possible: 28,
+    total_possible: 23,
     logic: "Each indicator has specific thresholds. When breached, generates canary signal.",
     severity_levels: {
       high: "Critical threshold breached (e.g., VIX > 30, Buffett > 160%)",
@@ -692,7 +612,6 @@ async function auditCanarySignals() {
       { indicator: "QQQ Below SMA20", high: "Yes + downtrend", medium: "Yes", low: "Approaching" },
       { indicator: "QQQ Below SMA50", high: "Yes + downtrend", medium: "Yes", low: "Approaching" },
       { indicator: "QQQ Below Bollinger", high: "Yes + volatility spike", medium: "Yes", low: "Approaching" },
-      { indicator: "QQQ Death Cross", high: "Yes + accelerating", medium: "Yes", low: "Approaching" },
       { indicator: "Buffett Indicator", high: ">160%", medium: ">120%", low: ">100%" },
       { indicator: "S&P P/E", high: ">25x", medium: ">18x", low: ">16x" },
       { indicator: "VIX", high: ">30", medium: ">20", low: ">17" },
@@ -702,7 +621,7 @@ async function auditCanarySignals() {
       { canaries: "0-7", alert: "Normal", action: "Monitor" },
       { canaries: "8-14", alert: "Elevated", action: "Increase hedges" },
       { canaries: "15-21", alert: "High Alert", action: "Defensive positioning" },
-      { canaries: "22-28", alert: "Maximum", action: "Full defense mode" }
+      { canaries: "22-23", alert: "Maximum", action: "Full defense mode" }
     ]
   }
 }
