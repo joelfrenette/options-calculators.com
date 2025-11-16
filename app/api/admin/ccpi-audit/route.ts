@@ -104,7 +104,7 @@ async function auditAllIndicators() {
       source_url: "https://api.polygon.io/v2/aggs/ticker/QQQ (calculated)",
       api_endpoint: "/api/ccpi (via Apify Yahoo Finance)",
       fetch_method: "Calculated from 200-day QQQ price history with proximity tracking",
-      status: await testPolygonAPI() ? "Live" : "Failed",
+      status: await testPolygonAPI() ? "Live" : "Missing API Key",
       last_fetched_at: new Date().toISOString(),
       raw_sample: { value: false, unit: "boolean", proximity: 0 },
       threshold: { bullish: "Above SMA200", bearish: "Below SMA200", proximity: "0-100% danger scale" }
@@ -323,15 +323,15 @@ async function auditAllIndicators() {
     },
     {
       id: 24,
-      name: "Risk Appetite Index",
+      name: "Credit Spread Widening",
       pillar: "Pillar 5: Sentiment & Media Feedback",
-      source_url: "Baseline (calculated from other sentiment metrics)",
-      api_endpoint: "/api/ccpi (baseline value)",
-      fetch_method: "Baseline: 35 (calculated from sentiment composite)",
-      status: "Baseline",
+      source_url: "https://fred.stlouisfed.org/series/BAMLH0A0HYM2",
+      api_endpoint: "/api/ccpi (via FRED API)",
+      fetch_method: "FRED API: BAMLH0A0HYM2 (High Yield spread) - spread is inherently vs. Treasuries",
+      status: process.env.FRED_API_KEY ? "Live" : "Missing API Key",
       last_fetched_at: new Date().toISOString(),
-      raw_sample: { value: 35, unit: "index" },
-      threshold: { risk_off: "<30", neutral: "30-70", risk_on: ">70" }
+      raw_sample: { value: 3.8, unit: "percent" },
+      threshold: { tight: "<3% (complacency)", normal: "3-4%", widening: "4-5% (caution)", stress: ">5% (credit stress)" }
     },
     
     // PILLAR 6: CAPITAL FLOWS & POSITIONING (2 indicators)
@@ -539,12 +539,12 @@ async function auditPillarFormulas() {
           scoring: ">75 = 20pts (greed), >65 = 12pts, <25 = 15pts (fear)"
         },
         {
-          name: "Risk Appetite",
+          name: "Credit Spread Widening",
           weight: 0.18,
-          scoring: ">60 = 18pts, >40 = 10pts, <-30 = 12pts"
+          scoring: ">7% = 35pts (crisis), >5% = 25pts (stress), >4% = 15pts (caution), <3% = complacency"
         }
       ],
-      calculation: "Contrarian indicators - extreme optimism or pessimism both add risk"
+      calculation: "Contrarian indicators - extreme optimism or pessimism both add risk. Credit spreads show credit market stress leading equities."
     },
     // PILLAR 6: CAPITAL FLOWS & POSITIONING
     {
