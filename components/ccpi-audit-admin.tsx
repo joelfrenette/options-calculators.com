@@ -250,13 +250,18 @@ ${auditData.canaries.alert_levels.map((alert: any) => `
                                       <h4 className="font-semibold text-gray-900">{ind.name}</h4>
                                       <p className="text-xs text-gray-600 mt-1">ID: {ind.id} | Pillar: {ind.pillar}</p>
                                     </div>
-                                    <Badge className={
-                                      ind.status === "Live" ? "bg-green-100 text-green-800" :
-                                      ind.status === "Baseline" ? "bg-yellow-100 text-yellow-800" :
-                                      "bg-red-100 text-red-800"
-                                    }>
-                                      {ind.status}
-                                    </Badge>
+                                    <div className="flex items-center gap-2">
+                                      <Badge className={
+                                        ind.status === "Live" ? "bg-green-500 text-white" :
+                                        ind.status === "Baseline" ? "bg-yellow-500 text-white" :
+                                        "bg-red-500 text-white"
+                                      }>
+                                        {ind.status === "Live" && "🟢 "}
+                                        {ind.status === "Baseline" && "🟡 "}
+                                        {ind.status === "Failed" && "🔴 "}
+                                        {ind.status}
+                                      </Badge>
+                                    </div>
                                   </div>
                                   
                                   <div className="space-y-2 text-sm">
@@ -288,6 +293,13 @@ ${auditData.canaries.alert_levels.map((alert: any) => `
                                         {JSON.stringify(ind.threshold, null, 2)}
                                       </code>
                                     </div>
+                                    {ind.status === "Baseline" && (
+                                      <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                                        <p className="text-xs text-yellow-800">
+                                          ⚠️ Using baseline/fallback value. API may be unavailable or configured incorrectly.
+                                        </p>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               ))}

@@ -42,6 +42,17 @@ interface CCPIData {
     severity: "high" | "medium" | "low"
   }>
   indicators?: Record<string, any>
+  apiStatus?: {
+    qqqTechnicals: { live: boolean; source: string; lastUpdated: string }
+    vixTerm: { live: boolean; source: string; lastUpdated: string }
+    marketBreadth: { live: boolean; source: string; lastUpdated: string }
+    fred: { live: boolean; source: string; lastUpdated: string }
+    alphaVantage: { live: boolean; source: string; lastUpdated: string }
+    apify: { live: boolean; source: string; lastUpdated: string }
+    fmp: { live: boolean; source: string; lastUpdated: string }
+    aaii: { live: boolean; source: string; lastUpdated: string }
+    etfFlows: { live: boolean; source: string; lastUpdated: string }
+  }
   timestamp: string
 }
 
@@ -74,6 +85,16 @@ export function CcpiDashboard() {
     if (percentage <= 33) return '#22c55e' // green-500
     if (percentage <= 66) return '#eab308' // yellow-500
     return '#ef4444' // red-500
+  }
+
+  const getStatusBadge = (live: boolean, source: string) => {
+    if (live) {
+      return <Badge className="ml-2 bg-green-100 text-green-800 text-xs">🟢 Live</Badge>
+    } else if (source.includes('baseline')) {
+      return <Badge className="ml-2 bg-yellow-100 text-yellow-800 text-xs">🟡 Baseline</Badge>
+    } else {
+      return <Badge className="ml-2 bg-red-100 text-red-800 text-xs">🔴 Failed</Badge>
+    }
   }
 
   useEffect(() => {
@@ -224,6 +245,60 @@ export function CcpiDashboard() {
           Refresh
         </Button>
       </div>
+
+      {data.apiStatus && (
+        <Card className="border-2 border-blue-200">
+          <CardHeader>
+            <CardTitle className="text-lg">API Data Source Status</CardTitle>
+            <CardDescription>Real-time tracking of data sources and API availability</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                <span className="text-sm font-medium">QQQ Technicals</span>
+                {getStatusBadge(data.apiStatus.qqqTechnicals.live, data.apiStatus.qqqTechnicals.source)}
+              </div>
+              <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                <span className="text-sm font-medium">Market Breadth</span>
+                {getStatusBadge(data.apiStatus.marketBreadth.live, data.apiStatus.marketBreadth.source)}
+              </div>
+              <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                <span className="text-sm font-medium">VIX Term Structure</span>
+                {getStatusBadge(data.apiStatus.vixTerm.live, data.apiStatus.vixTerm.source)}
+              </div>
+              <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                <span className="text-sm font-medium">FRED Macro</span>
+                {getStatusBadge(data.apiStatus.fred.live, data.apiStatus.fred.source)}
+              </div>
+              <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                <span className="text-sm font-medium">Alpha Vantage</span>
+                {getStatusBadge(data.apiStatus.alphaVantage.live, data.apiStatus.alphaVantage.source)}
+              </div>
+              <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                <span className="text-sm font-medium">Apify Yahoo</span>
+                {getStatusBadge(data.apiStatus.apify.live, data.apiStatus.apify.source)}
+              </div>
+              <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                <span className="text-sm font-medium">FMP</span>
+                {getStatusBadge(data.apiStatus.fmp.live, data.apiStatus.fmp.source)}
+              </div>
+              <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                <span className="text-sm font-medium">AAII Sentiment</span>
+                {getStatusBadge(data.apiStatus.aaii.live, data.apiStatus.aaii.source)}
+              </div>
+              <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                <span className="text-sm font-medium">ETF Flows</span>
+                {getStatusBadge(data.apiStatus.etfFlows.live, data.apiStatus.etfFlows.source)}
+              </div>
+            </div>
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+              <p className="text-sm text-blue-800">
+                <strong>Legend:</strong> 🟢 Live = Real-time API data | 🟡 Baseline = Historical average/fallback value | 🔴 Failed = API unavailable
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main CCPI Score Card */}
       <Card className="border-2 shadow-lg">
@@ -776,7 +851,7 @@ export function CcpiDashboard() {
                   )}
 
                   {/* High-Low Index */}
-                  {data.indicators.highLowIndex !== undefined && (
+                  {data.indicators.highLowIndex !== undefined && data.indicators.highLowIndex !== null && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">High-Low Index</span>

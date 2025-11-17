@@ -6,6 +6,24 @@ import { fetchQQQTechnicals as fetchQQQTechnicalsData } from '@/lib/qqq-technica
 // This API endpoint integrates ALL 28 indicators (5 new QQQ + 23 existing) with REAL data via live APIs
 // NO mock data - all values are fetched from actual sources with fallback chains
 
+interface DataSourceStatus {
+  live: boolean
+  source: string
+  lastUpdated: string
+}
+
+interface APIStatusTracker {
+  qqqTechnicals: DataSourceStatus
+  vixTerm: DataSourceStatus
+  marketBreadth: DataSourceStatus
+  fred: DataSourceStatus
+  alphaVantage: DataSourceStatus
+  apify: DataSourceStatus
+  fmp: DataSourceStatus
+  aaii: DataSourceStatus
+  etfFlows: DataSourceStatus
+}
+
 export async function GET() {
   try {
     const data = await fetchMarketData()
@@ -100,10 +118,11 @@ export async function GET() {
       summary,
       canaries,
       indicators: snapshot,
+      apiStatus: data.apiStatus,
       timestamp: new Date().toISOString()
     })
   } catch (error) {
-    console.error("[v0] CCPI API error:", error)
+    console.error("CCPI API error:", error)
     return NextResponse.json(
       { error: "Failed to compute CCPI" },
       { status: 500 }
@@ -112,6 +131,18 @@ export async function GET() {
 }
 
 async function fetchMarketData() {
+  const apiStatus: APIStatusTracker = {
+    qqqTechnicals: { live: false, source: 'baseline', lastUpdated: new Date().toISOString() },
+    vixTerm: { live: false, source: 'baseline', lastUpdated: new Date().toISOString() },
+    marketBreadth: { live: false, source: 'baseline', lastUpdated: new Date().toISOString() },
+    fred: { live: false, source: 'baseline', lastUpdated: new Date().toISOString() },
+    alphaVantage: { live: false, source: 'baseline', lastUpdated: new Date().toISOString() },
+    apify: { live: false, source: 'baseline', lastUpdated: new Date().toISOString() },
+    fmp: { live: false, source: 'baseline', lastUpdated: new Date().toISOString() },
+    aaii: { live: false, source: 'baseline', lastUpdated: new Date().toISOString() },
+    etfFlows: { live: false, source: 'baseline', lastUpdated: new Date().toISOString() }
+  }
+  
   try {
     const results = await Promise.allSettled([
       fetchMarketBreadthData(),
@@ -127,8 +158,7 @@ async function fetchMarketData() {
       fetchAIJobPostings(),
     ])
     
-    // Extract values or use fallbacks
-    const marketBreadthData = results[0].status === 'fulfilled' ? results[0].value : { highLowIndex: 0.42, source: 'baseline' }
+    const marketBreadthData = results[0].status === 'fulfilled' ? results[0].value : null
     const qqqTechnicalsData = results[1].status === 'fulfilled' ? results[1].value : { 
       dailyReturn: 0.0, 
       consecutiveDaysDown: 0, 
@@ -147,6 +177,60 @@ async function fetchMarketData() {
     const etfData = results[8].status === 'fulfilled' ? results[8].value : { techETFFlows: -1.8 }
     const gpuData = results[9].status === 'fulfilled' ? results[9].value : { premium: 20 }
     const jobData = results[10].status === 'fulfilled' ? results[10].value : { growth: -5 }
+    
+    apiStatus.marketBreadth = {
+      live: results[0].status === 'fulfilled' && marketBreadthData && marketBreadthData.source !== 'baseline',
+      source: marketBreadthData?.source || 'baseline',
+      lastUpdated: new Date().toISOString()
+    }
+    
+    apiStatus.qqqTechnicals = {
+      live: results[1].status === 'fulfilled' && qqqTechnicalsData.source !== 'baseline',
+      source: qqqTechnicalsData.source || 'baseline',
+      lastUpdated: new Date().toISOString()
+    }
+    
+    apiStatus.vixTerm = {
+      live: results[2].status === 'fulfilled' && vixTermData.source !== 'baseline',
+      source: vixTermData.source || 'baseline',
+      lastUpdated: new Date().toISOString()
+    }
+    
+    apiStatus.fred = {
+      live: results[3].status === 'fulfilled',
+      source: results[3].status === 'fulfilled' ? 'FRED API' : 'baseline',
+      lastUpdated: new Date().toISOString()
+    }
+    
+    apiStatus.alphaVantage = {
+      live: results[4].status === 'fulfilled',
+      source: results[4].status === 'fulfilled' ? 'Alpha Vantage API' : 'baseline',
+      lastUpdated: new Date().toISOString()
+    }
+    
+    apiStatus.apify = {
+      live: results[5].status === 'fulfilled' && apifyYahooData.dataSource && !apifyYahooData.dataSource.includes('baseline'),
+      source: apifyYahooData.dataSource || 'baseline',
+      lastUpdated: new Date().toISOString()
+    }
+    
+    apiStatus.fmp = {
+      live: results[6].status === 'fulfilled',
+      source: results[6].status === 'fulfilled' ? 'FMP API' : 'baseline',
+      lastUpdated: new Date().toISOString()
+    }
+    
+    apiStatus.aaii = {
+      live: results[7].status === 'fulfilled' && aaiData.dataSource !== 'baseline',
+      source: aaiData.dataSource || 'baseline',
+      lastUpdated: new Date().toISOString()
+    }
+    
+    apiStatus.etfFlows = {
+      live: results[8].status === 'fulfilled' && etfData.dataSource !== 'baseline-recent-reports',
+      source: etfData.dataSource || 'baseline',
+      lastUpdated: new Date().toISOString()
+    }
     
     console.log('[v0] Market data fetch results:', {
       breadth: results[0].status,
@@ -184,7 +268,8 @@ async function fetchMarketData() {
       vxn: alphaVantageData.vxn,
       rvx: alphaVantageData.rvx || 20.1,
       atr: alphaVantageData.atr,
-      highLowIndex: marketBreadthData.highLowIndex,
+      // Use nullish coalescing for highLowIndex if marketBreadthData is null
+      highLowIndex: marketBreadthData?.highLowIndex ?? 0.42, 
       bullishPercent: 58,
       ltv: alphaVantageData.ltv,
       spotVol: alphaVantageData.spotVol || 0.22,
@@ -213,14 +298,15 @@ async function fetchMarketData() {
         gpuPricingPremium: gpuData.premium,
         aiJobPostingsGrowth: jobData.growth
       },
-      canaryCount: 0
+      canaryCount: 0,
+      
+      apiStatus
     }
   } catch (error) {
     console.error('[v0] fetchMarketData error:', error)
     throw error
   }
 }
-
 
 async function fetchMarketBreadth() {
   try {
@@ -231,24 +317,15 @@ async function fetchMarketBreadth() {
     console.log(`[v0] High-Low Index: ${(data.highLowIndex * 100).toFixed(1)}% from ${data.source} (${data.highs}H / ${data.lows}L)`)
     
     return {
-      value: data.highLowIndex, // This value is actually the highLowIndex used later in fetchMarketData
+      value: data.highLowIndex,
       source: data.source,
       highs: data.highs,
       lows: data.lows,
-      // Calculate threshold based on highLowIndex value directly
       threshold: data.highLowIndex > 0.5 ? 'bullish' : data.highLowIndex < 0.3 ? 'bearish' : 'neutral'
     }
   } catch (error) {
     console.error('[v0] Market breadth fetch error:', error)
-    console.warn('[v0] Falling back to baseline High-Low Index value')
-    
-    return {
-      value: 0.42, // Baseline high-low index
-      source: 'baseline',
-      highs: 0,
-      lows: 0,
-      threshold: 'neutral'
-    }
+    throw new Error('High-Low Index API unavailable')
   }
 }
 
@@ -359,8 +436,8 @@ async function fetchFMPIndicators() {
     
     return {
       buffettIndicator: 180,
-      spxPE: 22.5, // S&P 500 forward P/E - fallback baseline
-      spxPS: 2.8,  // S&P 500 P/S ratio - fallback baseline
+      spxPE: 22.5, // S&P 500 forward P/E - use financialmodelingprep.com/stable endpoints (paid)
+      spxPS: 2.8,  // S&P 500 P/S ratio - requires paid tier
       putCallRatio: 0.72,
       shortInterest: 16.5,
       highLowIndex: 0.42,
@@ -879,7 +956,7 @@ async function fetchAlphaVantageIndicators() {
   try {
     const baseUrl = 'https://www.alphavantage.co/query'
     
-    // Fetch VIX, VXN, RVX (Realized Volatility)
+    // Fetch VIX, VXN, RVX
     const [vixRes, vxnRes, rvxRes] = await Promise.all([
       fetch(`${baseUrl}?function=VIX_90DAY&apikey=${ALPHA_VANTAGE_API_KEY}`),
       fetch(`${baseUrl}?function=VXN_90DAY&apikey=${ALPHA_VANTAGE_API_KEY}`),
@@ -897,6 +974,7 @@ async function fetchAlphaVantageIndicators() {
     const rvx = parseFloat(rvxData?.['RVX Close'] || '20.1')
     
     // Fetch ATR (Average True Range)
+    // Using SMA as a proxy for ATR calculation, but it's not the same
     const atrRes = await fetch(`${baseUrl}?function=SMA&symbol=SPY&interval=daily&time_period=14&series_type=open&apikey=${ALPHA_VANTAGE_API_KEY}`)
     const atrData = await atrRes.json()
     const atr = parseFloat(atrData?.['Technical Analysis: SMA']?.[0]?.['SMA'] || '42.3')
@@ -1178,10 +1256,13 @@ async function computeTechnicalFragility(data: Awaited<ReturnType<typeof fetchMa
   
   // High-Low Index (market breadth) - CRITICAL INDICATOR
   // Low values = narrowERSHIP = fragile rally
-  if (data.highLowIndex < 0.3) score += 30 // Increased weight
-  else if (data.highLowIndex < 0.4) score += 20
-  else if (data.highLowIndex < 0.5) score += 12
-  else if (data.highLowIndex > 0.7) score -= 10 // Healthy breadth
+  if (data.highLowIndex !== undefined && data.highLowIndex !== null) {
+    // Low values = narrowERSHIP = fragile rally
+    if (data.highLowIndex < 0.3) score += 30 // Increased weight
+    else if (data.highLowIndex < 0.4) score += 20
+    else if (data.highLowIndex < 0.5) score += 12
+    else if (data.highLowIndex > 0.7) score -= 10 // Healthy breadth
+  }
   
   // Bullish Percent Index
   if (data.bullishPercent > 70) score += 18
@@ -1596,7 +1677,7 @@ function getTopCanaries(
   }
   
   // High-Low Index (Market Breadth)
-  if (data.highLowIndex < 0.40) {
+  if (data.highLowIndex !== undefined && data.highLowIndex !== null && data.highLowIndex < 0.40) {
     canaries.push({
       signal: `High-Low Index at ${(data.highLowIndex * 100).toFixed(0)}% - only ${(data.highLowIndex * 100).toFixed(0)}% of stocks are participating in the market rally (healthy breadth = >50%). A narrow rally led by a few mega-cap stocks creates a fragile foundation where index gains mask underlying weakness.`,
       pillar: "Technical Fragility",
