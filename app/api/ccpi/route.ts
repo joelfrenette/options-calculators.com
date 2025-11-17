@@ -56,7 +56,7 @@ export async function GET() {
       pillars.flows * weights.flows
     )
     
-    const canaries = getTopCanaries(pillars, data)
+    const canaries = await generateCanarySignals(data) // Changed from getTopCanaries
     const canaryCount = canaries.filter(c => c.severity === 'high' || c.severity === 'medium').length
     
     const confidence = computeCertaintyScore(pillars, data, canaryCount)
@@ -93,11 +93,11 @@ export async function GET() {
       fedFundsRate: data.fedFundsRate,
       junkSpread: data.junkSpread,
       yieldCurve: data.yieldCurve,
-      aaiiBullish: data.aaiiBullish,
-      aaiiBearish: data.aaiiBearish,
+      aaiiBullish: undefined, // Removed - no longer used
+      aaiiBearish: undefined, // Removed - no longer used
       putCallRatio: data.putCallRatio,
       fearGreedIndex: data.fearGreed,
-      riskAppetite: data.riskAppetite,
+      riskAppetite: undefined, // Removed baseline value - no viable API source
       etfFlows: data.etfFlows,
       shortInterest: data.shortInterest,
       aiCapexGrowth: data.snapshot.aiCapexGrowth,
@@ -171,10 +171,10 @@ async function fetchMarketData() {
     const vixTermData = results[2].status === 'fulfilled' ? results[2].value : { termStructure: 1.5, isInverted: false, source: 'baseline' }
     const fredData = results[3].status === 'fulfilled' ? results[3].value : { fedFundsRate: 5.33, junkSpread: 3.5, yieldCurve: 0.25 }
     const alphaVantageData = results[4].status === 'fulfilled' ? results[4].value : { vix: 16, vxn: 18, rvx: 20.1, ltv: 0.15, atr: 35, spotVol: 0.22 }
-    const apifyYahooData = results[5].status === 'fulfilled' ? results[5].value : { buffettIndicator: 180, spxPE: 21.5, spxPS: 2.9, putCallRatio: 0.72, shortInterest: 18 }
-    const fmpData = results[6].status === 'fulfilled' ? results[6].value : { spxPE: 21.5, spxPS: 2.9 }
-    const aaiData = results[7].status === 'fulfilled' ? results[7].value : { bullish: 35, bearish: 28, fearGreed: 50 }
-    const etfData = results[8].status === 'fulfilled' ? results[8].value : { techETFFlows: -1.8 }
+    const apifyYahooData = results[5].status === 'fulfilled' ? results[5].value : { buffettIndicator: 180, spxPE: 22.5, spxPS: 2.8, putCallRatio: 0.72, shortInterest: 18, dataSource: 'baseline-apify-failed' }
+    const fmpData = results[6].status === 'fulfilled' ? results[6].value : { spxPE: 22.5, spxPS: 2.9 }
+    const aaiData = results[7].status === 'fulfilled' ? results[7].value : { bullish: 35, bearish: 28, fearGreed: 50, dataSource: 'baseline' }
+    const etfData = results[8].status === 'fulfilled' ? results[8].value : { techETFFlows: -1.8, dataSource: 'baseline' }
     const gpuData = results[9].status === 'fulfilled' ? results[9].value : { premium: 20 }
     const jobData = results[10].status === 'fulfilled' ? results[10].value : { growth: -5 }
     
@@ -269,7 +269,7 @@ async function fetchMarketData() {
       rvx: alphaVantageData.rvx || 20.1,
       atr: alphaVantageData.atr,
       // Use nullish coalescing for highLowIndex if marketBreadthData is null
-      highLowIndex: marketBreadthData?.highLowIndex ?? 0.42, 
+      highLowIndex: marketBreadthData?.highLowIndex, 
       bullishPercent: 58,
       ltv: alphaVantageData.ltv,
       spotVol: alphaVantageData.spotVol || 0.22,
@@ -279,11 +279,11 @@ async function fetchMarketData() {
       junkSpread: fredData.junkSpread,
       yieldCurve: fredData.yieldCurve,
       
-      aaiiBullish: aaiData.bullish,
-      aaiiBearish: aaiData.bearish,
+      aaiiBullish: undefined, // Removed - no longer used
+      aaiiBearish: undefined, // Removed - no longer used
       putCallRatio: apifyYahooData.putCallRatio,
       fearGreedIndex: aaiData.fearGreed,
-      riskAppetite: 35,
+      riskAppetite: undefined, // Removed baseline value - no viable API source
       
       // Flow indicators (ETF.com + Yahoo Finance)
       etfFlows: etfData.techETFFlows,
@@ -450,10 +450,10 @@ async function fetchFMPIndicators() {
 // Now using both Apify Yahoo Finance Actors with fallback strategy
 
 async function fetchApifyYahooFinance() {
-  const APIFY_API_TOKEN = process.env.APIFY_API_KEY
+  const APIFY_API_KEY = process.env.APIFY_API_KEY
   
-  if (!APIFY_API_TOKEN) {
-    console.warn('[v0] APIFY_API_TOKEN not set, using baseline values')
+  if (!APIFY_API_KEY) {
+    console.warn('[v0] APIFY_API_KEY not set, using baseline values')
     return {
       spxPE: 22.5,
       spxPS: 2.8,
@@ -494,7 +494,7 @@ async function fetchApifyYahooFinance() {
     try {
       console.log(`[v0] Calling Apify actor: ${actor.name}...`)
       
-      const response = await fetch(`https://api.apify.com/v2/acts/${actor.name}/runs?token=${APIFY_API_TOKEN}&waitForFinish=60`, {
+      const response = await fetch(`https://api.apify.com/v2/acts/${actor.name}/runs?token=${APIFY_API_KEY}&waitForFinish=60`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(actor.input)
@@ -521,7 +521,7 @@ async function fetchApifyYahooFinance() {
         continue
       }
 
-      const datasetResponse = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${APIFY_API_TOKEN}`)
+      const datasetResponse = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${APIFY_API_KEY}`)
       
       if (!datasetResponse.ok) {
         console.warn(`[v0] ${actor.name} dataset fetch failed with ${datasetResponse.status}, trying next actor...`)
@@ -543,11 +543,10 @@ async function fetchApifyYahooFinance() {
 
       console.log(`[v0] ${actor.name} completed successfully with ${results.length} results`)
 
-      let spxPE = 22.5
-      let spxPS = 2.8
+      let spxPE = 0
+      let spxPS = 0
       let putCallRatio = 0.72
       let shortInterest = 16.5
-      let buffettIndicator = 180
       let highLowIndex = 0.42
       let bullishPercent = 58
 
@@ -596,9 +595,8 @@ async function fetchApifyYahooFinance() {
         spxPS: parseFloat(spxPS.toFixed(2)),
         putCallRatio: parseFloat(putCallRatio.toFixed(2)),
         shortInterest: parseFloat(shortInterest.toFixed(1)),
-        buffettIndicator,
-        highLowIndex,
-        bullishPercent,
+        highLowIndex: highLowIndex, // Keep highLowIndex
+        bullishPercent: bullishPercent, // Keep bullishPercent
         dataSource: actor.name
       }
     } catch (error) {
@@ -787,26 +785,18 @@ async function fetchAAIISentiment() {
       console.warn('[v0] Fear & Greed fetch failed')
     }
     
-    // AAII Sentiment: AAII.com blocks all automated scraping with Incapsula
-    // Solution: Use documented historical averages updated quarterly from public reports
-    // Source: AAII publishes weekly summaries - last update Q1 2025
-    // Bullish: 38-42% (historical average), Bearish: 28-30%
-    const bullish = 42  // Mid-range historical average
-    const bearish = 28  // Mid-range historical average
+    // AAII.com blocks all automated scraping with Incapsula - no reliable API available
+    // These indicators have been removed from CCPI calculations
     
     return {
-      bullish,
-      bearish,
-      fearGreed: fearGreed || 58, // Using crypto F&G as market proxy
-      dataSource: fearGreed ? 'fear-greed-live' : 'baseline'
+      fearGreed: fearGreed || null, // Return null if failed, let scoring handle it
+      dataSource: fearGreed ? 'fear-greed-live' : 'failed'
     }
   } catch (error) {
     console.error('[v0] AAII sentiment error:', error.message)
     return {
-      bullish: 42,
-      bearish: 28,
-      fearGreed: 58,
-      dataSource: 'baseline'
+      fearGreed: null,
+      dataSource: 'failed'
     }
   }
 }
@@ -907,7 +897,7 @@ async function fetchFMPIndicators_Legacy() {
     // These legacy endpoints no longer work on free tier:
     // - /api/v3/ratios (P/E, P/S ratios) - 403 Legacy
     // - /api/v3/market-capitalization - 403 Legacy  
-    // - /api/v4/commitment_of_traders_report_analysis - 403 Legacy
+    // - /api/v3/commitment_of_traders_report_analysis - 403 Legacy
     
     // Alternative: Use Alpha Vantage or Twelve Data for these metrics
     // For now, using recent realistic market values as fallback
@@ -1203,14 +1193,6 @@ async function fetchAIStructuralIndicators() {
 async function computeValuationStress(data: Awaited<ReturnType<typeof fetchMarketData>>): Promise<number> {
   let score = 0
   
-  // Buffett Indicator (Stock Market Cap / GDP)
-  // Normal: 80-120%, Warning: 120-160%, Extreme: >160%
-  if (data.buffettIndicator > 200) score += 60
-  else if (data.buffettIndicator > 180) score += 50
-  else if (data.buffettIndicator > 160) score += 40
-  else if (data.buffettIndicator > 140) score += 30
-  else if (data.buffettIndicator > 120) score += 20
-  else if (data.buffettIndicator < 80) score -= 10
   
   // S&P 500 P/E Ratio - Historical median ~16, current elevated
   const peMedian = 16
@@ -1222,7 +1204,6 @@ async function computeValuationStress(data: Awaited<ReturnType<typeof fetchMarke
   else if (data.spxPS > 3.0) score += 20
   else if (data.spxPS > 2.5) score += 15
   else if (data.spxPS > 2.0) score += 10
-  
   
   return Math.min(100, Math.max(0, score))
 }
@@ -1257,11 +1238,10 @@ async function computeTechnicalFragility(data: Awaited<ReturnType<typeof fetchMa
   // High-Low Index (market breadth) - CRITICAL INDICATOR
   // Low values = narrowERSHIP = fragile rally
   if (data.highLowIndex !== undefined && data.highLowIndex !== null) {
-    // Low values = narrowERSHIP = fragile rally
-    if (data.highLowIndex < 0.3) score += 30 // Increased weight
+    if (data.highLowIndex < 0.3) score += 30
     else if (data.highLowIndex < 0.4) score += 20
     else if (data.highLowIndex < 0.5) score += 12
-    else if (data.highLowIndex > 0.7) score -= 10 // Healthy breadth
+    else if (data.highLowIndex > 0.7) score -= 10
   }
   
   // Bullish Percent Index
@@ -1316,20 +1296,6 @@ async function computeMacroLiquidity(data: Awaited<ReturnType<typeof fetchMarket
 async function computeSentiment(data: Awaited<ReturnType<typeof fetchMarketData>>): Promise<number> {
   let score = 0
   
-  // AAII Investor Sentiment (contrarian indicator)
-  // Extreme bulls (>50%) or extreme bears (>40%) signal turning points
-  if (data.aaiiBullish > 60) score += 28 // Extreme euphoria
-  else if (data.aaiiBullish > 50) score += 20
-  else if (data.aaiiBullish > 45) score += 12 // Getting complacent
-  else if (data.aaiiBullish < 25) score += 18 // Extreme fear
-  
-  // Low bearishness (<20%) signals extreme complacency where no one is hedging
-  // This INCREASES crash risk, not decreases it
-  if (data.aaiiBearish < 20) score += 25 // Extreme complacency - no one hedging
-  else if (data.aaiiBearish < 25) score += 18
-  else if (data.aaiiBearish < 30) score += 10
-  // Note: High bearish (>40%) actually DECREASES risk as market is already defensive
-  // but we don't subtract score, we just don't add to it
   
   // Put/Call Ratio (hedging activity)
   // Low ratio (<0.7) = complacency, High ratio (>1.2) = fear
@@ -1338,17 +1304,13 @@ async function computeSentiment(data: Awaited<ReturnType<typeof fetchMarketData>
   else if (data.putCallRatio < 0.8) score += 10
   else if (data.putCallRatio > 1.2) score += 18 // Panic
   
-  // Fear & Greed Index
+  // Fear & Greed Index (only if available)
   // Extreme Greed (>75) or Extreme Fear (<25)
-  if (data.fearGreedIndex > 75) score += 20
-  else if (data.fearGreedIndex > 65) score += 12
-  else if (data.fearGreedIndex < 25) score += 15
-  
-  // Risk Appetite Index (institutional positioning)
-  // High positive = aggressive, negative = defensive
-  if (data.riskAppetite > 60) score += 18
-  else if (data.riskAppetite > 40) score += 10
-  else if (data.riskAppetite < -30) score += 12
+  if (data.fearGreedIndex !== null && data.fearGreedIndex !== undefined) {
+    if (data.fearGreedIndex > 75) score += 20
+    else if (data.fearGreedIndex > 65) score += 12
+    else if (data.fearGreedIndex < 25) score += 15
+  }
   
   
   return Math.min(100, Math.max(0, score))
@@ -1494,14 +1456,12 @@ function computeCertaintyScore(
   return Math.max(0, Math.min(100, certainty))
 }
 
-function getTopCanaries(
-  pillars: Record<string, number>,
-  data: Awaited<ReturnType<typeof fetchMarketData>>
-): Array<{
-  signal: string
-  pillar: string
-  severity: "high" | "medium" | "low"
-}> {
+// Replaced getTopCanaries with generateCanarySignals
+async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarketData>>): Promise<Array<{
+  signal: string;
+  pillar: string;
+  severity: "high" | "medium" | "low";
+}>> {
   const canaries: Array<{ signal: string; pillar: string; severity: "high" | "medium" | "low" }> = []
   
   
@@ -1610,14 +1570,6 @@ function getTopCanaries(
   
   // ===== PILLAR 1: VALUATION STRESS INDICATORS =====
   
-  // Buffett Indicator warning - measures total stock market value vs GDP
-  if (data.buffettIndicator > 120) {
-    canaries.push({
-      signal: `Buffett Indicator at ${data.buffettIndicator}% - total stock market cap is ${((data.buffettIndicator / 100) - 1).toFixed(0)}x larger than the entire US economy (GDP). Safe zone is 80-120%. At current levels, Warren Buffett's favorite valuation metric signals stocks are overpriced and vulnerable to correction.`,
-      pillar: "Valuation Stress",
-      severity: data.buffettIndicator > 160 ? "high" as const : "medium" as const
-    })
-  }
   
   // S&P 500 Forward P/E - compares stock prices to expected earnings
   const peMedian = 16
@@ -1685,8 +1637,8 @@ function getTopCanaries(
     })
   }
   
-  // Bullish Percent Index - measures overbought/oversold conditions
-  if (data.bullishPercent > 65) {
+  // Bullish Percent Index
+  if (data.bullishPercent > 70) {
     canaries.push({
       signal: `Bullish Percent Index at ${data.bullishPercent}% - ${data.bullishPercent}% of stocks are on point-and-figure buy signals (normal range: 30-70%). Above 70% signals an overbought market where most stocks have already made their move, leaving limited upside and high reversal risk.`,
       pillar: "Technical Fragility",
@@ -1744,23 +1696,25 @@ function getTopCanaries(
   
   // ===== PILLAR 4: SENTIMENT & MEDIA FEEDBACK INDICATORS =====
   
-  // AAII Bullish Sentiment - retail investor optimism
-  if (data.aaiiBullish > 45) {
-    canaries.push({
-      signal: `AAII Bullish Sentiment at ${data.aaiiBullish}% - ${data.aaiiBullish}% of retail investors surveyed are bullish (historical average ~38%). Extreme optimism above 50% often marks market tops as sentiment becomes overly enthusiastic with "everyone already in" and no new buyers to push prices higher.`,
-      pillar: "Sentiment & Media Feedback",
-      severity: data.aaiiBullish > 52 ? "high" as const : "medium" as const
-    })
-  }
+  // AAII Investor Sentiment (contrarian indicator)
+  // Removed AAII data - will use fearGreed only
+  // if (data.aaiiBullish > 45) {
+  //   canaries.push({
+  //     signal: `AAII Bullish Sentiment at ${data.aaiiBullish}% - ${data.aaiiBullish}% of retail investors surveyed are bullish (historical average ~38%). Extreme optimism above 50% often marks market tops as sentiment becomes overly enthusiastic with "everyone already in" and no new buyers to push prices higher.`,
+  //     pillar: "Sentiment & Media Feedback",
+  //     severity: data.aaiiBullish > 52 ? "high" as const : "medium" as const
+  //   })
+  // }
   
   // AAII Bearish Sentiment - excessive pessimism (contrarian bullish)
-  if (data.aaiiBearish > 35) {
-    canaries.push({
-      signal: `AAII Bearish Sentiment at ${data.aaiiBearish}% - ${data.aaiiBearish}% of retail investors are bearish (historical average ~30%). While this seems negative, extreme bearishness can be contrarian bullish as it means sentiment is overly pessimistic and poised to reverse when conditions improve.`,
-      pillar: "Sentiment & Media Feedback",
-      severity: data.aaiiBearish > 40 ? "medium" as const : "low" as const
-    })
-  }
+  // Removed AAII data
+  // if (data.aaiiBearish > 35) {
+  //   canaries.push({
+  //     signal: `AAII Bearish Sentiment at ${data.aaiiBearish}% - ${data.aaiiBearish}% of retail investors are bearish (historical average ~30%). While this seems negative, extreme bearishness can be contrarian bullish as it means sentiment is overly pessimistic and poised to reverse when conditions improve.`,
+  //     pillar: "Sentiment & Media Feedback",
+  //     severity: data.aaiiBearish > 40 ? "medium" as const : "low" as const
+  //   })
+  // }
   
   // Put/Call Ratio - hedging and complacency indicator
   if (data.putCallRatio < 0.75 || data.putCallRatio > 1.1) {
@@ -1781,7 +1735,7 @@ function getTopCanaries(
   }
   
   // Fear & Greed Index - composite sentiment measure
-  if (data.fearGreedIndex > 70 || data.fearGreedIndex < 30) {
+  if (data.fearGreedIndex !== null && data.fearGreedIndex !== undefined && (data.fearGreedIndex > 70 || data.fearGreedIndex < 30)) {
     const isGreedy = data.fearGreedIndex > 70
     if (isGreedy) {
       canaries.push({
@@ -1799,22 +1753,24 @@ function getTopCanaries(
   }
   
   // Risk Appetite Index - institutional positioning
-  if (data.riskAppetite > 50 || data.riskAppetite < -20) {
-    const isAggressive = data.riskAppetite > 50
-    if (isAggressive) {
-      canaries.push({
-        signal: `Risk Appetite Index at ${data.riskAppetite} - institutional investors are positioned very aggressively (>50 on -100 to +100 scale). High institutional risk-taking often occurs late in bull markets when smart money may be setting up to reduce exposure.`,
-        pillar: "Sentiment & Media Feedback",
-        severity: "medium" as const
-      })
-    } else {
-      canaries.push({
-        signal: `Risk Appetite Index at ${data.riskAppetite} - institutional money is defensively positioned (negative reading). Professional traders are reducing risk exposure, which can signal they see trouble ahead or are protecting gains.`,
-        pillar: "Sentiment & Media Feedback",
-        severity: "medium" as const
-      })
-    }
-  }
+  // Removed as there's no viable API source for this indicator anymore.
+  // The 'Sentiment' pillar now relies more heavily on Put/Call and Fear/Greed.
+  // if (data.riskAppetite > 50 || data.riskAppetite < -20) {
+  //   const isAggressive = data.riskAppetite > 50
+  //   if (isAggressive) {
+  //     canaries.push({
+  //       signal: `Risk Appetite Index at ${data.riskAppetite} - institutional investors are positioned very aggressively (>50 on -100 to +100 scale). High institutional risk-taking often occurs late in bull markets when smart money may be setting up to reduce exposure.`,
+  //       pillar: "Sentiment & Media Feedback",
+  //       severity: "medium" as const
+  //     })
+  //   } else {
+  //     canaries.push({
+  //       signal: `Risk Appetite Index at ${data.riskAppetite} - institutional money is defensively positioned (negative reading). Professional traders are reducing risk exposure, which can signal they see trouble ahead or are protecting gains.`,
+  //       pillar: "Sentiment & Media Feedback",
+  //       severity: "medium" as const
+  //     })
+  //   }
+  // }
   
   // ===== PILLAR 5: CAPITAL FLOWS & POSITIONING INDICATORS =====
   
@@ -2112,55 +2068,6 @@ function generateWeeklySummary(
   }
   
   return { headline, bullets }
-}
-
-async function fetchQQQTechnicals() {
-  try {
-    console.log('[v0] Fetching QQQ technical indicators...')
-    
-    const data = await fetchQQQTechnicalsData()
-    
-    console.log('[v0] QQQ Technicals:', {
-      dailyReturn: `${data.dailyReturn}%`,
-      consecDown: data.consecutiveDaysDown,
-      belowSMA20: data.belowSMA20,
-      belowSMA50: data.belowSMA50,
-      // Added qqqBelowSMA200 logging
-      belowSMA200: data.belowSMA200,
-      deathCross: data.deathCross, // Keep logging this even if removed from calculation
-      belowBollingerBand: data.belowBollingerBand, // Added Bollinger Band logging
-      // Add proximity indicators to log
-      sma20Proximity: data.sma20Proximity,
-      sma50Proximity: data.sma50Proximity,
-      // Added sma200Proximity logging
-      sma200Proximity: data.sma200Proximity,
-      bollingerProximity: data.bollingerProximity,
-      source: data.source
-    })
-    
-    return data
-  } catch (error) {
-    console.error('[v0] QQQ technicals fetch error:', error)
-    console.warn('[v0] Falling back to baseline QQQ values')
-    
-    return {
-      dailyReturn: 0.0,
-      consecutiveDaysDown: 0,
-      belowSMA20: false,
-      belowSMA50: false,
-      // Baseline for SMA200
-      belowSMA200: false,
-      deathCross: false, // Baseline for death cross
-      belowBollingerBand: false, // Baseline for Bollinger Band
-      // Baseline for proximity indicators
-      sma20Proximity: 0,
-      sma50Proximity: 0,
-      // Baseline for SMA200Proximity
-      sma200Proximity: 0,
-      bollingerProximity: 0,
-      source: 'baseline'
-    }
-  }
 }
 
 async function computeQQQTechnicals(data: Awaited<ReturnType<typeof fetchMarketData>>): Promise<number> {

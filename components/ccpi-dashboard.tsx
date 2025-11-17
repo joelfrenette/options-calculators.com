@@ -673,33 +673,6 @@ export function CcpiDashboard() {
                 </div>
                 <div className="space-y-6">
                   
-                  {/* Buffett Indicator */}
-                  {data.indicators.buffettIndicator !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">Buffett Indicator (Market Cap / GDP)</span>
-                        <span className="font-bold">{data.indicators.buffettIndicator}%</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        {/* Gray overlay for unfilled portion */}
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.buffettIndicator / 200) * 100)}%` 
-                        }} />
-                        {/* Threshold markers */}
-                        <div className="absolute inset-0 flex items-center">
-                          <div className="w-[60%] border-r-2 border-gray-400 opacity-30" />
-                          <div className="w-[20%] border-r-2 border-gray-400 opacity-30" />
-                        </div>
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Normal: &lt;120%</span>
-                        <span>Warning: 120-160%</span>
-                        <span>Extreme: &gt;160%</span>
-                      </div>
-                    </div>
-                  )}
-
                   {/* S&P 500 P/E */}
                   {data.indicators.spxPE !== undefined && (
                     <div className="space-y-2">
@@ -709,7 +682,6 @@ export function CcpiDashboard() {
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        {/* Gray overlay for unfilled portion */}
                         <div className="absolute inset-0 bg-gray-200" style={{ 
                           marginLeft: `${Math.min(100, ((data.indicators.spxPE - 10) / 15) * 100)}%` 
                         }} />
@@ -730,7 +702,6 @@ export function CcpiDashboard() {
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        {/* Gray overlay for unfilled portion */}
                         <div className="absolute inset-0 bg-gray-200" style={{ 
                           marginLeft: `${Math.min(100, ((data.indicators.spxPS - 1) / 2) * 100)}%` 
                         }} />
@@ -967,48 +938,6 @@ export function CcpiDashboard() {
                 </div>
                 <div className="space-y-6">
                   
-                  {/* AAII Bullish Sentiment */}
-                  {data.indicators.aaiiBullish !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">AAII Bullish Sentiment</span>
-                        <span className="font-bold">{data.indicators.aaiiBullish}%</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${data.indicators.aaiiBullish}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Bearish: &lt;30%</span>
-                        <span>Neutral: 30-50%</span>
-                        <span>Euphoric: &gt;50%</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* AAII Bearish Sentiment */}
-                  {data.indicators.aaiiBearish !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">AAII Bearish Sentiment</span>
-                        <span className="font-bold">{data.indicators.aaiiBearish}%</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${data.indicators.aaiiBearish}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Complacent: &lt;20%</span>
-                        <span>Normal: 20-35%</span>
-                        <span>Fearful: &gt;35%</span>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Put/Call Ratio */}
                   {data.indicators.putCallRatio !== undefined && (
                     <div className="space-y-2">
@@ -1031,7 +960,7 @@ export function CcpiDashboard() {
                   )}
 
                   {/* Fear & Greed Index */}
-                  {data.indicators.fearGreedIndex !== undefined && (
+                  {data.indicators.fearGreedIndex !== undefined && data.indicators.fearGreedIndex !== null && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">Fear & Greed Index</span>
@@ -1052,7 +981,7 @@ export function CcpiDashboard() {
                   )}
 
                   {/* Risk Appetite Index */}
-                  {data.indicators.riskAppetite !== undefined && (
+                  {data.indicators.riskAppetite !== undefined && data.indicators.riskAppetite !== null && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">Risk Appetite Index</span>
