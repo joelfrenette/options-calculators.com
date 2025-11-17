@@ -537,15 +537,15 @@ export function CcpiDashboard() {
                         <span className="font-bold">{data.indicators.vixTermStructure.toFixed(2)}</span>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, Math.max(0, (data.indicators.vixTermStructure - 0.5) / 1.5 * 100))}%` 
+                          marginLeft: `${Math.min(100, Math.max(0, (2.0 - data.indicators.vixTermStructure) / 1.5 * 100))}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Backwardation: {'<'}1.0 (FEAR)</span>
+                        <span>Contango: {'>'}1.5 (Safe)</span>
                         <span className="text-yellow-600">Normal: 1.0-1.2</span>
-                        <span>Contango: {'>'}1.5</span>
+                        <span className="text-red-600">Backwardation: {'<'}1.0 (FEAR)</span>
                       </div>
                     </div>
                   )}
@@ -964,6 +964,26 @@ export function CcpiDashboard() {
                       </div>
                     </div>
                   )}
+
+                  {data.indicators.debtToGDP !== undefined && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">US Debt-to-GDP Ratio</span>
+                        <span className="font-bold">{data.indicators.debtToGDP.toFixed(1)}%</span>
+                      </div>
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.debtToGDP - 60) / 80) * 100))}%` 
+                        }} />
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Healthy: {'<'}90%</span>
+                        <span className="text-yellow-600">Elevated: 100-120%</span>
+                        <span className="text-red-600">Danger: {'>'}130%</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -985,16 +1005,15 @@ export function CcpiDashboard() {
                         <span className="font-bold">{data.indicators.putCallRatio.toFixed(2)}</span>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, Math.max(0, (1.5 - data.indicators.putCallRatio) * 66.67))}%` 
+                          marginLeft: `${Math.min(100, Math.max(0, (1.6 - data.indicators.putCallRatio) / 1.5 * 100))}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span className="text-red-600">Danger: {'<'}0.7</span>
-                        <span className="text-yellow-600">Warning: 0.7-0.9</span>
+                        <span>Safe: {'>'}1.1 (Hedging)</span>
                         <span className="text-yellow-600">Caution: 0.9-1.1</span>
-                        <span>Safe: {'>'}1.1</span>
+                        <span className="text-red-600">Danger: {'<'}0.7 (Complacency)</span>
                       </div>
                     </div>
                   )}
@@ -1060,31 +1079,24 @@ export function CcpiDashboard() {
                       </div>
                     </div>
                   )}
-                </div>
-              </div>
 
-              <div className="space-y-4 border-t pt-6">
-                
-                <div className="space-y-6">
-                  
                   {/* Short Interest - moved from Pillar 6 to Pillar 4 */}
                   {data.indicators.shortInterest !== undefined && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">SPY Short Interest Ratio</span>
-                        <span className="font-bold">{data.indicators.shortInterest.toFixed(1)}</span>
+                        <span className="font-bold">{(data.indicators.shortInterest * 100).toFixed(1)}%</span>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, Math.max(0, (6 - data.indicators.shortInterest) * 16.67))}%` 
+                          marginLeft: `${Math.min(100, Math.max(0, (0.15 - data.indicators.shortInterest) / 0.15 * 100))}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span className="text-red-600">Danger: {'<'}1.5</span>
-                        <span className="text-yellow-600">Warning: 1.5-2.5</span>
-                        <span className="text-yellow-600">Caution: 2.5-3.5</span>
-                        <span>Safe: {'>'}3.5</span>
+                        <span>Safe: {'>'}15% (Positioned)</span>
+                        <span className="text-yellow-600">Caution: 5-15%</span>
+                        <span className="text-red-600">Danger: {'<'}1.5% (Complacency)</span>
                       </div>
                     </div>
                   )}

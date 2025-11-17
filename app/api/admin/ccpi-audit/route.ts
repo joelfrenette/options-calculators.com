@@ -78,7 +78,7 @@ async function auditAllIndicators() {
       name: "QQQ Below 50-Day SMA",
       pillar: "Pillar 1: Technical & Price Action",
       source_url: "https://api.polygon.io/v2/aggs/ticker/QQQ (calculated)",
-      api_endpoint: "/api/qqq-technicals → lib/qqq-technicals.ts",
+      api_endpoint: "/api/ccpi",
       fetch_method: "Calculated from 50-day QQQ price history",
       status: await testPolygonAPI() ? "Live" : "Failed",
       last_fetched_at: new Date().toISOString(),
@@ -257,6 +257,25 @@ async function auditAllIndicators() {
       raw_sample: { value: 0.15, unit: "percent" },
       threshold: { inverted: "<0%", flat: "0-0.5%", normal: ">0.5%" }
     },
+    {
+      id: 26,
+      name: "US Debt-to-GDP Ratio",
+      pillar: "Pillar 3: Macro Economic",
+      source_url: "https://fred.stlouisfed.org/series/GFDEGDQ188S",
+      api_endpoint: "/api/ccpi (via FRED)",
+      fetch_method: "FRED series GFDEGDQ188S (Federal Debt: Total Public Debt as Percent of GDP)",
+      status: await testFREDAPI() ? "Live" : "Failed",
+      last_fetched_at: new Date().toISOString(),
+      raw_sample: { value: 123, unit: "percent" },
+      threshold: { 
+        healthy: "<90%", 
+        moderate: "90-100%", 
+        elevated: "100-110%", 
+        high: "110-120%",
+        danger: "120-130%",
+        extreme: ">130%" 
+      }
+    },
     
     // PILLAR 4: Sentiment & Social
     {
@@ -416,21 +435,26 @@ async function auditPillarFormulas() {
       indicators: [
         {
           name: "Fed Funds Rate",
-          weight: 0.40,
+          weight: 0.30,
           scoring: ">5.5% = 35pts, >4.5% = 22pts, <2.0% = -10pts"
         },
         {
           name: "Junk Spread",
-          weight: 0.35,
+          weight: 0.30,
           scoring: ">8% = 40pts, >6% = 28pts, >5% = 22pts"
         },
         {
           name: "Yield Curve",
-          weight: 0.25,
+          weight: 0.20,
           scoring: "<-0.5% = 30pts, <0% = 12pts, >1.0% = -10pts"
+        },
+        {
+          name: "US Debt-to-GDP Ratio",
+          weight: 0.20,
+          scoring: ">130% = 35pts, >120% = 28pts, >110% = 20pts, >100% = 12pts"
         }
       ],
-      calculation: "Monetary policy and credit stress (30% of CCPI)"
+      calculation: "Monetary policy, credit stress, and fiscal sustainability (30% of CCPI)"
     },
     // PILLAR 4: Sentiment & Social
     {
@@ -535,7 +559,7 @@ async function auditConfidenceLogic() {
 
 async function auditCanarySignals() {
   return {
-    total_possible: 25,
+    total_possible: 26,
     logic: "Each indicator has specific thresholds. When breached, generates canary signal.",
     severity_levels: {
       high: "Critical threshold breached (e.g., VIX > 30, Buffett > 160%)",
@@ -553,13 +577,14 @@ async function auditCanarySignals() {
       { indicator: "Buffett Indicator", high: ">200%", medium: ">180%", low: ">150%" },
       { indicator: "Put/Call Ratio (CBOE)", high: "<0.7", medium: "<0.85", low: ">1.1" },
       { indicator: "AAII Bullish Sentiment", high: ">50%", medium: "45-50%", low: "30-45%" },
-      { indicator: "Short Interest Ratio (SPY)", high: "<1.5", medium: "<2.5", low: ">3.5" }
+      { indicator: "Short Interest Ratio (SPY)", high: "<1.5", medium: "<2.5", low: ">3.5" },
+      { indicator: "US Debt-to-GDP", high: ">130%", medium: ">120%", low: ">110%" }
     ],
     alert_levels: [
       { canaries: "0-8", alert: "Normal", action: "Monitor" },
       { canaries: "9-16", alert: "Elevated", action: "Increase hedges" },
       { canaries: "17-23", alert: "High Alert", action: "Defensive positioning" },
-      { canaries: "24-25", alert: "Maximum", action: "Full defense mode" }
+      { canaries: "24-26", alert: "Maximum", action: "Full defense mode" }
     ]
   }
 }

@@ -99,6 +99,7 @@ export async function GET() {
         fedFundsRate: data.fedFundsRate,
         junkSpread: data.junkSpread,
         yieldCurve: data.yieldCurve,
+        debtToGDP: data.debtToGDP, // Added Debt-to-GDP to indicators
         
         // Sentiment & Social
         putCallRatio: data.putCallRatio,
@@ -262,6 +263,7 @@ async function fetchMarketData() {
     fedFundsRate: fredData?.fedFundsRate || 5.33,
     junkSpread: fredData?.junkSpread || 3.5,
     yieldCurve: fredData?.yieldCurve || 0.25,
+    debtToGDP: fredData?.debtToGDP || 123, // Added Debt-to-GDP to data object
     
     // Sentiment
     putCallRatio: putCallData.ratio,
@@ -289,30 +291,43 @@ async function fetchFREDIndicators() {
   const FRED_API_KEY = process.env.FRED_API_KEY
   
   if (!FRED_API_KEY) {
-    return { fedFundsRate: 5.33, junkSpread: 3.5, yieldCurve: 0.25 }
+    return { 
+      fedFundsRate: 5.33, 
+      junkSpread: 3.5, 
+      yieldCurve: 0.25,
+      debtToGDP: 123 // Added baseline for Debt-to-GDP
+    }
   }
   
   try {
     const baseUrl = 'https://api.stlouisfed.org/fred/series/observations'
-    const [fedFundsRes, junkSpreadRes, yieldCurveRes] = await Promise.all([
+    const [fedFundsRes, junkSpreadRes, yieldCurveRes, debtToGDPRes] = await Promise.all([
       fetch(`${baseUrl}?series_id=DFF&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
       fetch(`${baseUrl}?series_id=BAMLH0A0HYM2&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
-      fetch(`${baseUrl}?series_id=T10Y2Y&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) })
+      fetch(`${baseUrl}?series_id=T10Y2Y&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
+      fetch(`${baseUrl}?series_id=GFDEGDQ188S&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) })
     ])
     
-    const [fedFunds, junkSpread, yieldCurve] = await Promise.all([
+    const [fedFunds, junkSpread, yieldCurve, debtToGDP] = await Promise.all([
       fedFundsRes.json(),
       junkSpreadRes.json(),
-      yieldCurveRes.json()
+      yieldCurveRes.json(),
+      debtToGDPRes.json()
     ])
     
     return {
       fedFundsRate: parseFloat(fedFunds.observations[0]?.value || '5.33'),
       junkSpread: parseFloat(junkSpread.observations[0]?.value || '3.5'),
-      yieldCurve: parseFloat(yieldCurve.observations[0]?.value || '0.25')
+      yieldCurve: parseFloat(yieldCurve.observations[0]?.value || '0.25'),
+      debtToGDP: parseFloat(debtToGDP.observations[0]?.value || '123') // Parse Debt-to-GDP
     }
   } catch (error) {
-    return { fedFundsRate: 5.33, junkSpread: 3.5, yieldCurve: 0.25 }
+    return { 
+      fedFundsRate: 5.33, 
+      junkSpread: 3.5, 
+      yieldCurve: 0.25,
+      debtToGDP: 123
+    }
   }
 }
 
@@ -412,9 +427,14 @@ async function computeFundamentalPillar(data: Awaited<ReturnType<typeof fetchMar
 
 async function computeMacroPillar(data: Awaited<ReturnType<typeof fetchMarketData>>): Promise<number> {
   let score = 0
-  console.log("[v0] Macro Pillar Input:", { fedFundsRate: data.fedFundsRate, junkSpread: data.junkSpread, yieldCurve: data.yieldCurve })
+  console.log("[v0] Macro Pillar Input:", { 
+    fedFundsRate: data.fedFundsRate, 
+    junkSpread: data.junkSpread, 
+    yieldCurve: data.yieldCurve,
+    debtToGDP: data.debtToGDP // Added to logging
+  })
   
-  // Fed Funds Rate - Higher rates = More restrictive = Higher crash risk
+  // Fed Funds Rate - Higher rates = More restrictive policy = Higher crash risk
   if (data.fedFundsRate > 6.0) score += 35
   else if (data.fedFundsRate > 5.5) score += 30
   else if (data.fedFundsRate > 5.0) score += 25  // Current: 5.33 hits here
@@ -438,6 +458,14 @@ async function computeMacroPillar(data: Awaited<ReturnType<typeof fetchMarketDat
   else if (data.yieldCurve < 0) score += 12
   else if (data.yieldCurve < 0.5) score += 8  // Current: 0.25 hits here - flat curve still concerning
   else if (data.yieldCurve < 1.0) score += 4
+  
+  // Historical context: >100% is concerning, >120% is dangerous, >130% is extreme
+  if (data.debtToGDP > 130) score += 35  // Extreme debt levels
+  else if (data.debtToGDP > 120) score += 28  // Very high debt (current: 123)
+  else if (data.debtToGDP > 110) score += 20  // High debt
+  else if (data.debtToGDP > 100) score += 12  // Elevated debt
+  else if (data.debtToGDP > 90) score += 5   // Moderate debt
+  // else: healthy debt levels = 0 points
   
   console.log("[v0] Macro Pillar Score:", score)
   return Math.min(100, Math.max(0, score))
@@ -722,6 +750,28 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   } else if (data.yieldCurve < -0.2) {
     canaries.push({
       signal: `Yield curve inverted at ${data.yieldCurve.toFixed(2)}% - Economic slowdown signal`,
+      pillar: "Macro Economic",
+      severity: "medium"
+    })
+  }
+  
+  // Debt-to-GDP Ratio
+  const debtToGDP = data.debtToGDP || 123
+  if (debtToGDP > 130) {
+    canaries.push({
+      signal: `US Debt-to-GDP at ${debtToGDP.toFixed(1)}% - Extreme fiscal stress (danger >130%)`,
+      pillar: "Macro Economic",
+      severity: "high"
+    })
+  } else if (debtToGDP > 120) {
+    canaries.push({
+      signal: `US Debt-to-GDP at ${debtToGDP.toFixed(1)}% - High debt burden (warning >120%)`,
+      pillar: "Macro Economic",
+      severity: "medium"
+    })
+  } else if (debtToGDP > 110) {
+    canaries.push({
+      signal: `US Debt-to-GDP at ${debtToGDP.toFixed(1)}% - Elevated debt levels (watch >110%)`,
       pillar: "Macro Economic",
       severity: "medium"
     })
