@@ -240,10 +240,8 @@ export function CcpiDashboard() {
         </CardHeader>
         <CardContent>
           <div className="mb-6">
-            <h3 className="text-sm font-semibold mb-2 text-gray-700">CCPI Historical Scale</h3>
-            <p className="text-xs text-gray-500 mb-3">
-              Visual representation of crash risk zones from low risk to crash watch
-            </p>
+            
+            
             
             <div className="pt-16">
               <div className="relative">
@@ -402,7 +400,7 @@ export function CcpiDashboard() {
       <div className="grid grid-cols-1 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Seven Pillar Breakdown</CardTitle>
+            <CardTitle>Six Pillar Breakdown</CardTitle>
             <CardDescription>Individual stress scores (0-100) across all risk dimensions</CardDescription>
           </CardHeader>
           <CardContent>
