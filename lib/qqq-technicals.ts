@@ -21,14 +21,14 @@ export async function fetchQQQTechnicals() {
   try {
     const today = new Date()
     const pastDate = new Date(today)
-    pastDate.setDate(today.getDate() - 250)
+    pastDate.setDate(today.getDate() - 300) // Increased from 250 to 300 days
     
     const fromDate = pastDate.toISOString().split('T')[0]
     const toDate = today.toISOString().split('T')[0]
     
     const response = await fetch(
-      `https://api.polygon.io/v2/aggs/ticker/QQQ/range/1/day/${fromDate}/${toDate}?adjusted=true&sort=asc&limit=250&apiKey=${POLYGON_API_KEY}`,
-      { signal: AbortSignal.timeout(10000) }
+      `https://api.polygon.io/v2/aggs/ticker/QQQ/range/1/day/${fromDate}/${toDate}?adjusted=true&sort=asc&limit=300&apiKey=${POLYGON_API_KEY}`,
+      { signal: AbortSignal.timeout(15000) } // Increased timeout from 10s to 15s
     )
     
     if (!response.ok) {
@@ -41,16 +41,16 @@ export async function fetchQQQTechnicals() {
       throw new Error("No QQQ data returned")
     }
     
-    const prices = data.results.map((r: any) => r.c) // closing prices
+    const sortedResults = data.results.sort((a: any, b: any) => a.t - b.t) // Sort by timestamp to ensure chronological order
+    const prices = sortedResults.map((r: any) => r.c) // closing prices
     const currentPrice = prices[prices.length - 1]
     const prevClose = prices[prices.length - 2]
     
     console.log(`[v0] QQQ Data: Fetched ${prices.length} days of historical data`)
+    console.log(`[v0] QQQ Current Price: $${currentPrice.toFixed(2)}`)
     
-    // Calculate 1-day % return
     const dailyReturn = ((currentPrice - prevClose) / prevClose) * 100
     
-    // Calculate consecutive down days (>1% drops)
     let consecutiveDaysDown = 0
     for (let i = prices.length - 1; i > 0; i--) {
       const dayChange = ((prices[i] - prices[i-1]) / prices[i-1]) * 100
@@ -83,13 +83,14 @@ export async function fetchQQQTechnicals() {
       hasSMA200 = true
     }
     
+    console.log(`[v0] Calculated SMAs: 20d=$${sma20.toFixed(2)}, 50d=$${sma50.toFixed(2)}, 200d=$${sma200.toFixed(2)}`)
+    
     let bollingerLower = sma20
     let bollingerUpper = sma20
     let belowBollingerBand = false
     
     if (hasSMA20) {
       const last20Prices = prices.slice(-20)
-      // Calculate standard deviation
       const squaredDiffs = last20Prices.map((price: number) => Math.pow(price - sma20, 2))
       const variance = squaredDiffs.reduce((a: number, b: number) => a + b, 0) / 20
       const stdDev = Math.sqrt(variance)
@@ -103,23 +104,18 @@ export async function fetchQQQTechnicals() {
     const belowSMA50 = hasSMA50 ? currentPrice < sma50 : false
     const belowSMA200 = hasSMA200 ? currentPrice < sma200 : false
     
-    // Proximity shows how close to danger zone (0% = safe, 100% = breached)
+    console.log(`[v0] SMA Breaches: 20d=${belowSMA20} (${currentPrice.toFixed(2)} vs ${sma20.toFixed(2)}), 50d=${belowSMA50} (${currentPrice.toFixed(2)} vs ${sma50.toFixed(2)}), 200d=${belowSMA200} (${currentPrice.toFixed(2)} vs ${sma200.toFixed(2)})`)
     
-    // SMA20 Proximity: 0% when 5%+ above SMA20, 100% when at/below SMA20
     let sma20Proximity = 0
     if (hasSMA20) {
       const distanceFromSMA20 = ((currentPrice - sma20) / sma20) * 100
       if (distanceFromSMA20 <= 0) {
-        // Already below - maximum danger
         sma20Proximity = 100
       } else if (distanceFromSMA20 < 5) {
-        // Within 5% above - graduated danger scale
         sma20Proximity = 100 - (distanceFromSMA20 / 5 * 100)
       }
-      // else stays 0 (safe distance)
     }
     
-    // SMA50 Proximity: 0% when 8%+ above SMA50, 100% when at/below SMA50  
     let sma50Proximity = 0
     if (hasSMA50) {
       const distanceFromSMA50 = ((currentPrice - sma50) / sma50) * 100
@@ -130,28 +126,22 @@ export async function fetchQQQTechnicals() {
       }
     }
     
-    // SMA200 Proximity: 0% when 10%+ above SMA200, 100% when at/below SMA200
     let sma200Proximity = 0
     if (hasSMA200) {
       const distanceFromSMA200 = ((currentPrice - sma200) / sma200) * 100
       if (distanceFromSMA200 <= 0) {
-        // Already below - maximum danger
         sma200Proximity = 100
       } else if (distanceFromSMA200 < 10) {
-        // Within 10% above - graduated danger scale  
         sma200Proximity = 100 - (distanceFromSMA200 / 10 * 100)
       }
-      // else stays 0 (safe distance)
     }
     
-    // Bollinger Band Proximity: 0% when at middle/upper band, 100% at/below lower band
     let bollingerProximity = 0
     if (hasSMA20) {
       const distanceFromLower = ((currentPrice - bollingerLower) / bollingerLower) * 100
       if (distanceFromLower <= 0) {
         bollingerProximity = 100
       } else if (distanceFromLower < 3) {
-        // Within 3% of lower band
         bollingerProximity = 100 - (distanceFromLower / 3 * 100)
       }
     }
