@@ -1085,8 +1085,6 @@ async function fetchCBOEIndicators() {
 
 // Sentiment Indicators - Multiple sources
 async function fetchSentimentIndicators(): Promise<{
-  aaiiBullish: number
-  aaiiBearish: number
   fearGreedIndex: number
 }> {
   try {
@@ -1094,15 +1092,11 @@ async function fetchSentimentIndicators(): Promise<{
     
     // Placeholder values until web scraping implemented
     return {
-      aaiiBullish: 42,
-      aaiiBearish: 28,
       fearGreedIndex: 58
     }
   } catch (error) {
     console.error('[v0] Sentiment API error:', error)
     return {
-      aaiiBullish: 42,
-      aaiiBearish: 28,
       fearGreedIndex: 58
     }
   }
@@ -1507,16 +1501,6 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   if (data.qqqBelowBollinger) {
     canaries.push({
       signal: `QQQ trading below lower Bollinger Band - indicates an oversold condition on short-term charts. While this can signal a near-term bounce, extreme deviations below the band suggest significant selling pressure and potential for continued downside if broader market trends remain weak.`,
-      pillar: "QQQ Momentum & Trend Health",
-      severity: "high" as const
-    })
-  }
-  
-  if (data.qqqSMA20Proximity && data.qqqSMA20Proximity > 70 && 
-      data.qqqSMA50Proximity && data.qqqSMA50Proximity > 70 && 
-      data.qqqBollingerProximity && data.qqqBollingerProximity > 70) {
-    canaries.push({
-      signal: `QQQ MULTIPLE DANGER ZONES: High proximity to 20-day SMA, 50-day SMA, AND lower Bollinger Band (all >70%). This confluence of warning signals across multiple timeframes and indicators points to severe technical pressure in the NASDAQ-100. This significantly elevates crash probability.`,
       pillar: "QQQ Momentum & Trend Health",
       severity: "high" as const
     })
