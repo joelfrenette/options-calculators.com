@@ -1084,25 +1084,26 @@ async function fetchCBOEIndicators() {
 }
 
 // Sentiment Indicators - Multiple sources
-async function fetchSentimentIndicators() {
+async function fetchSentimentIndicators(): Promise<{
+  aaiiBullish: number
+  aaiiBearish: number
+  fearGreedIndex: number
+}> {
   try {
-    // Fear & Greed Index (CNN) - would need web scraping
     // AAII Sentiment - would need subscription or scraping
     
     // Placeholder values until web scraping implemented
     return {
       aaiiBullish: 42,
       aaiiBearish: 28,
-      fearGreedIndex: 58,
-      riskAppetite: 35
+      fearGreedIndex: 58
     }
   } catch (error) {
     console.error('[v0] Sentiment API error:', error)
     return {
       aaiiBullish: 42,
       aaiiBearish: 28,
-      fearGreedIndex: 58,
-      riskAppetite: 35
+      fearGreedIndex: 58
     }
   }
 }
