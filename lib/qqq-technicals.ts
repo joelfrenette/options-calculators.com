@@ -14,7 +14,6 @@ export async function fetchQQQTechnicals() {
       sma50Proximity: 0,
       sma200Proximity: 0,
       bollingerProximity: 0,
-      deathCross: false,
       source: "baseline"
     }
   }
@@ -104,8 +103,6 @@ export async function fetchQQQTechnicals() {
     const belowSMA50 = hasSMA50 ? currentPrice < sma50 : false
     const belowSMA200 = hasSMA200 ? currentPrice < sma200 : false
     
-    const deathCross = (hasSMA50 && hasSMA200) ? sma50 < sma200 : false
-    
     // Proximity shows how close to danger zone (0% = safe, 100% = breached)
     
     // SMA20 Proximity: 0% when 5%+ above SMA20, 100% when at/below SMA20
@@ -172,7 +169,6 @@ export async function fetchQQQTechnicals() {
       belowSMA50: belowSMA50 ? "YES (bearish)" : "NO (bullish)",
       belowSMA200: belowSMA200 ? "YES (bearish)" : "NO (bullish)",
       belowBollingerBand: belowBollingerBand ? "YES (oversold)" : "NO",
-      deathCross: deathCross ? "YES - MAJOR BEARISH" : "NO",
       sma20Proximity: sma20Proximity.toFixed(1) + "% danger",
       sma50Proximity: sma50Proximity.toFixed(1) + "% danger",
       sma200Proximity: sma200Proximity.toFixed(1) + "% danger",
@@ -187,7 +183,6 @@ export async function fetchQQQTechnicals() {
       belowSMA50,
       belowSMA200,
       belowBollingerBand,
-      deathCross,
       sma20Proximity: parseFloat(sma20Proximity.toFixed(1)),
       sma50Proximity: parseFloat(sma50Proximity.toFixed(1)),
       sma200Proximity: parseFloat(sma200Proximity.toFixed(1)),
@@ -211,7 +206,6 @@ export async function fetchQQQTechnicals() {
       belowSMA50: false,
       belowSMA200: false,
       belowBollingerBand: false,
-      deathCross: false,
       sma20Proximity: 0,
       sma50Proximity: 0,
       sma200Proximity: 0,

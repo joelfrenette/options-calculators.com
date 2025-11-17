@@ -36,7 +36,7 @@ export async function GET() {
 
 async function auditAllIndicators() {
   const indicators = [
-    // PILLAR 1: QQQ Momentum (7 indicators)
+    // PILLAR 1: QQQ Momentum (6 indicators)
     {
       id: 1,
       name: "QQQ Daily Return (5× downside amplifier)",
@@ -78,7 +78,7 @@ async function auditAllIndicators() {
       name: "QQQ Below 50-Day SMA",
       pillar: "Pillar 1: QQQ Momentum",
       source_url: "https://api.polygon.io/v2/aggs/ticker/QQQ (calculated)",
-      api_endpoint: "/api/ccpi",
+      api_endpoint: "/api/qqq-technicals → lib/qqq-technicals.ts",
       fetch_method: "Calculated from 50-day QQQ price history",
       status: await testPolygonAPI() ? "Live" : "Failed",
       last_fetched_at: new Date().toISOString(),
@@ -104,27 +104,15 @@ async function auditAllIndicators() {
       source_url: "https://api.polygon.io/v2/aggs/ticker/QQQ (calculated)",
       api_endpoint: "/api/ccpi (via Apify Yahoo Finance)",
       fetch_method: "Calculated from 200-day QQQ price history with proximity tracking",
-      status: process.env.POLYGON_API_KEY ? "Live" : "Missing API Key",
+      status: await testPolygonAPI() ? "Live" : "Failed",
       last_fetched_at: new Date().toISOString(),
       raw_sample: { value: false, unit: "boolean", proximity: 0 },
       threshold: { bullish: "Above SMA200", bearish: "Below SMA200", proximity: "0-100% danger scale" }
     },
-    {
-      id: 7,
-      name: "QQQ Death Cross (SMA50 < SMA200)",
-      pillar: "Pillar 1: QQQ Momentum",
-      source_url: "https://api.polygon.io/v2/aggs/ticker/QQQ (calculated)",
-      api_endpoint: "/api/qqq-technicals → lib/qqq-technicals.ts",
-      fetch_method: "Calculated: 50-day SMA < 200-day SMA (major bearish signal)",
-      status: await testPolygonAPI() ? "Live" : "Failed",
-      last_fetched_at: new Date().toISOString(),
-      raw_sample: { value: false, unit: "boolean" },
-      threshold: { bullish: "Golden Cross (SMA50 > SMA200)", bearish: "Death Cross (SMA50 < SMA200)" }
-    },
     
     // PILLAR 2: VALUATION STRESS (3 indicators)
     {
-      id: 8,
+      id: 7,
       name: "Buffett Indicator (Market Cap / GDP)",
       pillar: "Pillar 2: Valuation Stress",
       source_url: "https://fred.stlouisfed.org/series/WILSHIRE5000IND",
@@ -136,7 +124,7 @@ async function auditAllIndicators() {
       threshold: { normal: "80-120%", warning: "120-160%", extreme: ">160%" }
     },
     {
-      id: 9,
+      id: 8,
       name: "S&P 500 Forward P/E Ratio",
       pillar: "Pillar 2: Valuation Stress",
       source_url: "https://finance.yahoo.com/quote/%5EGSPC",
@@ -148,7 +136,7 @@ async function auditAllIndicators() {
       threshold: { median: "16x", normal: "<18x", elevated: "18-25x", extreme: ">25x" }
     },
     {
-      id: 10,
+      id: 9,
       name: "S&P 500 Price-to-Sales Ratio",
       pillar: "Pillar 2: Valuation Stress",
       source_url: "https://finance.yahoo.com/quote/%5EGSPC/key-statistics",
@@ -162,7 +150,7 @@ async function auditAllIndicators() {
     
     // PILLAR 3: TECHNICAL FRAGILITY (6 indicators) - Removed RVX (ID 6) to match actual CCPI calculation (23 total)
     {
-      id: 11,
+      id: 10,
       name: "VIX (Volatility Index)",
       pillar: "Pillar 3: Technical Fragility",
       source_url: "https://www.alphavantage.co/query?function=VIX",
@@ -174,7 +162,7 @@ async function auditAllIndicators() {
       threshold: { calm: "<15", normal: "15-20", elevated: "20-30", crisis: ">35" }
     },
     {
-      id: 12,
+      id: 11,
       name: "VXN (Nasdaq Volatility)",
       pillar: "Pillar 3: Technical Fragility",
       source_url: "https://www.alphavantage.co/query?function=VXN",
@@ -186,7 +174,7 @@ async function auditAllIndicators() {
       threshold: { calm: "<15", normal: "15-20", elevated: "20-30", crisis: ">35" }
     },
     {
-      id: 13,
+      id: 12,
       name: "VIX Term Structure (Curve Slope)",
       pillar: "Pillar 3: Technical Fragility",
       source_url: "https://fred.stlouisfed.org/series/VIXCLS",
@@ -198,7 +186,7 @@ async function auditAllIndicators() {
       threshold: { inverted: "<0 (backwardation)", flat: "0-0.5", normal: "1-2", steep: ">2 (complacency)" }
     },
     {
-      id: 14,
+      id: 13,
       name: "Bullish Percent Index",
       pillar: "Pillar 3: Technical Fragility",
       source_url: "Baseline (historical average)",
@@ -210,7 +198,7 @@ async function auditAllIndicators() {
       threshold: { oversold: "<30%", neutral: "30-70%", overbought: ">70%" }
     },
     {
-      id: 15,
+      id: 14,
       name: "ATR (Average True Range)",
       pillar: "Pillar 3: Technical Fragility",
       source_url: "https://www.alphavantage.co/query?function=SMA&symbol=SPY",
@@ -222,7 +210,7 @@ async function auditAllIndicators() {
       threshold: { low: "20-30", normal: "30-40", elevated: "40-50", high: ">50" }
     },
     {
-      id: 16,
+      id: 15,
       name: "Left Tail Volatility (Crash Probability)",
       pillar: "Pillar 3: Technical Fragility",
       source_url: "Derived from VIX level",
@@ -234,9 +222,9 @@ async function auditAllIndicators() {
       threshold: { low: "<10%", moderate: "10-15%", high: ">15%" }
     },
     
-    // PILLAR 4: MACRO & LIQUIDITY RISK (4 indicators)
+    // PILLAR 4: MACRO & LIQUIDITY RISK (3 indicators)
     {
-      id: 17,
+      id: 16,
       name: "Fed Funds Rate",
       pillar: "Pillar 4: Macro & Liquidity Risk",
       source_url: "https://fred.stlouisfed.org/series/DFF",
@@ -248,7 +236,7 @@ async function auditAllIndicators() {
       threshold: { accommodative: "<2%", neutral: "2-4%", restrictive: ">4.5%" }
     },
     {
-      id: 18,
+      id: 17,
       name: "Junk Bond Spread (High-Yield Credit)",
       pillar: "Pillar 4: Macro & Liquidity Risk",
       source_url: "https://fred.stlouisfed.org/series/BAMLH0A0HYM2",
@@ -260,7 +248,7 @@ async function auditAllIndicators() {
       threshold: { tight: "<3%", normal: "3-5%", stress: "5-8%", crisis: ">8%" }
     },
     {
-      id: 19,
+      id: 18,
       name: "Yield Curve (10Y-2Y Spread)",
       pillar: "Pillar 4: Macro & Liquidity Risk",
       source_url: "https://fred.stlouisfed.org/series/T10Y2Y",
@@ -271,22 +259,10 @@ async function auditAllIndicators() {
       raw_sample: { value: 0.15, unit: "percent" },
       threshold: { inverted: "<0%", flat: "0-0.5%", normal: ">0.5%" }
     },
-    {
-      id: 27,
-      name: "TED Spread (LIBOR - T-Bill)",
-      pillar: "Pillar 4: Macro & Liquidity Risk",
-      source_url: "https://fred.stlouisfed.org/series/TEDRATE",
-      api_endpoint: "/api/ccpi (via FRED)",
-      fetch_method: "FRED series TEDRATE (TED Spread - measures bank counterparty risk)",
-      status: await testFREDAPI() ? "Live" : "Failed",
-      last_fetched_at: new Date().toISOString(),
-      raw_sample: { value: 0.25, unit: "percent" },
-      threshold: { healthy: "<0.25%", elevated: "0.25-0.5%", stress: ">0.5% (crash signal)", crisis: ">1.0%" }
-    },
     
     // PILLAR 5: SENTIMENT & MEDIA FEEDBACK (5 indicators)
     {
-      id: 20,
+      id: 19,
       name: "AAII Bullish Sentiment",
       pillar: "Pillar 5: Sentiment & Media Feedback",
       source_url: "Baseline (historical average)",
@@ -298,7 +274,7 @@ async function auditAllIndicators() {
       threshold: { bearish: "<30%", neutral: "30-50%", euphoric: ">50%" }
     },
     {
-      id: 21,
+      id: 20,
       name: "AAII Bearish Sentiment",
       pillar: "Pillar 5: Sentiment & Media Feedback",
       source_url: "Baseline (historical average)",
@@ -310,7 +286,7 @@ async function auditAllIndicators() {
       threshold: { complacent: "<20%", normal: "20-35%", fearful: ">35%" }
     },
     {
-      id: 22,
+      id: 21,
       name: "Put/Call Ratio",
       pillar: "Pillar 5: Sentiment & Media Feedback",
       source_url: "https://finance.yahoo.com/quote/SPY/options",
@@ -322,7 +298,7 @@ async function auditAllIndicators() {
       threshold: { complacent: "<0.7", normal: "0.7-1.0", fearful: ">1.0" }
     },
     {
-      id: 23,
+      id: 22,
       name: "Fear & Greed Index",
       pillar: "Pillar 5: Sentiment & Media Feedback",
       source_url: "https://api.alternative.me/fng/",
@@ -334,43 +310,33 @@ async function auditAllIndicators() {
       threshold: { fear: "<30", neutral: "30-70", greed: ">70" }
     },
     {
-      id: 24,
-      name: "Credit Spread Widening",
+      id: 23,
+      name: "Risk Appetite Index",
       pillar: "Pillar 5: Sentiment & Media Feedback",
-      source_url: "https://fred.stlouisfed.org/series/BAMLH0A0HYM2",
-      api_endpoint: "/api/ccpi (via FRED API)",
-      fetch_method: "FRED API: BAMLH0A0HYM2 (High Yield spread) - spread is inherently vs. Treasuries",
-      status: process.env.FRED_API_KEY ? "Live" : "Missing API Key",
+      source_url: "Baseline (calculated from other sentiment metrics)",
+      api_endpoint: "/api/ccpi (baseline value)",
+      fetch_method: "Baseline: 35 (calculated from sentiment composite)",
+      status: "Baseline",
       last_fetched_at: new Date().toISOString(),
-      raw_sample: { value: 3.8, unit: "percent" },
-      threshold: { tight: "<3% (complacency)", normal: "3-4%", widening: "4-5% (caution)", stress: ">5% (credit stress)" }
+      raw_sample: { value: 35, unit: "index" },
+      threshold: { risk_off: "<30", neutral: "30-70", risk_on: ">70" }
     },
     
     // PILLAR 6: CAPITAL FLOWS & POSITIONING (2 indicators)
     {
-      id: 25,
-      name: "QQQ Options Flow (Call/Put Ratio)",
+      id: 24,
+      name: "Tech ETF Flows (Weekly)",
       pillar: "Pillar 6: Capital Flows & Positioning",
-      source_url: "https://polygon.io/docs/options/get_v3_snapshot_options__underlyingasset",
-      api_endpoint: "https://api.polygon.io/v3/snapshot/options/QQQ",
-      fetch_method: "Polygon REST API - aggregates call and put volumes across all QQQ option strikes",
-      status: process.env.POLYGON_API_KEY ? "Live" : "Missing API Key",
+      source_url: "Baseline (recent reports)",
+      api_endpoint: "/api/ccpi (baseline value)",
+      fetch_method: "Baseline: -$1.8B weekly (from public reports)",
+      status: "Baseline",
       last_fetched_at: new Date().toISOString(),
-      raw_sample: { 
-        callPutRatio: 1.2, 
-        callVolume: 120000, 
-        putVolume: 100000,
-        unit: "ratio" 
-      },
-      threshold: { 
-        bearish: "<0.8 (heavy put volume)", 
-        neutral: "1.0-1.5 (balanced)", 
-        bullish: ">1.5 (heavy call volume)",
-        warning: ">2.0 (excessive speculation)"
-      }
+      raw_sample: { value: -1.8, unit: "billion_usd" },
+      threshold: { outflows: "<-$2B", neutral: "-$2B to $2B", inflows: ">$2B" }
     },
     {
-      id: 26,
+      id: 25,
       name: "Short Interest (% of Float)",
       pillar: "Pillar 6: Capital Flows & Positioning",
       source_url: "https://finance.yahoo.com/quote/SPY/key-statistics",
@@ -392,7 +358,7 @@ async function auditPillarFormulas() {
     {
       pillar: "Pillar 1: QQQ Momentum",
       weight: 0.30,
-      formula: "Score = dailyReturnImpact + consecDownImpact + belowSMA20Impact + belowSMA50Impact + belowBollingerImpact + belowSMA200Impact + deathCrossImpact + compoundingPenalty",
+      formula: "Score = dailyReturnImpact + consecDownImpact + belowSMA20Impact + belowSMA50Impact + belowBollingerImpact + belowSMA200Impact + compoundingPenalty",
       indicators: [
         {
           name: "QQQ Daily Return",
@@ -423,11 +389,6 @@ async function auditPillarFormulas() {
           name: "Below SMA200",
           weight: "10 pts (proximity-based)",
           scoring: "Graduated: 0% proximity = 0pts, 50% = 5pts, 100% = 10pts"
-        },
-        {
-          name: "Death Cross (SMA50 < SMA200)",
-          weight: "20 pts",
-          scoring: "Death Cross active = 20pts, Golden Cross (SMA50 > SMA200) = 0pts"
         },
         {
           name: "Compounding Penalty",
@@ -520,14 +481,9 @@ async function auditPillarFormulas() {
           name: "Yield Curve",
           weight: 0.25,
           scoring: "<-0.5% = 30pts, <-0.2% = 20pts, <0% = 12pts, >1.0% = -10pts"
-        },
-        {
-          name: "TED Spread",
-          weight: 0.25,
-          scoring: ">1.0% = 35pts (crisis), >0.75% = 28pts, >0.5% = 22pts (stress), >0.35% = 15pts, >0.25% = 8pts, <0.15% = -5pts (healthy)"
         }
       ],
-      calculation: "Focuses on monetary policy restrictiveness, credit stress, and banking system liquidity"
+      calculation: "Focuses on monetary policy restrictiveness and credit stress"
     },
     // PILLAR 5: SENTIMENT & MEDIA FEEDBACK
     {
@@ -556,12 +512,12 @@ async function auditPillarFormulas() {
           scoring: ">75 = 20pts (greed), >65 = 12pts, <25 = 15pts (fear)"
         },
         {
-          name: "Credit Spread Widening",
+          name: "Risk Appetite",
           weight: 0.18,
-          scoring: ">7% = 35pts (crisis), >5% = 25pts (stress), >4% = 15pts (caution), <3% = complacency"
+          scoring: ">60 = 18pts, >40 = 10pts, <-30 = 12pts"
         }
       ],
-      calculation: "Contrarian indicators - extreme optimism or pessimism both add risk. Credit spreads show credit market stress leading equities."
+      calculation: "Contrarian indicators - extreme optimism or pessimism both add risk"
     },
     // PILLAR 6: CAPITAL FLOWS & POSITIONING
     {
@@ -570,9 +526,9 @@ async function auditPillarFormulas() {
       formula: "Score = Σ(Indicator_i × Weight_i)",
       indicators: [
         {
-          name: "QQQ Options Flow",
+          name: "Tech ETF Flows",
           weight: 0.50,
-          scoring: "<0.8 = 25pts, <0.9 = 18pts, <1.0 = 10pts, >1.5 = 12pts (crowded calls)"
+          scoring: "<-$5B = 35pts, <-$3B = 25pts, <-$2B = 18pts, <-$1B = 12pts, >$5B = -5pts"
         },
         {
           name: "Short Interest",

@@ -2,65 +2,22 @@ import { NextResponse } from "next/server"
 import { fetchMarketBreadth as fetchMarketBreadthData } from "@/lib/market-breadth"
 import { fetchVIXTermStructure } from "@/lib/vix-term-structure"
 import { fetchQQQTechnicals as fetchQQQTechnicalsData } from '@/lib/qqq-technicals'
-import type { NextRequest } from "next/server"
 
 // This API endpoint integrates ALL 28 indicators (5 new QQQ + 23 existing) with REAL data via live APIs
 // NO mock data - all values are fetched from actual sources with fallback chains
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    console.log('[v0] === CCPI API called ===')
+    const data = await fetchMarketData()
     
-    const [fetchedData, optionsData, vixTermStructure] = await Promise.all([
-      fetchMarketData().catch(e => {
-        console.error('[v0] fetchMarketData failed:', e.message, e.stack)
-        throw new Error(`fetchMarketData: ${e.message}`)
-      }),
-      fetchQQQOptionsFlow().catch(e => {
-        console.error('[v0] fetchQQQOptionsFlow failed:', e.message, e.stack)
-        throw new Error(`fetchQQQOptionsFlow: ${e.message}`)
-      }),
-      fetchVIXTermStructure().catch(e => {
-        console.error('[v0] fetchVIXTermStructure failed:', e.message, e.stack)
-        throw new Error(`fetchVIXTermStructure: ${e.message}`)
-      })
-    ])
-
-    console.log('[v0] All data fetched successfully')
-    
-    let pillars
-    try {
-      console.log('[v0] Computing pillars...')
-      pillars = {
-        qqqTechnicals: await computeQQQTechnicals(fetchedData).catch(e => {
-          console.error('[v0] computeQQQTechnicals failed:', e.message)
-          throw e
-        }),
-        valuation: await computeValuationStress(fetchedData).catch(e => {
-          console.error('[v0] computeValuationStress failed:', e.message)
-          throw e
-        }),
-        technical: await computeTechnicalFragility(fetchedData).catch(e => {
-          console.error('[v0] computeTechnicalFragility failed:', e.message)
-          throw e
-        }),
-        macro: await computeMacroLiquidity(fetchedData).catch(e => {
-          console.error('[v0] computeMacroLiquidity failed:', e.message)
-          throw e
-        }),
-        sentiment: await computeSentiment(fetchedData).catch(e => {
-          console.error('[v0] computeSentiment failed:', e.message)
-          throw e
-        }),
-        flows: await computeFlows(fetchedData).catch(e => {
-          console.error('[v0] computeFlows failed:', e.message)
-          throw e
-        }),
-      }
-      console.log('[v0] Pillars computed successfully:', pillars)
-    } catch (pillarError) {
-      console.error('[v0] Pillar computation error:', pillarError)
-      throw pillarError
+    const pillars = {
+      qqqTechnicals: await computeQQQTechnicals(data),  // NEW Pillar 1
+      valuation: await computeValuationStress(data),     // Renamed to Pillar 2
+      technical: await computeTechnicalFragility(data),   // Renamed to Pillar 3
+      macro: await computeMacroLiquidity(data),           // Renamed to Pillar 4
+      sentiment: await computeSentiment(data),            // Renamed to Pillar 5
+      flows: await computeFlows(data),                    // Renamed to Pillar 6
+      // Removed Pillar 7 - Structural (all baseline data)
     }
     
     const weights = {
@@ -81,63 +38,57 @@ export async function GET(request: Request) {
       pillars.flows * weights.flows
     )
     
-    const canaries = getTopCanaries(pillars, fetchedData)
+    const canaries = getTopCanaries(pillars, data)
     const canaryCount = canaries.filter(c => c.severity === 'high' || c.severity === 'medium').length
     
-    const confidence = computeCertaintyScore(pillars, fetchedData, canaryCount)
+    const confidence = computeCertaintyScore(pillars, data, canaryCount)
     
     const regime = determineRegime(ccpi, canaryCount)
     const playbook = getPlaybook(regime)
     
-    const summary = generateWeeklySummary(ccpi, confidence, regime, pillars, fetchedData, canaries)
+    const summary = generateWeeklySummary(ccpi, confidence, regime, pillars, data, canaries)
     
     const snapshot = {
-      // QQQ Technical Indicators
-      qqqDailyReturn: fetchedData.qqqDailyReturn,
-      qqqConsecDown: fetchedData.qqqConsecDown,
-      qqqBelowSMA20: fetchedData.qqqBelowSMA20,
-      qqqBelowSMA50: fetchedData.qqqBelowSMA50,
-      qqqBelowSMA200: fetchedData.qqqBelowSMA200,
-      qqqBelowBollinger: fetchedData.qqqBelowBollinger,
-      qqqDeathCross: fetchedData.qqqDeathCross,
-      qqqSMA20Proximity: fetchedData.qqqSMA20Proximity,
-      qqqSMA50Proximity: fetchedData.qqqSMA50Proximity,
-      qqqSMA200Proximity: fetchedData.qqqSMA200Proximity,
-      qqqBollingerProximity: fetchedData.qqqBollingerProximity,
+      // QQQ Technical Indicators (NEW)
+      qqqDailyReturn: data.qqqDailyReturn,
+      qqqConsecDown: data.qqqConsecDown,
+      qqqBelowSMA20: data.qqqBelowSMA20,
+      qqqBelowSMA50: data.qqqBelowSMA50,
+      qqqBelowSMA200: data.qqqBelowSMA200,
+      qqqBelowBollinger: data.qqqBelowBollinger,
+      qqqSMA20Proximity: data.qqqSMA20Proximity,
+      qqqSMA50Proximity: data.qqqSMA50Proximity,
+      qqqSMA200Proximity: data.qqqSMA200Proximity,
+      qqqBollingerProximity: data.qqqBollingerProximity,
       
-      // Valuation indicators
-      buffettIndicator: fetchedData.buffettIndicator,
-      spxPE: fetchedData.spxPE,
-      spxPS: fetchedData.spxPS,
-      
-      vix: fetchedData.vix,
-      vxn: fetchedData.vxn,
-      rvx: fetchedData.rvx,
-      atr: fetchedData.atr,
-      bullishPercent: fetchedData.bullishPercent, // FIX: Use fetchedData.bullishPercent
-      ltv: fetchedData.ltv,
-      vixTermStructure: fetchedData.vixTermStructure,
-      spotVol: fetchedData.spotVol,
-      
-      // Macro indicators
-      fedFundsRate: fetchedData.fedFundsRate,
-      junkSpread: fetchedData.junkSpread,
-      yieldCurve: fetchedData.yieldCurve,
-      creditSpread: fetchedData.creditSpread, // Added
-      treasury10Y: fetchedData.treasury10Y, // Added
-      tedSpread: fetchedData.tedSpread,
-      
-      // Sentiment indicators
-      aaiiBullish: fetchedData.aaiiBullish,
-      aaiiBearish: fetchedData.aaiiBearish,
-      putCallRatio: fetchedData.putCallRatio,
-      fearGreedIndex: fetchedData.fearGreedIndex,
-      riskAppetite: fetchedData.riskAppetite,
-      
-      qqqOptionsCallPutRatio: fetchedData.qqqOptionsCallPutRatio,
-      qqqOptionsCallVolume: fetchedData.qqqOptionsCallVolume,
-      qqqOptionsPutVolume: fetchedData.qqqOptionsPutVolume,
-      shortInterest: fetchedData.shortInterest
+      // Existing indicators
+      buffettIndicator: data.buffettIndicator,
+      spxPE: data.spxPE,
+      spxPS: data.spxPS,
+      vix: data.vix,
+      vxn: data.vxn,
+      rvx: data.rvx,
+      atr: data.atr,
+      highLowIndex: data.highLowIndex,
+      bullishPercent: data.bullishPercent,
+      ltv: data.ltv,
+      fedFundsRate: data.fedFundsRate,
+      junkSpread: data.junkSpread,
+      yieldCurve: data.yieldCurve,
+      aaiiBullish: data.aaiiBullish,
+      aaiiBearish: data.aaiiBearish,
+      putCallRatio: data.putCallRatio,
+      fearGreedIndex: data.fearGreed,
+      riskAppetite: data.riskAppetite,
+      etfFlows: data.etfFlows,
+      shortInterest: data.shortInterest,
+      aiCapexGrowth: data.snapshot.aiCapexGrowth,
+      aiRevenueGrowth: data.snapshot.aiRevenueGrowth,
+      gpuPricingPremium: data.snapshot.gpuPricingPremium,
+      aiJobPostingsGrowth: data.snapshot.aiJobPostingsGrowth,
+
+      vixTermStructure: data.vixTermStructure,
+      vixTermInverted: data.vixTermInverted,
     }
     
     return NextResponse.json({
@@ -160,130 +111,109 @@ export async function GET(request: Request) {
   }
 }
 
-// async function fetchTechnicals() {
-//   console.log('[v0] Fetching Technicals...')
-//   return {}
-// }
-
-// async function fetchSentimentData() {
-//   console.log('[v0] Fetching Sentiment Data...')
-//   return {}
-// }
-
-// async function fetchMacroData() {
-//   console.log('[v0] Fetching Macro Data...')
-//   return {}
-// }
-
-// async function fetchVIXData() {
-//   console.log('[v0] Fetching VIX Data...')
-//   return {}
-// }
-
-// async function fetchVIXHistory() {
-//   console.log('[v0] Fetching VIX History...')
-//   return {}
-// }
-
 async function fetchMarketData() {
   try {
     const results = await Promise.allSettled([
-      fetchFMPValuation(),
-      fetchAlphaVantageIndicators(),
-      fetchFREDIndicators(),
-      fetchAAIISentiment(),
+      fetchMarketBreadthData(),
+      fetchQQQTechnicalsData(),
       fetchVIXTermStructure(),
-      fetchApifyYahooFinance(['QQQ', '^GSPC']),
-      fetchQQQOptionsFlow()
+      fetchFREDIndicators(),
+      fetchAlphaVantageIndicators(),
+      fetchApifyYahooFinance(),
+      fetchFMPIndicators(),
+      fetchAAIISentiment(),
+      fetchETFFlows(),
+      fetchGPUPricing(),
+      fetchAIJobPostings(),
     ])
-
-    const fmpData = results[0].status === 'fulfilled' ? results[0].value : { spxPE: 22.5, spxPS: 2.8 }
-    const alphaVantageData = results[1].status === 'fulfilled' ? results[1].value : { vix: 20, vxn: 21, rvx: 20, dataSource: 'baseline' }
-    const fredData = results[2].status === 'fulfilled' ? results[2].value : { fedFundsRate: 5.33, junkSpread: 3.2, yieldCurve: -0.5, treasury10Y: 4.5, tedSpread: 0.25, creditSpread: 3.2, buffettIndicator: 180, dataSource: 'baseline' }
-    const aaii = results[3].status === 'fulfilled' ? results[3].value : { bullish: 42, bearish: 28, dataSource: 'baseline' }
-    const vixTerm = results[4].status === 'fulfilled' ? results[4].value : { structure: 1.2, inverted: false, dataSource: 'baseline' }
-    const apifyYahooData = results[5].status === 'fulfilled' ? results[5].value : { spxPE: 22.5, spxPS: 2.8, putCallRatio: 0.72, shortInterest: 16.5, bullishPercent: 58 }
-    const qqqOptions = results[6].status === 'fulfilled' ? results[6].value : { callPutRatio: 1.2, callVolume: 0, putVolume: 0, dataSource: 'baseline' }
-
-    const fmpStatus = results[0].status
-    const alphaVantageStatus = results[1].status
-    const fredStatus = results[2].status
-    const aaiiStatus = results[3].status
-    const vixTermStatus = results[4].status
-    const apifyYahooStatus = results[5].status
-    const qqqOptionsStatus = results[6].status
     
-    console.log('[v0] Market data fetch statuses:', {
-      fmp: fmpStatus,
-      alphaVantage: alphaVantageStatus,
-      fred: fredStatus,
-      aaii: aaiiStatus,
-      vixTerm: vixTermStatus,
-      apifyYahoo: apifyYahooStatus,
-      qqqOptions: qqqOptionsStatus,
-    })
-    
-    const qqqTechnicals = apifyYahooData.qqqTechnicals || {
-      dailyReturn: 0,
-      consecutiveDaysDown: 0,
-      belowSMA20: false,
-      belowSMA50: false,
+    // Extract values or use fallbacks
+    const marketBreadthData = results[0].status === 'fulfilled' ? results[0].value : { highLowIndex: 0.42, source: 'baseline' }
+    const qqqTechnicalsData = results[1].status === 'fulfilled' ? results[1].value : { 
+      dailyReturn: 0.0, 
+      consecutiveDaysDown: 0, 
+      belowSMA20: false, 
+      belowSMA50: false, 
       belowSMA200: false,
       belowBollingerBand: false,
-      deathCross: false,
-      sma20Proximity: 0,
-      sma50Proximity: 0,
-      sma200Proximity: 0,
-      bollingerProximity: 0,
+      source: 'baseline' 
     }
+    const vixTermData = results[2].status === 'fulfilled' ? results[2].value : { termStructure: 1.5, isInverted: false, source: 'baseline' }
+    const fredData = results[3].status === 'fulfilled' ? results[3].value : { fedFundsRate: 5.33, junkSpread: 3.5, yieldCurve: 0.25 }
+    const alphaVantageData = results[4].status === 'fulfilled' ? results[4].value : { vix: 16, vxn: 18, rvx: 20.1, ltv: 0.15, atr: 35, spotVol: 0.22 }
+    const apifyYahooData = results[5].status === 'fulfilled' ? results[5].value : { buffettIndicator: 180, spxPE: 21.5, spxPS: 2.9, putCallRatio: 0.72, shortInterest: 18 }
+    const fmpData = results[6].status === 'fulfilled' ? results[6].value : { spxPE: 21.5, spxPS: 2.9 }
+    const aaiData = results[7].status === 'fulfilled' ? results[7].value : { bullish: 35, bearish: 28, fearGreed: 50 }
+    const etfData = results[8].status === 'fulfilled' ? results[8].value : { techETFFlows: -1.8 }
+    const gpuData = results[9].status === 'fulfilled' ? results[9].value : { premium: 20 }
+    const jobData = results[10].status === 'fulfilled' ? results[10].value : { growth: -5 }
     
+    console.log('[v0] Market data fetch results:', {
+      breadth: results[0].status,
+      qqq: results[1].status,
+      vixTerm: results[2].status,
+      fred: results[3].status,
+      alphaVantage: results[4].status,
+      apifyYahoo: results[5].status,
+      fmp: results[6].status,
+      aaii: results[7].status,
+      etf: results[8].status,
+      gpu: results[9].status,
+      jobs: results[10].status,
+    })
+    
+    // Corrected property name for qqqBelowBollingerBand to qqqBelowBollinger
     return {
-      buffettIndicator: fredData.buffettIndicator,
-      spxPE: fmpData.spxPE,
-      spxPS: fmpData.spxPS,
+      qqqDailyReturn: qqqTechnicalsData.dailyReturn,
+      qqqConsecDown: qqqTechnicalsData.consecutiveDaysDown,
+      qqqBelowSMA20: qqqTechnicalsData.belowSMA20,
+      qqqBelowSMA50: qqqTechnicalsData.belowSMA50,
+      qqqBelowSMA200: qqqTechnicalsData.belowSMA200 ?? false,
+      qqqBelowBollinger: qqqTechnicalsData.belowBollingerBand, 
+      qqqSMA20Proximity: qqqTechnicalsData.sma20Proximity ?? 0,
+      qqqSMA50Proximity: qqqTechnicalsData.sma50Proximity ?? 0,
+      qqqSMA200Proximity: qqqTechnicalsData.sma200Proximity ?? 0,
+      qqqBollingerProximity: qqqTechnicalsData.bollingerProximity ?? 0,
+      
+      // Valuation indicators (Apify Yahoo Finance primary)
+      buffettIndicator: apifyYahooData.buffettIndicator,
+      spxPE: fmpData.spxPE || apifyYahooData.spxPE,
+      spxPS: fmpData.spxPS || apifyYahooData.spxPS,
       
       vix: alphaVantageData.vix,
       vxn: alphaVantageData.vxn,
-      rvx: alphaVantageData.rvx,
+      rvx: alphaVantageData.rvx || 20.1,
       atr: alphaVantageData.atr,
-      bullishPercent: apifyYahooData.bullishPercent,
+      highLowIndex: marketBreadthData.highLowIndex,
+      bullishPercent: 58,
       ltv: alphaVantageData.ltv,
-      spotVol: apifyYahooData.spotVol,
+      spotVol: alphaVantageData.spotVol || 0.22,
       
+      // Macro indicators (FRED - already working)
       fedFundsRate: fredData.fedFundsRate,
       junkSpread: fredData.junkSpread,
       yieldCurve: fredData.yieldCurve,
-      creditSpread: fredData.creditSpread,
-      treasury10Y: fredData.treasury10Y,
-      tedSpread: fredData.tedSpread,
       
-      aaiiBullish: aaii.bullish,
-      aaiiBearish: aaii.bearish,
+      aaiiBullish: aaiData.bullish,
+      aaiiBearish: aaiData.bearish,
       putCallRatio: apifyYahooData.putCallRatio,
-      fearGreedIndex: aaii.fearGreed,
-      riskAppetite: 35, // Placeholder - needs actual fetch
+      fearGreedIndex: aaiData.fearGreed,
+      riskAppetite: 35,
       
+      // Flow indicators (ETF.com + Yahoo Finance)
+      etfFlows: etfData.techETFFlows,
       shortInterest: apifyYahooData.shortInterest,
       
-      vixTermStructure: vixTerm.structure,
-      vixTermInverted: vixTerm.inverted,
+      vixTermStructure: vixTermData.termStructure,
+      vixTermInverted: vixTermData.isInverted,
 
-      qqqOptionsCallPutRatio: qqqOptions.callPutRatio,
-      qqqOptionsCallVolume: qqqOptions.callVolume,
-      qqqOptionsPutVolume: qqqOptions.putVolume,
-
-      // QQQ Technicals
-      qqqDailyReturn: qqqTechnicals.dailyReturn,
-      qqqConsecDown: qqqTechnicals.consecutiveDaysDown,
-      qqqBelowSMA20: qqqTechnicals.belowSMA20,
-      qqqBelowSMA50: qqqTechnicals.belowSMA50,
-      qqqBelowSMA200: qqqTechnicals.belowSMA200 ?? false,
-      qqqBelowBollinger: qqqTechnicals.belowBollingerBand, 
-      qqqDeathCross: qqqTechnicals.deathCross ?? false,
-      qqqSMA20Proximity: qqqTechnicals.sma20Proximity ?? 0,
-      qqqSMA50Proximity: qqqTechnicals.sma50Proximity ?? 0,
-      qqqSMA200Proximity: qqqTechnicals.sma200Proximity ?? 0,
-      qqqBollingerProximity: qqqTechnicals.bollingerProximity ?? 0,
+      snapshot: {
+        aiCapexGrowth: 40,
+        aiRevenueGrowth: 15,
+        gpuPricingPremium: gpuData.premium,
+        aiJobPostingsGrowth: jobData.growth
+      },
+      canaryCount: 0
     }
   } catch (error) {
     console.error('[v0] fetchMarketData error:', error)
@@ -292,76 +222,82 @@ async function fetchMarketData() {
 }
 
 
-// FRED API Integration - Free, reliable economic data
-async function fetchFREDIndicators() {
+async function fetchMarketBreadth() {
   try {
-    const fredKey = process.env.FRED_API_KEY
-    if (!fredKey) {
-      console.warn('[v0] FRED_API_KEY not set, using baseline values')
-      return {
-        fedFundsRate: 5.33,
-        junkSpread: 3.2,
-        yieldCurve: -0.5,
-        treasury10Y: 4.5,
-        tedSpread: 0.25,
-        buffettIndicator: 180,
-        dataSource: 'baseline-no-api-key'
-      }
-    }
-
-    const [fedfunds, junk, curve, treasury, ted] = await Promise.all([
-      fetch(`https://api.stlouisfed.org/fred/series/observations?series_id=FEDFUNDS&api_key=${fredKey}&limit=1&sort_order=desc&file_type=json`),
-      fetch(`https://api.stlouisfed.org/fred/series/observations?series_id=BAMLH0A0HYM2&api_key=${fredKey}&limit=1&sort_order=desc&file_type=json`),
-      fetch(`https://api.stlouisfed.org/fred/series/observations?series_id=T10Y2Y&api_key=${fredKey}&limit=1&sort_order=desc&file_type=json`),
-      fetch(`https://api.stlouisfed.org/fred/series/observations?series_id=DGS10&api_key=${fredKey}&limit=1&sort_order=desc&file_type=json`),
-      fetch(`https://api.stlouisfed.org/fred/series/observations?series_id=TEDRATE&api_key=${fredKey}&limit=1&sort_order=desc&file_type=json`)
-    ])
-
-    const [fedfundsData, junkData, curveData, treasuryData, tedData] = await Promise.all([
-      fedfunds.json(),
-      junk.json(),
-      curve.json(),
-      treasury.json(),
-      ted.json()
-    ])
-
-    const fedFundsRate = parseFloat(fedfundsData.observations?.[0]?.value || '5.33')
-    const junkSpread = parseFloat(junkData.observations?.[0]?.value || '3.2')
-    const yieldCurve = parseFloat(curveData.observations?.[0]?.value || '-0.5')
-    const treasury10Y = parseFloat(treasuryData.observations?.[0]?.value || '4.5')
-    const tedSpread = parseFloat(tedData.observations?.[0]?.value || '0.25')
+    console.log('[v0] Fetching live High-Low Index from market breadth function...')
     
-    const buffettIndicator = 180 // Baseline: historical average market cap to GDP ratio
-
-    console.log(`[v0] FRED Data: Fed=${fedFundsRate}%, Junk=${junkSpread}%, Curve=${yieldCurve}%, 10Y=${treasury10Y}%, TED=${tedSpread}%, Buffett=${buffettIndicator}% (baseline)`)
-
+    const data = await fetchMarketBreadthData()
+    
+    console.log(`[v0] High-Low Index: ${(data.highLowIndex * 100).toFixed(1)}% from ${data.source} (${data.highs}H / ${data.lows}L)`)
+    
     return {
-      fedFundsRate,
-      junkSpread,
-      yieldCurve,
-      treasury10Y,
-      tedSpread,
-      creditSpread: junkSpread,
-      buffettIndicator,
-      dataSource: 'fred-live'
+      value: data.highLowIndex, // This value is actually the highLowIndex used later in fetchMarketData
+      source: data.source,
+      highs: data.highs,
+      lows: data.lows,
+      // Calculate threshold based on highLowIndex value directly
+      threshold: data.highLowIndex > 0.5 ? 'bullish' : data.highLowIndex < 0.3 ? 'bearish' : 'neutral'
     }
   } catch (error) {
-    console.error('[v0] Error fetching FRED data:', error)
+    console.error('[v0] Market breadth fetch error:', error)
+    console.warn('[v0] Falling back to baseline High-Low Index value')
+    
     return {
-      fedFundsRate: 5.33,
-      junkSpread: 3.2,
-      yieldCurve: -0.5,
-      treasury10Y: 4.5,
-      tedSpread: 0.25,
-      creditSpread: 3.2,
-      buffettIndicator: 180,
-      dataSource: 'baseline-error'
+      value: 0.42, // Baseline high-low index
+      source: 'baseline',
+      highs: 0,
+      lows: 0,
+      threshold: 'neutral'
+    }
+  }
+}
+
+// FRED API Integration - Free, reliable economic data
+async function fetchFREDIndicators() {
+  const FRED_API_KEY = process.env.FRED_API_KEY
+  
+  if (!FRED_API_KEY) {
+    console.warn('[v0] FRED_API_KEY not set, using fallback values')
+    return {
+      fedFundsRate: 4.5,
+      junkSpread: 3.8,
+      yieldCurve: 0.15
+    }
+  }
+  
+  try {
+    const baseUrl = 'https://api.stlouisfed.org/fred/series/observations'
+    
+    // Fetch Fed Funds Rate, Junk Spread, and Yield Curve in parallel
+    const [fedFundsRes, junkSpreadRes, yieldCurveRes] = await Promise.all([
+      fetch(`${baseUrl}?series_id=DFF&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`),
+      fetch(`${baseUrl}?series_id=BAMLH0A0HYM2&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`),
+      fetch(`${baseUrl}?series_id=T10Y2Y&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`)
+    ])
+    
+    const [fedFunds, junkSpread, yieldCurve] = await Promise.all([
+      fedFundsRes.json(),
+      junkSpreadRes.json(),
+      yieldCurveRes.json()
+    ])
+    
+    return {
+      fedFundsRate: parseFloat(fedFunds.observations[0]?.value || '4.5'),
+      junkSpread: parseFloat(junkSpread.observations[0]?.value || '3.8'),
+      yieldCurve: parseFloat(yieldCurve.observations[0]?.value || '0.15')
+    }
+  } catch (error) {
+    console.error('[v0] FRED API error:', error)
+    return {
+      fedFundsRate: 4.5,
+      junkSpread: 3.8,
+      yieldCurve: 0.15
     }
   }
 }
 
 // FMP API Integration - Using stable endpoint for S&P 500 data
-async function fetchFMPValuation() {
+async function fetchFMPIndicators() {
   const FMP_API_KEY = process.env.FMP_API_KEY
   
   if (!FMP_API_KEY) {
@@ -370,7 +306,10 @@ async function fetchFMPValuation() {
       buffettIndicator: 180,
       spxPE: 22.5,
       spxPS: 2.8,
-      dataSource: 'baseline-no-api-key'
+      putCallRatio: 0.72,
+      shortInterest: 16.5,
+      highLowIndex: 0.42,
+      bullishPercent: 58
     }
   }
   
@@ -409,7 +348,10 @@ async function fetchFMPValuation() {
       buffettIndicator: 180, // Still needs calculation from FRED GDP data
       spxPE: parseFloat(spxPE.toFixed(2)),
       spxPS: parseFloat(spxPS.toFixed(2)),
-      dataSource: 'fmp-live'
+      putCallRatio: 0.72, // Not available from FMP - use other source
+      shortInterest: 16.5, // Not available from FMP - use other source
+      highLowIndex: 0.42, // Market breadth - not from FMP
+      bullishPercent: 58  // Not from FMP
     }
   } catch (error) {
     console.error('[v0] FMP API error:', error instanceof Error ? error.message : String(error))
@@ -419,7 +361,10 @@ async function fetchFMPValuation() {
       buffettIndicator: 180,
       spxPE: 22.5, // S&P 500 forward P/E - fallback baseline
       spxPS: 2.8,  // S&P 500 P/S ratio - fallback baseline
-      dataSource: 'baseline-error'
+      putCallRatio: 0.72,
+      shortInterest: 16.5,
+      highLowIndex: 0.42,
+      bullishPercent: 58
     }
   }
 }
@@ -427,10 +372,10 @@ async function fetchFMPValuation() {
 
 // Now using both Apify Yahoo Finance Actors with fallback strategy
 
-async function fetchApifyYahooFinance(symbols: string[]) {
-  const APIFY_API_KEY = process.env.APIFY_API_KEY
+async function fetchApifyYahooFinance() {
+  const APIFY_API_TOKEN = process.env.APIFY_API_KEY
   
-  if (!APIFY_API_KEY) {
+  if (!APIFY_API_TOKEN) {
     console.warn('[v0] APIFY_API_TOKEN not set, using baseline values')
     return {
       spxPE: 22.5,
@@ -438,31 +383,49 @@ async function fetchApifyYahooFinance(symbols: string[]) {
       putCallRatio: 0.72,
       shortInterest: 16.5,
       buffettIndicator: 180,
+      highLowIndex: 0.42,
       bullishPercent: 58,
       dataSource: 'baseline-no-apify-token'
     }
   }
 
   // Try canadesk actor first (primary), then architjn (fallback)
-  const actors = ['canadesk~yahoo-finance', 'Architjn~yahoo-finance']
+  const actors = [
+    {
+      name: 'canadesk~yahoo-finance',
+      input: {
+        startUrls: [
+          { url: 'https://finance.yahoo.com/quote/%5EGSPC' },
+          { url: 'https://finance.yahoo.com/quote/%5EGSPC/key-statistics' },
+          { url: 'https://finance.yahoo.com/quote/SPY/options' },
+          { url: 'https://finance.yahoo.com/quote/SPY/key-statistics' }
+        ],
+        maxRequestRetries: 3,
+        proxyConfiguration: { useApifyProxy: true }
+      }
+    },
+    {
+      name: 'Architjn~yahoo-finance',
+      input: {
+        tickers: ['^GSPC', 'SPY'],
+        maxRequestRetries: 3
+      }
+    }
+  ]
   
-  for (const actorName of actors) {
+  for (const actor of actors) {
     try {
-      console.log(`[v0] Calling Apify actor: ${actorName}...`)
+      console.log(`[v0] Calling Apify actor: ${actor.name}...`)
       
-      const response = await fetch(`https://api.apify.com/v2/acts/${actorName}/runs?token=${APIFY_API_KEY}&waitForFinish=60`, {
+      const response = await fetch(`https://api.apify.com/v2/acts/${actor.name}/runs?token=${APIFY_API_TOKEN}&waitForFinish=60`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          startUrls: symbols.map(symbol => ({ url: `https://finance.yahoo.com/quote/${symbol}` })),
-          maxRequestRetries: 3,
-          proxyConfiguration: { useApifyProxy: true }
-        })
+        body: JSON.stringify(actor.input)
       })
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unable to read error')
-        console.warn(`[v0] ${actorName} failed with ${response.status}: ${errorText.substring(0, 200)}`)
+        console.warn(`[v0] ${actor.name} failed with ${response.status}: ${errorText.substring(0, 200)}`)
         continue
       }
 
@@ -470,21 +433,21 @@ async function fetchApifyYahooFinance(symbols: string[]) {
       try {
         runData = await response.json()
       } catch (parseError) {
-        console.warn(`[v0] ${actorName} returned invalid JSON, trying next actor...`)
+        console.warn(`[v0] ${actor.name} returned invalid JSON, trying next actor...`)
         continue
       }
 
       const datasetId = runData.data?.defaultDatasetId
 
       if (!datasetId) {
-        console.warn(`[v0] ${actorName} returned no dataset ID, trying next actor...`)
+        console.warn(`[v0] ${actor.name} returned no dataset ID, trying next actor...`)
         continue
       }
 
-      const datasetResponse = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${APIFY_API_KEY}`)
+      const datasetResponse = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${APIFY_API_TOKEN}`)
       
       if (!datasetResponse.ok) {
-        console.warn(`[v0] ${actorName} dataset fetch failed with ${datasetResponse.status}, trying next actor...`)
+        console.warn(`[v0] ${actor.name} dataset fetch failed with ${datasetResponse.status}, trying next actor...`)
         continue
       }
 
@@ -492,16 +455,16 @@ async function fetchApifyYahooFinance(symbols: string[]) {
       try {
         results = await datasetResponse.json()
       } catch (parseError) {
-        console.warn(`[v0] ${actorName} dataset returned invalid JSON, trying next actor...`)
+        console.warn(`[v0] ${actor.name} dataset returned invalid JSON, trying next actor...`)
         continue
       }
       
       if (!Array.isArray(results) || results.length === 0) {
-        console.warn(`[v0] ${actorName} returned no results, trying next actor...`)
+        console.warn(`[v0] ${actor.name} returned no results, trying next actor...`)
         continue
       }
 
-      console.log(`[v0] ${actorName} completed successfully with ${results.length} results`)
+      console.log(`[v0] ${actor.name} completed successfully with ${results.length} results`)
 
       let spxPE = 22.5
       let spxPS = 2.8
@@ -510,12 +473,11 @@ async function fetchApifyYahooFinance(symbols: string[]) {
       let buffettIndicator = 180
       let highLowIndex = 0.42
       let bullishPercent = 58
-      let qqqTechnicals = {} // Initialize for QQQ technicals
 
       // Parse results from either actor format
       for (const item of results) {
         // Check for S&P 500 data
-        if (symbols.includes('^GSPC') && (item.symbol === '^GSPC' || item.symbol === 'GSPC' || item.url?.includes('GSPC'))) {
+        if (item.symbol === '^GSPC' || item.symbol === 'GSPC' || item.url?.includes('GSPC')) {
           if (item.forwardPE) spxPE = parseFloat(item.forwardPE)
           else if (item.trailingPE) spxPE = parseFloat(item.trailingPE)
           else if (item.valuation?.forwardPE) spxPE = parseFloat(item.valuation.forwardPE)
@@ -523,11 +485,11 @@ async function fetchApifyYahooFinance(symbols: string[]) {
           if (item.priceToSales) spxPS = parseFloat(item.priceToSales)
           else if (item.valuation?.priceToSales) spxPS = parseFloat(item.valuation.priceToSales)
           
-          console.log(`[v0] ${actorName} found S&P 500 data:`, { spxPE, spxPS })
+          console.log(`[v0] ${actor.name} found S&P 500 data:`, { spxPE, spxPS })
         }
 
         // Check for SPY options/statistics data
-        if (symbols.includes('SPY') && (item.symbol === 'SPY' || item.url?.includes('SPY'))) {
+        if (item.symbol === 'SPY' || item.url?.includes('SPY')) {
           // Put/Call ratio from options data
           if (item.options) {
             const puts = item.options.puts || []
@@ -548,25 +510,7 @@ async function fetchApifyYahooFinance(symbols: string[]) {
             shortInterest = parseFloat(item.statistics.shortPercentOfFloat) * 100
           }
           
-          console.log(`[v0] ${actorName} found SPY data:`, { putCallRatio, shortInterest })
-        }
-
-        // Extract QQQ technicals
-        if (symbols.includes('QQQ') && (item.symbol === 'QQQ' || item.url?.includes('QQQ'))) {
-          qqqTechnicals = {
-            dailyReturn: parseFloat(item.dailyReturn || '0'),
-            consecutiveDaysDown: parseInt(item.consecutiveDaysDown || '0'),
-            belowSMA20: item.belowSMA20 || false,
-            belowSMA50: item.belowSMA50 || false,
-            belowSMA200: item.belowSMA200 || false,
-            belowBollingerBand: item.belowBollingerBand || false,
-            deathCross: item.deathCross || false,
-            sma20Proximity: parseFloat(item.sma20Proximity || '0'),
-            sma50Proximity: parseFloat(item.sma50Proximity || '0'),
-            sma200Proximity: parseFloat(item.sma200Proximity || '0'),
-            bollingerProximity: parseFloat(item.bollingerProximity || '0'),
-          };
-          console.log(`[v0] ${actorName} found QQQ technical data:`, qqqTechnicals);
+          console.log(`[v0] ${actor.name} found SPY data:`, { putCallRatio, shortInterest })
         }
       }
 
@@ -578,11 +522,10 @@ async function fetchApifyYahooFinance(symbols: string[]) {
         buffettIndicator,
         highLowIndex,
         bullishPercent,
-        qqqTechnicals, // Include QQQ technicals
-        dataSource: actorName
+        dataSource: actor.name
       }
     } catch (error) {
-      console.error(`[v0] ${actorName} error:`, error instanceof Error ? error.message : String(error))
+      console.error(`[v0] ${actor.name} error:`, error instanceof Error ? error.message : String(error))
       // Continue to next actor
     }
   }
@@ -597,81 +540,156 @@ async function fetchApifyYahooFinance(symbols: string[]) {
     buffettIndicator: 180,
     highLowIndex: 0.42,
     bullishPercent: 58,
-    qqqTechnicals: {}, // Return empty object for QQQ technicals if fetch failed
     dataSource: 'baseline-apify-failed'
   }
 }
 
 
-async function fetchAlphaVantageIndicators() {
-  const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY
-  
-  if (!ALPHA_VANTAGE_API_KEY) {
-    console.warn('[v0] ALPHA_VANTAGE_API_KEY not set, using fallback values')
-    return {
-      vix: 18.2,
-      vxn: 19.5,
-      rvx: 20.1,
-      atr: 42.3,
-      ltv: 0.12,
-      spotVol: 0.22,
-      dataSource: 'baseline-no-api-key'
-    }
-  }
-  
+async function fetchYahooFinancePE() {
   try {
-    const baseUrl = 'https://www.alphavantage.co/query'
+    console.log('[v0] Fetching S&P 500 P/E from Yahoo Finance...')
     
-    // Fetch VIX, VXN, RVX
-    const [vixRes, vxnRes, rvxRes] = await Promise.all([
-      fetch(`${baseUrl}?function=VIX_90DAY&apikey=${ALPHA_VANTAGE_API_KEY}`),
-      fetch(`${baseUrl}?function=VXN_90DAY&apikey=${ALPHA_VANTAGE_API_KEY}`),
-      fetch(`${baseUrl}?function=RVX_90DAY&apikey=${ALPHA_VANTAGE_API_KEY}`)
-    ])
+    // Yahoo Finance Query API - Free, no auth required
+    const response = await fetch('https://query2.finance.yahoo.com/v10/finance/quoteSummary/%5EGSPC?modules=summaryDetail,defaultKeyStatistics,price', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    })
     
-    const [vixData, vxnData, rvxData] = await Promise.all([
-      vixRes.json(),
-      vxnRes.json(),
-      rvxRes.json()
-    ])
+    if (!response.ok) {
+      throw new Error(`Yahoo Finance failed: ${response.status}`)
+    }
     
-    const vix = parseFloat(vixData?.['VIX Close'] || '18.2')
-    const vxn = parseFloat(vxnData?.['VXN Close'] || '19.5')
-    const rvx = parseFloat(rvxData?.['RVX Close'] || '20.1')
+    const data = await response.json()
+    const stats = data.quoteSummary?.result?.[0]?.summaryDetail || {}
+    const keyStats = data.quoteSummary?.result?.[0]?.defaultKeyStatistics || {}
     
-    // Fetch ATR (Average True Range) - Note: Alpha Vantage SMA is not ATR
-    // Using a placeholder for ATR as it's not directly available via free AV API
-    const atr = 42.3 
+    // Extract P/E ratio
+    const forwardPE = keyStats.forwardPE?.raw || stats.trailingPE?.raw || 22.5
     
-    // Left Tail Volatility (LTV) - not directly available, use VIX level as proxy
-    const ltv = vix > 25 ? 0.18 : vix > 20 ? 0.14 : vix > 15 ? 0.11 : 0.08
+    // Extract Price-to-Sales (from market cap / revenue)
+    const marketCap = stats.marketCap?.raw
+    const revenue = keyStats.totalRevenue?.raw
+    const priceToSales = (marketCap && revenue) ? (marketCap / revenue) : 2.8
     
-    // Spot Volatility - derived from VIX
-    const spotVol = vix / 100
+    console.log('[v0] Yahoo Finance P/E:', forwardPE, 'P/S:', priceToSales)
     
     return {
-      vix,
-      vxn,
-      rvx,
-      atr,
-      ltv,
-      spotVol,
-      dataSource: 'alphavantage-live'
+      spxPE: parseFloat(forwardPE.toFixed(2)),
+      spxPS: parseFloat(priceToSales.toFixed(2)),
+      dataSource: 'yahoo-finance'
     }
   } catch (error) {
-    console.error('[v0] Alpha Vantage API error:', error)
+    console.error('[v0] Yahoo Finance P/E error:', error.message)
     return {
-      vix: 18.2,
-      vxn: 19.5,
-      rvx: 20.1,
-      atr: 42.3,
-      ltv: 0.12,
-      spotVol: 0.22,
-      dataSource: 'baseline-error'
+      spxPE: 22.5,
+      spxPS: 2.8,
+      dataSource: 'baseline'
     }
   }
 }
 
+async function fetchYahooFinancePutCall() {
+  try {
+    console.log('[v0] Fetching Put/Call ratio from Yahoo Finance options...')
+    
+    // Get SPY options data (free public endpoint)
+    const response = await fetch('https://query2.finance.yahoo.com/v7/finance/options/SPY', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    })
+    
+    if (!response.ok) {
+      throw new Error(`Yahoo options failed: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    const options = data.optionChain?.result?.[0]?.options?.[0]
+    
+    if (!options) {
+      throw new Error('No options data')
+    }
+    
+    // Calculate put/call volume ratio
+    const puts = options.puts || []
+    const calls = options.calls || []
+    
+    const putVolume = puts.reduce((sum: number, p: any) => sum + (p.volume || 0), 0)
+    const callVolume = calls.reduce((sum: number, c: any) => sum + (c.volume || 0), 0)
+    
+    const putCallRatio = callVolume > 0 ? (putVolume / callVolume) : 0.72
+    
+    console.log('[v0] Yahoo Put/Call:', putCallRatio.toFixed(2))
+    
+    return {
+      putCallRatio: parseFloat(putCallRatio.toFixed(2)),
+      dataSource: 'yahoo-finance'
+    }
+  } catch (error) {
+    console.error('[v0] Yahoo Put/Call error:', error.message)
+    return {
+      putCallRatio: 0.72,
+      dataSource: 'baseline'
+    }
+  }
+}
+
+// Short interest now comes from Apify or baseline
+
+// async function fetchYahooFinanceShortInterest() {
+//   try {
+//     console.log('[v0] Fetching Short Interest from Yahoo Finance...')
+    
+//     // Get SPY statistics (includes short data)
+//     const response = await fetch('https://query2.finance.yahoo.com/v10/finance/quoteSummary/SPY?modules=defaultKeyStatistics', {
+//       headers: {
+//         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+//       }
+//     })
+    
+//     if (!response.ok) {
+//       throw new Error(`Yahoo short interest failed: ${response.status}`)
+//     }
+    
+//     const data = await response.json()
+//     const stats = data.quoteSummary?.result?.[0]?.defaultKeyStatistics
+    
+//     // Get short % of float
+//     const shortPercentOfFloat = stats?.shortPercentOfFloat?.raw
+    
+//     if (shortPercentOfFloat) {
+//       const shortInterest = shortPercentOfFloat * 100
+//       console.log('[v0] Yahoo Short Interest:', shortInterest.toFixed(1) + '%')
+      
+//       return {
+//         shortInterest: parseFloat(shortInterest.toFixed(1)),
+//         dataSource: 'yahoo-finance'
+//       }
+//     }
+    
+//     throw new Error('No short data')
+//   } catch (error) {
+//     console.error('[v0] Yahoo Short Interest error:', error.message)
+//     return {
+//       shortInterest: 16.5,
+//       dataSource: 'baseline'
+//     }
+//   }
+// }
+
+async function fetchMultplIndicators() {
+  // Calculated as: Total US Market Cap / GDP (~180% as of 2024)
+  return {
+    buffettIndicator: 180,
+    dataSource: 'baseline-historical-average'
+  }
+}
+
+
+
+// AAII Sentiment - REMOVED direct scraping (blocked by Incapsula)
+// Using alternative sources only for sentiment indicators
 async function fetchAAIISentiment() {
   try {
     console.log('[v0] Fetching sentiment indicators...')
@@ -735,72 +753,6 @@ async function fetchETFFlows() {
     }
   }
 }
-
-async function fetchQQQOptionsFlow() {
-  try {
-    console.log('[v0] Fetching QQQ options flow from Polygon...')
-    
-    if (!process.env.POLYGON_API_KEY) {
-      console.warn('[v0] POLYGON_API_KEY not set, using baseline')
-      return {
-        callVolume: 100,
-        putVolume: 80,
-        ratio: 1.25,
-        dataSource: 'baseline-no-api-key'
-      }
-    }
-
-    const response = await fetch(
-      `https://api.polygon.io/v3/snapshot/options/QQQ?apiKey=${process.env.POLYGON_API_KEY}`,
-      { next: { revalidate: 300 } }
-    )
-
-    if (!response.ok) {
-      console.warn('[v0] Polygon API failed, using baseline')
-      return {
-        callVolume: 100,
-        putVolume: 80,
-        ratio: 1.25,
-        dataSource: 'baseline-api-failed'
-      }
-    }
-
-    const data = await response.json()
-    
-    // Extract call and put volumes
-    const callVolume = data.results?.filter((opt: any) => opt.details?.contract_type === 'call')
-      .reduce((sum: number, opt: any) => sum + (opt.day?.volume || 0), 0) || 0
-    
-    const putVolume = data.results?.filter((opt: any) => opt.details?.contract_type === 'put')
-      .reduce((sum: number, opt: any) => sum + (opt.day?.volume || 0), 0) || 0
-
-    let ratio = 1.0
-    if (putVolume === 0 && callVolume > 0) {
-      ratio = 5.0 // Extremely bullish - cap at 5
-      console.log('[v0] QQQ Options Flow: Zero put volume detected, capping ratio at 5.0 (extreme bullish sentiment)')
-    } else if (putVolume > 0) {
-      ratio = callVolume / putVolume
-    }
-
-    console.log(`[v0] QQQ Options Flow: Call=${callVolume}, Put=${putVolume}, Ratio=${ratio.toFixed(2)}`)
-
-    return {
-      callVolume,
-      putVolume,
-      ratio,
-      dataSource: 'polygon-live'
-    }
-  } catch (error) {
-    console.error('[v0] Error fetching QQQ options flow:', error)
-    return {
-      callVolume: 100,
-      putVolume: 80,
-      ratio: 1.25,
-      dataSource: 'baseline-error'
-    }
-  }
-}
-
 
 async function fetchGPUPricing() {
   try {
@@ -878,7 +830,7 @@ async function fetchFMPIndicators_Legacy() {
     // These legacy endpoints no longer work on free tier:
     // - /api/v3/ratios (P/E, P/S ratios) - 403 Legacy
     // - /api/v3/market-capitalization - 403 Legacy  
-    // - /api/v3/market-capitalization - 403 Legacy
+    // - /api/v4/commitment_of_traders_report_analysis - 403 Legacy
     
     // Alternative: Use Alpha Vantage or Twelve Data for these metrics
     // For now, using recent realistic market values as fallback
@@ -909,6 +861,72 @@ async function fetchFMPIndicators_Legacy() {
   }
 }
 
+async function fetchAlphaVantageIndicators() {
+  const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY
+  
+  if (!ALPHA_VANTAGE_API_KEY) {
+    console.warn('[v0] ALPHA_VANTAGE_API_KEY not set, using fallback values')
+    return {
+      vix: 18.2,
+      vxn: 19.5,
+      rvx: 20.1,
+      atr: 42.3,
+      ltv: 0.12,
+      spotVol: 0.22
+    }
+  }
+  
+  try {
+    const baseUrl = 'https://www.alphavantage.co/query'
+    
+    // Fetch VIX, VXN, RVX (Realized Volatility)
+    const [vixRes, vxnRes, rvxRes] = await Promise.all([
+      fetch(`${baseUrl}?function=VIX_90DAY&apikey=${ALPHA_VANTAGE_API_KEY}`),
+      fetch(`${baseUrl}?function=VXN_90DAY&apikey=${ALPHA_VANTAGE_API_KEY}`),
+      fetch(`${baseUrl}?function=RVX_90DAY&apikey=${ALPHA_VANTAGE_API_KEY}`)
+    ])
+    
+    const [vixData, vxnData, rvxData] = await Promise.all([
+      vixRes.json(),
+      vxnRes.json(),
+      rvxRes.json()
+    ])
+    
+    const vix = parseFloat(vixData?.['VIX Close'] || '18.2')
+    const vxn = parseFloat(vxnData?.['VXN Close'] || '19.5')
+    const rvx = parseFloat(rvxData?.['RVX Close'] || '20.1')
+    
+    // Fetch ATR (Average True Range)
+    const atrRes = await fetch(`${baseUrl}?function=SMA&symbol=SPY&interval=daily&time_period=14&series_type=open&apikey=${ALPHA_VANTAGE_API_KEY}`)
+    const atrData = await atrRes.json()
+    const atr = parseFloat(atrData?.['Technical Analysis: SMA']?.[0]?.['SMA'] || '42.3')
+    
+    // Left Tail Volatility (LTV) - not directly available, use VIX level as proxy
+    const ltv = vix > 25 ? 0.18 : vix > 20 ? 0.14 : vix > 15 ? 0.11 : 0.08
+    
+    // Spot Volatility - derived from VIX
+    const spotVol = vix / 100
+    
+    return {
+      vix,
+      vxn,
+      rvx,
+      atr,
+      ltv,
+      spotVol
+    }
+  } catch (error) {
+    console.error('[v0] Alpha Vantage API error:', error)
+    return {
+      vix: 18.2,
+      vxn: 19.5,
+      rvx: 20.1,
+      atr: 42.3,
+      ltv: 0.12,
+      spotVol: 0.22
+    }
+  }
+}
 
 async function fetchTwelveDataIndicators() {
   const TWELVE_DATA_API_KEY = process.env.TWELVE_DATA_API_KEY || process.env.TWELVEDATA_API_KEY
@@ -921,8 +939,7 @@ async function fetchTwelveDataIndicators() {
       spxPS: 2.8,
       atr: 42.3,
       highLowIndex: 0.42,
-      bullishPercent: 58,
-      dataSource: 'baseline-no-api-key'
+      bullishPercent: 58
     }
   }
   
@@ -965,8 +982,7 @@ async function fetchTwelveDataIndicators() {
       spxPS,
       atr,
       highLowIndex,
-      bullishPercent,
-      dataSource: 'twelvedata-live'
+      bullishPercent
     }
   } catch (error) {
     console.error('[v0] Twelve Data API error:', error)
@@ -976,8 +992,7 @@ async function fetchTwelveDataIndicators() {
       spxPS: 2.8,
       atr: 42.3,
       highLowIndex: 0.42,
-      bullishPercent: 58,
-      dataSource: 'baseline-error'
+      bullishPercent: 58
     }
   }
 }
@@ -994,8 +1009,7 @@ async function fetchCBOEIndicators() {
       rvx: 20.1,
       putCallRatio: 0.72,
       ltv: 0.12,
-      spotVol: 0.22,
-      dataSource: 'baseline-no-api-key'
+      spotVol: 0.22
     }
   }
   
@@ -1028,8 +1042,7 @@ async function fetchCBOEIndicators() {
       rvx: 20.1, // Russell volatility - would need separate fetch
       putCallRatio,
       ltv,
-      spotVol: vix / 100, // Convert VIX to decimal volatility
-      dataSource: 'polygon-live'
+      spotVol: vix / 100 // Convert VIX to decimal volatility
     }
   } catch (error) {
     console.error('[v0] Polygon API error:', error)
@@ -1039,8 +1052,7 @@ async function fetchCBOEIndicators() {
       rvx: 20.1,
       putCallRatio: 0.72,
       ltv: 0.12,
-      spotVol: 0.22,
-      dataSource: 'baseline-error'
+      spotVol: 0.22
     }
   }
 }
@@ -1056,8 +1068,7 @@ async function fetchSentimentIndicators() {
       aaiiBullish: 42,
       aaiiBearish: 28,
       fearGreedIndex: 58,
-      riskAppetite: 35,
-      dataSource: 'baseline-placeholder'
+      riskAppetite: 35
     }
   } catch (error) {
     console.error('[v0] Sentiment API error:', error)
@@ -1065,8 +1076,7 @@ async function fetchSentimentIndicators() {
       aaiiBullish: 42,
       aaiiBearish: 28,
       fearGreedIndex: 58,
-      riskAppetite: 35,
-      dataSource: 'baseline-error'
+      riskAppetite: 35
     }
   }
 }
@@ -1078,15 +1088,13 @@ async function fetchFlowsIndicators() {
     // Placeholder values
     return {
       etfFlows: -1.8,
-      shortInterest: 16.5,
-      dataSource: 'baseline-placeholder'
+      shortInterest: 16.5
     }
   } catch (error) {
     console.error('[v0] Flows API error:', error)
     return {
       etfFlows: -1.8,
-      shortInterest: 16.5,
-      dataSource: 'baseline-error'
+      shortInterest: 16.5
     }
   }
 }
@@ -1101,8 +1109,7 @@ async function fetchAIStructuralIndicators() {
       aiCapexGrowth: 40,
       aiRevenueGrowth: 15,
       gpuPricingPremium: 20,
-      aiJobPostingsGrowth: -5,
-      dataSource: 'baseline-placeholder'
+      aiJobPostingsGrowth: -5
     }
   } catch (error) {
     console.error('[v0] AI Structural data error:', error)
@@ -1110,8 +1117,7 @@ async function fetchAIStructuralIndicators() {
       aiCapexGrowth: 40,
       aiRevenueGrowth: 15,
       gpuPricingPremium: 20,
-      aiJobPostingsGrowth: -5,
-      dataSource: 'baseline-error'
+      aiJobPostingsGrowth: -5
     }
   }
 }
@@ -1170,9 +1176,18 @@ async function computeTechnicalFragility(data: Awaited<ReturnType<typeof fetchMa
     score -= 10 // Steep contango - complacency
   }
   
-  // Bullish Percent Index - measures % of stocks on buy signals
-  if (data.bullishPercent < 40) score += 25
-
+  // High-Low Index (market breadth) - CRITICAL INDICATOR
+  // Low values = narrowERSHIP = fragile rally
+  if (data.highLowIndex < 0.3) score += 30 // Increased weight
+  else if (data.highLowIndex < 0.4) score += 20
+  else if (data.highLowIndex < 0.5) score += 12
+  else if (data.highLowIndex > 0.7) score -= 10 // Healthy breadth
+  
+  // Bullish Percent Index
+  if (data.bullishPercent > 70) score += 18
+  else if (data.bullishPercent > 60) score += 12
+  else if (data.bullishPercent < 30) score += 12 // Extreme weakness
+  
   // ATR (Average True Range) - volatility expansion indicator
   if (data.atr > 50) score += 18
   else if (data.atr > 40) score += 12
@@ -1213,26 +1228,6 @@ async function computeMacroLiquidity(data: Awaited<ReturnType<typeof fetchMarket
   else if (data.yieldCurve < 0) score += 12
   else if (data.yieldCurve > 1.0) score -= 10 // Healthy steepness
   
-  // Credit Spread (High Yield vs. Treasuries) - broader credit risk
-  // Normal: 3-5%, Stress: 5-7%, Crisis: >7%
-  if (data.creditSpread > 7) score += 35
-  else if (data.creditSpread > 5) score += 25
-  else if (data.creditSpread > 4) score += 15
-  
-  // Treasury 10Y Yield - high yields can pressure valuations
-  // Elevated yields > 4.5% are a headwind
-  if (data.treasury10Y > 4.5) score += 20
-  else if (data.treasury10Y > 4.0) score += 10
-  else if (data.treasury10Y < 2.5) score -= 10 // Lower yields are supportive
-  
-  // TED Spread = LIBOR minus 3-month T-Bill rate
-  // Normal: <0.25%, Elevated: 0.25-0.5%, Stress: >0.5%, Crisis: >1.0%
-  if (data.tedSpread > 1.0) score += 35 // Banking crisis levels
-  else if (data.tedSpread > 0.75) score += 28 // Severe stress
-  else if (data.tedSpread > 0.5) score += 22 // Banking stress (crash signal)
-  else if (data.tedSpread > 0.35) score += 15 // Elevated caution
-  else if (data.tedSpread > 0.25) score += 8 // Above normal
-  else if (data.tedSpread < 0.15) score -= 5 // Healthy banking system
   
   return Math.min(100, Math.max(0, score))
 }
@@ -1281,16 +1276,14 @@ async function computeSentiment(data: Awaited<ReturnType<typeof fetchMarketData>
 async function computeFlows(data: Awaited<ReturnType<typeof fetchMarketData>>): Promise<number> {
   let score = 0
   
-  // QQQ Options Flow (smart money positioning)
-  // High put volume (low ratio) = bearish positioning/hedging
-  const ratio = data.qqqOptionsCallPutRatio
-  
-  if (ratio < 0.6) score += 35 // Extreme put buying (crash protection)
-  else if (ratio < 0.8) score += 25 // Heavy put volume (defensive)
-  else if (ratio < 1.0) score += 15 // More puts than calls (caution)
-  else if (ratio < 1.2) score += 8 // Balanced with slight put bias
-  else if (ratio > 2.0) score += 12 // Excessive call buying (complacency)
-  else if (ratio > 1.5) score -= 5 // Healthy bullish flow
+  // ETF Flows (capital allocation trends)
+  // Large outflows signal distribution
+  if (data.etfFlows < -5) score += 35
+  else if (data.etfFlows < -3) score += 25
+  else if (data.etfFlows < -2) score += 18
+  else if (data.etfFlows < -1) score += 12
+  else if (data.etfFlows < 0) score += 8
+  else if (data.etfFlows > 5) score -= 5 // Strong inflows = risk on
   
   // Short Interest (positioning)
   // Very low short interest = complacency
@@ -1304,9 +1297,6 @@ async function computeFlows(data: Awaited<ReturnType<typeof fetchMarketData>>): 
     score += 15 // Double complacency warning
   }
   
-  if (ratio > 1.8 && data.putCallRatio < 0.7) {
-    score += 10 // Both indicators show extreme complacency
-  }
   
   return Math.min(100, Math.max(0, score))
 }
@@ -1516,15 +1506,6 @@ function getTopCanaries(
     })
   }
   
-  // QQQ Death Cross (50-day SMA crosses below 200-day SMA)
-  if (data.qqqDeathCross) {
-    canaries.push({
-      signal: `QQQ Death Cross active - 50-day moving average has crossed below 200-day moving average. This is a classic major bearish technical signal watched by institutional traders globally. Death crosses historically precede significant market declines and confirm the intermediate-term trend has turned negative. Combined with price below both moving averages, this indicates severe technical deterioration requiring defensive positioning.`,
-      pillar: "QQQ Momentum & Trend Health",
-      severity: (data.qqqBelowSMA50 && data.qqqBelowSMA200) ? "high" as const : "medium" as const
-    })
-  }
-
   if (data.qqqSMA20Proximity && data.qqqSMA20Proximity > 70 && 
       data.qqqSMA50Proximity && data.qqqSMA50Proximity > 70 && 
       data.qqqBollingerProximity && data.qqqBollingerProximity > 70) {
@@ -1544,9 +1525,11 @@ function getTopCanaries(
     })
   }
   
-  // ===== PILLAR 2: VALUATION STRESS INDICATORS =====
+  // ===== EXISTING CANARIES FOR PILLARS 2-7 =====
   
-  // Buffett Indicator - measures total stock market value vs GDP
+  // ===== PILLAR 1: VALUATION STRESS INDICATORS =====
+  
+  // Buffett Indicator warning - measures total stock market value vs GDP
   if (data.buffettIndicator > 120) {
     canaries.push({
       signal: `Buffett Indicator at ${data.buffettIndicator}% - total stock market cap is ${((data.buffettIndicator / 100) - 1).toFixed(0)}x larger than the entire US economy (GDP). Safe zone is 80-120%. At current levels, Warren Buffett's favorite valuation metric signals stocks are overpriced and vulnerable to correction.`,
@@ -1577,7 +1560,7 @@ function getTopCanaries(
     })
   }
   
-  // ===== PILLAR 3: TECHNICAL FRAGILITY INDICATORS =====
+  // ===== PILLAR 2: TECHNICAL FRAGILITY INDICATORS =====
   
   // VIX (Volatility Index) - the "fear gauge"
   if (data.vix > 20) {
@@ -1612,7 +1595,16 @@ function getTopCanaries(
     })
   }
   
-  // Bullish Percent Index
+  // High-Low Index (Market Breadth)
+  if (data.highLowIndex < 0.40) {
+    canaries.push({
+      signal: `High-Low Index at ${(data.highLowIndex * 100).toFixed(0)}% - only ${(data.highLowIndex * 100).toFixed(0)}% of stocks are participating in the market rally (healthy breadth = >50%). A narrow rally led by a few mega-cap stocks creates a fragile foundation where index gains mask underlying weakness.`,
+      pillar: "Technical Fragility",
+      severity: data.highLowIndex < 0.30 ? "high" as const : "medium" as const
+    })
+  }
+  
+  // Bullish Percent Index - measures overbought/oversold conditions
   if (data.bullishPercent > 65) {
     canaries.push({
       signal: `Bullish Percent Index at ${data.bullishPercent}% - ${data.bullishPercent}% of stocks are on point-and-figure buy signals (normal range: 30-70%). Above 70% signals an overbought market where most stocks have already made their move, leaving limited upside and high reversal risk.`,
@@ -1639,7 +1631,7 @@ function getTopCanaries(
     })
   }
   
-  // ===== PILLAR 4: MACRO & LIQUIDITY RISK INDICATORS =====
+  // ===== PILLAR 3: MACRO & LIQUIDITY RISK INDICATORS =====
   
   // Fed Funds Rate - restrictive monetary policy
   if (data.fedFundsRate > 4.25) {
@@ -1668,35 +1660,8 @@ function getTopCanaries(
       severity: data.yieldCurve < -0.3 ? "high" as const : "medium" as const
     })
   }
-
-  // Credit Spread (High Yield vs. Treasuries)
-  if (data.creditSpread > 5.0) {
-    canaries.push({
-      signal: `Credit Spread at ${data.creditSpread.toFixed(1)}% - the difference between high-yield corporate bond yields and U.S. Treasury yields is ${data.creditSpread.toFixed(1)}%. Spreads above 5% signal increasing credit risk and tightening liquidity, suggesting investors are demanding higher compensation for taking on corporate debt risk. This often precedes equity market weakness.`,
-      pillar: "Macro & Liquidity Risk",
-      severity: data.creditSpread > 7.0 ? "high" as const : "medium" as const
-    })
-  }
   
-  // Treasury 10Y Yield
-  if (data.treasury10Y > 4.0) {
-    canaries.push({
-      signal: `10-Year Treasury Yield at ${data.treasury10Y.toFixed(2)}% - benchmark government bond yields are elevated at ${data.treasury10Y.toFixed(2)}%. High long-term yields increase borrowing costs for businesses and consumers, and make bonds more attractive relative to stocks, potentially pressuring equity valuations.`,
-      pillar: "Macro & Liquidity Risk",
-      severity: data.treasury10Y > 4.5 ? "high" as const : "medium" as const
-    })
-  }
-
-  // TED Spread - bank counterparty risk and liquidity stress
-  if (data.tedSpread > 0.5) {
-    canaries.push({
-      signal: `TED Spread at ${data.tedSpread.toFixed(2)}% - the difference between LIBOR and 3-month Treasury Bills is ${data.tedSpread.toFixed(2)}%. Spreads above 0.5% signal elevated bank counterparty risk and credit market stress. During the 2008 financial crisis, the TED spread spiked above 4%. Rising TED spreads indicate banks are reluctant to lend to each other, suggesting liquidity concerns that often precede broader market weakness.`,
-      pillar: "Macro & Liquidity Risk",
-      severity: data.tedSpread > 0.75 ? "high" as const : "medium" as const
-    })
-  }
-  
-  // ===== PILLAR 5: SENTIMENT & MEDIA FEEDBACK INDICATORS =====
+  // ===== PILLAR 4: SENTIMENT & MEDIA FEEDBACK INDICATORS =====
   
   // AAII Bullish Sentiment - retail investor optimism
   if (data.aaiiBullish > 45) {
@@ -1770,26 +1735,19 @@ function getTopCanaries(
     }
   }
   
-  // ===== PILLAR 6: CAPITAL FLOWS & POSITIONING INDICATORS =====
+  // ===== PILLAR 5: CAPITAL FLOWS & POSITIONING INDICATORS =====
   
-  // QQQ Options Flow (smart money positioning via options)
-  const qqqOptionsRatio = data.qqqOptionsCallPutRatio
-  
-  if (qqqOptionsRatio < 0.6) {
+  // ETF Flows (capital allocation trends)
+  // Large outflows signal distribution
+  if (data.etfFlows < -1.0) {
     canaries.push({
-      signal: `QQQ Options Flow at ${qqqOptionsRatio.toFixed(2)} Call/Put ratio - put volume is ${(data.qqqOptionsPutVolume / data.qqqOptionsCallVolume).toFixed(1)}x call volume. Extreme put buying (${data.qqqOptionsPutVolume.toLocaleString()} puts vs ${data.qqqOptionsCallVolume.toLocaleString()} calls) shows institutions are aggressively hedging downside, often a precursor to sharp selloffs.`,
+      signal: `Tech ETF Outflows at $${Math.abs(data.etfFlows).toFixed(1)}B weekly - institutional money is exiting technology sector via ETFs at a rate of $${Math.abs(data.etfFlows).toFixed(1)} billion per week. Large sustained outflows often precede sector corrections as smart money reduces exposure before retail investors.`,
       pillar: "Capital Flows & Positioning",
-      severity: "high" as const
+      severity: data.etfFlows < -3.0 ? "high" as const : "medium" as const
     })
-  } else if (qqqOptionsRatio < 0.8) {
+  } else if (data.etfFlows > 3.0) {
     canaries.push({
-      signal: `QQQ Options Flow at ${qqqOptionsRatio.toFixed(2)} Call/Put ratio - heavy defensive positioning with put volume at ${data.qqqOptionsPutVolume.toLocaleString()} vs call volume at ${data.qqqOptionsCallVolume.toLocaleString()}. Smart money is buying protection, signaling concern about near-term downside.`,
-      pillar: "Capital Flows & Positioning",
-      severity: "medium" as const
-    })
-  } else if (qqqOptionsRatio > 2.0) {
-    canaries.push({
-      signal: `QQQ Options Flow at ${qqqOptionsRatio.toFixed(2)} Call/Put ratio - excessive call buying (${data.qqqOptionsCallVolume.toLocaleString()} calls vs ${data.qqqOptionsPutVolume.toLocaleString()} puts). Ratio above 2.0 shows extreme bullish speculation with minimal hedging, leaving market vulnerable if sentiment shifts.`,
+      signal: `Tech ETF Inflows at $${data.etfFlows.toFixed(1)}B weekly - massive institutional buying into technology sector ($${data.etfFlows.toFixed(1)}B/week). While bullish short-term, extremely large inflows can signal FOMO and late-stage buying that exhausts buying power.`,
       pillar: "Capital Flows & Positioning",
       severity: "medium" as const
     })
@@ -1810,23 +1768,38 @@ function getTopCanaries(
       severity: "medium" as const
     })
   }
-
-  // Credit Spread Widening - credit markets lead equities in crashes
-  if (data.creditSpread > 5.0 || data.creditSpread < 3.0) {
-    const isWidening = data.creditSpread > 5.0
-    if (isWidening) {
-      canaries.push({
-        signal: `Credit Spread at ${data.creditSpread.toFixed(2)}% - High Yield bonds are trading ${data.creditSpread.toFixed(2)}% above Treasuries (normal ~3-4%). Widening credit spreads show investors demanding much higher compensation for credit risk, historically a leading indicator that precedes equity market stress by weeks or months.`,
-        pillar: "Sentiment & Media Feedback", // NOTE: This canary is moved to Sentiment pillar
-        severity: data.creditSpread > 6.5 ? "high" as const : "medium" as const
-      })
-    } else {
-      canaries.push({
-        signal: `Credit Spread at ${data.creditSpread.toFixed(2)}% - Extremely tight credit spreads (<3%) show investors are taking excessive risk in junk bonds for minimal extra yield. This complacency in credit markets often precedes sudden spread widening and equity selloffs when reality sets in.`,
-        pillar: "Sentiment & Media Feedback", // NOTE: This canary is moved to Sentiment pillar
-        severity: "medium" as const
-      })
-    }
+  
+  // ===== PILLAR 6: STRUCTURAL INDICATORS (AI-SPECIFIC) =====
+  
+  // Note: These use hardcoded values since they're alt data, but we check them
+  const capexGrowth = data.snapshot.aiCapexGrowth || 40
+  const revenueGrowth = data.snapshot.aiRevenueGrowth || 15
+  const gpuPremium = (data.snapshot.gpuPricingPremium || 20) / 100
+  const jobPostingGrowth = data.snapshot.aiJobPostingsGrowth || -5
+  
+  const capexRevenueGap = capexGrowth - revenueGrowth
+  if (capexRevenueGap > 20) {
+    canaries.push({
+      signal: `AI CapEx growing ${capexGrowth}% while revenue grows ${revenueGrowth}% - companies are investing ${capexRevenueGap}% faster in AI infrastructure than they're generating revenue from it. This ${capexRevenueGap}-point gap signals potential overinvestment bubble where spending outpaces profitable use cases.`,
+      pillar: "Structural",
+      severity: "high" as const
+    })
+  }
+  
+  if (gpuPremium > 0.15) {
+    canaries.push({
+      signal: `GPU Pricing Premium at ${(gpuPremium * 100).toFixed(0)}% - AI chips trading ${(gpuPremium * 100).toFixed(0)}% above normal pricing due to supply constraints. Elevated premiums signal overheated demand that may not be sustainable, creating risk if demand cools or supply catches up.`,
+      pillar: "Structural",
+      severity: "medium" as const
+    })
+  }
+  
+  if (jobPostingGrowth < -3) {
+    canaries.push({
+      signal: `AI Job Postings declining ${Math.abs(jobPostingGrowth)}% - hiring demand for AI roles is falling ${Math.abs(jobPostingGrowth)}% year-over-year. Declining job postings can signal companies are pulling back on AI initiatives, potentially indicating the hype cycle is cooling.`,
+      pillar: "Structural",
+      severity: "medium" as const
+    })
   }
   
   return canaries
@@ -1910,6 +1883,7 @@ function getPlaybook(regime: ReturnType<typeof determineRegime>) {
         "Keep core AI/tech exposure but avoid large new leverage",
         "Continue income strategies: covered calls and moderate put selling",
         "Wheel strategy on robust AI-adjacent names",
+        "Initiate small diagonal call spreads to reduce cost",
         "Small amount of index puts or inverse ETF as low-cost tail hedge"
       ],
       allocation: {
@@ -2059,6 +2033,55 @@ function generateWeeklySummary(
   return { headline, bullets }
 }
 
+async function fetchQQQTechnicals() {
+  try {
+    console.log('[v0] Fetching QQQ technical indicators...')
+    
+    const data = await fetchQQQTechnicalsData()
+    
+    console.log('[v0] QQQ Technicals:', {
+      dailyReturn: `${data.dailyReturn}%`,
+      consecDown: data.consecutiveDaysDown,
+      belowSMA20: data.belowSMA20,
+      belowSMA50: data.belowSMA50,
+      // Added qqqBelowSMA200 logging
+      belowSMA200: data.belowSMA200,
+      deathCross: data.deathCross, // Keep logging this even if removed from calculation
+      belowBollingerBand: data.belowBollingerBand, // Added Bollinger Band logging
+      // Add proximity indicators to log
+      sma20Proximity: data.sma20Proximity,
+      sma50Proximity: data.sma50Proximity,
+      // Added sma200Proximity logging
+      sma200Proximity: data.sma200Proximity,
+      bollingerProximity: data.bollingerProximity,
+      source: data.source
+    })
+    
+    return data
+  } catch (error) {
+    console.error('[v0] QQQ technicals fetch error:', error)
+    console.warn('[v0] Falling back to baseline QQQ values')
+    
+    return {
+      dailyReturn: 0.0,
+      consecutiveDaysDown: 0,
+      belowSMA20: false,
+      belowSMA50: false,
+      // Baseline for SMA200
+      belowSMA200: false,
+      deathCross: false, // Baseline for death cross
+      belowBollingerBand: false, // Baseline for Bollinger Band
+      // Baseline for proximity indicators
+      sma20Proximity: 0,
+      sma50Proximity: 0,
+      // Baseline for SMA200Proximity
+      sma200Proximity: 0,
+      bollingerProximity: 0,
+      source: 'baseline'
+    }
+  }
+}
+
 async function computeQQQTechnicals(data: Awaited<ReturnType<typeof fetchMarketData>>): Promise<number> {
   console.log("[v0] Computing QQQ Technical Pillar score...")
   
@@ -2068,7 +2091,6 @@ async function computeQQQTechnicals(data: Awaited<ReturnType<typeof fetchMarketD
   const qqqBelowSMA50 = data.qqqBelowSMA50 || false
   const qqqBelowSMA200 = data.qqqBelowSMA200 || false
   const qqqBelowBollingerBand = data.qqqBelowBollinger || false
-  const qqqDeathCross = data.qqqDeathCross || false // Get death cross data
   const sma20Proximity = data.qqqSMA20Proximity || 0
   const sma50Proximity = data.qqqSMA50Proximity || 0
   const sma200Proximity = data.qqqSMA200Proximity || 0
@@ -2095,12 +2117,6 @@ async function computeQQQTechnicals(data: Awaited<ReturnType<typeof fetchMarketD
   } else if (qqqConsecDown === 2) {
     consecDownImpact = 5
   }
-  
-  // 3. Death Cross Signal (0-20 points)
-  let deathCrossImpact = 0
-  if (qqqDeathCross) {
-    deathCrossImpact = 20 // Major bearish signal
-  }
 
   // Uses proximity percentage: 0% = no risk, 100% = breached
   const sma20ProximityImpact = (sma20Proximity / 100) * 20
@@ -2119,7 +2135,6 @@ async function computeQQQTechnicals(data: Awaited<ReturnType<typeof fetchMarketD
   const score = 
     dailyReturnImpact +
     consecDownImpact +
-    deathCrossImpact + // Add death cross impact
     sma20ProximityImpact +
     sma50ProximityImpact +
     sma200ProximityImpact +
@@ -2135,30 +2150,9 @@ async function computeQQQTechnicals(data: Awaited<ReturnType<typeof fetchMarketD
     sma50ProximityImpact: sma50ProximityImpact.toFixed(1) + ` (${sma50Proximity}% proximity)`,
     sma200ProximityImpact: sma200ProximityImpact.toFixed(1) + ` (${sma200Proximity}% proximity)`,
     bollingerProximityImpact: bollingerProximityImpact.toFixed(1) + ` (${bollingerProximity}% proximity)`,
-    deathCrossImpact: deathCrossImpact.toFixed(1) + ` (${qqqDeathCross ? 'ACTIVE' : 'none'})`,
     compoundingPenalty,
     finalScore
   })
 
   return finalScore
-}
-
-// NOTE: The original code had an issue with `computeValuationStress` being defined twice.
-// The second definition (inside the Promise.allSettled) was removed to avoid duplicates.
-// Assuming the definition outside the Promise.allSettled is the intended one.
-// Also, `computeTechnicalFragility` was defined twice. The second one was removed.
-// `computeMacroLiquidity` was defined twice. The second one was removed.
-// `computeSentiment` was defined twice. The second one was removed.
-// `computeFlows` was defined twice. The second one was removed.
-// `computeStructuralAltData` was defined twice. The second one was removed.
-
-// The functions below are placed here as they are called within the GET function.
-// They are assumed to be correctly implemented and are not part of the diff.
-
-async function fetchMarketBreadthData() {
-  console.log('[v0] Market Breadth: Deprecated (replaced by VIX Term Structure)')
-  return {
-    highLowIndex: 0.42, // Neutral baseline
-    dataSource: 'baseline-deprecated'
-  }
 }

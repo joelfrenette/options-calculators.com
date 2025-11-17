@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { AlertTriangle, TrendingDown, Activity, DollarSign, Users, Database, RefreshCw, Download, Settings, Layers, Target, Briefcase, PieChart, TrendingUp } from 'lucide-react'
+import { AlertTriangle, TrendingDown, Activity, DollarSign, Users, Database, RefreshCw, Download, Settings, Layers } from 'lucide-react'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from "recharts"
 
 interface CCPIData {
@@ -43,7 +43,6 @@ interface CCPIData {
   }>
   indicators?: Record<string, any>
   timestamp: string
-  score?: number // Added score to interface to align with new components
 }
 
 interface HistoricalData {
@@ -218,27 +217,35 @@ export function CcpiDashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Header Controls */}
+      <div className="flex items-center justify-end">
+        <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
 
       {/* Main CCPI Score Card */}
       <Card className="border-2 shadow-lg">
-        <CardHeader className="bg-muted/50">
+        <CardHeader>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Activity className="h-6 w-6 text-primary" />
-              <div>
-                <CardTitle className="text-xl">CCPI: Crash & Correction Prediction Index</CardTitle>
-                <CardDescription>AI-led market correction early warning oracle for options traders</CardDescription>
-              </div>
+            <div>
+              <CardTitle className="text-2xl">CCPI: Crash & Correction Prediction Index</CardTitle>
+              <CardDescription>AI-led market correction early warning oracle for options traders</CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            </Button>
+            <Badge variant={zone.color === "red" ? "destructive" : "secondary"} className="text-lg px-4 py-2">
+              {zone.label}
+            </Badge>
           </div>
         </CardHeader>
         <CardContent>
           <div className="mb-6">
+            <h3 className="text-sm font-semibold mb-2 text-gray-700">CCPI Historical Scale</h3>
+            <p className="text-xs text-gray-500 mb-3">
+              Visual representation of crash risk zones from low risk to crash watch
+            </p>
             
-            <div className="pt-8">
+            <div className="pt-16">
               <div className="relative">
                 {/* Gradient bar */}
                 <div className="h-16 bg-gradient-to-r from-green-600 via-[20%] via-lime-500 via-[40%] via-yellow-500 via-[60%] via-orange-500 via-[80%] via-red-500 to-[100%] to-red-700 rounded-lg shadow-inner" />
@@ -334,7 +341,7 @@ export function CcpiDashboard() {
               Canaries in the Coal Mine - Active Warning Signals
             </div>
             <span className="text-2xl font-bold text-red-600">
-              {data.canaries.filter(c => c.severity === "high" || c.severity === "medium").length}
+              {data.canaries.filter(c => c.severity === "high" || c.severity === "medium").length}/23
             </span>
           </CardTitle>
           <CardDescription>Executive summary of medium and high severity red flags across all indicators</CardDescription>
@@ -384,7 +391,53 @@ export function CcpiDashboard() {
         </CardContent>
       </Card>
 
-      {/* Market Indicators Breakdown - Full Width */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Pillar Breakdown */}
+        
+
+        {/* Canaries in the Coal Mine */}
+        
+      </div>
+
+      <div className="grid grid-cols-1 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Seven Pillar Breakdown</CardTitle>
+            <CardDescription>Individual stress scores (0-100) across all risk dimensions</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={pillarChartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+                <YAxis domain={[0, 100]} />
+                <Tooltip />
+                <ReferenceLine y={60} stroke="orange" strokeDasharray="3 3" label="High Risk" />
+                <Bar dataKey="value" fill="#3b82f6" />
+              </BarChart>
+            </ResponsiveContainer>
+            
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              {pillarData.map((pillar) => {
+                const Icon = pillar.icon
+                const severity = pillar.value >= 70 ? "high" : pillar.value >= 50 ? "medium" : "low"
+                const color = severity === "high" ? "text-red-600" : severity === "medium" ? "text-orange-500" : "text-green-600"
+                
+                return (
+                  <div key={pillar.name} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                    <div className="flex items-center gap-2">
+                      <Icon className={`h-4 w-4 ${color}`} />
+                      <span className="text-sm font-medium">{pillar.name}</span>
+                    </div>
+                    <span className={`text-sm font-bold ${color}`}>{pillar.value}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {data.indicators && Object.keys(data.indicators).length > 0 && (
         <Card>
           <CardHeader>
@@ -411,17 +464,13 @@ export function CcpiDashboard() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">QQQ Daily Return (5× downside amplifier)</span>
-                        <span className="font-bold">{data.indicators.qqqDailyReturn}%</span>
+                        <span className="font-bold">{data.indicators.qqqDailyReturn}</span>
                       </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden bg-gray-200">
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        {/* Position indicator at the correct spot on the gradient */}
-                        <div 
-                          className="absolute top-0 bottom-0 w-1 bg-black"
-                          style={{ 
-                            left: `${Math.min(100, Math.max(0, ((parseFloat(data.indicators.qqqDailyReturn) + 2) / 4) * 100))}%` 
-                          }}
-                        />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${Math.min(100, Math.max(0, (parseFloat(data.indicators.qqqDailyReturn) + 2) / 4 * 100))}%` 
+                        }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
                         <span>Down: &lt;-1%</span>
@@ -438,13 +487,11 @@ export function CcpiDashboard() {
                         <span className="font-medium">QQQ Consecutive Down Days</span>
                         <span className="font-bold">{data.indicators.qqqConsecDown} days</span>
                       </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden bg-gray-200">
-                        <div 
-                          className="absolute inset-y-0 left-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500"
-                          style={{ 
-                            width: `${Math.min(100, (data.indicators.qqqConsecDown / 5) * 100)}%` 
-                          }}
-                        />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${Math.min(100, (data.indicators.qqqConsecDown / 5) * 100)}%` 
+                        }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
                         <span>Healthy: 0-1 days</span>
@@ -470,13 +517,11 @@ export function CcpiDashboard() {
                           </span>
                         </div>
                       </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden bg-gray-200">
-                        <div 
-                          className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500"
-                          style={{ 
-                            width: `${data.indicators?.qqqSMA20Proximity || 0}%`
-                          }}
-                        />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${data.indicators?.qqqSMA20Proximity || 0}%`
+                        }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
                         <span>Safe: 0% (far above)</span>
@@ -502,18 +547,16 @@ export function CcpiDashboard() {
                           </span>
                         </div>
                       </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden bg-gray-200">
-                        <div 
-                          className="absolute inset-y-0 left-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500"
-                          style={{ 
-                            width: `${data.indicators?.qqqSMA50Proximity || 0}%`
-                          }}
-                        />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${data.indicators?.qqqSMA50Proximity || 0}%`
+                        }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Healthy: 0-1 days</span>
-                        <span>Warning: 2-3 days</span>
-                        <span>Danger: 4+ days</span>
+                        <span>Safe: 0% (far above)</span>
+                        <span>Warning: 50%</span>
+                        <span>Danger: 100% (breached)</span>
                       </div>
                     </div>
                   )}
@@ -533,13 +576,11 @@ export function CcpiDashboard() {
                           </span>
                         </div>
                       </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden bg-gray-200">
-                        <div 
-                          className="absolute inset-y-0 left-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500"
-                          style={{ 
-                            width: `${data.indicators?.qqqSMA200Proximity || 0}%`
-                          }}
-                        />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${data.indicators?.qqqSMA200Proximity || 0}%`
+                        }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
                         <span>Safe: 0% (far above)</span>
@@ -565,10 +606,10 @@ export function CcpiDashboard() {
                           </span>
                         </div>
                       </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden bg-gray-200">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-red-500" />
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: data.indicators.qqqBelowBollinger ? '100%' : '0%' 
+                          marginLeft: `${data.indicators?.qqqBollingerProximity || 0}%`
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
@@ -622,133 +663,137 @@ export function CcpiDashboard() {
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        {/* Gray overlay for unfilled portion */}
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.buffettIndicator / 200) * 100)}%`
+                          marginLeft: `${Math.min(100, (data.indicators.buffettIndicator / 200) * 100)}%` 
                         }} />
+                        {/* Threshold markers */}
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-[60%] border-r-2 border-gray-400 opacity-30" />
+                          <div className="w-[20%] border-r-2 border-gray-400 opacity-30" />
+                        </div>
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Undervalued: &lt;80%</span>
-                        <span>Fair: 80-120%</span>
-                        <span>Overvalued: &gt;120%</span>
+                        <span>Normal: &lt;120%</span>
+                        <span>Warning: 120-160%</span>
+                        <span>Extreme: &gt;160%</span>
                       </div>
                     </div>
                   )}
 
-                  {/* S&P 500 Forward P/E */}
+                  {/* S&P 500 P/E */}
                   {data.indicators.spxPE !== undefined && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">S&P 500 Forward P/E</span>
-                        <span className="font-bold">{data.indicators.spxPE.toFixed(1)}x</span>
+                        <span className="font-bold">{data.indicators.spxPE}</span>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        {/* Gray overlay for unfilled portion */}
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.spxPE / 30) * 100)}%`
+                          marginLeft: `${Math.min(100, ((data.indicators.spxPE - 10) / 15) * 100)}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Cheap: &lt;15x</span>
-                        <span>Fair: 15-20x</span>
-                        <span>Expensive: &gt;20x</span>
+                        <span>Historical Median: 16</span>
+                        <span>Current: {data.indicators.spxPE}</span>
                       </div>
                     </div>
                   )}
 
-                  {/* S&P 500 Price-to-Sales */}
+                  {/* P/S Ratio */}
                   {data.indicators.spxPS !== undefined && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">S&P 500 Price-to-Sales</span>
-                        <span className="font-bold">{data.indicators.spxPS.toFixed(2)}x</span>
+                        <span className="font-bold">{data.indicators.spxPS}</span>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        {/* Gray overlay for unfilled portion */}
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.spxPS / 4) * 100)}%`
+                          marginLeft: `${Math.min(100, ((data.indicators.spxPS - 1) / 2) * 100)}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Cheap: &lt;1.5x</span>
-                        <span>Normal: 1.5-2.5x</span>
-                        <span>Expensive: &gt;2.5x</span>
+                        <span>Normal: &lt;2.5</span>
+                        <span>Elevated: &gt;3.0</span>
                       </div>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Pillar 3 - Technical Fragility */}
               <div className="space-y-4 border-t pt-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold flex items-center gap-2">
                     <Activity className="h-5 w-5 text-purple-600" />
-                    Pillar 3 - Technical Fragility (12% weight)
+                    Pillar 3 - Technical Fragility (10% weight)
                   </h3>
                   <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.technical)}/100</span>
                 </div>
                 <div className="space-y-6">
-                  {/* VIX (Volatility Index) */}
+                  
+                  {/* VIX */}
                   {data.indicators.vix !== undefined && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">VIX (Volatility Index)</span>
-                        <span className="font-bold">{data.indicators.vix.toFixed(2)}</span>
+                        <span className="font-bold">{data.indicators.vix}</span>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 via-orange-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.vix / 50) * 100)}%`
+                          marginLeft: `${Math.min(100, ((data.indicators.vix - 10) / 30) * 100)}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Low: &lt;15</span>
+                        <span>Calm: 10-15</span>
                         <span>Elevated: 20-30</span>
                         <span>High: &gt;30</span>
                       </div>
                     </div>
                   )}
 
-                  {/* VXN (Nasdaq Volatility) */}
+                  {/* VXN */}
                   {data.indicators.vxn !== undefined && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">VXN (Nasdaq Volatility)</span>
-                        <span className="font-bold">{data.indicators.vxn.toFixed(2)}</span>
+                        <span className="font-bold">{data.indicators.vxn}</span>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 via-orange-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.vxn / 50) * 100)}%`
+                          marginLeft: `${Math.min(100, ((data.indicators.vxn - 10) / 30) * 100)}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Low: &lt;18</span>
-                        <span>Elevated: 25-35</span>
-                        <span>High: &gt;35</span>
+                        <span>Calm: 10-15</span>
+                        <span>Elevated: 20-30</span>
+                        <span>High: &gt;30</span>
                       </div>
                     </div>
                   )}
 
-                  {/* VIX Term Structure */}
-                  {data.indicators.vixTermStructure !== undefined && (
+                  {/* High-Low Index */}
+                  {data.indicators.highLowIndex !== undefined && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">VIX Term Structure</span>
-                        <span className="font-bold">
-                          {data.indicators.vixTermInverted ? 'INVERTED' : data.indicators.vixTermStructure.toFixed(2)}
-                        </span>
+                        <span className="font-medium">High-Low Index</span>
+                        <span className="font-bold">{(data.indicators.highLowIndex * 100).toFixed(2)}%</span>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-yellow-500 to-orange-500" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: data.indicators.vixTermInverted ? '0%' : `${Math.min(100, (data.indicators.vixTermStructure / 3) * 100)}%`
+                          marginLeft: `${data.indicators.highLowIndex * 100}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Inverted: &lt;0</span>
-                        <span>Normal: 1-2</span>
-                        <span>Steep: &gt;2.5</span>
+                        <span>Weak: &lt;30%</span>
+                        <span>Neutral: 30-60%</span>
+                        <span>Strong: &gt;60%</span>
                       </div>
                     </div>
                   )}
@@ -758,12 +803,12 @@ export function CcpiDashboard() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">Bullish Percent Index</span>
-                        <span className="font-bold">{data.indicators.bullishPercent.toFixed(1)}%</span>
+                        <span className="font-bold">{data.indicators.bullishPercent}%</span>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${data.indicators.bullishPercent}%`
+                          marginLeft: `${data.indicators.bullishPercent}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
@@ -775,174 +820,151 @@ export function CcpiDashboard() {
                   )}
 
                   {/* Left Tail Volatility */}
-                  {data.indicators.leftTailVol !== undefined && (
+                  {data.indicators.ltv !== undefined && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">Left Tail Volatility (14-day)</span>
-                        <span className="font-bold">{data.indicators.leftTailVol.toFixed(2)}%</span>
+                        <span className="font-medium">Left Tail Volatility</span>
+                        <span className="font-bold">{(data.indicators.ltv * 100).toFixed(2)}%</span>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.leftTailVol / 5) * 100)}%`
+                          marginLeft: `${Math.min(100, (data.indicators.ltv * 100))}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Low: &lt;1%</span>
-                        <span>Elevated: 2-3%</span>
-                        <span>High: &gt;3%</span>
+                        <span>Low: &lt;10%</span>
+                        <span>Elevated: 10-20%</span>
+                        <span>High: &gt;20%</span>
                       </div>
                     </div>
                   )}
 
-                  {/* ATR (Average True Range) */}
+                  {/* ATR */}
                   {data.indicators.atr !== undefined && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">ATR (14-day) - Daily Trading Range</span>
-                        <span className="font-bold">{data.indicators.atr.toFixed(2)}%</span>
+                        <span className="font-medium">ATR (Average True Range)</span>
+                        <span className="font-bold">{data.indicators.atr}</span>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.atr / 5) * 100)}%`
+                          marginLeft: `${Math.min(100, ((data.indicators.atr - 20) / 40) * 100)}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Calm: &lt;1.5%</span>
-                        <span>Normal: 1.5-3%</span>
-                        <span>Volatile: &gt;3%</span>
+                        <span>Low: 20-30</span>
+                        <span>Elevated: 40-50</span>
+                        <span>High: &gt;50</span>
                       </div>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Pillar 4 - Macro & Liquidity Risk */}
               <div className="space-y-4 border-t pt-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <TrendingDown className="h-5 w-5 text-red-600" />
-                    Pillar 4 - Macro & Liquidity Risk (12% weight)
+                    <TrendingDown className="h-5 w-5 text-orange-600" />
+                    Pillar 4 - Macro & Liquidity Risk (10% weight)
                   </h3>
                   <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.macro)}/100</span>
                 </div>
                 <div className="space-y-6">
+                  
                   {/* Fed Funds Rate */}
                   {data.indicators.fedFundsRate !== undefined && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">Fed Funds Rate</span>
-                        <span className="font-bold">{data.indicators.fedFundsRate.toFixed(2)}%</span>
+                        <span className="font-bold">{data.indicators.fedFundsRate}%</span>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.fedFundsRate / 6) * 100)}%`
+                          marginLeft: `${Math.min(100, (data.indicators.fedFundsRate / 6) * 100)}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Low: &lt;2%</span>
+                        <span>Accommodative: &lt;2%</span>
                         <span>Neutral: 2-4%</span>
-                        <span>High: &gt;4%</span>
+                        <span>Restrictive: &gt;4.5%</span>
                       </div>
                     </div>
                   )}
 
-                  {/* Junk Bond Spread */}
+                  {/* Junk Spread */}
                   {data.indicators.junkSpread !== undefined && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">Junk Bond Spread (High Yield - Treasury)</span>
-                        <span className="font-bold">{data.indicators.junkSpread.toFixed(2)}%</span>
+                        <span className="font-medium">Junk Bond Spread</span>
+                        <span className="font-bold">{data.indicators.junkSpread}%</span>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.junkSpread / 8) * 100)}%`
+                          marginLeft: `${Math.min(100, ((data.indicators.junkSpread - 2) / 8) * 100)}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
                         <span>Tight: &lt;3%</span>
                         <span>Normal: 3-5%</span>
-                        <span>Wide: &gt;5%</span>
+                        <span>Wide: &gt;6%</span>
                       </div>
                     </div>
                   )}
 
-                  {/* Yield Curve (10Y-2Y) */}
+                  {/* Yield Curve */}
                   {data.indicators.yieldCurve !== undefined && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">Yield Curve (10Y - 2Y Treasury)</span>
-                        <span className="font-bold">
-                          {data.indicators.yieldCurve > 0 ? '+' : ''}{data.indicators.yieldCurve.toFixed(2)}%
-                        </span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.max(0, Math.min(100, ((data.indicators.yieldCurve + 1) / 3) * 100))}%`
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Inverted: &lt;-0.5%</span>
-                        <span>Flat: -0.5 to +0.5%</span>
-                        <span>Normal: &gt;+1%</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* TED Spread (LIBOR - T-Bill) */}
-                  {data.indicators.tedSpread !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">TED Spread (Bank Stress)</span>
-                        <span className="font-bold">{data.indicators.tedSpread.toFixed(2)}%</span>
+                        <span className="font-medium">Yield Curve (10Y-2Y)</span>
+                        <span className="font-bold">{data.indicators.yieldCurve}%</span>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.tedSpread / 1.5) * 100)}%`
+                          marginLeft: `${Math.min(100, Math.max(0, 100 - ((data.indicators.yieldCurve + 1) / 2) * 100))}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Healthy: &lt;0.25%</span>
-                        <span>Elevated: 0.25-0.5%</span>
-                        <span>Stress: &gt;0.5%</span>
+                        <span>Normal: &gt;0.5%</span>
+                        <span>Flat: 0-0.5%</span>
+                        <span>Inverted: &lt;0%</span>
                       </div>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Pillar 5 - Sentiment & Media Feedback */}
               <div className="space-y-4 border-t pt-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <Users className="h-5 w-5 text-orange-600" />
-                    Pillar 5 - Sentiment & Media Feedback (12% weight)
+                    <Users className="h-5 w-5 text-green-600" />
+                    Pillar 5 - Sentiment & Media Feedback (10% weight)
                   </h3>
                   <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.sentiment)}/100</span>
                 </div>
                 <div className="space-y-6">
+                  
                   {/* AAII Bullish Sentiment */}
                   {data.indicators.aaiiBullish !== undefined && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">AAII Bullish Sentiment</span>
-                        <span className="font-bold">{data.indicators.aaiiBullish.toFixed(1)}%</span>
+                        <span className="font-bold">{data.indicators.aaiiBullish}%</span>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${data.indicators.aaiiBullish}%`
+                          marginLeft: `${data.indicators.aaiiBullish}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Bearish: &lt;25%</span>
-                        <span>Neutral: 25-45%</span>
-                        <span>Bullish: &gt;45%</span>
+                        <span>Bearish: &lt;30%</span>
+                        <span>Neutral: 30-50%</span>
+                        <span>Euphoric: &gt;50%</span>
                       </div>
                     </div>
                   )}
@@ -952,18 +974,18 @@ export function CcpiDashboard() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">AAII Bearish Sentiment</span>
-                        <span className="font-bold">{data.indicators.aaiiBearish.toFixed(1)}%</span>
+                        <span className="font-bold">{data.indicators.aaiiBearish}%</span>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.aaiiBearish / 60) * 100)}%`
+                          marginLeft: `${data.indicators.aaiiBearish}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Low Fear: &lt;20%</span>
-                        <span>Neutral: 20-35%</span>
-                        <span>High Fear: &gt;35%</span>
+                        <span>Complacent: &lt;20%</span>
+                        <span>Normal: 20-35%</span>
+                        <span>Fearful: &gt;35%</span>
                       </div>
                     </div>
                   )}
@@ -973,12 +995,12 @@ export function CcpiDashboard() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">Put/Call Ratio</span>
-                        <span className="font-bold">{data.indicators.putCallRatio.toFixed(2)}</span>
+                        <span className="font-bold">{data.indicators.putCallRatio}</span>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.putCallRatio / 1.5) * 100)}%`
+                          marginLeft: `${Math.min(100, (data.indicators.putCallRatio / 1.5) * 100)}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
@@ -997,15 +1019,15 @@ export function CcpiDashboard() {
                         <span className="font-bold">{data.indicators.fearGreedIndex}</span>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${data.indicators.fearGreedIndex}%`
+                          marginLeft: `${data.indicators.fearGreedIndex}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Extreme Fear: &lt;25</span>
-                        <span>Neutral: 45-55</span>
-                        <span>Extreme Greed: &gt;75</span>
+                        <span>Fear: &lt;30</span>
+                        <span>Neutral: 30-70</span>
+                        <span>Greed: &gt;70</span>
                       </div>
                     </div>
                   )}
@@ -1018,48 +1040,48 @@ export function CcpiDashboard() {
                         <span className="font-bold">{data.indicators.riskAppetite}</span>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${data.indicators.riskAppetite}%`
+                          marginLeft: `${data.indicators.riskAppetite}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Risk Off: &lt;30</span>
+                        <span>Risk-Off: &lt;30</span>
                         <span>Neutral: 30-70</span>
-                        <span>Risk On: &gt;70</span>
+                        <span>Risk-On: &gt;70</span>
                       </div>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Pillar 6 - Capital Flows & Positioning */}
               <div className="space-y-4 border-t pt-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <Database className="h-5 w-5 text-green-600" />
-                    Pillar 6 - Capital Flows & Positioning (11% weight)
+                    <TrendingDown className="h-5 w-5 text-teal-600" />
+                    Pillar 6 - Capital Flows & Positioning (10% weight)
                   </h3>
                   <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.flows)}/100</span>
                 </div>
                 <div className="space-y-6">
-                  {/* QQQ Options Flow (Call/Put Ratio) */}
-                  {data.indicators.qqqOptionsFlow !== undefined && (
+                  
+                  {/* ETF Flows */}
+                  {data.indicators.etfFlows !== undefined && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">QQQ Options Call/Put Volume Ratio</span>
-                        <span className="font-bold">{data.indicators.qqqOptionsFlow.toFixed(2)}</span>
+                        <span className="font-medium">Tech ETF Flows (Weekly)</span>
+                        <span className="font-bold">${data.indicators.etfFlows}B</span>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.qqqOptionsFlow / 2) * 100)}%`
+                          marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.etfFlows + 5) / 10) * 100))}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Bearish: &lt;0.8</span>
-                        <span>Neutral: 0.8-1.2</span>
-                        <span>Bullish: &gt;1.5</span>
+                        <span>Outflows: &lt;-$2B</span>
+                        <span>Neutral: -$2B to $2B</span>
+                        <span>Inflows: &gt;$2B</span>
                       </div>
                     </div>
                   )}
@@ -1068,480 +1090,472 @@ export function CcpiDashboard() {
                   {data.indicators.shortInterest !== undefined && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">QQQ Short Interest (% of Float)</span>
-                        <span className="font-bold">{data.indicators.shortInterest.toFixed(2)}%</span>
+                        <span className="font-medium">Short Interest (% of Float)</span>
+                        <span className="font-bold">{data.indicators.shortInterest}%</span>
                       </div>
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.shortInterest / 5) * 100)}%`
+                          marginLeft: `${Math.min(100, (data.indicators.shortInterest / 30) * 100)}%` 
                         }} />
                       </div>
                       <div className="flex justify-between text-xs text-gray-600">
-                        <span>Low: &lt;1%</span>
-                        <span>Moderate: 1-2%</span>
-                        <span>High: &gt;2%</span>
+                        <span>Complacent: &lt;15%</span>
+                        <span>Normal: 15-20%</span>
+                        <span>Hedged: &gt;20%</span>
                       </div>
                     </div>
                   )}
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
-      {/* Options Strategy Guide card */}
-      {data && (
-        <Card>
-          <CardHeader className="bg-muted/50">
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Options Strategy Guide by CCPI Crash Risk Level
-            </CardTitle>
-            <CardDescription>Complete trading playbook across all crash risk regimes</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="space-y-4">
-              
-              {/* CCPI 0-19: Low Risk */}
-              <div className={`rounded-lg border-2 ${data.ccpi <= 19 ? 'border-green-500 bg-green-50/50' : 'border-gray-200'} p-4`}>
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-semibold text-gray-700">CCPI: 0-19</span>
-                      <span className="text-sm font-bold text-green-700">Low Risk</span>
-                    </div>
-                    <p className="text-xs text-gray-600">Market shows minimal crash signals. Safe to deploy capital with aggressive strategies.</p>
+              {/* Updated formula weights to include QQQ Technicals and renumbered */}
+              <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="font-semibold text-sm mb-3 text-blue-900">CCPI Formula Weights</h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-700">QQQ Technicals:</span>
+                    <span className="font-bold text-blue-900">30%</span>
                   </div>
-                  <span className="px-3 py-1 text-xs font-bold bg-green-100 text-green-800 rounded">TRENDING BUY</span>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-4 mb-3 text-sm">
-                  <div>
-                    <div className="text-xs text-gray-500 mb-1">CCPI</div>
-                    <div className="font-bold text-blue-600">0-19%</div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-700">Valuation:</span>
+                    <span className="font-bold text-blue-900">23%</span>
                   </div>
-                  <div>
-                    <div className="text-xs text-gray-500 mb-1">EXPOSURE</div>
-                    <div className="font-bold text-purple-600">80-100%</div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-700">Technical:</span>
+                    <span className="font-bold text-blue-900">12%</span>
                   </div>
-                  <div>
-                    <div className="text-xs text-gray-500 mb-1">POSITION SIZE</div>
-                    <div className="font-bold">Large (5-10%)</div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-700">Macro:</span>
+                    <span className="font-bold text-blue-900">12%</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-700">Sentiment:</span>
+                    <span className="font-bold text-blue-900">12%</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-700">Flows:</span>
+                    <span className="font-bold text-blue-900">11%</span>
                   </div>
                 </div>
-                
-                <div className="text-sm">
-                  <div className="font-semibold text-gray-700 mb-2">TOP STRATEGIES:</div>
-                  <ul className="space-y-1 text-xs text-gray-600">
-                    <li>• Sell cash-secured puts at 20-30 delta on SPY/QQQ</li>
-                    <li>• Run the wheel strategy on tier traders (NVDA, MSFT, AAPL)</li>
-                    <li>• Long ITM LEAPS on 70+ delta for portfolio leverage</li>
-                  </ul>
-                </div>
-              </div>
-
-              {/* CCPI 20-39: Normal */}
-              <div className={`rounded-lg border-2 ${data.ccpi >= 20 && data.ccpi <= 39 ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200'} p-4`}>
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-semibold text-gray-700">CCPI: 20-39</span>
-                      <span className="text-sm font-bold text-blue-700">Normal</span>
-                    </div>
-                    <p className="text-xs text-gray-600">Standard market conditions. Deploy capital with normal risk management protocols.</p>
-                  </div>
-                  <span className="px-3 py-1 text-xs font-bold bg-gray-100 text-gray-700 rounded">BUY</span>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-4 mb-3 text-sm">
-                  <div>
-                    <div className="text-xs text-gray-500 mb-1">CCPI</div>
-                    <div className="font-bold text-blue-600">15-25%</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-500 mb-1">EXPOSURE</div>
-                    <div className="font-bold text-purple-600">70-85%</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-500 mb-1">POSITION SIZE</div>
-                    <div className="font-bold">Medium (3-5%)</div>
-                  </div>
-                </div>
-                
-                <div className="text-sm">
-                  <div className="font-semibold text-gray-700 mb-2">TOP STRATEGIES:</div>
-                  <ul className="space-y-1 text-xs text-gray-600">
-                    <li>• Balanced put selling at 20-30 delta on SPY/QQQ</li>
-                    <li>• Consider calls for existing positions (45-50 DTE)</li>
-                    <li>• Set put spreads over 30-45 calendar days</li>
-                  </ul>
-                </div>
-              </div>
-
-              {/* CCPI 40-59: Hold */}
-              <div className={`rounded-lg border-2 ${data.ccpi >= 40 && data.ccpi <= 59 ? 'border-green-500 bg-green-50/50' : 'border-gray-200'} p-4`}>
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-semibold text-gray-700">CCPI: 40-59</span>
-                      <span className="text-sm font-bold text-green-700">Hold</span>
-                    </div>
-                    <p className="text-xs text-gray-600">Mild signal appearing. Reduce exposure and focus on defensive positioning.</p>
-                  </div>
-                  <span className="px-3 py-1 text-xs font-bold bg-green-100 text-green-800 rounded">HOLD</span>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-4 mb-3 text-sm">
-                  <div>
-                    <div className="text-xs text-gray-500 mb-1">CCPI</div>
-                    <div className="font-bold text-blue-600">30-40%</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-500 mb-1">EXPOSURE</div>
-                    <div className="font-bold text-purple-600">50-70%</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-500 mb-1">POSITION SIZE</div>
-                    <div className="font-bold">Small (1-3%)</div>
-                  </div>
-                </div>
-                
-                <div className="text-sm">
-                  <div className="font-semibold text-gray-700 mb-2">TOP STRATEGIES:</div>
-                  <ul className="space-y-1 text-xs text-gray-600">
-                    <li>• VIX to defined-risk strategies (e.g. spreads, iron condors)</li>
-                    <li>• Increase VIX call hedges (2-3 month expiry)</li>
-                    <li>• Sell put close ratio to avoid assignment</li>
-                  </ul>
-                </div>
-              </div>
-
-              {/* CCPI 60-79: High Alert */}
-              <div className={`rounded-lg border-2 ${data.ccpi >= 60 && data.ccpi <= 79 ? 'border-orange-500 bg-orange-50/50' : 'border-gray-200'} p-4`}>
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-semibold text-gray-700">CCPI: 60-79</span>
-                      <span className="text-sm font-bold text-orange-700">High Alert</span>
-                    </div>
-                    <p className="text-xs text-gray-600">Reduced mode signals. Protect capital and prepare for volatility expansion.</p>
-                  </div>
-                  <span className="px-3 py-1 text-xs font-bold bg-orange-100 text-orange-800 rounded">CAUTION</span>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-4 mb-3 text-sm">
-                  <div>
-                    <div className="text-xs text-gray-500 mb-1">CCPI</div>
-                    <div className="font-bold text-blue-600">50-60%</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-500 mb-1">EXPOSURE</div>
-                    <div className="font-bold text-purple-600">30-50%</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-500 mb-1">POSITION SIZE</div>
-                    <div className="font-bold">Very Small (0.5-1%)</div>
-                  </div>
-                </div>
-                
-                <div className="text-sm">
-                  <div className="font-semibold text-gray-700 mb-2">TOP STRATEGIES:</div>
-                  <ul className="space-y-1 text-xs text-gray-600">
-                    <li>• Buy puts back / close insurance (45-60 DTE)</li>
-                    <li>• If new position, buy at-the-money protective puts</li>
-                    <li>• Close or rollout short option immediately</li>
-                  </ul>
-                </div>
-              </div>
-
-              {/* CCPI 80-100: Crash Watch */}
-              <div className={`rounded-lg border-2 ${data.ccpi >= 80 ? 'border-red-500 bg-red-50/50' : 'border-gray-200'} p-4`}>
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-semibold text-gray-700">CCPI: 80-100</span>
-                      <span className="text-sm font-bold text-red-700">Crash Watch</span>
-                    </div>
-                    <p className="text-xs text-gray-600">Extreme crash risk. Sell all risky capital positions. Prioritize capital preservation.</p>
-                  </div>
-                  <span className="px-3 py-1 text-xs font-bold bg-red-100 text-red-800 rounded">VIGILANCE</span>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-4 mb-3 text-sm">
-                  <div>
-                    <div className="text-xs text-gray-500 mb-1">CCPI</div>
-                    <div className="font-bold text-blue-600">70-80%</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-500 mb-1">EXPOSURE</div>
-                    <div className="font-bold text-purple-600">10-30%</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-500 mb-1">POSITION SIZE</div>
-                    <div className="font-bold">Minimal (0-0.5%)</div>
-                  </div>
-                </div>
-                
-                <div className="text-sm">
-                  <div className="font-semibold text-gray-700 mb-2">TOP STRATEGIES:</div>
-                  <ul className="space-y-1 text-xs text-gray-600">
-                    <li>• Aggressive long puts on SPY/QQQ (10-60 DTE)</li>
-                    <li>• VIX tail spread to capitalize on volatility spike</li>
-                    <li>• Inverse ETFs (SQQQ, SH) at 3-month+ positions</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
-                <strong>Note:</strong> The CCPI is most effective when used with technical analysis and portfolio stress testing. OCP scores above 60 historically precede significant drawdowns within 1-4 weeks. Important proper sizing and risk off entries regardless of individual stock circumstances. Consult with a financial advisor for personalized advice.
+                <p className="text-xs text-blue-700 mt-3">
+                  Final CCPI = Σ(Pillar Score × Weight). Each pillar score (0-100) is calculated from multiple professional indicators with specific thresholds.
+                </p>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Portfolio Allocation card */}
-      {data && (
-        <Card>
-          <CardHeader className="bg-muted/50">
-            <CardTitle className="flex items-center gap-2">
-              <PieChart className="h-5 w-5" />
-              Portfolio Allocation by CCPI Crash Risk Level
-            </CardTitle>
-            <CardDescription>Recommended asset class diversification across crash risk regimes</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="space-y-4">
-              
-              {/* CCPI 0-19: Low Risk */}
-              <div className={`rounded-lg border-2 ${data.ccpi <= 19 ? 'border-green-500 bg-green-50/50' : 'border-gray-200'} p-4`}>
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-semibold text-gray-700">CCPI: 0-19</span>
-                      <span className="text-sm font-bold text-green-700">Low Risk</span>
-                    </div>
-                    <p className="text-xs text-gray-600">Aggressive growth allocation with maximum equity exposure</p>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-5 gap-3 mb-3 text-sm">
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">STOCKS/ETFS</div>
-                    <div className="font-bold text-green-700">55-65%</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">OPTIONS</div>
-                    <div className="font-bold text-purple-700">15-20%</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">TECH/CRYPTO</div>
-                    <div className="font-bold text-blue-700">8-12%</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">BONDS/CASH</div>
-                    <div className="font-bold text-gray-700">5-8%</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">CASH RESERVE</div>
-                    <div className="font-bold text-gray-700">5-10%</div>
-                  </div>
-                </div>
-                
-                <ul className="space-y-1 text-xs text-gray-600">
-                  <li>• Deploy 70%+ into aggressive long-term growth stocks</li>
-                  <li>• Allocate 15-20% to options strategies for leverage and yield</li>
-                  <li>• Hold 8-15% for payments across BTC/ETH</li>
-                  <li>• Minimal cash reserves (~5 low risk environment)</li>
-                  <li>• Keep good execution (3-5%) for insurance policy</li>
-                </ul>
-              </div>
+      {/* Options Strategy Guide by CCPI Crash Risk Level */}
+      <Card className="shadow-sm border-gray-200">
+        <CardHeader className="bg-gray-50 border-b border-gray-200">
+          <CardTitle className="text-lg font-bold text-gray-900">
+            Options Strategy Guide by CCPI Crash Risk Level
+          </CardTitle>
+          <p className="text-sm text-gray-600 mt-1">Complete trading playbook across all crash risk regimes</p>
+        </CardHeader>
+        <CardContent className="pt-4 pb-4">
+          <div className="space-y-2">
+            {[
+              {
+                range: "0-19",
+                level: "Low Risk",
+                signal: "STRONG BUY",
+                description: "Market shows minimal crash signals. Safe to deploy capital with aggressive strategies.",
+                guidance: {
+                  cashAllocation: "5-10%",
+                  marketExposure: "90-100%",
+                  positionSize: "Large (5-10%)",
+                  strategies: [
+                    "Sell cash-secured puts on quality names at 30-delta",
+                    "Run the wheel strategy on tech leaders (NVDA, MSFT, AAPL)",
+                    "Long ITM LEAPS calls (70-80 delta) for portfolio leverage",
+                    "Aggressive short strangles on high IV stocks",
+                    "Credit spreads in earnings season"
+                  ]
+                }
+              },
+              {
+                range: "20-39",
+                level: "Normal",
+                signal: "BUY",
+                description: "Standard market conditions. Deploy capital with normal risk management protocols.",
+                guidance: {
+                  cashAllocation: "15-25%",
+                  marketExposure: "70-85%",
+                  positionSize: "Medium (3-5%)",
+                  strategies: [
+                    "Balanced put selling at 20-30 delta on SPY/QQQ",
+                    "Covered calls on existing positions (40-45 DTE)",
+                    "Bull put spreads with 1.5-2x credit/risk ratio",
+                    "Diagonal calendar spreads for income + upside",
+                    "Protective puts on core holdings (10% allocation)"
+                  ]
+                }
+              },
+              {
+                range: "40-59",
+                level: "Caution",
+                signal: "HOLD",
+                description: "Mixed signals appearing. Reduce exposure and focus on defensive positioning.",
+                guidance: {
+                  cashAllocation: "30-40%",
+                  marketExposure: "50-70%",
+                  positionSize: "Small (1-3%)",
+                  strategies: [
+                    "Shift to defined-risk strategies only (spreads, iron condors)",
+                    "Increase VIX call hedges (2-3 month expiry)",
+                    "Roll out short puts to avoid assignment",
+                    "Close winning trades early (50-60% max profit)",
+                    "Buy protective puts on concentrated positions"
+                  ]
+                }
+              },
+              {
+                range: "60-79",
+                level: "High Alert",
+                signal: "CAUTION",
+                description: "Multiple crash signals active. Preserve capital and prepare for volatility expansion.",
+                guidance: {
+                  cashAllocation: "50-60%",
+                  marketExposure: "30-50%",
+                  positionSize: "Very Small (0.5-1%)",
+                  strategies: [
+                    "Buy VIX calls for crash insurance (60-90 DTE)",
+                    "Long put spreads on QQQ/SPY at-the-money",
+                    "Close all naked short options immediately",
+                    "Tactical long volatility trades (VXX calls)",
+                    "Gold miners (GDX) call options as diversification"
+                  ]
+                }
+              },
+              {
+                range: "80-100",
+                level: "Crash Watch",
+                signal: "SELL/HEDGE",
+                description: "Extreme crash risk. Full defensive positioning required. Prioritize capital preservation.",
+                guidance: {
+                  cashAllocation: "70-80%",
+                  marketExposure: "10-30%",
+                  positionSize: "Minimal (0.25-0.5%)",
+                  strategies: [
+                    "Aggressive long puts on SPY/QQQ (30-60 DTE)",
+                    "VIX call spreads to capitalize on volatility spike",
+                    "Inverse ETFs (SQQQ, SH) or long put options",
+                    "Close ALL short premium positions",
+                    "Tail risk hedges: deep OTM puts on major indices"
+                  ]
+                }
+              }
+            ].map((item, index) => {
+              const isCurrent =
+                data.ccpi >= Number.parseInt(item.range.split("-")[0]) &&
+                data.ccpi <= Number.parseInt(item.range.split("-")[1])
 
-              {/* CCPI 20-39: Normal */}
-              <div className={`rounded-lg border-2 ${data.ccpi >= 20 && data.ccpi <= 39 ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200'} p-4`}>
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-semibold text-gray-700">CCPI: 20-39</span>
-                      <span className="text-sm font-bold text-blue-700">Normal</span>
+              return (
+                <div
+                  key={index}
+                  className={`p-4 rounded-lg border transition-colors ${
+                    isCurrent ? "border-green-500 bg-green-100 shadow-md ring-2 ring-green-300" : "border-gray-200 bg-white hover:bg-gray-50"
+                  }`}
+                >
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <span className="font-mono text-sm font-bold text-gray-900">CCPI: {item.range}</span>
+                        <span
+                          className={`ml-3 font-bold text-sm ${
+                            index === 0
+                              ? "text-green-600"
+                              : index === 1
+                                ? "text-lime-600"
+                                : index === 2
+                                  ? "text-yellow-600"
+                                  : index === 3
+                                    ? "text-orange-600"
+                                    : "text-red-600"
+                          }`}
+                        >
+                          {item.level}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {isCurrent && (
+                          <span className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-full">
+                            CURRENT
+                          </span>
+                        )}
+                        <span
+                          className={`px-3 py-1 text-xs font-bold rounded-full ${
+                            item.signal === "STRONG BUY"
+                              ? "bg-green-100 text-green-800"
+                              : item.signal === "BUY"
+                                ? "bg-green-100 text-green-700"
+                                : item.signal === "HOLD"
+                                  ? "bg-gray-100 text-gray-700"
+                                  : item.signal === "CAUTION"
+                                    ? "bg-orange-100 text-orange-700"
+                                    : "bg-red-100 text-red-700"
+                          }`}
+                        >
+                          {item.signal}
+                        </span>
+                      </div>
                     </div>
-                    <p className="text-xs text-gray-600">Balanced allocation with standard risk management</p>
+                    <p className="text-sm text-gray-600 italic">{item.description}</p>
                   </div>
-                </div>
-                
-                <div className="grid grid-cols-5 gap-3 mb-3 text-sm">
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">STOCKS/ETFS</div>
-                    <div className="font-bold text-blue-700">45-55%</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">OPTIONS</div>
-                    <div className="font-bold text-purple-700">10-15%</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">TECH/CRYPTO</div>
-                    <div className="font-bold text-blue-700">5-8%</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">BONDS/CASH</div>
-                    <div className="font-bold text-gray-700">5-8%</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">CASH RESERVE</div>
-                    <div className="font-bold text-gray-700">15-25%</div>
-                  </div>
-                </div>
-                
-                <ul className="space-y-1 text-xs text-gray-600">
-                  <li>• Core equity exposure via diversified ETFs and blue chips</li>
-                  <li>• Use options for income generation and tactical positioning</li>
-                  <li>• Reduce crypto exposure to 5-8% of portfolio</li>
-                  <li>• Modest bond/cash layer (15-25%) for downside cushion</li>
-                  <li>• Keep options exposure &lt;15% to manage vol</li>
-                </ul>
-              </div>
 
-              {/* CCPI 40-59: Caution */}
-              <div className={`rounded-lg border-2 ${data.ccpi >= 40 && data.ccpi <= 59 ? 'border-green-500 bg-green-50/50' : 'border-gray-200'} p-4`}>
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-semibold text-gray-700">CCPI: 40-59</span>
-                      <span className="text-sm font-bold text-green-700">Caution</span>
+                  <div className="grid grid-cols-3 gap-3 mb-3">
+                    <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                      <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Cash</div>
+                      <div className="text-lg font-bold text-blue-900">{item.guidance.cashAllocation}</div>
                     </div>
-                    <p className="text-xs text-gray-600">Defensive tilt with elevated cash and hedges</p>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-5 gap-3 mb-3 text-sm">
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">STOCKS/ETFS</div>
-                    <div className="font-bold text-green-700">30-40%</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">OPTIONS</div>
-                    <div className="font-bold text-purple-700">8-12%</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">TECH/CRYPTO</div>
-                    <div className="font-bold text-blue-700">3-5%</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">BONDS/CASH</div>
-                    <div className="font-bold text-gray-700">10-15%</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">CASH RESERVE</div>
-                    <div className="font-bold text-gray-700">30-40%</div>
-                  </div>
-                </div>
-                
-                <ul className="space-y-1 text-xs text-gray-600">
-                  <li>• Reduce equity exposure to strictly only</li>
-                  <li>• SOE options allocation toward hedges and tail spreads</li>
-                  <li>• Trim crypto to absolute minimum (3-5% max)</li>
-                  <li>• Increase govt/short (10-15%) as safe haven</li>
-                  <li>• Build substantial cash position (30%+) for stability</li>
-                </ul>
-              </div>
-
-              {/* CCPI 60-79: High Alert */}
-              <div className={`rounded-lg border-2 ${data.ccpi >= 60 && data.ccpi <= 79 ? 'border-orange-500 bg-orange-50/50' : 'border-gray-200'} p-4`}>
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-semibold text-gray-700">CCPI: 60-79</span>
-                      <span className="text-sm font-bold text-orange-700">High Alert</span>
+                    <div className="p-3 bg-purple-50 rounded border border-purple-200">
+                      <div className="text-xs font-semibold text-purple-900 uppercase mb-1">Exposure</div>
+                      <div className="text-lg font-bold text-purple-900">{item.guidance.marketExposure}</div>
                     </div>
-                    <p className="text-xs text-gray-600">Capital preservation mode with heavy defensive positioning</p>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-5 gap-3 mb-3 text-sm">
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">STOCKS/ETFS</div>
-                    <div className="font-bold text-orange-700">15-25%</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">OPTIONS</div>
-                    <div className="font-bold text-purple-700">10-15%</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">TECH/CRYPTO</div>
-                    <div className="font-bold text-blue-700">0-2%</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">BONDS/CASH</div>
-                    <div className="font-bold text-gray-700">10-20%</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">CASH RESERVE</div>
-                    <div className="font-bold text-gray-700">50-60%</div>
-                  </div>
-                </div>
-                
-                <ul className="space-y-1 text-xs text-gray-600">
-                  <li>• Minimal equity exposure - only defensive sectors (utilities, staples)</li>
-                  <li>• Options portfolio entirely in crash protective hedges (puts/VIX)</li>
-                  <li>• Exit nearly all crypto exposure due to crash risk</li>
-                  <li>• Build aggressive flight: 10-20% to protect from crashes</li>
-                  <li>• Hold 50-60% cash to deploy after market correction</li>
-                </ul>
-              </div>
-
-              {/* CCPI 80-100: Crash Watch */}
-              <div className={`rounded-lg border-2 ${data.ccpi >= 80 ? 'border-red-500 bg-red-50/50' : 'border-gray-200'} p-4`}>
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-semibold text-gray-700">CCPI: 80-100</span>
-                      <span className="text-sm font-bold text-red-700">Crash Watch</span>
+                    <div className="p-3 bg-gray-50 rounded border border-gray-300">
+                      <div className="text-xs font-semibold text-gray-900 uppercase mb-1">Position Size</div>
+                      <div className="text-sm font-bold text-gray-900">{item.guidance.positionSize}</div>
                     </div>
-                    <p className="text-xs text-gray-600">Maximum defense - cash out and wait for reset only</p>
                   </div>
-                </div>
-                
-                <div className="grid grid-cols-5 gap-3 mb-3 text-sm">
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">STOCKS/ETFS</div>
-                    <div className="font-bold text-red-700">5-10%</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">OPTIONS</div>
-                    <div className="font-bold text-purple-700">10-15%</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">TECH/CRYPTO</div>
-                    <div className="font-bold text-blue-700">0%</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">BONDS/CASH</div>
-                    <div className="font-bold text-gray-700">20-25%</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">CASH RESERVE</div>
-                    <div className="font-bold text-gray-700">70-80%</div>
-                  </div>
-                </div>
-                
-                <ul className="space-y-1 text-xs text-gray-600">
-                  <li>• Liquidate nearly all equity exposure immediately</li>
-                  <li>• Options used exclusively for tail risk hedges and vol spreads</li>
-                  <li>• Zero crypto/risky assets - too volatile during crash events</li>
-                  <li>• Heavy treasury/safe 20-25% exposure</li>
-                  <li>• Hold 70-80% cash to deploy after market reset (20-30% drops)</li>
-                </ul>
-              </div>
 
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
-                <strong>Note:</strong> These allocations represent baseline guidelines for crash risk management. Always size based on your personal risk tolerance, time horizon, and financial goals. CPF areas above 60 warrant significant defensive posturing regardless of individual circumstances. Consult with a financial advisor for personalized advice.
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                  <div className="mb-3">
+                    <div className="text-xs font-bold text-gray-900 uppercase mb-2">Top Strategies</div>
+                    <div className="space-y-1">
+                      {item.guidance.strategies.slice(0, 3).map((strategy, idx) => (
+                        <div key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                          <span className="text-primary mt-1 flex-shrink-0">•</span>
+                          <span>{strategy}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+            <p className="text-sm text-blue-800 leading-relaxed">
+              <strong>Note:</strong> The CCPI is most effective when used with technical analysis and portfolio stress testing.
+              CCPI scores above 60 historically precede significant drawdowns within 1-6 months. Always maintain proper position
+              sizing and use defined-risk strategies during elevated CCPI regimes.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Portfolio Allocation by CCPI Crash Risk Level */}
+      <Card className="shadow-sm border-gray-200">
+        <CardHeader className="bg-gray-50 border-b border-gray-200">
+          <CardTitle className="text-lg font-bold text-gray-900">Portfolio Allocation by CCPI Crash Risk Level</CardTitle>
+          <p className="text-sm text-gray-600 mt-1">
+            Recommended asset class diversification across crash risk regimes
+          </p>
+        </CardHeader>
+        <CardContent className="pt-4 pb-4">
+          <div className="space-y-2">
+            {[
+              {
+                range: "0-19",
+                level: "Low Risk",
+                data: {
+                  stocks: "55-65%",
+                  options: "15-20%",
+                  crypto: "8-12%",
+                  gold: "3-5%",
+                  cash: "5-10%",
+                  description: "Aggressive growth allocation with maximum equity exposure",
+                  rationale: [
+                    "Deploy capital<bos>aggressively into quality tech growth stocks",
+                    "Allocate 15-20% to options strategies for leverage and income",
+                    "Hold 8-12% crypto for asymmetric upside (BTC/ETH)",
+                    "Minimal cash reserves needed in low-risk environment",
+                    "Small gold allocation (3-5%) as insurance policy"
+                  ]
+                }
+              },
+              {
+                range: "20-39",
+                level: "Normal",
+                data: {
+                  stocks: "45-55%",
+                  options: "12-15%",
+                  crypto: "5-8%",
+                  gold: "5-8%",
+                  cash: "15-25%",
+                  description: "Balanced allocation with standard risk management",
+                  rationale: [
+                    "Core equity exposure via diversified ETFs and blue chips",
+                    "Use options for income generation and tactical positioning",
+                    "Reduce crypto exposure to 5-8% of portfolio",
+                    "Increase gold/silver to 5-8% for diversification",
+                    "Build cash reserves to 15-25% for opportunities"
+                  ]
+                }
+              },
+              {
+                range: "40-59",
+                level: "Caution",
+                data: {
+                  stocks: "30-40%",
+                  options: "8-12%",
+                  crypto: "3-5%",
+                  gold: "10-15%",
+                  cash: "30-40%",
+                  description: "Defensive tilt with elevated cash and hedges",
+                  rationale: [
+                    "Reduce equity exposure to highest-quality names only",
+                    "Shift options allocation toward hedges and put spreads",
+                    "Trim crypto to minimal allocation (3-5%)",
+                    "Increase gold/silver to 10-15% as safe haven",
+                    "Build substantial cash position (30-40%) for volatility"
+                  ]
+                }
+              },
+              {
+                range: "60-79",
+                level: "High Alert",
+                data: {
+                  stocks: "15-25%",
+                  options: "10-15%",
+                  crypto: "0-2%",
+                  gold: "15-20%",
+                  cash: "50-60%",
+                  description: "Capital preservation mode with heavy defensive positioning",
+                  rationale: [
+                    "Minimal equity exposure - only defensive sectors (utilities, staples)",
+                    "Options portfolio entirely hedges and volatility plays",
+                    "Exit nearly all crypto exposure due to crash risk",
+                    "Gold allocation 15-20% as primary safe haven asset",
+                    "Hold 50-60% cash to deploy after market correction"
+                  ]
+                }
+              },
+              {
+                range: "80-100",
+                level: "Crash Watch",
+                data: {
+                  stocks: "5-10%",
+                  options: "10-15%",
+                  crypto: "0%",
+                  gold: "20-25%",
+                  cash: "70-80%",
+                  description: "Maximum defense - cash and hard assets only",
+                  rationale: [
+                    "Liquidate nearly all equity exposure immediately",
+                    "Options used exclusively for tail risk hedges and put spreads",
+                    "Zero crypto exposure - too correlated with risk assets",
+                    "Maximum gold/precious metals allocation (20-25%)",
+                    "Hold 70-80% cash reserves to deploy after crash"
+                  ]
+                }
+              }
+            ].map((item, index) => {
+              const isCurrent =
+                data.ccpi >= Number.parseInt(item.range.split("-")[0]) &&
+                data.ccpi <= Number.parseInt(item.range.split("-")[1])
+
+              return (
+                <div
+                  key={index}
+                  className={`p-4 rounded-lg border transition-colors ${
+                    isCurrent ? "border-green-500 bg-green-100 shadow-md ring-2 ring-green-300" : "border-gray-200 bg-white hover:bg-gray-50"
+                  }`}
+                >
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <span className="font-mono text-sm font-bold text-gray-900">CCPI {item.range}</span>
+                        <span
+                          className={`ml-3 font-bold text-sm ${
+                            index === 0
+                              ? "text-green-600"
+                              : index === 1
+                                ? "text-lime-600"
+                                : index === 2
+                                  ? "text-yellow-600"
+                                  : index === 3
+                                    ? "text-orange-600"
+                                    : "text-red-600"
+                          }`}
+                        >
+                          {item.level}
+                        </span>
+                      </div>
+                      {isCurrent && (
+                        <span className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-full">CURRENT</span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-600 italic">{item.data.description}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
+                    <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                      <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Stocks/ETFs</div>
+                      <div className="text-lg font-bold text-blue-900">{item.data.stocks}</div>
+                    </div>
+                    <div className="p-3 bg-purple-50 rounded border border-purple-200">
+                      <div className="text-xs font-semibold text-purple-900 uppercase mb-1">Options</div>
+                      <div className="text-lg font-bold text-purple-900">{item.data.options}</div>
+                    </div>
+                    <div className="p-3 bg-orange-50 rounded border border-orange-200">
+                      <div className="text-xs font-semibold text-orange-900 uppercase mb-1">BTC/Crypto</div>
+                      <div className="text-lg font-bold text-orange-900">{item.data.crypto}</div>
+                    </div>
+                    <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
+                      <div className="text-xs font-semibold text-yellow-900 uppercase mb-1">Gold/Silver</div>
+                      <div className="text-lg font-bold text-yellow-900">{item.data.gold}</div>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded border border-gray-300">
+                      <div className="text-xs font-semibold text-gray-900 uppercase mb-1">Cash Reserve</div>
+                      <div className="text-lg font-bold text-gray-900">{item.data.cash}</div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {item.data.rationale.map((point, idx) => (
+                      <div key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                        <span className="text-primary mt-1 flex-shrink-0">•</span>
+                        <span>{point}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+            <p className="text-sm text-blue-800 leading-relaxed">
+              <strong>Note:</strong> These allocations represent baseline guidelines for crash risk management. Always adjust
+              based on your personal risk tolerance, time horizon, and financial goals. CCPI levels above 60 warrant significant
+              defensive positioning regardless of individual circumstances. Consult with a financial advisor for personalized advice.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Export Controls */}
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            const summary = `CCPI Weekly Outlook\n\n${data.summary.headline}\n\n${data.summary.bullets.join('\n')}\n\nCCPI Score: ${data.ccpi}\nCertainty: ${data.certainty}\nRegime: ${data.regime.name}\n\nGenerated: ${new Date(data.timestamp).toLocaleString()}`
+            navigator.clipboard.writeText(summary)
+            alert("Summary copied to clipboard!")
+          }}
+        >
+          Copy Summary
+        </Button>
+        <Button variant="outline" size="sm">
+          <Download className="h-4 w-4 mr-2" />
+          Export CSV
+        </Button>
+      </div>
     </div>
   )
 }
