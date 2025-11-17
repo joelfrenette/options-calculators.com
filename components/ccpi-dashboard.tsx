@@ -110,16 +110,16 @@ export function CcpiDashboard() {
         totalIndicators: 23
       })
       console.log("[v0] Pillar Breakdown (weighted contribution to CCPI):")
-      console.log("  Technical:", result.pillars.technical, "× 35% =", (result.pillars.technical * 0.35).toFixed(1))
-      console.log("  Fundamental:", result.pillars.fundamental, "× 25% =", (result.pillars.fundamental * 0.25).toFixed(1))
-      console.log("  Macro:", result.pillars.macro, "× 30% =", (result.pillars.macro * 0.30).toFixed(1))
-      console.log("  Sentiment:", result.pillars.sentiment, "× 10% =", (result.pillars.sentiment * 0.10).toFixed(1))
-      
+      console.log("  Momentum:", result.pillars.momentum, "× 40% =", (result.pillars.momentum * 0.40).toFixed(1))
+      console.log("  Risk Appetite:", result.pillars.riskAppetite, "× 30% =", (result.pillars.riskAppetite * 0.30).toFixed(1))
+      console.log("  Valuation:", result.pillars.valuation, "× 20% =", (result.pillars.valuation * 0.20).toFixed(1))
+      console.log("  Macro:", result.pillars.macro, "× 10% =", (result.pillars.macro * 0.10).toFixed(1))
+
       const calculatedCCPI = 
-        result.pillars.technical * 0.35 +
-        result.pillars.fundamental * 0.25 +
-        result.pillars.macro * 0.30 +
-        result.pillars.sentiment * 0.10
+        result.pillars.momentum * 0.40 +
+        result.pillars.riskAppetite * 0.30 +
+        result.pillars.valuation * 0.20 +
+        result.pillars.macro * 0.10
       console.log("  Calculated CCPI:", calculatedCCPI.toFixed(1), "| API CCPI:", result.ccpi)
       
       setData(result)
@@ -202,10 +202,10 @@ export function CcpiDashboard() {
   }
 
   const pillarData = [
-    { name: "Pillar 1 - Momentum & Technical Breakdown", value: data.pillars.momentum, weight: "40%", icon: Activity },
+    { name: "Pillar 1 - Momentum & Technical", value: data.pillars.momentum, weight: "40%", icon: Activity },
     { name: "Pillar 2 - Risk Appetite & Volatility", value: data.pillars.riskAppetite, weight: "30%", icon: TrendingDown },
-    { name: "Pillar 3 - Valuation & Fundamentals", value: data.pillars.valuation, weight: "20%", icon: DollarSign },
-    { name: "Pillar 4 - Macro Economic", value: data.pillars.macro, weight: "10%", icon: Users }
+    { name: "Pillar 3 - Valuation", value: data.pillars.valuation, weight: "20%", icon: DollarSign },
+    { name: "Pillar 4 - Macro", value: data.pillars.macro, weight: "10%", icon: Users }
   ]
 
   const pillarChartData = pillarData.map((pillar, index) => ({
@@ -439,810 +439,747 @@ export function CcpiDashboard() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {data.indicators?.qqqBelowSMA50 && (
-            <div className="mb-6 p-4 bg-red-100 border-2 border-red-500 rounded-lg animate-pulse">
-              <div className="flex items-center gap-3">
-                <AlertTriangle className="h-8 w-8 text-red-600" />
-                <div>
-                  <h3 className="text-lg font-bold text-red-900">⚠️ QQQ TREND BREAK - CRASH PROBABILITY SURGING</h3>
-                  <p className="text-sm text-red-700 font-medium">
-                    QQQ has broken below 50-day SMA. Historical backtests show 70% probability of further decline within 5-10 days.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <ResponsiveContainer width="100%" height={350}>
-            <BarChart data={pillarChartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="name" 
-                angle={-15} 
-                textAnchor="end" 
-                height={100}
-                tick={{ fontSize: 12 }}
-              />
-              <YAxis domain={[0, 100]} />
-              <Tooltip content={({ active, payload }) => {
-                if (active && payload && payload[0]) {
-                  const data = payload[0].payload
-                  return (
-                    <div className="bg-white p-3 border-2 border-gray-300 rounded shadow-lg">
-                      <p className="font-bold text-sm mb-1">{data.fullName}</p>
-                      <p className="text-lg font-bold text-blue-600">{data.value}/100</p>
-                      <p className="text-xs text-gray-600">Weight: {data.weight}</p>
-                    </div>
-                  )
-                }
-                return null
-              }} />
-              <ReferenceLine y={70} stroke="red" strokeDasharray="3 3" label="High Risk" />
-              <ReferenceLine y={50} stroke="orange" strokeDasharray="3 3" label="Elevated" />
-              <Bar dataKey="value" fill="#3b82f6" />
-            </BarChart>
-          </ResponsiveContainer>
           
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            {pillarData.map((pillar) => {
-              const Icon = pillar.icon
-              const severity = pillar.value >= 70 ? "high" : pillar.value >= 50 ? "medium" : "low"
-              const color = severity === "high" ? "text-red-600" : severity === "medium" ? "text-orange-500" : "text-green-600"
-              const bgColor = severity === "high" ? "bg-red-50" : severity === "medium" ? "bg-orange-50" : "bg-green-50"
+          {/* Reorganized indicators into new CCPI v2.0 pillar structure */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Activity className="h-5 w-5 text-cyan-600" />
+                Pillar 1 - Momentum & Technical (40% weight)
+              </h3>
+              <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.momentum)}/100</span>
+            </div>
+            <div className="space-y-6">
               
-              return (
-                <div key={pillar.name} className={`flex items-center justify-between p-4 ${bgColor} rounded-lg border-2 ${severity === 'high' ? 'border-red-300' : severity === 'medium' ? 'border-orange-300' : 'border-green-300'}`}>
-                  <div className="flex items-center gap-3">
-                    <Icon className={`h-6 w-6 ${color}`} />
-                    <div>
-                      <span className="text-sm font-semibold text-gray-900">{pillar.name}</span>
-                      <div className="text-xs text-gray-600 font-medium">Weight: {pillar.weight}</div>
+              {/* QQQ Daily Return */}
+              {data.indicators?.qqqDailyReturn !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">QQQ Daily Return (5× downside amplifier)</span>
+                    <span className="font-bold">{data.indicators.qqqDailyReturn}</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, Math.max(0, (parseFloat(data.indicators.qqqDailyReturn) + 2) / 4 * 100))}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Down: {'<'}-1%</span>
+                    <span className="text-yellow-600">Flat: -1% to +1%</span>
+                    <span>Up: {'>'} +1%</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Consecutive Down Days */}
+              {data.indicators?.qqqConsecDown !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">QQQ Consecutive Down Days</span>
+                    <span className="font-bold">{data.indicators.qqqConsecDown} days</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, (data.indicators.qqqConsecDown / 5) * 100)}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Healthy: 0-1 days</span>
+                    <span>Warning: 2-3 days</span>
+                    <span>Danger: 4+ days</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Below SMA20 */}
+              {data.indicators?.qqqBelowSMA20 !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">QQQ Below 20-Day SMA</span>
+                    <div className="flex items-center gap-2">
+                      {data.indicators?.qqqSMA20Proximity !== undefined && (
+                        <span className="text-xs font-semibold text-orange-600">
+                          {data.indicators.qqqSMA20Proximity.toFixed(0)}% proximity
+                        </span>
+                      )}
+                      <span className={`font-bold ${data.indicators.qqqBelowSMA20 ? 'text-red-600' : 'text-green-600'}`}>
+                        {data.indicators.qqqBelowSMA20 ? 'YES' : 'NO'}
+                      </span>
                     </div>
                   </div>
-                  <span className={`text-2xl font-bold ${color}`}>{Math.round(pillar.value)}</span>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${data.indicators?.qqqSMA20Proximity || 0}%`
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Safe: 0% (far above)</span>
+                    <span>Warning: 50%</span>
+                    <span>Danger: 100% (breached)</span>
+                  </div>
                 </div>
-              )
-            })}
+              )}
+
+              {/* Below SMA50 */}
+              {data.indicators?.qqqBelowSMA50 !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">QQQ Below 50-Day SMA</span>
+                    <div className="flex items-center gap-2">
+                      {data.indicators?.qqqSMA50Proximity !== undefined && (
+                        <span className="text-xs font-semibold text-orange-600">
+                          {data.indicators.qqqSMA50Proximity.toFixed(0)}% proximity
+                        </span>
+                      )}
+                      <span className={`font-bold ${data.indicators.qqqBelowSMA50 ? 'text-red-600' : 'text-green-600'}`}>
+                        {data.indicators.qqqBelowSMA50 ? 'YES' : 'NO'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${data.indicators?.qqqSMA50Proximity || 0}%`
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Safe: 0% (far above)</span>
+                    <span>Warning: 50%</span>
+                    <span>Danger: 100% (breached)</span>
+                  </div>
+                </div>
+              )}
+
+              {data.indicators?.qqqBelowSMA200 !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">QQQ Below 200-Day SMA</span>
+                    <div className="flex items-center gap-2">
+                      {data.indicators?.qqqSMA200Proximity !== undefined && (
+                        <span className="text-xs font-semibold text-orange-600">
+                          {data.indicators.qqqSMA200Proximity.toFixed(0)}% proximity
+                        </span>
+                      )}
+                      <span className={`font-bold ${data.indicators.qqqBelowSMA200 ? 'text-red-600' : 'text-green-600'}`}>
+                        {data.indicators.qqqBelowSMA200 ? 'YES' : 'NO'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${data.indicators?.qqqSMA200Proximity || 0}%`
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Safe: 0% (far above)</span>
+                    <span>Warning: 50%</span>
+                    <span>Danger: 100% (breached)</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Below Bollinger Band (Lower) */}
+              {data.indicators?.qqqBelowBollinger !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">QQQ Below Bollinger Band (Lower)</span>
+                    <div className="flex items-center gap-2">
+                      {data.indicators?.qqqBollingerProximity !== undefined && (
+                        <span className="text-xs font-semibold text-orange-600">
+                          {data.indicators.qqqBollingerProximity.toFixed(0)}% proximity
+                        </span>
+                      )}
+                      <span className={`font-bold ${data.indicators.qqqBelowBollinger ? 'text-red-600' : 'text-green-600'}`}>
+                        {data.indicators.qqqBelowBollinger ? 'YES - OVERSOLD' : 'NO'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${data.indicators?.qqqBollingerProximity || 0}%`
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Safe: 0% (at middle band)</span>
+                    <span>Warning: 50%</span>
+                    <span>Oversold: 100% (breached)</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Death Cross */}
+              {data.indicators?.qqqDeathCross !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">QQQ Death Cross (SMA50 {'<'} SMA200)</span>
+                    <span className={`font-bold ${data.indicators.qqqDeathCross ? 'text-red-600' : 'text-green-600'}`}>
+                      {data.indicators.qqqDeathCross ? 'YES - DANGER' : 'NO'}
+                    </span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: data.indicators.qqqDeathCross ? '100%' : '0%' 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Golden Cross: Bullish</span>
+                    <span>Death Cross: Bearish</span>
+                  </div>
+                </div>
+              )}
+
+              {/* VIX */}
+              {data.indicators.vix !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">VIX (Fear Gauge)</span>
+                    <span className="font-bold">{data.indicators.vix.toFixed(1)}</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, (data.indicators.vix / 50) * 100)}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Calm: {'<'}15</span>
+                    <span className="text-yellow-600">Elevated: 15-25</span>
+                    <span>Fear: {'>'}25</span>
+                  </div>
+                </div>
+              )}
+
+              {/* VXN */}
+              {data.indicators.vxn !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">VXN (Nasdaq Volatility)</span>
+                    <span className="font-bold">{data.indicators.vxn.toFixed(1)}</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, (data.indicators.vxn / 50) * 100)}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Calm: {'<'}15</span>
+                    <span className="text-yellow-600">Elevated: 15-25</span>
+                    <span>Panic: {'>'}35</span>
+                  </div>
+                </div>
+              )}
+
+              {/* RVX */}
+              {data.indicators.rvx !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">RVX (Russell 2000 Volatility)</span>
+                    <span className="font-bold">{data.indicators.rvx.toFixed(1)}</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, (data.indicators.rvx / 50) * 100)}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Low: {'<'}18</span>
+                    <span className="text-yellow-600">Normal: 18-25</span>
+                    <span>High: {'>'}30</span>
+                  </div>
+                </div>
+              )}
+
+              {/* VIX Term Structure */}
+              {data.indicators.vixTermStructure !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">VIX Term Structure (Spot/1M)</span>
+                    <span className="font-bold">{data.indicators.vixTermStructure.toFixed(2)}</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, Math.max(0, (2.0 - data.indicators.vixTermStructure) / 1.5 * 100))}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Contango: {'>'}1.5 (Safe)</span>
+                    <span className="text-yellow-600">Normal: 1.0-1.2</span>
+                    <span className="text-red-600">Backwardation: {'<'}1.0 (FEAR)</span>
+                  </div>
+                </div>
+              )}
+
+              {/* ATR - Average True Range */}
+              {data.indicators.atr !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">ATR - Average True Range</span>
+                    <span className="font-bold">{data.indicators.atr.toFixed(1)}</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, (data.indicators.atr / 60) * 100)}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Low Vol: {'<'}25</span>
+                    <span className="text-yellow-600">Normal: 25-40</span>
+                    <span>High Vol: {'>'}50</span>
+                  </div>
+                </div>
+              )}
+
+              {/* LTV - Long-term Volatility */}
+              {data.indicators.ltv !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">LTV - Long-term Volatility</span>
+                    <span className="font-bold">{(data.indicators.ltv * 100).toFixed(1)}%</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, (data.indicators.ltv / 0.3) * 100)}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Stable: {'<'}10%</span>
+                    <span className="text-yellow-600">Normal: 10-15%</span>
+                    <span>Elevated: {'>'}20%</span>
+                  </div>
+                </div>
+              )}
+
+              {/* High-Low Index (Market Breadth) */}
+              {data.indicators.highLowIndex !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">High-Low Index (Market Breadth)</span>
+                    <span className="font-bold">{data.indicators.highLowIndex}%</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${data.indicators.highLowIndex}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Weak: {'<'}30% (bearish)</span>
+                    <span className="text-yellow-600">Neutral: 30-50%</span>
+                    <span>Strong: {'>'}70% (bullish)</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Bullish Percent Index */}
+              {data.indicators.bullishPercent !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">Bullish Percent Index</span>
+                    <span className="font-bold">{data.indicators.bullishPercent}%</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${data.indicators.bullishPercent}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Oversold: {'<'}30%</span>
+                    <span className="text-yellow-600">Normal: 30-50%</span>
+                    <span>Overbought: {'>'}70%</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="mt-6 p-4 bg-blue-50 border-2 border-blue-300 rounded-lg">
-            <h4 className="font-semibold text-sm mb-3 text-blue-900">CCPI v2.0 Formula (Optimized for 1-14 Day Crash Prediction)</h4>
-            <div className="text-sm text-blue-800 font-mono mb-3">
-              CCPI = (Momentum × 40%) + (Risk Appetite × 30%) + (Valuation × 20%) + (Macro × 10%) + Crash Amplifiers
+          <div className="space-y-4 border-t pt-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <TrendingDown className="h-5 w-5 text-orange-600" />
+                Pillar 2 - Risk Appetite & Volatility (30% weight)
+              </h3>
+              <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.riskAppetite)}/100</span>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-              <div className="flex items-center justify-between p-2 bg-white rounded">
-                <span className="text-blue-700 font-semibold">Momentum:</span>
+            <div className="space-y-6">
+              
+              {/* Put/Call Ratio */}
+              {data.indicators.putCallRatio !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">Put/Call Ratio</span>
+                    <span className="font-bold">{data.indicators.putCallRatio.toFixed(2)}</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, Math.max(0, (1.6 - data.indicators.putCallRatio) / 1.5 * 100))}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Safe: {'>'}1.1 (Hedging)</span>
+                    <span className="text-yellow-600">Caution: 0.9-1.1</span>
+                    <span className="text-red-600">Danger: {'<'}0.7 (Complacency)</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Fear & Greed Index */}
+              {data.indicators.fearGreedIndex !== undefined && data.indicators.fearGreedIndex !== null && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">Fear & Greed Index</span>
+                    <span className="font-bold">{data.indicators.fearGreedIndex}</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${data.indicators.fearGreedIndex}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Fear: {'<'}30</span>
+                    <span className="text-yellow-600">Neutral: 30-60</span>
+                    <span>Greed: {'>'}70</span>
+                  </div>
+                </div>
+              )}
+
+              {/* AAII Bullish Sentiment */}
+              {data.indicators.aaiiBullish !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">AAII Bullish Sentiment</span>
+                    <span className="font-bold">{data.indicators.aaiiBullish.toFixed(0)}%</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.aaiiBullish - 20) / 0.4)))}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Safe: {'<'}30%</span>
+                    <span className="text-yellow-600">Warning: 30-40%</span>
+                    <span className="text-red-600">Danger: {'>'}50%</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Short Interest */}
+              {data.indicators.shortInterest !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">SPY Short Interest Ratio</span>
+                    <span className="font-bold">{(data.indicators.shortInterest * 100).toFixed(1)}%</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, Math.max(0, (0.15 - data.indicators.shortInterest) / 0.15 * 100))}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Safe: {'>'}15% (Positioned)</span>
+                    <span className="text-yellow-600">Caution: 5-15%</span>
+                    <span className="text-red-600">Danger: {'<'}1.5% (Complacency)</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Tech ETF Flows */}
+              {data.indicators.etfFlows !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">Tech ETF Flows (Weekly)</span>
+                    <span className="font-bold">${data.indicators.etfFlows}B</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.etfFlows + 5) / 10) * 100))}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Outflows: {'<'}-$2B</span>
+                    <span className="text-yellow-600">Neutral: -$2B to +$2B</span>
+                    <span>Inflows: {'>'} $2B</span>
+                  </div>
+                </div>
+              )}
+
+              {/* ATR - Average True Range */}
+              {data.indicators.atr !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">ATR - Average True Range</span>
+                    <span className="font-bold">{data.indicators.atr.toFixed(1)}</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, (data.indicators.atr / 60) * 100)}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Low Vol: {'<'}25</span>
+                    <span className="text-yellow-600">Normal: 25-40</span>
+                    <span>High Vol: {'>'}50</span>
+                  </div>
+                </div>
+              )}
+
+              {/* LTV - Long-term Volatility */}
+              {data.indicators.ltv !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">LTV - Long-term Volatility</span>
+                    <span className="font-bold">{(data.indicators.ltv * 100).toFixed(1)}%</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, (data.indicators.ltv / 0.3) * 100)}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Stable: {'<'}10%</span>
+                    <span className="text-yellow-600">Normal: 10-15%</span>
+                    <span>Elevated: {'>'}20%</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Bullish Percent Index */}
+              {data.indicators.bullishPercent !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">Bullish Percent Index</span>
+                    <span className="font-bold">{data.indicators.bullishPercent}%</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${data.indicators.bullishPercent}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Oversold: {'<'}30%</span>
+                    <span className="text-yellow-600">Normal: 30-50%</span>
+                    <span>Overbought: {'>'}70%</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Yield Curve - moved to Risk Appetite */}
+              {data.indicators.yieldCurve !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">Yield Curve (10Y-2Y)</span>
+                    <span className="font-bold">{data.indicators.yieldCurve.toFixed(2)}%</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, Math.max(0, 100 - ((data.indicators.yieldCurve + 1) / 2) * 100))}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Normal: {'>'}0.5%</span>
+                    <span className="text-yellow-600">Flat: 0-0.5%</span>
+                    <span>Inverted: {'<'}0%</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-4 border-t pt-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-blue-600" />
+                Pillar 3 - Valuation (20% weight)
+              </h3>
+              <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.valuation)}/100</span>
+            </div>
+            <div className="space-y-6">
+              
+              {/* S&P 500 P/E */}
+              {data.indicators.spxPE !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">S&P 500 Forward P/E</span>
+                    <span className="font-bold">{data.indicators.spxPE}</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, ((data.indicators.spxPE - 10) / 15) * 100)}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Historical Median: 16</span>
+                    <span>Current: {data.indicators.spxPE}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* P/S Ratio */}
+              {data.indicators.spxPS !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">S&P 500 Price-to-Sales</span>
+                    <span className="font-bold">{data.indicators.spxPS}</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, ((data.indicators.spxPS - 1) / 2) * 100)}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Normal: {'<'}2.5</span>
+                    <span>Elevated: {'>'}3.0</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Buffett Indicator */}
+              {data.indicators.buffettIndicator !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">Buffett Indicator (Market Cap / GDP)</span>
+                    <span className="font-bold">{data.indicators.buffettIndicator.toFixed(0)}%</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.buffettIndicator - 80) / 1.6)))}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Undervalued: {'<'}120%</span>
+                    <span>Fair: 120-150%</span>
+                    <span>Warning: 150-180%</span>
+                    <span className="text-red-600">Danger: {'>'}200%</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-4 border-t pt-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Users className="h-5 w-5 text-green-600" />
+                Pillar 4 - Macro (10% weight)
+              </h3>
+              <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.macro)}/100</span>
+            </div>
+            <div className="space-y-6">
+              
+              {/* Fed Funds Rate */}
+              {data.indicators.fedFundsRate !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">Fed Funds Rate</span>
+                    <span className="font-bold">{data.indicators.fedFundsRate}%</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, (data.indicators.fedFundsRate / 6) * 100)}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Accommodative: {'<'}2%</span>
+                    <span className="text-yellow-600">Neutral: 2-4%</span>
+                    <span>Restrictive: {'>'}4.5%</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Junk Bond Spread - moved to Macro */}
+              {data.indicators.junkSpread !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">Junk Bond Spread</span>
+                    <span className="font-bold">{data.indicators.junkSpread.toFixed(2)}%</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, ((data.indicators.junkSpread - 2) / 8) * 100)}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Tight: {'<'}3%</span>
+                    <span className="text-yellow-600">Normal: 3-5%</span>
+                    <span>Wide: {'>'}6%</span>
+                  </div>
+                </div>
+              )}
+
+              {/* US Debt-to-GDP */}
+              {data.indicators.debtToGDP !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">US Debt-to-GDP Ratio</span>
+                    <span className="font-bold">{data.indicators.debtToGDP.toFixed(1)}%</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.debtToGDP - 60) / 80) * 100))}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Healthy: {'<'}90%</span>
+                    <span className="text-yellow-600">Elevated: 100-120%</span>
+                    <span className="text-red-600">Danger: {'>'}130%</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h4 className="font-semibold text-sm mb-3 text-blue-900">CCPI Formula Weights</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-blue-700">Technical & Price:</span>
                 <span className="font-bold text-blue-900">40%</span>
               </div>
-              <div className="flex items-center justify-between p-2 bg-white rounded">
-                <span className="text-blue-700 font-semibold">Risk Appetite:</span>
+              <div className="flex items-center justify-between">
+                <span className="text-blue-700">Risk Appetite:</span>
                 <span className="font-bold text-blue-900">30%</span>
               </div>
-              <div className="flex items-center justify-between p-2 bg-white rounded">
-                <span className="text-blue-700 font-semibold">Valuation:</span>
+              <div className="flex items-center justify-between">
+                <span className="text-blue-700">Valuation:</span>
                 <span className="font-bold text-blue-900">20%</span>
               </div>
-              <div className="flex items-center justify-between p-2 bg-white rounded">
-                <span className="text-blue-700 font-semibold">Macro:</span>
+              <div className="flex items-center justify-between">
+                <span className="text-blue-700">Macro:</span>
                 <span className="font-bold text-blue-900">10%</span>
               </div>
             </div>
-            <p className="text-xs text-blue-700 mt-3 font-medium">
-              🎯 70% weight on fast-moving momentum + fear signals (the triggers of 1-2 week crashes).
-              Historical backtests show this weighting predicted 2000, 2008, 2022 crashes 3-10 days before peak.
+            <p className="text-xs text-blue-700 mt-3">
+              Final CCPI = Σ(Pillar Score × Weight). Each pillar score (0-100) is calculated from multiple professional indicators with specific thresholds.
             </p>
           </div>
         </CardContent>
       </Card>
-
-      {data.indicators && Object.keys(data.indicators).length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Market Indicators Breakdown</CardTitle>
-            <CardDescription>
-              Professional indicators used in CCPI formula with current values, thresholds, and pillar weights
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <Activity className="h-5 w-5 text-cyan-600" />
-                    Pillar 1 - Technical & Price Action (35% weight)
-                  </h3>
-                  <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.technical)}/100</span>
-                </div>
-                <div className="space-y-6">
-                  
-                  {/* VIX indicator graph */}
-                  {data.indicators.vix !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">VIX (Fear Gauge)</span>
-                        <span className="font-bold">{data.indicators.vix.toFixed(1)}</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.vix / 50) * 100)}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Calm: {'<'}15</span>
-                        <span className="text-yellow-600">Elevated: 15-25</span>
-                        <span>Fear: {'>'}25</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* VXN indicator graph */}
-                  {data.indicators.vxn !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">VXN (Nasdaq Volatility)</span>
-                        <span className="font-bold">{data.indicators.vxn.toFixed(1)}</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.vxn / 50) * 100)}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Calm: {'<'}15</span>
-                        <span className="text-yellow-600">Elevated: 15-25</span>
-                        <span>Panic: {'>'}35</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* RVX indicator graph */}
-                  {data.indicators.rvx !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">RVX (Russell 2000 Volatility)</span>
-                        <span className="font-bold">{data.indicators.rvx.toFixed(1)}</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.rvx / 50) * 100)}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Low: {'<'}18</span>
-                        <span className="text-yellow-600">Normal: 18-25</span>
-                        <span>High: {'>'}30</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* VIX Term Structure graph */}
-                  {data.indicators.vixTermStructure !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">VIX Term Structure (Spot/1M)</span>
-                        <span className="font-bold">{data.indicators.vixTermStructure.toFixed(2)}</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, Math.max(0, (2.0 - data.indicators.vixTermStructure) / 1.5 * 100))}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Contango: {'>'}1.5 (Safe)</span>
-                        <span className="text-yellow-600">Normal: 1.0-1.2</span>
-                        <span className="text-red-600">Backwardation: {'<'}1.0 (FEAR)</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* QQQ Daily Return */}
-                  {data.indicators?.qqqDailyReturn !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">QQQ Daily Return (5× downside amplifier)</span>
-                        <span className="font-bold">{data.indicators.qqqDailyReturn}</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, Math.max(0, (parseFloat(data.indicators.qqqDailyReturn) + 2) / 4 * 100))}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Down: {'<'}-1%</span>
-                        <span className="text-yellow-600">Flat: -1% to +1%</span>
-                        <span>Up: {'>'} +1%</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Consecutive Down Days */}
-                  {data.indicators?.qqqConsecDown !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">QQQ Consecutive Down Days</span>
-                        <span className="font-bold">{data.indicators.qqqConsecDown} days</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.qqqConsecDown / 5) * 100)}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Healthy: 0-1 days</span>
-                        <span>Warning: 2-3 days</span>
-                        <span>Danger: 4+ days</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Below SMA20 */}
-                  {data.indicators?.qqqBelowSMA20 !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">QQQ Below 20-Day SMA</span>
-                        <div className="flex items-center gap-2">
-                          {data.indicators?.qqqSMA20Proximity !== undefined && (
-                            <span className="text-xs font-semibold text-orange-600">
-                              {data.indicators.qqqSMA20Proximity.toFixed(0)}% proximity
-                            </span>
-                          )}
-                          <span className={`font-bold ${data.indicators.qqqBelowSMA20 ? 'text-red-600' : 'text-green-600'}`}>
-                            {data.indicators.qqqBelowSMA20 ? 'YES' : 'NO'}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${data.indicators?.qqqSMA20Proximity || 0}%`
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Safe: 0% (far above)</span>
-                        <span>Warning: 50%</span>
-                        <span>Danger: 100% (breached)</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Below SMA50 */}
-                  {data.indicators?.qqqBelowSMA50 !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">QQQ Below 50-Day SMA</span>
-                        <div className="flex items-center gap-2">
-                          {data.indicators?.qqqSMA50Proximity !== undefined && (
-                            <span className="text-xs font-semibold text-orange-600">
-                              {data.indicators.qqqSMA50Proximity.toFixed(0)}% proximity
-                            </span>
-                          )}
-                          <span className={`font-bold ${data.indicators.qqqBelowSMA50 ? 'text-red-600' : 'text-green-600'}`}>
-                            {data.indicators.qqqBelowSMA50 ? 'YES' : 'NO'}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${data.indicators?.qqqSMA50Proximity || 0}%`
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Safe: 0% (far above)</span>
-                        <span>Warning: 50%</span>
-                        <span>Danger: 100% (breached)</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {data.indicators?.qqqBelowSMA200 !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">QQQ Below 200-Day SMA</span>
-                        <div className="flex items-center gap-2">
-                          {data.indicators?.qqqSMA200Proximity !== undefined && (
-                            <span className="text-xs font-semibold text-orange-600">
-                              {data.indicators.qqqSMA200Proximity.toFixed(0)}% proximity
-                            </span>
-                          )}
-                          <span className={`font-bold ${data.indicators.qqqBelowSMA200 ? 'text-red-600' : 'text-green-600'}`}>
-                            {data.indicators.qqqBelowSMA200 ? 'YES' : 'NO'}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${data.indicators?.qqqSMA200Proximity || 0}%`
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Safe: 0% (far above)</span>
-                        <span>Warning: 50%</span>
-                        <span>Danger: 100% (breached)</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Below Bollinger Band (Lower) */}
-                  {data.indicators?.qqqBelowBollinger !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">QQQ Below Bollinger Band (Lower)</span>
-                        <div className="flex items-center gap-2">
-                          {data.indicators?.qqqBollingerProximity !== undefined && (
-                            <span className="text-xs font-semibold text-orange-600">
-                              {data.indicators.qqqBollingerProximity.toFixed(0)}% proximity
-                            </span>
-                          )}
-                          <span className={`font-bold ${data.indicators.qqqBelowBollinger ? 'text-red-600' : 'text-green-600'}`}>
-                            {data.indicators.qqqBelowBollinger ? 'YES - OVERSOLD' : 'NO'}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${data.indicators?.qqqBollingerProximity || 0}%`
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Safe: 0% (at middle band)</span>
-                        <span>Warning: 50%</span>
-                        <span>Oversold: 100% (breached)</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Death Cross */}
-                  {data.indicators?.qqqDeathCross !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">QQQ Death Cross (SMA50 {'<'} SMA200)</span>
-                        <span className={`font-bold ${data.indicators.qqqDeathCross ? 'text-red-600' : 'text-green-600'}`}>
-                          {data.indicators.qqqDeathCross ? 'YES - DANGER' : 'NO'}
-                        </span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: data.indicators.qqqDeathCross ? '100%' : '0%' 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Golden Cross: Bullish</span>
-                        <span>Death Cross: Bearish</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* ATR - Average True Range */}
-                  {data.indicators.atr !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">ATR - Average True Range</span>
-                        <span className="font-bold">{data.indicators.atr.toFixed(1)}</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.atr / 60) * 100)}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Low Vol: {'<'}25</span>
-                        <span className="text-yellow-600">Normal: 25-40</span>
-                        <span>High Vol: {'>'}50</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* LTV - Long-term Volatility */}
-                  {data.indicators.ltv !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">LTV - Long-term Volatility</span>
-                        <span className="font-bold">{(data.indicators.ltv * 100).toFixed(1)}%</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.ltv / 0.3) * 100)}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Stable: {'<'}10%</span>
-                        <span className="text-yellow-600">Normal: 10-15%</span>
-                        <span>Elevated: {'>'}20%</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* High-Low Index (Market Breadth) */}
-                  {data.indicators.highLowIndex !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">High-Low Index (Market Breadth)</span>
-                        <span className="font-bold">{data.indicators.highLowIndex}%</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${data.indicators.highLowIndex}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Weak: {'<'}30% (bearish)</span>
-                        <span className="text-yellow-600">Neutral: 30-50%</span>
-                        <span>Strong: {'>'}70% (bullish)</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Bullish Percent Index */}
-                  {data.indicators.bullishPercent !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">Bullish Percent Index</span>
-                        <span className="font-bold">{data.indicators.bullishPercent}%</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${data.indicators.bullishPercent}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Oversold: {'<'}30%</span>
-                        <span className="text-yellow-600">Normal: 30-50%</span>
-                        <span>Overbought: {'>'}70%</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-4 border-t pt-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <DollarSign className="h-5 w-5 text-blue-600" />
-                    Pillar 2 - Fundamental & Valuation (25% weight)
-                  </h3>
-                  <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.fundamental)}/100</span>
-                </div>
-                <div className="space-y-6">
-                  
-                  {/* S&P 500 P/E */}
-                  {data.indicators.spxPE !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">S&P 500 Forward P/E</span>
-                        <span className="font-bold">{data.indicators.spxPE}</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, ((data.indicators.spxPE - 10) / 15) * 100)}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Historical Median: 16</span>
-                        <span>Current: {data.indicators.spxPE}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* P/S Ratio */}
-                  {data.indicators.spxPS !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">S&P 500 Price-to-Sales</span>
-                        <span className="font-bold">{data.indicators.spxPS}</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, ((data.indicators.spxPS - 1) / 2) * 100)}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Normal: {'<'}2.5</span>
-                        <span>Elevated: {'>'}3.0</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {data.indicators.buffettIndicator !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">Buffett Indicator (Market Cap / GDP)</span>
-                        <span className="font-bold">{data.indicators.buffettIndicator.toFixed(0)}%</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.buffettIndicator - 80) / 1.6)))}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Undervalued: {'<'}120%</span>
-                        <span>Fair: 120-150%</span>
-                        <span>Warning: 150-180%</span>
-                        <span className="text-red-600">Danger: {'>'}200%</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-4 border-t pt-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <TrendingDown className="h-5 w-5 text-orange-600" />
-                    Pillar 3 - Macro Economic (30% weight)
-                  </h3>
-                  <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.macro)}/100</span>
-                </div>
-                <div className="space-y-6">
-                  
-                  {/* Fed Funds Rate */}
-                  {data.indicators.fedFundsRate !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">Fed Funds Rate</span>
-                        <span className="font-bold">{data.indicators.fedFundsRate}%</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, (data.indicators.fedFundsRate / 6) * 100)}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Accommodative: {'<'}2%</span>
-                        <span className="text-yellow-600">Neutral: 2-4%</span>
-                        <span>Restrictive: {'>'}4.5%</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Junk Spread */}
-                  {data.indicators.junkSpread !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">Junk Bond Spread</span>
-                        <span className="font-bold">{data.indicators.junkSpread}%</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, ((data.indicators.junkSpread - 2) / 8) * 100)}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Tight: {'<'}3%</span>
-                        <span className="text-yellow-600">Normal: 3-5%</span>
-                        <span>Wide: {'>'}6%</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Yield Curve */}
-                  {data.indicators.yieldCurve !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">Yield Curve (10Y-2Y)</span>
-                        <span className="font-bold">{data.indicators.yieldCurve}%</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, Math.max(0, 100 - ((data.indicators.yieldCurve + 1) / 2) * 100))}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Normal: {'>'}0.5%</span>
-                        <span className="text-yellow-600">Flat: 0-0.5%</span>
-                        <span>Inverted: {'<'}0%</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {data.indicators.debtToGDP !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">US Debt-to-GDP Ratio</span>
-                        <span className="font-bold">{data.indicators.debtToGDP.toFixed(1)}%</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.debtToGDP - 60) / 80) * 100))}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Healthy: {'<'}90%</span>
-                        <span className="text-yellow-600">Elevated: 100-120%</span>
-                        <span className="text-red-600">Danger: {'>'}130%</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-4 border-t pt-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <Users className="h-5 w-5 text-green-600" />
-                    Pillar 4 - Sentiment & Social (10% weight)
-                  </h3>
-                  <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.sentiment)}/100</span>
-                </div>
-                <div className="space-y-6">
-                  
-                  {/* Put/Call Ratio */}
-                  {data.indicators.putCallRatio !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">Put/Call Ratio</span>
-                        <span className="font-bold">{data.indicators.putCallRatio.toFixed(2)}</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, Math.max(0, (1.6 - data.indicators.putCallRatio) / 1.5 * 100))}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Safe: {'>'}1.1 (Hedging)</span>
-                        <span className="text-yellow-600">Caution: 0.9-1.1</span>
-                        <span className="text-red-600">Danger: {'<'}0.7 (Complacency)</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Fear & Greed Index */}
-                  {data.indicators.fearGreedIndex !== undefined && data.indicators.fearGreedIndex !== null && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">Fear & Greed Index</span>
-                        <span className="font-bold">{data.indicators.fearGreedIndex}</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${data.indicators.fearGreedIndex}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Fear: {'<'}30</span>
-                        <span className="text-yellow-600">Neutral: 30-60</span>
-                        <span>Greed: {'>'}70</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Risk Appetite Index */}
-                  {data.indicators.riskAppetite !== undefined && data.indicators.riskAppetite !== null && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">Risk Appetite Index</span>
-                        <span className="font-bold">{data.indicators.riskAppetite}</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${data.indicators.riskAppetite}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Risk-Off: {'<'}30</span>
-                        <span className="text-yellow-600">Neutral: 30-60</span>
-                        <span>Risk-On: {'>'}70</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {data.indicators.aaiiBullish !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">AAII Bullish Sentiment</span>
-                        <span className="font-bold">{data.indicators.aaiiBullish.toFixed(0)}%</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.aaiiBullish - 20) / 0.4)))}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Safe: {'<'}30%</span>
-                        <span className="text-yellow-600">Warning: 30-40%</span>
-                        <span className="text-red-600">Danger: {'>'}50%</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Short Interest - moved from Pillar 6 to Pillar 4 */}
-                  {data.indicators.shortInterest !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">SPY Short Interest Ratio</span>
-                        <span className="font-bold">{(data.indicators.shortInterest * 100).toFixed(1)}%</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, Math.max(0, (0.15 - data.indicators.shortInterest) / 0.15 * 100))}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Safe: {'>'}15% (Positioned)</span>
-                        <span className="text-yellow-600">Caution: 5-15%</span>
-                        <span className="text-red-600">Danger: {'<'}1.5% (Complacency)</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* ETF Flows - moved from Pillar 6 to Pillar 4 */}
-                  {data.indicators.etfFlows !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">Tech ETF Flows (Weekly)</span>
-                        <span className="font-bold">${data.indicators.etfFlows}B</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.etfFlows + 5) / 10) * 100))}%` 
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Outflows: {'<'}-$2B</span>
-                        <span className="text-yellow-600">Neutral: -$2B to +$2B</span>
-                        <span>Inflows: {'>'} $2B</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h4 className="font-semibold text-sm mb-3 text-blue-900">CCPI Formula Weights</h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-blue-700">Technical & Price:</span>
-                    <span className="font-bold text-blue-900">35%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-blue-700">Fundamental:</span>
-                    <span className="font-bold text-blue-900">25%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-blue-700">Macro Economic:</span>
-                    <span className="font-bold text-blue-900">30%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-blue-700">Sentiment & Social:</span>
-                    <span className="font-bold text-blue-900">10%</span>
-                  </div>
-                </div>
-                <p className="text-xs text-blue-700 mt-3">
-                  Final CCPI = Σ(Pillar Score × Weight). Each pillar score (0-100) is calculated from multiple professional indicators with specific thresholds.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Options Strategy Guide by CCPI Crash Risk Level */}
       <Card className="shadow-sm border-gray-200">
