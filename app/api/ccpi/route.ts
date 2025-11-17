@@ -80,7 +80,6 @@ export async function GET() {
       qqqBollingerProximity: data.qqqBollingerProximity,
       
       // Existing indicators
-      buffettIndicator: data.buffettIndicator,
       spxPE: data.spxPE,
       spxPS: data.spxPS,
       vix: data.vix,
@@ -171,7 +170,7 @@ async function fetchMarketData() {
     const vixTermData = results[2].status === 'fulfilled' ? results[2].value : { termStructure: 1.5, isInverted: false, source: 'baseline' }
     const fredData = results[3].status === 'fulfilled' ? results[3].value : { fedFundsRate: 5.33, junkSpread: 3.5, yieldCurve: 0.25 }
     const alphaVantageData = results[4].status === 'fulfilled' ? results[4].value : { vix: 16, vxn: 18, rvx: 20.1, ltv: 0.15, atr: 35, spotVol: 0.22 }
-    const apifyYahooData = results[5].status === 'fulfilled' ? results[5].value : { buffettIndicator: 180, spxPE: 22.5, spxPS: 2.8, putCallRatio: 0.72, shortInterest: 18, dataSource: 'baseline-apify-failed' }
+    const apifyYahooData = results[5].status === 'fulfilled' ? results[5].value : { spxPE: 22.5, spxPS: 2.8, shortInterest: 18, dataSource: 'baseline-apify-failed' }
     const fmpData = results[6].status === 'fulfilled' ? results[6].value : { spxPE: 22.5, spxPS: 2.9 }
     const aaiData = results[7].status === 'fulfilled' ? results[7].value : { bullish: 35, bearish: 28, fearGreed: 50, dataSource: 'baseline' }
     const etfData = results[8].status === 'fulfilled' ? results[8].value : { techETFFlows: -1.8, dataSource: 'baseline' }
@@ -260,7 +259,6 @@ async function fetchMarketData() {
       qqqBollingerProximity: qqqTechnicalsData.bollingerProximity ?? 0,
       
       // Valuation indicators (Apify Yahoo Finance primary)
-      buffettIndicator: apifyYahooData.buffettIndicator,
       spxPE: fmpData.spxPE || apifyYahooData.spxPE,
       spxPS: fmpData.spxPS || apifyYahooData.spxPS,
       
@@ -380,13 +378,8 @@ async function fetchFMPIndicators() {
   if (!FMP_API_KEY) {
     console.warn('[v0] FMP_API_KEY not set, using fallback values')
     return {
-      buffettIndicator: 180,
       spxPE: 22.5,
       spxPS: 2.8,
-      putCallRatio: 0.72,
-      shortInterest: 16.5,
-      highLowIndex: 0.42,
-      bullishPercent: 58
     }
   }
   
@@ -422,26 +415,16 @@ async function fetchFMPIndicators() {
     console.log(`[v0] FMP S&P 500 data: P/E=${spxPE}, P/S=${spxPS}`)
     
     return {
-      buffettIndicator: 180, // Still needs calculation from FRED GDP data
       spxPE: parseFloat(spxPE.toFixed(2)),
       spxPS: parseFloat(spxPS.toFixed(2)),
-      putCallRatio: 0.72, // Not available from FMP - use other source
-      shortInterest: 16.5, // Not available from FMP - use other source
-      highLowIndex: 0.42, // Market breadth - not from FMP
-      bullishPercent: 58  // Not from FMP
     }
   } catch (error) {
     console.error('[v0] FMP API error:', error instanceof Error ? error.message : String(error))
     console.warn('[v0] Falling back to baseline S&P 500 valuation values')
     
     return {
-      buffettIndicator: 180,
       spxPE: 22.5, // S&P 500 forward P/E - use financialmodelingprep.com/stable endpoints (paid)
       spxPS: 2.8,  // S&P 500 P/S ratio - requires paid tier
-      putCallRatio: 0.72,
-      shortInterest: 16.5,
-      highLowIndex: 0.42,
-      bullishPercent: 58
     }
   }
 }
@@ -457,11 +440,7 @@ async function fetchApifyYahooFinance() {
     return {
       spxPE: 22.5,
       spxPS: 2.8,
-      putCallRatio: 0.72,
-      shortInterest: 16.5,
-      buffettIndicator: 180,
-      highLowIndex: 0.42,
-      bullishPercent: 58,
+      shortInterest: 18,
       dataSource: 'baseline-no-apify-token'
     }
   }
@@ -545,7 +524,7 @@ async function fetchApifyYahooFinance() {
 
       let spxPE = 0
       let spxPS = 0
-      let putCallRatio = 0.72
+      let putCallRatio: number | undefined
       let shortInterest = 16.5
       let highLowIndex = 0.42
       let bullishPercent = 58
@@ -593,10 +572,10 @@ async function fetchApifyYahooFinance() {
       return {
         spxPE: parseFloat(spxPE.toFixed(2)),
         spxPS: parseFloat(spxPS.toFixed(2)),
-        putCallRatio: parseFloat(putCallRatio.toFixed(2)),
+        ...(putCallRatio !== undefined && { putCallRatio: parseFloat(putCallRatio.toFixed(2)) }),
         shortInterest: parseFloat(shortInterest.toFixed(1)),
-        highLowIndex: highLowIndex, // Keep highLowIndex
-        bullishPercent: bullishPercent, // Keep bullishPercent
+        highLowIndex: highLowIndex,
+        bullishPercent: bullishPercent,
         dataSource: actor.name
       }
     } catch (error) {
@@ -610,9 +589,7 @@ async function fetchApifyYahooFinance() {
   return {
     spxPE: 22.5,
     spxPS: 2.8,
-    putCallRatio: 0.72,
     shortInterest: 16.5,
-    buffettIndicator: 180,
     highLowIndex: 0.42,
     bullishPercent: 58,
     dataSource: 'baseline-apify-failed'
@@ -756,7 +733,7 @@ async function fetchYahooFinancePutCall() {
 async function fetchMultplIndicators() {
   // Calculated as: Total US Market Cap / GDP (~180% as of 2024)
   return {
-    buffettIndicator: 180,
+    // buffettIndicator: 180, // Removed as it's no longer explicitly tracked here
     dataSource: 'baseline-historical-average'
   }
 }
@@ -877,13 +854,8 @@ async function fetchFMPIndicators_Legacy() {
   if (!FMP_API_KEY) {
     console.warn('[v0] FMP_API_KEY not set, using fallback values')
     return {
-      buffettIndicator: 180,
       spxPE: 22.5,
       spxPS: 2.8,
-      putCallRatio: 0.72,
-      shortInterest: 16.5,
-      highLowIndex: 0.42,
-      bullishPercent: 58
     }
   }
   
@@ -906,24 +878,14 @@ async function fetchFMPIndicators_Legacy() {
     console.warn('[v0] To get live P/E, P/S data: upgrade FMP subscription or use alternative APIs')
     
     return {
-      buffettIndicator: 180, // Calculated from FRED GDP + market cap data (requires implementation)
       spxPE: 22.5, // S&P 500 forward P/E - use financialmodelingprep.com/stable endpoints (paid)
       spxPS: 2.8, // S&P 500 P/S ratio - requires paid tier
-      putCallRatio: 0.72, // CBOE put/call ratio - use CBOE direct or Alpha Vantage
-      shortInterest: 16.5, // Aggregate short interest - requires premium data
-      highLowIndex: 0.42, // Market breadth - calculate from constituent data
-      bullishPercent: 58  // Bullish percent index - requires StockCharts or premium service
     }
   } catch (error) {
     console.error('[v0] FMP API error:', error)
     return {
-      buffettIndicator: 180,
       spxPE: 22.5,
       spxPS: 2.8,
-      putCallRatio: 0.72,
-      shortInterest: 16.5,
-      highLowIndex: 0.42,
-      bullishPercent: 58
     }
   }
 }
@@ -1002,7 +964,6 @@ async function fetchTwelveDataIndicators() {
   if (!TWELVE_DATA_API_KEY) {
     console.warn('[v0] TWELVE_DATA_API_KEY not set, using fallback values')
     return {
-      buffettIndicator: 180,
       spxPE: 22.5,
       spxPS: 2.8,
       atr: 42.3,
@@ -1038,14 +999,12 @@ async function fetchTwelveDataIndicators() {
     
     // These require additional data sources or calculations
     // For now using sensible defaults based on market conditions
-    const buffettIndicator = 180 // Needs US GDP data from FRED
     const spxPE = 22.5 // Would need earnings data
     const spxPS = 2.8 // Would need sales data
     const highLowIndex = 0.42 // Needs breadth data from StockCharts or similar
     const bullishPercent = 58 // Needs breadth data
     
     return {
-      buffettIndicator,
       spxPE,
       spxPS,
       atr,
@@ -1055,7 +1014,6 @@ async function fetchTwelveDataIndicators() {
   } catch (error) {
     console.error('[v0] Twelve Data API error:', error)
     return {
-      buffettIndicator: 180,
       spxPE: 22.5,
       spxPS: 2.8,
       atr: 42.3,
@@ -1299,10 +1257,12 @@ async function computeSentiment(data: Awaited<ReturnType<typeof fetchMarketData>
   
   // Put/Call Ratio (hedging activity)
   // Low ratio (<0.7) = complacency, High ratio (>1.2) = fear
-  if (data.putCallRatio < 0.6) score += 25 // Extreme complacency
-  else if (data.putCallRatio < 0.7) score += 18
-  else if (data.putCallRatio < 0.8) score += 10
-  else if (data.putCallRatio > 1.2) score += 18 // Panic
+  if (data.putCallRatio !== undefined) {
+    if (data.putCallRatio < 0.6) score += 25 // Extreme complacency
+    else if (data.putCallRatio < 0.7) score += 18
+    else if (data.putCallRatio < 0.8) score += 10
+    else if (data.putCallRatio > 1.2) score += 18 // Panic
+  }
   
   // Fear & Greed Index (only if available)
   // Extreme Greed (>75) or Extreme Fear (<25)
@@ -1336,7 +1296,7 @@ async function computeFlows(data: Awaited<ReturnType<typeof fetchMarketData>>): 
   else if (data.shortInterest > 25) score += 12 // Crowded shorts
   
   // Cross-check with Put/Call for positioning consistency
-  if (data.putCallRatio < 0.7 && data.shortInterest < 15) {
+  if (data.putCallRatio !== undefined && data.putCallRatio < 0.7 && data.shortInterest < 15) {
     score += 15 // Double complacency warning
   }
   
@@ -1571,7 +1531,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // ===== PILLAR 1: VALUATION STRESS INDICATORS =====
   
   
-  // S&P 500 Forward P/E - compares stock prices to expected earnings
+  // S&P 500 Forward P/E Ratio - compares stock prices to expected earnings
   const peMedian = 16
   const peDeviation = ((data.spxPE - peMedian) / peMedian) * 100
   if (data.spxPE > peMedian * 1.15) { // 15% above historical median
@@ -1717,21 +1677,14 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // }
   
   // Put/Call Ratio - hedging and complacency indicator
-  if (data.putCallRatio < 0.75 || data.putCallRatio > 1.1) {
+  if (data.putCallRatio !== undefined && (data.putCallRatio < 0.75 || data.putCallRatio > 1.1)) {
     const isComplacent = data.putCallRatio < 0.75
-    if (isComplacent) {
-      canaries.push({
-        signal: `Put/Call Ratio at ${data.putCallRatio.toFixed(2)} - for every protective put bought, ${(1/data.putCallRatio).toFixed(1)} bullish calls are traded. This extreme ratio shows dangerous complacency where traders are under-hedged. Market is vulnerable to sudden reversals when optimism is this high.`,
-        pillar: "Sentiment & Media Feedback",
-        severity: data.putCallRatio < 0.65 ? "high" as const : "medium" as const
-      })
-    } else {
-      canaries.push({
-        signal: `Put/Call Ratio at ${data.putCallRatio.toFixed(2)} - heavy put buying relative to calls (normal ~0.7-1.0) signals defensive positioning and potential panic. While high put/call can mark bottoms, it also shows traders are hedging aggressively against downside.`,
-        pillar: "Sentiment & Media Feedback",
-        severity: "medium" as const
-      })
-    }
+    canaries.push({
+      signal: isComplacent 
+        ? `Put/Call Ratio at ${data.putCallRatio.toFixed(2)} - for every protective put bought, ${(1/data.putCallRatio).toFixed(1)} bullish calls are traded. This extreme ratio shows dangerous complacency where traders are under-hedged. Market is vulnerable to sudden reversals when optimism is this high.`
+        : `Put/Call Ratio at ${data.putCallRatio.toFixed(2)} - heavy put buying relative to calls (normal ~0.7-1.0) signals defensive positioning and potential panic. While high put/call can mark bottoms, it also shows traders are hedging aggressively against downside.`,
+      severity: data.putCallRatio < 0.65 ? "high" as const : "medium" as const
+    })
   }
   
   // Fear & Greed Index - composite sentiment measure
