@@ -170,7 +170,7 @@ async function fetchMarketData() {
     const vixTermData = results[2].status === 'fulfilled' ? results[2].value : { termStructure: 1.5, isInverted: false, source: 'baseline' }
     const fredData = results[3].status === 'fulfilled' ? results[3].value : { fedFundsRate: 5.33, junkSpread: 3.5, yieldCurve: 0.25 }
     const alphaVantageData = results[4].status === 'fulfilled' ? results[4].value : { vix: 16, vxn: 18, rvx: 20.1, ltv: 0.15, atr: 35, spotVol: 0.22 }
-    const apifyYahooData = results[5].status === 'fulfilled' ? results[5].value : { spxPE: 22.5, spxPS: 2.8, shortInterest: 18, dataSource: 'baseline-apify-failed' }
+    const apifyYahooData = results[5].status === 'fulfilled' ? results[5].value : { spxPE: 22.5, spxPS: 2.8, dataSource: 'baseline-apify-failed' }
     const fmpData = results[6].status === 'fulfilled' ? results[6].value : { spxPE: 22.5, spxPS: 2.9 }
     const aaiData = results[7].status === 'fulfilled' ? results[7].value : { bullish: 35, bearish: 28, fearGreed: 50, dataSource: 'baseline' }
     const etfData = results[8].status === 'fulfilled' ? results[8].value : { techETFFlows: -1.8, dataSource: 'baseline' }
@@ -440,7 +440,6 @@ async function fetchApifyYahooFinance() {
     return {
       spxPE: 22.5,
       spxPS: 2.8,
-      shortInterest: 18,
       dataSource: 'baseline-no-apify-token'
     }
   }
@@ -525,7 +524,7 @@ async function fetchApifyYahooFinance() {
       let spxPE = 0
       let spxPS = 0
       let putCallRatio: number | undefined
-      let shortInterest = 16.5
+      let shortInterest: number | undefined
       let highLowIndex = 0.42
       let bullishPercent = 58
 
@@ -573,7 +572,7 @@ async function fetchApifyYahooFinance() {
         spxPE: parseFloat(spxPE.toFixed(2)),
         spxPS: parseFloat(spxPS.toFixed(2)),
         ...(putCallRatio !== undefined && { putCallRatio: parseFloat(putCallRatio.toFixed(2)) }),
-        shortInterest: parseFloat(shortInterest.toFixed(1)),
+        ...(shortInterest !== undefined && { shortInterest: parseFloat(shortInterest.toFixed(1)) }),
         highLowIndex: highLowIndex,
         bullishPercent: bullishPercent,
         dataSource: actor.name
@@ -589,9 +588,6 @@ async function fetchApifyYahooFinance() {
   return {
     spxPE: 22.5,
     spxPS: 2.8,
-    shortInterest: 16.5,
-    highLowIndex: 0.42,
-    bullishPercent: 58,
     dataSource: 'baseline-apify-failed'
   }
 }
@@ -1291,13 +1287,15 @@ async function computeFlows(data: Awaited<ReturnType<typeof fetchMarketData>>): 
   
   // Short Interest (positioning)
   // Very low short interest = complacency
-  if (data.shortInterest < 12) score += 22 // Extreme complacency
-  else if (data.shortInterest < 15) score += 16
-  else if (data.shortInterest < 18) score += 8
-  else if (data.shortInterest > 25) score += 12 // Crowded shorts
+  if (data.shortInterest !== undefined) {
+    if (data.shortInterest < 12) score += 22 // Extreme complacency
+    else if (data.shortInterest < 15) score += 16
+    else if (data.shortInterest < 18) score += 8
+    else if (data.shortInterest > 25) score += 12 // Crowded shorts
+  }
   
   // Cross-check with Put/Call for positioning consistency
-  if (data.putCallRatio !== undefined && data.putCallRatio < 0.7 && data.shortInterest < 15) {
+  if (data.putCallRatio !== undefined && data.shortInterest !== undefined && data.putCallRatio < 0.7 && data.shortInterest < 15) {
     score += 15 // Double complacency warning
   }
   
@@ -1746,18 +1744,20 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   
   // Short Interest (positioning)
   // Very low short interest = complacency
-  if (data.shortInterest < 15) {
-    canaries.push({
-      signal: `Short Interest at ${data.shortInterest.toFixed(1)}% - only ${data.shortInterest.toFixed(1)}% of shares are sold short, well below historical average (18-22%). Very low short interest shows complacency with few traders positioned for downside, reducing potential for short-squeeze rallies and leaving market vulnerable to selling.`,
-      pillar: "Capital Flows & Positioning",
-      severity: "medium" as const
-    })
-  } else if (data.shortInterest > 24) {
-    canaries.push({
-      signal: `Short Interest at ${data.shortInterest.toFixed(1)}% - heavy short positioning (>${data.shortInterest.toFixed(1)}% of shares). High shorts can fuel explosive rallies if shorts are forced to cover, but also signals many professional traders see downside ahead.`,
-      pillar: "Capital Flows & Positioning",
-      severity: "medium" as const
-    })
+  if (data.shortInterest !== undefined) {
+    if (data.shortInterest < 15) {
+      canaries.push({
+        signal: `Short Interest at ${data.shortInterest.toFixed(1)}% - only ${data.shortInterest.toFixed(1)}% of shares are sold short, well below historical average (18-22%). Very low short interest shows complacency with few traders positioned for downside, reducing potential for short-squeeze rallies and leaving market vulnerable to selling.`,
+        pillar: "Capital Flows & Positioning",
+        severity: "medium" as const
+      })
+    } else if (data.shortInterest > 24) {
+      canaries.push({
+        signal: `Short Interest at ${data.shortInterest.toFixed(1)}% - heavy short positioning (>${data.shortInterest.toFixed(1)}% of shares). High shorts can fuel explosive rallies if shorts are forced to cover, but also signals many professional traders see downside ahead.`,
+        pillar: "Capital Flows & Positioning",
+        severity: "medium" as const
+      })
+    }
   }
   
   // ===== PILLAR 6: STRUCTURAL INDICATORS (AI-SPECIFIC) =====
