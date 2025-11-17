@@ -753,27 +753,6 @@ export function CcpiDashboard() {
                     </div>
                   )}
 
-                  {/* High-Low Index */}
-                  {data.indicators.highLowIndex !== undefined && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">High-Low Index</span>
-                        <span className="font-bold">{data.indicators.highLowIndex.toFixed(1)}%</span>
-                      </div>
-                      <div className="relative w-full h-3 rounded-full overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
-                        <div className="absolute inset-0 bg-gray-200" style={{ 
-                          marginLeft: `${data.indicators.highLowIndex}%`
-                        }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Weak: &lt;30%</span>
-                        <span>Neutral: 30-70%</span>
-                        <span>Strong: &gt;70%</span>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Bullish Percent Index */}
                   {data.indicators.bullishPercent !== undefined && (
                     <div className="space-y-2">
@@ -910,6 +889,27 @@ export function CcpiDashboard() {
                         <span>Inverted: &lt;-0.5%</span>
                         <span>Flat: -0.5 to +0.5%</span>
                         <span>Normal: &gt;+1%</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TED Spread (LIBOR - T-Bill) */}
+                  {data.indicators.tedSpread !== undefined && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">TED Spread (Bank Stress)</span>
+                        <span className="font-bold">{data.indicators.tedSpread.toFixed(2)}%</span>
+                      </div>
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div className="absolute inset-0 bg-gray-200" style={{ 
+                          marginLeft: `${Math.min(100, (data.indicators.tedSpread / 1.5) * 100)}%`
+                        }} />
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Healthy: &lt;0.25%</span>
+                        <span>Elevated: 0.25-0.5%</span>
+                        <span>Stress: &gt;0.5%</span>
                       </div>
                     </div>
                   )}

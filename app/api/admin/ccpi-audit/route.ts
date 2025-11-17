@@ -104,7 +104,7 @@ async function auditAllIndicators() {
       source_url: "https://api.polygon.io/v2/aggs/ticker/QQQ (calculated)",
       api_endpoint: "/api/ccpi (via Apify Yahoo Finance)",
       fetch_method: "Calculated from 200-day QQQ price history with proximity tracking",
-      status: await testPolygonAPI() ? "Live" : "Missing API Key",
+      status: process.env.POLYGON_API_KEY ? "Live" : "Missing API Key",
       last_fetched_at: new Date().toISOString(),
       raw_sample: { value: false, unit: "boolean", proximity: 0 },
       threshold: { bullish: "Above SMA200", bearish: "Below SMA200", proximity: "0-100% danger scale" }
@@ -234,7 +234,7 @@ async function auditAllIndicators() {
       threshold: { low: "<10%", moderate: "10-15%", high: ">15%" }
     },
     
-    // PILLAR 4: MACRO & LIQUIDITY RISK (3 indicators)
+    // PILLAR 4: MACRO & LIQUIDITY RISK (4 indicators)
     {
       id: 17,
       name: "Fed Funds Rate",
@@ -270,6 +270,18 @@ async function auditAllIndicators() {
       last_fetched_at: new Date().toISOString(),
       raw_sample: { value: 0.15, unit: "percent" },
       threshold: { inverted: "<0%", flat: "0-0.5%", normal: ">0.5%" }
+    },
+    {
+      id: 27,
+      name: "TED Spread (LIBOR - T-Bill)",
+      pillar: "Pillar 4: Macro & Liquidity Risk",
+      source_url: "https://fred.stlouisfed.org/series/TEDRATE",
+      api_endpoint: "/api/ccpi (via FRED)",
+      fetch_method: "FRED series TEDRATE (TED Spread - measures bank counterparty risk)",
+      status: await testFREDAPI() ? "Live" : "Failed",
+      last_fetched_at: new Date().toISOString(),
+      raw_sample: { value: 0.25, unit: "percent" },
+      threshold: { healthy: "<0.25%", elevated: "0.25-0.5%", stress: ">0.5% (crash signal)", crisis: ">1.0%" }
     },
     
     // PILLAR 5: SENTIMENT & MEDIA FEEDBACK (5 indicators)
@@ -508,9 +520,14 @@ async function auditPillarFormulas() {
           name: "Yield Curve",
           weight: 0.25,
           scoring: "<-0.5% = 30pts, <-0.2% = 20pts, <0% = 12pts, >1.0% = -10pts"
+        },
+        {
+          name: "TED Spread",
+          weight: 0.25,
+          scoring: ">1.0% = 35pts (crisis), >0.75% = 28pts, >0.5% = 22pts (stress), >0.35% = 15pts, >0.25% = 8pts, <0.15% = -5pts (healthy)"
         }
       ],
-      calculation: "Focuses on monetary policy restrictiveness and credit stress"
+      calculation: "Focuses on monetary policy restrictiveness, credit stress, and banking system liquidity"
     },
     // PILLAR 5: SENTIMENT & MEDIA FEEDBACK
     {
