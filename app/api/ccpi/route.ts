@@ -173,7 +173,8 @@ async function fetchMarketData() {
     const apifyYahooData = results[5].status === 'fulfilled' ? results[5].value : { spxPE: 22.5, spxPS: 2.8, dataSource: 'baseline-apify-failed' }
     const fmpData = results[6].status === 'fulfilled' ? results[6].value : { spxPE: 22.5, spxPS: 2.9 }
     const aaiData = results[7].status === 'fulfilled' ? results[7].value : { bullish: 35, bearish: 28, fearGreed: 50, dataSource: 'baseline' }
-    const etfData = results[8].status === 'fulfilled' ? results[8].value : { techETFFlows: -1.8, dataSource: 'baseline' }
+    // CHANGE: Remove ETF Flows baseline -1.8 fallback when API promise settles
+    const etfData = results[8].status === 'fulfilled' ? results[8].value : undefined
     const gpuData = results[9].status === 'fulfilled' ? results[9].value : { premium: 20 }
     const jobData = results[10].status === 'fulfilled' ? results[10].value : { growth: -5 }
     
@@ -226,8 +227,8 @@ async function fetchMarketData() {
     }
     
     apiStatus.etfFlows = {
-      live: results[8].status === 'fulfilled' && etfData.dataSource !== 'baseline-recent-reports',
-      source: etfData.dataSource || 'baseline',
+      live: results[8].status === 'fulfilled' && etfData && etfData.dataSource !== 'baseline-recent-reports',
+      source: etfData?.dataSource || 'baseline',
       lastUpdated: new Date().toISOString()
     }
     
@@ -284,7 +285,7 @@ async function fetchMarketData() {
       riskAppetite: undefined, // Removed baseline value - no viable API source
       
       // Flow indicators (ETF.com + Yahoo Finance)
-      etfFlows: etfData.techETFFlows,
+      etfFlows: etfData?.techETFFlows,
       shortInterest: apifyYahooData.shortInterest,
       
       vixTermStructure: vixTermData.termStructure,
@@ -776,22 +777,25 @@ async function fetchAAIISentiment() {
 
 // REMOVED direct ETF.com scraping (blocked by Cloudflare) - using Yahoo Finance only
 async function fetchETFFlows() {
-  try {
-    console.log('[v0] Fetching capital flows from Yahoo Finance...')
+  // CHANGE: ETF flows data is not reliably available via free APIs anymore
+  // Throwing an error to indicate this data source is unavailable.
+  throw new Error('ETF flows data not available - no reliable free API')
+  // try {
+  //   console.log('[v0] Fetching capital flows from Yahoo Finance...')
     
-    // Weekly tech ETF flows from public reports (QQQ, XLK, VGT)
-    // Recent average: -$1.8B weekly outflows
-    return {
-      techETFFlows: -1.8, // Renamed from etfFlows
-      dataSource: 'baseline-recent-reports'
-    }
-  } catch (error) {
-    console.error('[v0] Flows error:', error.message)
-    return {
-      techETFFlows: -1.8, // Renamed from etfFlows
-      dataSource: 'baseline'
-    }
-  }
+  //   // Weekly tech ETF flows from public reports (QQQ, XLK, VGT)
+  //   // Recent average: -$1.8B weekly outflows
+  //   return {
+  //     techETFFlows: -1.8, // Renamed from etfFlows
+  //     dataSource: 'baseline-recent-reports'
+  //   }
+  // } catch (error) {
+  //   console.error('[v0] Flows error:', error.message)
+  //   return {
+  //     techETFFlows: -1.8, // Renamed from etfFlows
+  //     dataSource: 'baseline'
+  //   }
+  // }
 }
 
 async function fetchGPUPricing() {
@@ -1278,12 +1282,14 @@ async function computeFlows(data: Awaited<ReturnType<typeof fetchMarketData>>): 
   
   // ETF Flows (capital allocation trends)
   // Large outflows signal distribution
-  if (data.etfFlows < -5) score += 35
-  else if (data.etfFlows < -3) score += 25
-  else if (data.etfFlows < -2) score += 18
-  else if (data.etfFlows < -1) score += 12
-  else if (data.etfFlows < 0) score += 8
-  else if (data.etfFlows > 5) score -= 5 // Strong inflows = risk on
+  if (data.etfFlows !== undefined) {
+    if (data.etfFlows < -5) score += 35
+    else if (data.etfFlows < -3) score += 25
+    else if (data.etfFlows < -2) score += 18
+    else if (data.etfFlows < -1) score += 12
+    else if (data.etfFlows < 0) score += 8
+    else if (data.etfFlows > 5) score -= 5 // Strong inflows = risk on
+  }
   
   // Short Interest (positioning)
   // Very low short interest = complacency
@@ -1728,18 +1734,20 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   
   // ETF Flows (capital allocation trends)
   // Large outflows signal distribution
-  if (data.etfFlows < -1.0) {
-    canaries.push({
-      signal: `Tech ETF Outflows at $${Math.abs(data.etfFlows).toFixed(1)}B weekly - institutional money is exiting technology sector via ETFs at a rate of $${Math.abs(data.etfFlows).toFixed(1)} billion per week. Large sustained outflows often precede sector corrections as smart money reduces exposure before retail investors.`,
-      pillar: "Capital Flows & Positioning",
-      severity: data.etfFlows < -3.0 ? "high" as const : "medium" as const
-    })
-  } else if (data.etfFlows > 3.0) {
-    canaries.push({
-      signal: `Tech ETF Inflows at $${data.etfFlows.toFixed(1)}B weekly - massive institutional buying into technology sector ($${data.etfFlows.toFixed(1)}B/week). While bullish short-term, extremely large inflows can signal FOMO and late-stage buying that exhausts buying power.`,
-      pillar: "Capital Flows & Positioning",
-      severity: "medium" as const
-    })
+  if (data.etfFlows !== undefined) { // CHANGE: Only create ETF Flows canary signal if data exists (not baseline)
+    if (data.etfFlows < -1.0) {
+      canaries.push({
+        signal: `Tech ETF Outflows at $${Math.abs(data.etfFlows).toFixed(1)}B weekly - institutional money is exiting technology sector via ETFs at a rate of $${Math.abs(data.etfFlows).toFixed(1)} billion per week. Large sustained outflows often precede sector corrections as smart money reduces exposure before retail investors.`,
+        pillar: "Capital Flows & Positioning",
+        severity: data.etfFlows < -3.0 ? "high" as const : "medium" as const
+      })
+    } else if (data.etfFlows > 3.0) {
+      canaries.push({
+        signal: `Tech ETF Inflows at $${data.etfFlows.toFixed(1)}B weekly - massive institutional buying into technology sector ($${data.etfFlows.toFixed(1)}B/week). While bullish short-term, extremely large inflows can signal FOMO and late-stage buying that exhausts buying power.`,
+        pillar: "Capital Flows & Positioning",
+        severity: "medium" as const
+      })
+    }
   }
   
   // Short Interest (positioning)
