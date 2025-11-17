@@ -325,7 +325,7 @@ async function fetchMarketBreadth() {
     }
   } catch (error) {
     console.error('[v0] Market breadth fetch error:', error)
-    throw new Error('High-Low Index API unavailable')
+    return undefined
   }
 }
 
