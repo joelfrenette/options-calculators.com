@@ -8,6 +8,7 @@ import {
   scrapeAAIISentiment,
   scrapeShortInterest
 } from '@/lib/scraping-bee'
+import { fetchApifyYahooFinance as fetchApifyYahooFinanceUtil } from '@/lib/apify-yahoo-finance'
 
 interface DataSourceStatus {
   live: boolean
@@ -161,7 +162,7 @@ async function fetchMarketData() {
     fetchVIXTermStructure(),
     fetchFREDIndicators(),
     fetchAlphaVantageIndicators(),
-    fetchApifyYahooFinance(),
+    fetchApifyYahooFinanceUtil('SPY'),
     fetchAAIISentiment(),
     scrapeBuffettIndicator(),
     scrapePutCallRatio(),
@@ -355,11 +356,46 @@ async function fetchAlphaVantageIndicators() {
 }
 
 async function fetchApifyYahooFinance() {
-  return {
-    spxPE: 22.5,
-    spxPS: 2.8,
-    dataSource: 'baseline',
-    etfFlows: -2.0 // Example value for etfFlows
+  try {
+    console.log("[v0] CCPI: Attempting to fetch from Apify Yahoo Finance...")
+    
+    const result = await fetchApifyYahooFinanceUtil('SPY')
+    
+    console.log(`[v0] CCPI: Apify data source: ${result.dataSource}`)
+    if (result.actorUsed) {
+      console.log(`[v0] CCPI: Successfully used actor: ${result.actorUsed}`)
+    }
+    
+    if (!result.data) {
+      console.warn("[v0] CCPI: Apify returned no data, using baseline")
+      return {
+        spxPE: 22.5,
+        spxPS: 2.8,
+        dataSource: result.dataSource || 'baseline-apify-no-data',
+        etfFlows: -2.0
+      }
+    }
+    
+    const data = result.data
+    
+    return {
+      spxPE: data.forwardPE || data.trailingPE || 22.5,
+      spxPS: data.priceToSales || 2.8,
+      dataSource: result.dataSource || 'apify-live',
+      actorUsed: result.actorUsed,
+      etfFlows: data.netInflows || -2.0,
+      marketCap: data.marketCap,
+      volume: data.volume,
+      price: data.currentPrice
+    }
+  } catch (error) {
+    console.error("[v0] CCPI: Apify fetch error:", error instanceof Error ? error.message : String(error))
+    return {
+      spxPE: 22.5,
+      spxPS: 2.8,
+      dataSource: 'baseline-apify-error',
+      etfFlows: -2.0
+    }
   }
 }
 
