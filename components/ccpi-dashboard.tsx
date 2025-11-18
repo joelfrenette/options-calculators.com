@@ -5,9 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { AlertTriangle, TrendingDown, Activity, DollarSign, Users, Database, RefreshCw, Download, Settings, Layers, Info } from 'lucide-react'
+import * as LucideIcons from 'lucide-react' // Updated import
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, ReferenceLine } from "recharts"
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { Progress } from '@/components/ui/progress'
+
+const { AlertTriangle, TrendingDown, Activity, DollarSign, Users, Database, RefreshCw, Download, Settings, Layers, Info } = LucideIcons
+
 
 interface CCPIData {
   ccpi: number
@@ -79,22 +83,35 @@ export function CcpiDashboard() {
     return '#ef4444' // red-500
   }
 
-  const getStatusBadge = (live: boolean, source: string) => {
-    if (live) {
-      return <Badge className="ml-2 bg-green-500 text-white text-xs flex items-center gap-1">
-        <span className="h-2 w-2 rounded-full bg-white"></span>
-        Live
-      </Badge>
-    } else if (source.includes('baseline') || source.includes('fallback') || source.includes('historical')) {
-      return <Badge className="ml-2 bg-amber-500 text-white text-xs flex items-center gap-1">
-        <span className="h-2 w-2 rounded-full bg-white"></span>
-        Baseline
-      </Badge>
+  const getStatusBadge = (isLive: boolean, source: string) => {
+    if (isLive || source.includes('live') || source.includes('API')) {
+      return (
+        <div className="flex items-center gap-2">
+          <span className="h-3 w-3 rounded-full bg-green-500 animate-pulse"></span>
+          <span className="text-xs font-semibold text-green-700">LIVE</span>
+        </div>
+      )
+    } else if (source.includes('grok') || source.includes('Grok')) {
+      return (
+        <div className="flex items-center gap-2">
+          <span className="h-3 w-3 rounded-full bg-blue-500"></span>
+          <span className="text-xs font-semibold text-blue-700">GROK AI</span>
+        </div>
+      )
+    } else if (source.includes('baseline')) {
+      return (
+        <div className="flex items-center gap-2">
+          <span className="h-3 w-3 rounded-full bg-amber-500"></span>
+          <span className="text-xs font-semibold text-amber-700">BASELINE</span>
+        </div>
+      )
     } else {
-      return <Badge className="ml-2 bg-red-500 text-white text-xs flex items-center gap-1">
-        <span className="h-2 w-2 rounded-full bg-white"></span>
-        Failed
-      </Badge>
+      return (
+        <div className="flex items-center gap-2">
+          <span className="h-3 w-3 rounded-full bg-red-500"></span>
+          <span className="text-xs font-semibold text-red-700">FAILED</span>
+        </div>
+      )
     }
   }
 
@@ -1906,7 +1923,7 @@ export function CcpiDashboard() {
                   <Activity className="h-4 w-4" />
                   CCPI Calculator Data Sources
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                   {data.apiStatus?.technical && (
                     <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
                       <div>
@@ -1941,6 +1958,24 @@ export function CcpiDashboard() {
                         <p className="text-xs text-gray-500">{data.apiStatus.alphaVantage.source}</p>
                       </div>
                       {getStatusBadge(data.apiStatus.alphaVantage.live, data.apiStatus.alphaVantage.source)}
+                    </div>
+                  )}
+                  {data.apiStatus?.polygon && (
+                    <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">Polygon</span>
+                        <p className="text-xs text-gray-500">{data.apiStatus.polygon.source}</p>
+                      </div>
+                      {getStatusBadge(data.apiStatus.polygon.live, data.apiStatus.polygon.source)}
+                    </div>
+                  )}
+                  {data.apiStatus?.twelveData && (
+                    <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">Twelve Data</span>
+                        <p className="text-xs text-gray-500">{data.apiStatus.twelveData.source}</p>
+                      </div>
+                      {getStatusBadge(data.apiStatus.twelveData.live, data.apiStatus.twelveData.source)}
                     </div>
                   )}
                   {data.apiStatus?.apify && (
@@ -1997,25 +2032,85 @@ export function CcpiDashboard() {
                       {getStatusBadge(data.apiStatus.shortInterest.live, data.apiStatus.shortInterest.source)}
                     </div>
                   )}
+                  {data.apiStatus?.nvidia && (
+                    <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">NVIDIA Price</span>
+                        <p className="text-xs text-gray-500">{data.apiStatus.nvidia.source}</p>
+                      </div>
+                      {getStatusBadge(data.apiStatus.nvidia.live, data.apiStatus.nvidia.source)}
+                    </div>
+                  )}
+                  {data.apiStatus?.sox && (
+                    <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">SOX Index</span>
+                        <p className="text-xs text-gray-500">{data.apiStatus.sox.source}</p>
+                      </div>
+                      {getStatusBadge(data.apiStatus.sox.live, data.apiStatus.sox.source)}
+                    </div>
+                  )}
+                  {data.apiStatus?.qqqPE && (
+                    <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">QQQ P/E</span>
+                        <p className="text-xs text-gray-500">{data.apiStatus.qqqPE.source}</p>
+                      </div>
+                      {getStatusBadge(data.apiStatus.qqqPE.live, data.apiStatus.qqqPE.source)}
+                    </div>
+                  )}
+                  {data.apiStatus?.mag7 && (
+                    <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">Mag7 Concentration</span>
+                        <p className="text-xs text-gray-500">{data.apiStatus.mag7.source}</p>
+                      </div>
+                      {getStatusBadge(data.apiStatus.mag7.live, data.apiStatus.mag7.source)}
+                    </div>
+                  )}
+                  {data.apiStatus?.cape && (
+                    <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">Shiller CAPE</span>
+                        <p className="text-xs text-gray-500">{data.apiStatus.cape.source}</p>
+                      </div>
+                      {getStatusBadge(data.apiStatus.cape.live, data.apiStatus.cape.source)}
+                    </div>
+                  )}
+                  {data.apiStatus?.grok && (
+                    <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-blue-300 shadow-md bg-gradient-to-br from-blue-50 to-indigo-50">
+                      <div>
+                        <span className="text-sm font-medium text-blue-900">Grok AI Fallback</span>
+                        <p className="text-xs text-blue-600">{data.apiStatus.grok.source}</p>
+                      </div>
+                      {getStatusBadge(data.apiStatus.grok.live, data.apiStatus.grok.source)}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Legend with traffic light style */}
               <div className="mt-4 p-4 bg-white border border-blue-200 rounded-lg">
                 <p className="text-sm font-semibold text-gray-900 mb-3">Legend: Data Source Status</p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                   <div className="flex items-center gap-3 p-2 bg-green-50 rounded border border-green-200">
-                    <span className="h-4 w-4 rounded-full bg-green-500 flex-shrink-0"></span>
+                    <span className="h-4 w-4 rounded-full bg-green-500 flex-shrink-0 animate-pulse"></span>
                     <div>
                       <p className="text-sm font-semibold text-green-900">Live</p>
                       <p className="text-xs text-green-700">Real-time API data</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-2 bg-blue-50 rounded border border-blue-200">
+                    <span className="h-4 w-4 rounded-full bg-blue-500 flex-shrink-0"></span>
+                    <div>
+                      <p className="text-sm font-semibold text-blue-900">Grok AI</p>
+                      <p className="text-xs text-blue-700">AI-fetched current data</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 p-2 bg-amber-50 rounded border border-amber-200">
                     <span className="h-4 w-4 rounded-full bg-amber-500 flex-shrink-0"></span>
                     <div>
                       <p className="text-sm font-semibold text-amber-900">Baseline</p>
-                      <p className="text-xs text-amber-700">Historical average/fallback</p>
+                      <p className="text-xs text-amber-700">Historical fallback</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 p-2 bg-red-50 rounded border border-red-200">
