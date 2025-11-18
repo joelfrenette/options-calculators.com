@@ -1143,7 +1143,7 @@ export function CcpiDashboard() {
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <DollarSign className="h-5 w-5 text-blue-600" />
-                Pillar 3 - Valuation (15% weight)
+                Pillar 3 - Valuation & Market Structure (15% weight)
               </h3>
               <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.valuation)}/100</span>
             </div>
@@ -1207,6 +1207,86 @@ export function CcpiDashboard() {
                     <span>Fair: 120-150%</span>
                     <span>Warning: 150-180%</span>
                     <span className="text-red-600">Danger: {'>'}200%</span>
+                  </div>
+                </div>
+              )}
+
+              {data.indicators.qqqPE !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">QQQ Forward P/E (AI-Specific Valuation)</span>
+                    <span className="font-bold">{data.indicators.qqqPE.toFixed(1)}</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, ((data.indicators.qqqPE - 15) / 30) * 100)}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Fair: {'<'}25</span>
+                    <span>Elevated: 30-35</span>
+                    <span>Bubble: {'>'}40</span>
+                  </div>
+                </div>
+              )}
+
+              {data.indicators.mag7Concentration !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">Magnificent 7 Concentration (Crash Contagion Risk)</span>
+                    <span className="font-bold">{data.indicators.mag7Concentration.toFixed(1)}%</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, ((data.indicators.mag7Concentration - 40) / 30) * 100)}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Diversified: {'<'}50%</span>
+                    <span>High: 55-60%</span>
+                    <span>Extreme: {'>'}65%</span>
+                  </div>
+                </div>
+              )}
+
+              {data.indicators.shillerCAPE !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">Shiller CAPE Ratio (10-Year Cyclical Valuation)</span>
+                    <span className="font-bold">{data.indicators.shillerCAPE.toFixed(1)}</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, ((data.indicators.shillerCAPE - 15) / 25) * 100)}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Historical Avg: 16-17</span>
+                    <span>Elevated: 25-30</span>
+                    <span>Extreme: {'>'}35</span>
+                  </div>
+                </div>
+              )}
+
+              {data.indicators.equityRiskPremium !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">Equity Risk Premium (Earnings Yield - 10Y Treasury)</span>
+                    <span className="font-bold">{data.indicators.equityRiskPremium.toFixed(2)}%</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, Math.max(0, 100 - ((data.indicators.equityRiskPremium - 1) / 5) * 100))}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Overvalued: {'<'}2%</span>
+                    <span>Fair: 3-4%</span>
+                    <span>Attractive: {'>'}5%</span>
                   </div>
                 </div>
               )}
@@ -1393,7 +1473,7 @@ export function CcpiDashboard() {
               </div>
             </div>
             <p className="text-xs text-blue-700 mt-3">
-              Final CCPI = Σ(Pillar Score × Weight). Phase 1 enhanced with AI sector indicators (NVDA, SOX) and macro leading indicators (TED, DXY, ISM, RRP).
+              Final CCPI = Σ(Pillar Score × Weight). Pillar 3 now includes 7 valuation & market structure indicators: S&P P/E, S&P P/S, Buffett Indicator, QQQ P/E, Mag7 Concentration, Shiller CAPE, and Equity Risk Premium.
             </p>
           </div>
         </CardContent>
