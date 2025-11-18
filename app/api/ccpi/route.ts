@@ -9,6 +9,12 @@ import {
   scrapeShortInterest
 } from '@/lib/scraping-bee'
 import { fetchApifyYahooFinance as fetchApifyYahooFinanceUtil } from '@/lib/apify-yahoo-finance'
+import { 
+  fetchShillerCAPEWithGrok,
+  fetchShortInterestWithGrok,
+  fetchMag7ConcentrationWithGrok,
+  fetchQQQPEWithGrok
+} from '@/lib/grok-market-data'
 
 interface DataSourceStatus {
   live: boolean
@@ -135,7 +141,13 @@ export async function GET() {
         tedSpread: data.tedSpread,
         dxyIndex: data.dxyIndex,
         ismPMI: data.ismPMI,
-        fedReverseRepo: data.fedReverseRepo
+        fedReverseRepo: data.fedReverseRepo,
+
+        // NEW Phase 2 indicators
+        qqqPE: data.qqqPE,
+        mag7Concentration: data.mag7Concentration,
+        shillerCAPE: data.shillerCAPE,
+        equityRiskPremium: data.equityRiskPremium
       },
       canaries,
       activeCanaries: canaries.filter(c => c.severity === 'high' || c.severity === 'medium').length,
@@ -172,11 +184,15 @@ async function fetchMarketData() {
     fetchFREDIndicators(),
     fetchAlphaVantageIndicators(),
     fetchApifyYahooFinanceUtil('SPY'),
+    fetchApifyYahooFinanceUtil('QQQ'),
     fetchAAIISentiment(),
     scrapeBuffettIndicator(),
     scrapePutCallRatio(),
     scrapeAAIISentiment(),
-    scrapeShortInterest()
+    scrapeShortInterest(),
+    // Fetch QQQ PE and Mag7 Concentration with Grok
+    fetchQQQPEWithGrok(),
+    fetchMag7ConcentrationWithGrok()
   ])
   
   const qqqData = results[0].status === 'fulfilled' ? results[0].value : null
@@ -184,11 +200,16 @@ async function fetchMarketData() {
   const fredData = results[2].status === 'fulfilled' ? results[2].value : null
   const alphaVantageData = results[3].status === 'fulfilled' ? results[3].value : null
   const apifyData = results[4].status === 'fulfilled' ? results[4].value : null
-  const sentimentData = results[5].status === 'fulfilled' ? results[5].value : null
-  const buffettData = results[6].status === 'fulfilled' ? results[6].value : { ratio: 180, status: 'baseline' }
-  const putCallData = results[7].status === 'fulfilled' ? results[7].value : { ratio: 0.95, status: 'baseline' }
-  const aaiData = results[8].status === 'fulfilled' ? results[8].value : { bullish: 35, bearish: 30, neutral: 35, spread: 5, status: 'baseline' }
-  const shortInterestData = results[9].status === 'fulfilled' ? results[9].value : { spyShortRatio: 2.5, status: 'baseline' }
+  const qqqFundamentals = results[5].status === 'fulfilled' ? results[5].value : null
+  const sentimentData = results[6].status === 'fulfilled' ? results[6].value : null
+  const buffettData = results[7].status === 'fulfilled' ? results[7].value : { ratio: 180, status: 'baseline' }
+  const putCallData = results[8].status === 'fulfilled' ? results[8].value : { ratio: 0.95, status: 'baseline' }
+  const aaiData = results[9].status === 'fulfilled' ? results[9].value : { bullish: 35, bearish: 30, neutral: 35, spread: 5, status: 'baseline' }
+  const shortInterestData = results[10].status === 'fulfilled' ? results[10].value : { spyShortRatio: 2.5, status: 'baseline' }
+  
+  // Use Grok-fetched QQQ PE and Mag7 Concentration
+  const qqqPE = results[11].status === 'fulfilled' ? results[11].value : null
+  const mag7Concentration = results[12].status === 'fulfilled' ? results[12].value : null
   
   // Update API status
   apiStatus.technical = {
@@ -279,6 +300,10 @@ async function fetchMarketData() {
     // Valuation
     spxPE: apifyData?.spxPE || 22.5,
     spxPS: apifyData?.spxPS || 2.8,
+    qqqPE: qqqPE || qqqFundamentals?.data?.forwardPE || qqqFundamentals?.data?.trailingPE || 32,
+    mag7Concentration: mag7Concentration || alphaVantageData?.mag7Concentration || 55,
+    shillerCAPE: fredData?.shillerCAPE || 30,
+    equityRiskPremium: calculateEquityRiskPremium(apifyData?.spxPE || 22.5, fredData?.yieldCurve10Y || 4.5),
     
     // Macro
     fedFundsRate: fredData?.fedFundsRate || 5.33,
@@ -311,8 +336,15 @@ async function fetchMarketData() {
     tedSpread: fredData?.tedSpread || 0.25,
     dxyIndex: fredData?.dxyIndex || 103,
     ismPMI: fredData?.ismPMI || 48,
-    fedReverseRepo: fredData?.fedReverseRepo || 450
+    fedReverseRepo: fredData?.fedReverseRepo || 450,
+    
+    apiStatus
   }
+}
+
+function calculateEquityRiskPremium(spxPE: number, treasury10Y: number): number {
+  const earningsYield = (1 / spxPE) * 100
+  return earningsYield - treasury10Y
 }
 
 async function fetchFREDIndicators() {
@@ -327,13 +359,19 @@ async function fetchFREDIndicators() {
       tedSpread: 0.25,
       dxyIndex: 103,
       ismPMI: 48,
-      fedReverseRepo: 450
+      fedReverseRepo: 450,
+      shillerCAPE: 30,
+      yieldCurve10Y: 4.5
     }
   }
   
   try {
     const baseUrl = 'https://api.stlouisfed.org/fred/series/observations'
-    const [fedFundsRes, junkSpreadRes, yieldCurveRes, debtToGDPRes, tedSpreadRes, dxyRes, ismRes, rrpRes] = await Promise.all([
+    
+    const [
+      fedFundsRes, junkSpreadRes, yieldCurveRes, debtToGDPRes, tedSpreadRes, 
+      dxyRes, ismRes, rrpRes, treasury10YRes
+    ] = await Promise.all([
       fetch(`${baseUrl}?series_id=DFF&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
       fetch(`${baseUrl}?series_id=BAMLH0A0HYM2&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
       fetch(`${baseUrl}?series_id=T10Y2Y&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
@@ -341,10 +379,14 @@ async function fetchFREDIndicators() {
       fetch(`${baseUrl}?series_id=TEDRATE&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
       fetch(`${baseUrl}?series_id=DTWEXBGS&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
       fetch(`${baseUrl}?series_id=MANEMP&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
-      fetch(`${baseUrl}?series_id=RRPONTSYD&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) })
+      fetch(`${baseUrl}?series_id=RRPONTSYD&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
+      fetch(`${baseUrl}?series_id=DGS10&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) })
     ])
     
-    const [fedFunds, junkSpread, yieldCurve, debtToGDP, tedSpread, dxy, ism, rrp] = await Promise.all([
+    const [
+      fedFunds, junkSpread, yieldCurve, debtToGDP, tedSpread, 
+      dxy, ism, rrp, treasury10Y
+    ] = await Promise.all([
       fedFundsRes.json(),
       junkSpreadRes.json(),
       yieldCurveRes.json(),
@@ -352,8 +394,12 @@ async function fetchFREDIndicators() {
       tedSpreadRes.json(),
       dxyRes.json(),
       ismRes.json(),
-      rrpRes.json()
+      rrpRes.json(),
+      treasury10YRes.json()
     ])
+    
+    console.log("[v0] FRED: Attempting to fetch Shiller CAPE with Grok...")
+    const shillerCAPE = await fetchShillerCAPEWithGrok()
     
     return {
       fedFundsRate: parseFloat(fedFunds.observations[0]?.value || '5.33'),
@@ -363,9 +409,14 @@ async function fetchFREDIndicators() {
       tedSpread: parseFloat(tedSpread.observations[0]?.value || '0.25'),
       dxyIndex: parseFloat(dxy.observations[0]?.value || '103'),
       ismPMI: parseFloat(ism.observations[0]?.value || '48'),
-      fedReverseRepo: parseFloat(rrp.observations[0]?.value || '450')
+      fedReverseRepo: parseFloat(rrp.observations[0]?.value || '450'),
+      shillerCAPE, // Use Grok-fetched value
+      yieldCurve10Y: parseFloat(treasury10Y.observations[0]?.value || '4.5')
     }
   } catch (error) {
+    console.error("[v0] FRED API error:", error)
+    const shillerCAPE = await fetchShillerCAPEWithGrok()
+    
     return { 
       fedFundsRate: 5.33, 
       junkSpread: 3.5, 
@@ -374,7 +425,9 @@ async function fetchFREDIndicators() {
       tedSpread: 0.25,
       dxyIndex: 103,
       ismPMI: 48,
-      fedReverseRepo: 450
+      fedReverseRepo: 450,
+      shillerCAPE,
+      yieldCurve10Y: 4.5
     }
   }
 }
@@ -392,19 +445,32 @@ async function fetchAlphaVantageIndicators() {
       spotVol: 0.22,
       nvidiaPrice: 800,
       nvidiaMomentum: 50,
-      soxIndex: 5000
+      soxIndex: 5000,
+      mag7Concentration: 55
     }
   }
   
   try {
-    const [nvidiaRes, soxRes] = await Promise.all([
+    const [nvidiaRes, soxRes, aaplRes, msftRes, googlRes, amznRes, metaRes, tslaRes] = await Promise.all([
       fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=NVDA&apikey=${ALPHA_VANTAGE_API_KEY}`, { signal: AbortSignal.timeout(10000) }),
-      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=SOXX&apikey=${ALPHA_VANTAGE_API_KEY}`, { signal: AbortSignal.timeout(10000) })
+      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=SOXX&apikey=${ALPHA_VANTAGE_API_KEY}`, { signal: AbortSignal.timeout(10000) }),
+      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AAPL&apikey=${ALPHA_VANTAGE_API_KEY}`, { signal: AbortSignal.timeout(10000) }),
+      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=MSFT&apikey=${ALPHA_VANTAGE_API_KEY}`, { signal: AbortSignal.timeout(10000) }),
+      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=GOOGL&apikey=${ALPHA_VANTAGE_API_KEY}`, { signal: AbortSignal.timeout(10000) }),
+      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AMZN&apikey=${ALPHA_VANTAGE_API_KEY}`, { signal: AbortSignal.timeout(10000) }),
+      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=META&apikey=${ALPHA_VANTAGE_API_KEY}`, { signal: AbortSignal.timeout(10000) }),
+      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=TSLA&apikey=${ALPHA_VANTAGE_API_KEY}`, { signal: AbortSignal.timeout(10000) })
     ])
     
-    const [nvidiaData, soxData] = await Promise.all([
+    const [nvidiaData, soxData, aaplData, msftData, googlData, amznData, metaData, tslaData] = await Promise.all([
       nvidiaRes.json(),
-      soxRes.json()
+      soxRes.json(),
+      aaplRes.json(),
+      msftRes.json(),
+      googlRes.json(),
+      amznRes.json(),
+      metaRes.json(),
+      tslaRes.json()
     ])
     
     const nvidiaPrice = parseFloat(nvidiaData?.['Global Quote']?.['05. price'] || '800')
@@ -412,7 +478,15 @@ async function fetchAlphaVantageIndicators() {
     const nvidiaMomentum = nvidiaChange > 0 ? 100 : 0
     const soxIndex = parseFloat(soxData?.['Global Quote']?.['05. price'] || '5000')
     
-    console.log(`[v0] Alpha Vantage Phase 1: NVDA=${nvidiaPrice}, SOX=${soxIndex}`)
+    // This is a proxy based on stock price strength
+    const mag7Avg = [aaplData, msftData, googlData, amznData, metaData, tslaData, nvidiaData]
+      .map(d => parseFloat(d?.['Global Quote']?.['10. change percent']?.replace('%', '') || '0'))
+      .reduce((a, b) => a + b, 0) / 7
+    
+    // Higher = more concentrated (using simplified proxy)
+    const mag7Concentration = 55 + (mag7Avg > 0 ? 5 : -5)
+    
+    console.log(`[v0] Alpha Vantage Phase 2: NVDA=${nvidiaPrice}, SOX=${soxIndex}, Mag7=${mag7Concentration.toFixed(1)}%`)
     
     return {
       vix: 18,
@@ -423,10 +497,11 @@ async function fetchAlphaVantageIndicators() {
       spotVol: 0.22,
       nvidiaPrice,
       nvidiaMomentum,
-      soxIndex
+      soxIndex,
+      mag7Concentration
     }
   } catch (error) {
-    console.error("[v0] Alpha Vantage Phase 1 error:", error)
+    console.error("[v0] Alpha Vantage error:", error)
     return {
       vix: 18,
       vxn: 19,
@@ -436,7 +511,8 @@ async function fetchAlphaVantageIndicators() {
       spotVol: 0.22,
       nvidiaPrice: 800,
       nvidiaMomentum: 50,
-      soxIndex: 5000
+      soxIndex: 5000,
+      mag7Concentration: 55
     }
   }
 }
@@ -660,7 +736,32 @@ async function computeValuationPillar(data: Awaited<ReturnType<typeof fetchMarke
   else if (buffett > 150) score += 20
   else if (buffett > 120) score += 10
   
-  console.log("[v0] Pillar 3 - Valuation & Fundamentals:", score)
+  
+  // QQQ Forward P/E (AI-specific valuation)
+  if (data.qqqPE > 40) score += 35
+  else if (data.qqqPE > 35) score += 28
+  else if (data.qqqPE > 30) score += 20
+  else if (data.qqqPE > 25) score += 12
+  
+  // Magnificent 7 Concentration
+  if (data.mag7Concentration > 65) score += 40
+  else if (data.mag7Concentration > 60) score += 32
+  else if (data.mag7Concentration > 55) score += 22
+  else if (data.mag7Concentration > 50) score += 12
+  
+  // Shiller CAPE Ratio
+  if (data.shillerCAPE > 35) score += 35
+  else if (data.shillerCAPE > 30) score += 28
+  else if (data.shillerCAPE > 25) score += 18
+  else if (data.shillerCAPE > 20) score += 8
+  
+  // Equity Risk Premium (lower = more overvalued)
+  if (data.equityRiskPremium < 1.5) score += 40
+  else if (data.equityRiskPremium < 2.0) score += 32
+  else if (data.equityRiskPremium < 3.0) score += 22
+  else if (data.equityRiskPremium < 4.0) score += 10
+  
+  console.log("[v0] Pillar 3 - Valuation & Market Structure:", score)
   return Math.min(100, Math.max(0, score))
 }
 
@@ -958,24 +1059,24 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   
   // 20. S&P 500 Forward P/E
   if (data.spxPE > 30) {
-    canaries.push({ signal: `S&P 500 P/E at ${data.spxPE.toFixed(1)} - Extreme overvaluation`, pillar: "Valuation", severity: "high" })
+    canaries.push({ signal: `S&P 500 P/E at ${data.spxPE.toFixed(1)} - Extreme overvaluation`, pillar: "Valuation & Market Structure", severity: "high" })
   } else if (data.spxPE > 22) {
-    canaries.push({ signal: `S&P 500 P/E at ${data.spxPE.toFixed(1)} - Above historical average`, pillar: "Valuation", severity: "medium" })
+    canaries.push({ signal: `S&P 500 P/E at ${data.spxPE.toFixed(1)} - Above historical average`, pillar: "Valuation & Market Structure", severity: "medium" })
   }
   
   // 21. S&P 500 Price-to-Sales
   if (data.spxPS > 3.5) {
-    canaries.push({ signal: `S&P 500 P/S at ${data.spxPS.toFixed(1)} - Extremely expensive`, pillar: "Valuation", severity: "high" })
+    canaries.push({ signal: `S&P 500 P/S at ${data.spxPS.toFixed(1)} - Extremely expensive`, pillar: "Valuation & Market Structure", severity: "high" })
   } else if (data.spxPS > 2.5) {
-    canaries.push({ signal: `S&P 500 P/S at ${data.spxPS.toFixed(1)} - Elevated valuation`, pillar: "Valuation", severity: "medium" })
+    canaries.push({ signal: `S&P 500 P/S at ${data.spxPS.toFixed(1)} - Elevated valuation`, pillar: "Valuation & Market Structure", severity: "medium" })
   }
   
   // 22. Buffett Indicator (Market Cap / GDP)
   const buffett = data.buffettIndicator || 180
   if (buffett > 200) {
-    canaries.push({ signal: `Buffett Indicator at ${buffett.toFixed(0)}% - Significantly overvalued`, pillar: "Valuation", severity: "high" })
+    canaries.push({ signal: `Buffett Indicator at ${buffett.toFixed(0)}% - Significantly overvalued`, pillar: "Valuation & Market Structure", severity: "high" })
   } else if (buffett > 150) {
-    canaries.push({ signal: `Buffett Indicator at ${buffett.toFixed(0)}% - Above fair value`, pillar: "Valuation", severity: "medium" })
+    canaries.push({ signal: `Buffett Indicator at ${buffett.toFixed(0)}% - Above fair value`, pillar: "Valuation & Market Structure", severity: "medium" })
   }
   
   
@@ -1042,6 +1143,35 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     canaries.push({ signal: `Fed RRP at $${data.fedReverseRepo.toFixed(0)}B - Severe liquidity drain`, pillar: "Macro", severity: "high" })
   } else if (data.fedReverseRepo > 1000) {
     canaries.push({ signal: `Fed RRP at $${data.fedReverseRepo.toFixed(0)}B - Tight liquidity conditions`, pillar: "Macro", severity: "medium" })
+  }
+  
+  
+  // QQQ P/E Ratio
+  if (data.qqqPE > 40) {
+    canaries.push({ signal: `QQQ P/E at ${data.qqqPE.toFixed(1)} - AI bubble territory`, pillar: "Valuation & Market Structure", severity: "high" })
+  } else if (data.qqqPE > 30) {
+    canaries.push({ signal: `QQQ P/E at ${data.qqqPE.toFixed(1)} - Tech overvaluation`, pillar: "Valuation & Market Structure", severity: "medium" })
+  }
+  
+  // Mag7 Concentration
+  if (data.mag7Concentration > 65) {
+    canaries.push({ signal: `Mag7 at ${data.mag7Concentration.toFixed(1)}% of QQQ - Extreme concentration risk`, pillar: "Valuation & Market Structure", severity: "high" })
+  } else if (data.mag7Concentration > 55) {
+    canaries.push({ signal: `Mag7 at ${data.mag7Concentration.toFixed(1)}% of QQQ - High concentration`, pillar: "Valuation & Market Structure", severity: "medium" })
+  }
+  
+  // Shiller CAPE
+  if (data.shillerCAPE > 35) {
+    canaries.push({ signal: `Shiller CAPE at ${data.shillerCAPE.toFixed(1)} - Historic overvaluation`, pillar: "Valuation & Market Structure", severity: "high" })
+  } else if (data.shillerCAPE > 28) {
+    canaries.push({ signal: `Shiller CAPE at ${data.shillerCAPE.toFixed(1)} - Elevated cyclical valuation`, pillar: "Valuation & Market Structure", severity: "medium" })
+  }
+  
+  // Equity Risk Premium
+  if (data.equityRiskPremium < 1.5) {
+    canaries.push({ signal: `Equity Risk Premium at ${data.equityRiskPremium.toFixed(2)}% - Stocks vs bonds severely overpriced`, pillar: "Valuation & Market Structure", severity: "high" })
+  } else if (data.equityRiskPremium < 3.0) {
+    canaries.push({ signal: `Equity Risk Premium at ${data.equityRiskPremium.toFixed(2)}% - Low compensation for equity risk`, pillar: "Valuation & Market Structure", severity: "medium" })
   }
   
   return canaries

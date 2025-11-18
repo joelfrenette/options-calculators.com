@@ -3,6 +3,8 @@
  * Web scraping service for extracting data from websites
  */
 
+import { fetchShortInterestWithGrok } from './grok-market-data'
+
 export interface ScrapingBeeOptions {
   renderJs?: boolean // Render JavaScript (default: true)
   premiumProxy?: boolean // Use premium residential proxies
@@ -406,7 +408,19 @@ export async function scrapeShortInterest(): Promise<{
     console.log('[v0] MarketWatch scraping failed:', marketwatchError)
   }
   
-  console.log('[v0] Short Interest: All live sources failed, using baseline value')
+  console.log('[v0] Short Interest: All scraping sources failed, trying Grok AI fallback...')
+  
+  try {
+    const grokValue = await fetchShortInterestWithGrok()
+    if (grokValue && grokValue > 0 && grokValue < 50) {
+      console.log(`[v0] Short Interest: Grok fetched value: ${grokValue}%`)
+      return { spyShortRatio: grokValue, status: 'live' }
+    }
+  } catch (grokError) {
+    console.log('[v0] Grok short interest fetch failed:', grokError)
+  }
+  
+  console.log('[v0] Short Interest: All sources including Grok failed, using baseline value')
   return {
     spyShortRatio: 1.2, // Baseline: low short interest is typical for SPY
     status: 'baseline'
