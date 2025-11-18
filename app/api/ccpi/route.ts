@@ -662,97 +662,190 @@ function generateWeeklySummary(
 async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarketData>>) {
   const canaries: Array<{ signal: string; pillar: string; severity: "high" | "medium" | "low" }> = []
   
-  // Pillar 1 - Momentum & Technical canaries
+  
+  // 1. QQQ Daily Return
   if (data.qqqDailyReturn <= -6) {
-    canaries.push({ signal: `QQQ crashed ${Math.abs(data.qqqDailyReturn).toFixed(1)}% - Momentum loss`, pillar: "Technical & Price Action", severity: "high" })
+    canaries.push({ signal: `QQQ crashed ${Math.abs(data.qqqDailyReturn).toFixed(1)}% - Momentum loss`, pillar: "Momentum & Technical", severity: "high" })
   } else if (data.qqqDailyReturn <= -3) {
-    canaries.push({ signal: `QQQ dropped ${Math.abs(data.qqqDailyReturn).toFixed(1)}% - Sharp decline`, pillar: "Technical & Price Action", severity: "medium" })
+    canaries.push({ signal: `QQQ dropped ${Math.abs(data.qqqDailyReturn).toFixed(1)}% - Sharp decline`, pillar: "Momentum & Technical", severity: "medium" })
   }
   
+  // 2. QQQ Consecutive Down Days
   if (data.qqqConsecDown >= 5) {
-    canaries.push({ signal: `${data.qqqConsecDown} consecutive down days - Trend break`, pillar: "Technical & Price Action", severity: "high" })
+    canaries.push({ signal: `${data.qqqConsecDown} consecutive down days - Trend break`, pillar: "Momentum & Technical", severity: "high" })
   } else if (data.qqqConsecDown >= 3) {
-    canaries.push({ signal: `${data.qqqConsecDown} consecutive down days`, pillar: "Technical & Price Action", severity: "medium" })
+    canaries.push({ signal: `${data.qqqConsecDown} consecutive down days`, pillar: "Momentum & Technical", severity: "medium" })
   }
   
-  if (data.qqqBelowSMA20 && data.qqqBelowSMA50) {
-    canaries.push({ signal: "QQQ below 20-day & 50-day SMA - Major support lost", pillar: "Technical & Price Action", severity: "high" })
-  } else if (data.qqqBelowSMA20) {
-    canaries.push({ signal: "QQQ below 20-day SMA - Momentum negative", pillar: "Technical & Price Action", severity: "medium" })
+  // 3. QQQ Below 20-Day SMA
+  if (data.qqqBelowSMA20 && data.qqqSMA20Proximity >= 100) {
+    canaries.push({ signal: "QQQ breached 20-day SMA - Short-term support lost", pillar: "Momentum & Technical", severity: "high" })
+  } else if (data.qqqSMA20Proximity >= 50) {
+    canaries.push({ signal: `QQQ approaching 20-day SMA (${data.qqqSMA20Proximity.toFixed(0)}% proximity)`, pillar: "Momentum & Technical", severity: "medium" })
   }
   
+  // 4. QQQ Below 50-Day SMA
+  if (data.qqqBelowSMA50 && data.qqqSMA50Proximity >= 100) {
+    canaries.push({ signal: "QQQ breached 50-day SMA - Medium-term trend broken", pillar: "Momentum & Technical", severity: "high" })
+  } else if (data.qqqSMA50Proximity >= 50) {
+    canaries.push({ signal: `QQQ approaching 50-day SMA (${data.qqqSMA50Proximity.toFixed(0)}% proximity)`, pillar: "Momentum & Technical", severity: "medium" })
+  }
+  
+  // 5. QQQ Below 200-Day SMA
+  if (data.qqqBelowSMA200 && data.qqqSMA200Proximity >= 100) {
+    canaries.push({ signal: "QQQ breached 200-day SMA - Long-term bull market in question", pillar: "Momentum & Technical", severity: "high" })
+  } else if (data.qqqSMA200Proximity >= 50) {
+    canaries.push({ signal: `QQQ approaching 200-day SMA (${data.qqqSMA200Proximity.toFixed(0)}% proximity)`, pillar: "Momentum & Technical", severity: "medium" })
+  }
+  
+  // 6. QQQ Below Bollinger Band
+  if (data.qqqBelowBollinger && data.qqqBollingerProximity >= 100) {
+    canaries.push({ signal: "QQQ breached lower Bollinger Band - Oversold territory", pillar: "Momentum & Technical", severity: "high" })
+  } else if (data.qqqBollingerProximity >= 50) {
+    canaries.push({ signal: `QQQ approaching Bollinger Band (${data.qqqBollingerProximity.toFixed(0)}% proximity)`, pillar: "Momentum & Technical", severity: "medium" })
+  }
+  
+  // 7. VIX (Fear Gauge)
   if (data.vix > 35) {
-    canaries.push({ signal: `VIX at ${data.vix.toFixed(1)} - Extreme fear`, pillar: "Technical & Price Action", severity: "high" })
+    canaries.push({ signal: `VIX at ${data.vix.toFixed(1)} - Extreme fear`, pillar: "Momentum & Technical", severity: "high" })
   } else if (data.vix > 25) {
-    canaries.push({ signal: `VIX at ${data.vix.toFixed(1)} - Elevated fear`, pillar: "Technical & Price Action", severity: "medium" })
-  } else if (data.vix > 20) {
-    canaries.push({ signal: `VIX at ${data.vix.toFixed(1)} - Moderate concern`, pillar: "Technical & Price Action", severity: "low" })
+    canaries.push({ signal: `VIX at ${data.vix.toFixed(1)} - Elevated fear`, pillar: "Momentum & Technical", severity: "medium" })
   }
   
-  if (data.vixTermInverted) {
-    canaries.push({ signal: "VIX term structure inverted - Backwardation", pillar: "Technical & Price Action", severity: "high" })
+  // 8. VXN (Nasdaq Volatility)
+  if (data.vxn > 35) {
+    canaries.push({ signal: `VXN at ${data.vxn.toFixed(1)} - Nasdaq panic`, pillar: "Momentum & Technical", severity: "high" })
+  } else if (data.vxn > 25) {
+    canaries.push({ signal: `VXN at ${data.vxn.toFixed(1)} - Nasdaq volatility elevated`, pillar: "Momentum & Technical", severity: "medium" })
   }
   
-  // Pillar 2 - Risk Appetite canaries
+  // 9. RVX (Russell 2000 Volatility)
+  if (data.rvx > 35) {
+    canaries.push({ signal: `RVX at ${data.rvx.toFixed(1)} - Small-cap stress`, pillar: "Momentum & Technical", severity: "high" })
+  } else if (data.rvx > 25) {
+    canaries.push({ signal: `RVX at ${data.rvx.toFixed(1)} - Small-cap volatility rising`, pillar: "Momentum & Technical", severity: "medium" })
+  }
+  
+  // 10. VIX Term Structure
+  if (data.vixTermInverted || data.vixTermStructure < 0.8) {
+    canaries.push({ signal: `VIX term structure inverted (${data.vixTermStructure.toFixed(2)}) - Immediate fear`, pillar: "Momentum & Technical", severity: "high" })
+  } else if (data.vixTermStructure < 1.2) {
+    canaries.push({ signal: `VIX term structure flattening (${data.vixTermStructure.toFixed(2)})`, pillar: "Momentum & Technical", severity: "medium" })
+  }
+  
+  // 11. ATR - Average True Range
+  if (data.atr > 50) {
+    canaries.push({ signal: `ATR at ${data.atr.toFixed(1)} - Extreme volatility`, pillar: "Momentum & Technical", severity: "high" })
+  } else if (data.atr > 40) {
+    canaries.push({ signal: `ATR at ${data.atr.toFixed(1)} - Elevated volatility`, pillar: "Momentum & Technical", severity: "medium" })
+  }
+  
+  // 12. LTV - Long-term Volatility
+  if (data.ltv > 0.20) {
+    canaries.push({ signal: `Long-term volatility at ${(data.ltv * 100).toFixed(1)}% - Sustained instability`, pillar: "Momentum & Technical", severity: "high" })
+  } else if (data.ltv > 0.15) {
+    canaries.push({ signal: `Long-term volatility at ${(data.ltv * 100).toFixed(1)}% - Rising`, pillar: "Momentum & Technical", severity: "medium" })
+  }
+  
+  // 13. Bullish Percent Index
+  if (data.bullishPercent > 70) {
+    canaries.push({ signal: `Bullish Percent at ${data.bullishPercent}% - Overbought danger`, pillar: "Momentum & Technical", severity: "high" })
+  } else if (data.bullishPercent > 60) {
+    canaries.push({ signal: `Bullish Percent at ${data.bullishPercent}% - Elevated optimism`, pillar: "Momentum & Technical", severity: "medium" })
+  }
+  
+  
+  // 14. Put/Call Ratio
   if (data.putCallRatio < 0.6) {
-    canaries.push({ signal: `Put/Call at ${data.putCallRatio.toFixed(2)} - Extreme complacency`, pillar: "Sentiment & Social", severity: "high" })
-  } else if (data.putCallRatio < 0.7) {
-    canaries.push({ signal: `Put/Call at ${data.putCallRatio.toFixed(2)} - Low hedging`, pillar: "Sentiment & Social", severity: "medium" })
+    canaries.push({ signal: `Put/Call at ${data.putCallRatio.toFixed(2)} - Extreme complacency`, pillar: "Risk Appetite & Volatility", severity: "high" })
+  } else if (data.putCallRatio < 0.85) {
+    canaries.push({ signal: `Put/Call at ${data.putCallRatio.toFixed(2)} - Low hedging activity`, pillar: "Risk Appetite & Volatility", severity: "medium" })
   }
   
-  if (data.fearGreedIndex !== null && data.fearGreedIndex > 80) {
-    canaries.push({ signal: `Fear & Greed at ${data.fearGreedIndex} - Extreme greed`, pillar: "Sentiment & Social", severity: "high" })
+  // 15. Fear & Greed Index
+  if (data.fearGreedIndex !== null) {
+    if (data.fearGreedIndex > 80) {
+      canaries.push({ signal: `Fear & Greed at ${data.fearGreedIndex} - Extreme greed`, pillar: "Risk Appetite & Volatility", severity: "high" })
+    } else if (data.fearGreedIndex > 70) {
+      canaries.push({ signal: `Fear & Greed at ${data.fearGreedIndex} - Elevated greed`, pillar: "Risk Appetite & Volatility", severity: "medium" })
+    }
   }
   
+  // 16. AAII Bullish Sentiment
   const aaiiBullish = data.aaiiBullish || 35
   if (aaiiBullish > 55) {
-    canaries.push({ signal: `AAII Bullish at ${aaiiBullish}% - Retail euphoria`, pillar: "Sentiment & Social", severity: "high" })
-  } else if (aaiiBullish > 50) {
-    canaries.push({ signal: `AAII Bullish at ${aaiiBullish}% - Elevated optimism`, pillar: "Sentiment & Social", severity: "medium" })
+    canaries.push({ signal: `AAII Bullish at ${aaiiBullish}% - Retail euphoria`, pillar: "Risk Appetite & Volatility", severity: "high" })
+  } else if (aaiiBullish > 45) {
+    canaries.push({ signal: `AAII Bullish at ${aaiiBullish}% - Elevated retail optimism`, pillar: "Risk Appetite & Volatility", severity: "medium" })
   }
   
+  // 17. SPY Short Interest Ratio
   const shortInterest = data.shortInterest || 2.5
   if (shortInterest < 1.5) {
-    canaries.push({ signal: `Short Interest at ${shortInterest.toFixed(1)}% - Low positioning`, pillar: "Sentiment & Social", severity: "high" })
+    canaries.push({ signal: `Short Interest at ${shortInterest.toFixed(1)}% - Extreme complacency`, pillar: "Risk Appetite & Volatility", severity: "high" })
+  } else if (shortInterest < 2.5) {
+    canaries.push({ signal: `Short Interest at ${shortInterest.toFixed(1)}% - Low positioning`, pillar: "Risk Appetite & Volatility", severity: "medium" })
   }
   
+  // 18. Tech ETF Flows
+  if (data.etfFlows !== undefined) {
+    if (data.etfFlows < -3.0) {
+      canaries.push({ signal: `ETF outflows at $${Math.abs(data.etfFlows).toFixed(1)}B - Capital flight`, pillar: "Risk Appetite & Volatility", severity: "high" })
+    } else if (data.etfFlows < -1.5) {
+      canaries.push({ signal: `ETF outflows at $${Math.abs(data.etfFlows).toFixed(1)}B - Selling pressure`, pillar: "Risk Appetite & Volatility", severity: "medium" })
+    }
+  }
+  
+  // 19. Yield Curve (10Y-2Y)
   if (data.yieldCurve < -1.0) {
-    canaries.push({ signal: `Yield curve inverted ${Math.abs(data.yieldCurve).toFixed(2)}% - Deep inversion`, pillar: "Fundamental & Valuation", severity: "high" })
-  } else if (data.yieldCurve < -0.5) {
-    canaries.push({ signal: `Yield curve inverted ${Math.abs(data.yieldCurve).toFixed(2)}%`, pillar: "Fundamental & Valuation", severity: "medium" })
+    canaries.push({ signal: `Yield curve inverted ${Math.abs(data.yieldCurve).toFixed(2)}% - Deep inversion`, pillar: "Risk Appetite & Volatility", severity: "high" })
+  } else if (data.yieldCurve < -0.2) {
+    canaries.push({ signal: `Yield curve inverted ${Math.abs(data.yieldCurve).toFixed(2)}%`, pillar: "Risk Appetite & Volatility", severity: "medium" })
   }
   
-  // Pillar 3 - Valuation canaries
+  
+  // 20. S&P 500 Forward P/E
   if (data.spxPE > 30) {
-    canaries.push({ signal: `S&P 500 P/E at ${data.spxPE.toFixed(1)} - Extreme overvaluation`, pillar: "Fundamental & Valuation", severity: "high" })
-  } else if (data.spxPE > 25) {
-    canaries.push({ signal: `S&P 500 P/E at ${data.spxPE.toFixed(1)} - Elevated valuation`, pillar: "Fundamental & Valuation", severity: "medium" })
+    canaries.push({ signal: `S&P 500 P/E at ${data.spxPE.toFixed(1)} - Extreme overvaluation`, pillar: "Valuation", severity: "high" })
+  } else if (data.spxPE > 22) {
+    canaries.push({ signal: `S&P 500 P/E at ${data.spxPE.toFixed(1)} - Above historical average`, pillar: "Valuation", severity: "medium" })
   }
   
+  // 21. S&P 500 Price-to-Sales
+  if (data.spxPS > 3.5) {
+    canaries.push({ signal: `S&P 500 P/S at ${data.spxPS.toFixed(1)} - Extremely expensive`, pillar: "Valuation", severity: "high" })
+  } else if (data.spxPS > 2.5) {
+    canaries.push({ signal: `S&P 500 P/S at ${data.spxPS.toFixed(1)} - Elevated valuation`, pillar: "Valuation", severity: "medium" })
+  }
+  
+  // 22. Buffett Indicator (Market Cap / GDP)
   const buffett = data.buffettIndicator || 180
   if (buffett > 200) {
-    canaries.push({ signal: `Buffett Indicator at ${buffett.toFixed(0)}% - Significantly overvalued`, pillar: "Fundamental & Valuation", severity: "high" })
-  } else if (buffett > 180) {
-    canaries.push({ signal: `Buffett Indicator at ${buffett.toFixed(0)}% - Overvalued`, pillar: "Fundamental & Valuation", severity: "medium" })
+    canaries.push({ signal: `Buffett Indicator at ${buffett.toFixed(0)}% - Significantly overvalued`, pillar: "Valuation", severity: "high" })
+  } else if (buffett > 150) {
+    canaries.push({ signal: `Buffett Indicator at ${buffett.toFixed(0)}% - Above fair value`, pillar: "Valuation", severity: "medium" })
   }
   
-  // Pillar 4 - Macro canaries
+  
+  // 23. Fed Funds Rate
   if (data.fedFundsRate > 6.0) {
-    canaries.push({ signal: `Fed Funds at ${data.fedFundsRate.toFixed(2)}% - Extremely restrictive`, pillar: "Macro Economic", severity: "high" })
-  } else if (data.fedFundsRate > 5.5) {
-    canaries.push({ signal: `Fed Funds at ${data.fedFundsRate.toFixed(2)}% - Restrictive policy`, pillar: "Macro Economic", severity: "medium" })
+    canaries.push({ signal: `Fed Funds at ${data.fedFundsRate.toFixed(2)}% - Extremely restrictive`, pillar: "Macro", severity: "high" })
+  } else if (data.fedFundsRate > 5.0) {
+    canaries.push({ signal: `Fed Funds at ${data.fedFundsRate.toFixed(2)}% - Restrictive policy`, pillar: "Macro", severity: "medium" })
   }
   
+  // 24. Junk Bond Spread
   if (data.junkSpread > 8) {
-    canaries.push({ signal: `Junk Bond Spread at ${data.junkSpread.toFixed(2)}% - Credit stress`, pillar: "Macro Economic", severity: "high" })
-  } else if (data.junkSpread > 6) {
-    canaries.push({ signal: `Junk Bond Spread at ${data.junkSpread.toFixed(2)}% - Elevated risk`, pillar: "Macro Economic", severity: "medium" })
+    canaries.push({ signal: `Junk Bond Spread at ${data.junkSpread.toFixed(2)}% - Severe credit stress`, pillar: "Macro", severity: "high" })
+  } else if (data.junkSpread > 5) {
+    canaries.push({ signal: `Junk Bond Spread at ${data.junkSpread.toFixed(2)}% - Credit tightening`, pillar: "Macro", severity: "medium" })
   }
   
+  // 25. US Debt-to-GDP Ratio
   if (data.debtToGDP > 130) {
-    canaries.push({ signal: `US Debt-to-GDP at ${data.debtToGDP.toFixed(0)}% - Unsustainable`, pillar: "Macro Economic", severity: "high" })
-  } else if (data.debtToGDP > 120) {
-    canaries.push({ signal: `US Debt-to-GDP at ${data.debtToGDP.toFixed(0)}% - Elevated`, pillar: "Macro Economic", severity: "medium" })
+    canaries.push({ signal: `US Debt-to-GDP at ${data.debtToGDP.toFixed(0)}% - Fiscal crisis risk`, pillar: "Macro", severity: "high" })
+  } else if (data.debtToGDP > 110) {
+    canaries.push({ signal: `US Debt-to-GDP at ${data.debtToGDP.toFixed(0)}% - Elevated fiscal burden`, pillar: "Macro", severity: "medium" })
   }
   
   return canaries

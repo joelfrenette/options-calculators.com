@@ -393,7 +393,7 @@ export function CcpiDashboard() {
               Canaries in the Coal Mine - Active Warning Signals
             </div>
             <span className="text-2xl font-bold text-red-600">
-              {data.canaries.filter(c => c.severity === "high" || c.severity === "medium").length}/23
+              {data.canaries.filter(c => c.severity === "high" || c.severity === "medium").length}/25
             </span>
           </CardTitle>
           <CardDescription>Executive summary of medium and high severity red flags across all indicators</CardDescription>
@@ -462,7 +462,7 @@ export function CcpiDashboard() {
           
           {/* Reorganized indicators into new CCPI v2.0 pillar structure */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between pt-12">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Activity className="h-5 w-5 text-cyan-600" />
                 Pillar 1 - Momentum & Technical (40% weight)
@@ -824,7 +824,7 @@ export function CcpiDashboard() {
             </div>
           </div>
 
-          <div className="space-y-4 border-t pt-6">
+          <div className="space-y-4 border-t pt-12">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <TrendingDown className="h-5 w-5 text-orange-600" />
@@ -1025,7 +1025,7 @@ export function CcpiDashboard() {
             </div>
           </div>
 
-          <div className="space-y-4 border-t pt-6">
+          <div className="space-y-4 border-t pt-12">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <DollarSign className="h-5 w-5 text-blue-600" />
@@ -1099,7 +1099,7 @@ export function CcpiDashboard() {
             </div>
           </div>
 
-          <div className="space-y-4 border-t pt-6">
+          <div className="space-y-4 border-t pt-12">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Users className="h-5 w-5 text-green-600" />
