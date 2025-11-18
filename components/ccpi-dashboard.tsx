@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { AlertTriangle, TrendingDown, Activity, DollarSign, Users, Database, RefreshCw, Download, Settings, Layers, Info } from 'lucide-react'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, ReferenceLine } from "recharts"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface CCPIData {
   ccpi: number
@@ -494,13 +494,13 @@ export function CcpiDashboard() {
                 
                 return (
                   <div key={i} className={`flex-1 min-w-[280px] p-4 rounded-lg border-2 ${severityConfig.bgColor} ${severityConfig.borderColor}`}>
-                    <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-start justify-between gap-2 mb-2">
                       <Badge variant="outline" className="text-xs font-semibold">
                         {canary.pillar}
                       </Badge>
-                      <Badge className={`text-xs font-bold ${severityConfig.badgeColor}`}>
+                      <span className={`text-xs font-bold px-3 py-1 rounded-md ${severityConfig.badgeColor} shadow-sm whitespace-nowrap`}>
                         {severityConfig.label}
-                      </Badge>
+                      </span>
                     </div>
                     <p className={`text-sm font-semibold ${severityConfig.textColor}`}>{canary.signal}</p>
                   </div>

@@ -3,7 +3,7 @@
  * Web scraping service for extracting data from websites
  */
 
-import { fetchShortInterestWithGrok } from './grok-market-data'
+import { fetchShortInterestWithGrok, fetchMarketDataWithGrok } from './grok-market-data'
 
 export interface ScrapingBeeOptions {
   renderJs?: boolean // Render JavaScript (default: true)
@@ -156,24 +156,20 @@ export async function scrapePutCallRatio(): Promise<{
   status: 'live' | 'baseline'
 }> {
   try {
-    // First, try Alpha Vantage API (we already have the key)
     const alphaVantageKey = process.env.ALPHA_VANTAGE_API_KEY
     
     if (alphaVantageKey) {
-      // Alpha Vantage doesn't have put/call directly, so we calculate from options volume
-      // Try using the Global Quote for VIX as a proxy measure
       const vixResponse = await fetch(
-        `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=^VIX&apikey=${alphaVantageKey}`
+        `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=^VIX&apikey=${alphaVantageKey}`,
+        { signal: AbortSignal.timeout(10000) }
       )
       
       if (vixResponse.ok) {
         const vixData = await vixResponse.json()
         const vix = parseFloat(vixData['Global Quote']?.['05. price'] || '0')
         
-        // If VIX is available, estimate put/call from VIX level
-        // VIX 15-20 = ~0.85, VIX 20-25 = ~1.0, VIX >25 = >1.1
         if (vix > 10 && vix < 100) {
-          const estimatedPutCall = 0.6 + (vix / 50) // Simple linear estimation
+          const estimatedPutCall = 0.6 + (vix / 50)
           console.log(`[v0] Put/Call estimated from VIX ${vix}: ${estimatedPutCall.toFixed(2)}`)
           return {
             ratio: parseFloat(estimatedPutCall.toFixed(2)),
@@ -183,27 +179,25 @@ export async function scrapePutCallRatio(): Promise<{
       }
     }
     
-    // Fallback: Try scraping from BarChart (simpler HTML structure)
-    const result = await scrapeUrl('https://www.barchart.com/stocks/quotes/$CPCE/overview', {
+    const cboeResult = await scrapeUrl('https://www.cboe.com/us/options/market_statistics/daily/', {
       renderJs: true,
       premiumProxy: true
     })
     
-    const html = typeof result.data === 'string' ? result.data : ''
+    const cboeHtml = typeof cboeResult.data === 'string' ? cboeResult.data : ''
     
-    // BarChart has cleaner structure
-    const patterns = [
-      /<span[^>]*class="[^"]*last-change[^"]*"[^>]*>(\d+\.\d+)<\/span>/,
-      /Last:\s*<strong>(\d+\.\d+)<\/strong>/,
-      /CPCE.*?(\d+\.\d+)/
+    const cboePatterns = [
+      /Total\s+Put\/Call\s+Ratio[:\s]+(\d+\.\d+)/is,
+      /CPCE.*?(\d+\.\d+)/,
+      /<td[^>]*>(\d+\.\d+)<\/td>.*?Put\/Call/is
     ]
     
-    for (const pattern of patterns) {
-      const match = html.match(pattern)
-      if (match) {
+    for (const pattern of cboePatterns) {
+      const match = cboeHtml.match(pattern)
+      if (match && match[1]) {
         const ratio = parseFloat(match[1])
-        if (ratio > 0.3 && ratio < 3) { // Sanity check: typical range is 0.5-1.5
-          console.log('[v0] Put/Call ratio scraped successfully from BarChart:', ratio)
+        if (ratio > 0.3 && ratio < 3) {
+          console.log('[v0] Put/Call ratio scraped from CBOE:', ratio)
           return {
             ratio,
             status: 'live'
@@ -212,11 +206,55 @@ export async function scrapePutCallRatio(): Promise<{
       }
     }
     
-    throw new Error('Could not parse Put/Call ratio')
+    const result = await scrapeUrl('https://www.barchart.com/stocks/quotes/$CPCE/overview', {
+      renderJs: true,
+      premiumProxy: true
+    })
+    
+    const html = typeof result.data === 'string' ? result.data : ''
+    
+    const patterns = [
+      /<span[^>]*class="[^"]*last-change[^"]*"[^>]*>(\d+\.\d+)<\/span>/,
+      /Last:\s*<strong>(\d+\.\d+)<\/strong>/,
+      /CPCE.*?(\d+\.\d+)/,
+      /Put\/Call.*?(\d+\.\d+)/is
+    ]
+    
+    for (const pattern of patterns) {
+      const match = html.match(pattern)
+      if (match && match[1]) {
+        const ratio = parseFloat(match[1])
+        if (ratio > 0.3 && ratio < 3) {
+          console.log('[v0] Put/Call ratio scraped from BarChart:', ratio)
+          return {
+            ratio,
+            status: 'live'
+          }
+        }
+      }
+    }
+    
+    throw new Error('Could not parse Put/Call ratio from scraping')
   } catch (error) {
-    console.error('[v0] Put/Call scraping failed:', error)
+    console.log('[v0] Put/Call scraping failed, trying Grok AI fallback...', error)
+    
+    try {
+      const grokValue = await fetchMarketDataWithGrok(
+        'CBOE equity put/call ratio',
+        'Current CBOE total equity put/call ratio (CPCE index)'
+      )
+      
+      if (grokValue && grokValue > 0.3 && grokValue < 3) {
+        console.log(`[v0] Put/Call: Grok fetched value: ${grokValue}`)
+        return { ratio: grokValue, status: 'live' }
+      }
+    } catch (grokError) {
+      console.log('[v0] Grok Put/Call fetch failed:', grokError)
+    }
+    
+    console.log('[v0] Put/Call: All sources including Grok failed, using baseline')
     return {
-      ratio: 0.95, // Baseline: neutral to slightly bearish
+      ratio: 0.95,
       status: 'baseline'
     }
   }
