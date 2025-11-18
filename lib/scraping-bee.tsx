@@ -271,37 +271,96 @@ export async function scrapeShortInterest(): Promise<{
   spyShortRatio: number
   status: 'live' | 'baseline'
 }> {
+  const polygonKey = process.env.POLYGON_API_KEY
+  
+  if (polygonKey) {
+    try {
+      const polygonResponse = await fetch(
+        `https://api.polygon.io/v3/reference/tickers/SPY?apiKey=${polygonKey}`,
+        { signal: AbortSignal.timeout(10000) }
+      )
+      
+      if (polygonResponse.ok) {
+        const polygonData = await polygonResponse.json()
+        const shortInterest = polygonData?.results?.share_class_shares_outstanding
+        
+        // Polygon returns shares outstanding, we need short interest percentage
+        // Try getting from their market status endpoint instead
+        const marketStatusResponse = await fetch(
+          `https://api.polygon.io/v2/aggs/ticker/SPY/range/1/day/${new Date(Date.now() - 86400000).toISOString().split('T')[0]}/${new Date().toISOString().split('T')[0]}?apiKey=${polygonKey}`,
+          { signal: AbortSignal.timeout(10000) }
+        )
+        
+        if (marketStatusResponse.ok) {
+          // Polygon doesn't provide short interest directly in free tier
+          console.log('[v0] Polygon API connected but short interest not in response')
+        }
+      }
+    } catch (polygonError) {
+      console.log('[v0] Polygon short interest failed:', polygonError)
+    }
+  }
+  
+  // Try Source 1: Alpha Vantage (we have this key)
+  const alphaKey = process.env.ALPHA_VANTAGE_API_KEY
+  
+  if (alphaKey) {
+    try {
+      // Alpha Vantage doesn't have direct short interest, try getting from overview
+      const avResponse = await fetch(
+        `https://www.alphavantage.co/query?function=OVERVIEW&symbol=SPY&apikey=${alphaKey}`,
+        { signal: AbortSignal.timeout(15000) }
+      )
+      
+      if (avResponse.ok) {
+        const avData = await avResponse.json()
+        const shortRatio = avData?.ShortRatio || avData?.ShortPercentFloat
+        
+        if (shortRatio) {
+          const ratio = parseFloat(shortRatio)
+          if (ratio >= 0 && ratio < 50) {
+            console.log('[v0] Short Interest from Alpha Vantage:', ratio)
+            return {
+              spyShortRatio: ratio,
+              status: 'live'
+            }
+          }
+        }
+      }
+    } catch (avError) {
+      console.log('[v0] Alpha Vantage short interest failed:', avError)
+    }
+  }
+  
+  // Try Source 2: Finviz with better parsing
   try {
-    const result = await scrapeUrl('https://finviz.com/quote.ashx?t=SPY&ty=si', {
+    const result = await scrapeUrl('https://finviz.com/quote.ashx?t=SPY', {
       renderJs: true,
       premiumProxy: true
     })
     
     const html = typeof result.data === 'string' ? result.data : ''
     
-    // Parse short interest from Finviz
+    console.log('[v0] Short Interest: Finviz HTML length:', html.length)
+    
+    // Multiple patterns to catch different Finviz layouts
     const patterns = [
-      /Short\s+Interest.*?<td[^>]*>(\d+\.?\d*[MBK]?)<\/td>/is,
-      /Short\s+Ratio.*?<td[^>]*>(\d+\.\d+)<\/td>/is,
-      /Days\s+to\s+Cover.*?(\d+\.\d+)/is
+      // Pattern 1: snapshot-td2 class
+      /<td[^>]*>Short\s+Float<\/td>\s*<td[^>]*class="snapshot-td2"[^>]*>([\d.]+)%<\/td>/is,
+      // Pattern 2: Any td after Short Float
+      /<td[^>]*>Short\s+Float<\/td>\s*<td[^>]*>([\d.]+)%<\/td>/is,
+      // Pattern 3: Within same td
+      /Short\s+Float[:\s]+([\d.]+)%/is,
+      // Pattern 4: Table row with data-boxover attribute
+      /<tr[^>]*data-boxover[^>]*>.*?Short\s+Float.*?([\d.]+)%/is
     ]
     
     for (const pattern of patterns) {
       const match = html.match(pattern)
-      if (match) {
-        let value = match[1]
-        // Convert M/B/K notation to decimal
-        if (value.includes('M')) {
-          value = (parseFloat(value) / 1000).toString()
-        } else if (value.includes('B')) {
-          value = parseFloat(value).toString()
-        } else if (value.includes('K')) {
-          value = (parseFloat(value) / 1000000).toString()
-        }
-        
-        const ratio = parseFloat(value)
-        if (ratio >= 0 && ratio < 100) { // Sanity check
-          console.log('[v0] Short Interest scraped successfully:', ratio)
+      if (match && match[1]) {
+        const ratio = parseFloat(match[1])
+        if (ratio >= 0 && ratio < 50) {
+          console.log('[v0] Short Interest from Finviz (pattern match):', ratio)
           return {
             spyShortRatio: ratio,
             status: 'live'
@@ -310,12 +369,46 @@ export async function scrapeShortInterest(): Promise<{
       }
     }
     
-    throw new Error('Could not parse short interest')
-  } catch (error) {
-    console.error('[v0] Short interest scraping failed:', error)
-    return {
-      spyShortRatio: 2.5, // Baseline: low but not extreme
-      status: 'baseline'
+    // Debug: Save HTML snippet for analysis
+    const shortIndex = html.toLowerCase().indexOf('short')
+    if (shortIndex !== -1) {
+      const snippet = html.substring(Math.max(0, shortIndex - 100), shortIndex + 400)
+      console.log('[v0] Short interest HTML snippet:', snippet.replace(/\s+/g, ' '))
     }
+    
+  } catch (finvizError) {
+    console.log('[v0] Finviz scraping failed:', finvizError)
+  }
+  
+  // Try Source 3: MarketWatch (simpler HTML, no login required)
+  try {
+    const result = await scrapeUrl('https://www.marketwatch.com/investing/fund/spy', {
+      renderJs: true,
+      premiumProxy: true
+    })
+    
+    const html = typeof result.data === 'string' ? result.data : ''
+    
+    const shortMatch = html.match(/Short\s+Interest.*?([\d.]+)%/is) ||
+                       html.match(/short.*?interest.*?([\d.]+)%/is)
+    
+    if (shortMatch && shortMatch[1]) {
+      const ratio = parseFloat(shortMatch[1])
+      if (ratio >= 0 && ratio < 50) {
+        console.log('[v0] Short Interest from MarketWatch:', ratio)
+        return {
+          spyShortRatio: ratio,
+          status: 'live'
+        }
+      }
+    }
+  } catch (marketwatchError) {
+    console.log('[v0] MarketWatch scraping failed:', marketwatchError)
+  }
+  
+  console.log('[v0] Short Interest: All live sources failed, using baseline value')
+  return {
+    spyShortRatio: 1.2, // Baseline: low short interest is typical for SPY
+    status: 'baseline'
   }
 }
