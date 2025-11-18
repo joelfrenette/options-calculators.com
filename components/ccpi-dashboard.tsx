@@ -540,12 +540,54 @@ export function CcpiDashboard() {
             <div className="flex items-center justify-between pt-12">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Activity className="h-5 w-5 text-cyan-600" />
-                Pillar 1 - Momentum & Technical (40% weight)
+                Pillar 1 - Momentum & Technical (35% weight)
               </h3>
               <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.momentum)}/100</span>
             </div>
             <div className="space-y-6">
               
+              {/* NVIDIA Momentum Score */}
+              {data.indicators?.nvidiaPrice !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">NVIDIA Momentum Score (AI Bellwether)</span>
+                    <span className="font-bold">${data.indicators.nvidiaPrice.toFixed(0)} | {data.indicators.nvidiaMomentum}/100</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${data.indicators.nvidiaMomentum}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Falling: {'<'}20 (Tech crash risk)</span>
+                    <span>Neutral: 40-60</span>
+                    <span>Strong: {'>'}80</span>
+                  </div>
+                </div>
+              )}
+
+              {/* SOX Semiconductor Index */}
+              {data.indicators?.soxIndex !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">SOX Semiconductor Index (Chip Sector Health)</span>
+                    <span className="font-bold">{data.indicators.soxIndex.toFixed(0)}</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.soxIndex - 4000) / 2000) * 100))}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Weak: {'<'}4500</span>
+                    <span>Baseline: 5000</span>
+                    <span>Strong: {'>'}5500</span>
+                  </div>
+                </div>
+              )}
+
               {/* QQQ Daily Return */}
               {data.indicators?.qqqDailyReturn !== undefined && (
                 <div className="space-y-2">
@@ -1104,7 +1146,7 @@ export function CcpiDashboard() {
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <DollarSign className="h-5 w-5 text-blue-600" />
-                Pillar 3 - Valuation (20% weight)
+                Pillar 3 - Valuation (15% weight)
               </h3>
               <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.valuation)}/100</span>
             </div>
@@ -1178,12 +1220,75 @@ export function CcpiDashboard() {
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Users className="h-5 w-5 text-green-600" />
-                Pillar 4 - Macro (10% weight)
+                Pillar 4 - Macro (20% weight)
               </h3>
               <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.macro)}/100</span>
             </div>
             <div className="space-y-6">
               
+              {/* TED Spread */}
+              {data.indicators?.tedSpread !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">TED Spread (Banking System Stress)</span>
+                    <span className="font-bold">{data.indicators.tedSpread.toFixed(2)}%</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, (data.indicators.tedSpread / 1.5) * 100)}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Normal: {'<'}0.35%</span>
+                    <span>Warning: 0.5-0.75%</span>
+                    <span>Crisis: {'>'}1.0%</span>
+                  </div>
+                </div>
+              )}
+
+              {/* US Dollar Index (DXY) */}
+              {data.indicators?.dxyIndex !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">US Dollar Index (DXY) - Tech Headwind</span>
+                    <span className="font-bold">{data.indicators.dxyIndex.toFixed(1)}</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.dxyIndex - 90) / 30) * 100))}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Weak: {'<'}95</span>
+                    <span>Normal: 100-105</span>
+                    <span>Strong: {'>'}110 (Hurts tech)</span>
+                  </div>
+                </div>
+              )}
+
+              {/* ISM Manufacturing PMI */}
+              {data.indicators?.ismPMI !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">ISM Manufacturing PMI (Economic Leading)</span>
+                    <span className="font-bold">{data.indicators.ismPMI.toFixed(1)}</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.ismPMI - 40) / 20) * 100))}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Contraction: {'<'}50</span>
+                    <span>Neutral: 50</span>
+                    <span>Expansion: {'>'}52</span>
+                  </div>
+                </div>
+              )}
+
               {/* Fed Funds Rate */}
               {data.indicators.fedFundsRate !== undefined && (
                 <div className="space-y-2">
@@ -1201,6 +1306,27 @@ export function CcpiDashboard() {
                     <span>Accommodative: {'<'}2%</span>
                     <span className="text-yellow-600">Neutral: 2-4%</span>
                     <span>Restrictive: {'>'}4.5%</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Fed Reverse Repo */}
+              {data.indicators?.fedReverseRepo !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">Fed Reverse Repo (Liquidity Conditions)</span>
+                    <span className="font-bold">${data.indicators.fedReverseRepo.toFixed(0)}B</span>
+                  </div>
+                  <div className="relative w-full h-3 rounded-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="absolute inset-0 bg-gray-200" style={{ 
+                      marginLeft: `${Math.min(100, (data.indicators.fedReverseRepo / 2500) * 100)}%` 
+                    }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Loose: {'<'}500B</span>
+                    <span>Normal: 1000B</span>
+                    <span>Tight: {'>'}2000B</span>
                   </div>
                 </div>
               )}
@@ -1254,7 +1380,7 @@ export function CcpiDashboard() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-blue-700">Technical & Price:</span>
-                <span className="font-bold text-blue-900">40%</span>
+                <span className="font-bold text-blue-900">35%</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-blue-700">Risk Appetite:</span>
@@ -1262,15 +1388,15 @@ export function CcpiDashboard() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-blue-700">Valuation:</span>
-                <span className="font-bold text-blue-900">20%</span>
+                <span className="font-bold text-blue-900">15%</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-blue-700">Macro:</span>
-                <span className="font-bold text-blue-900">10%</span>
+                <span className="font-bold text-blue-900">20%</span>
               </div>
             </div>
             <p className="text-xs text-blue-700 mt-3">
-              Final CCPI = Σ(Pillar Score × Weight). Each pillar score (0-100) is calculated from multiple professional indicators with specific thresholds.
+              Final CCPI = Σ(Pillar Score × Weight). Phase 1 enhanced with AI sector indicators (NVDA, SOX) and macro leading indicators (TED, DXY, ISM, RRP).
             </p>
           </div>
         </CardContent>

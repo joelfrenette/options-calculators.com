@@ -433,6 +433,33 @@ export async function GET(request: NextRequest) {
     validated: "INDUSTRY STANDARD",
   })
 
+  auditResults.calculations.push({
+    name: "NVIDIA Momentum & SOX Index (Phase 1)",
+    description: "AI sector health indicators via Alpha Vantage",
+    formula: "NVIDIA momentum score + SOX semiconductor index deviation",
+    source: "Alpha Vantage GLOBAL_QUOTE API",
+    usedIn: "CCPI Pillar 1 - Momentum & Technical",
+    validated: "NEW - Phase 1 Enhancement",
+  })
+
+  auditResults.calculations.push({
+    name: "TED Spread & DXY (Phase 1)",
+    description: "Banking stress and dollar strength via FRED",
+    formula: "TED = 3M LIBOR - 3M T-Bill | DXY = Trade-Weighted Dollar Index",
+    source: "FRED API (Federal Reserve)",
+    usedIn: "CCPI Pillar 4 - Macro",
+    validated: "NEW - Phase 1 Enhancement",
+  })
+
+  auditResults.calculations.push({
+    name: "ISM PMI & Fed RRP (Phase 1)",
+    description: "Manufacturing activity and liquidity conditions",
+    formula: "ISM PMI (economic leading) + Fed Reverse Repo (liquidity drain)",
+    source: "FRED API",
+    usedIn: "CCPI Pillar 4 - Macro",
+    validated: "NEW - Phase 1 Enhancement",
+  })
+
   auditResults.algorithms = [
     {
       name: "Black-Scholes Options Pricing",

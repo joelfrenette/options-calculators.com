@@ -361,6 +361,102 @@ async function auditAllIndicators() {
       last_fetched_at: new Date().toISOString(),
       raw_sample: { value: 2.5, unit: "days" },
       threshold: { danger: "<1.5", warning: "1.5-2.5", normal: "2.5-3.5", safe: ">3.5" }
+    },
+    {
+      id: 27,
+      name: "NVIDIA Price & Momentum (AI Bellwether)",
+      pillar: "Pillar 1: Momentum & Technical",
+      source_url: "https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=NVDA",
+      api_endpoint: "/api/ccpi (via Alpha Vantage)",
+      fetch_method: "Alpha Vantage GLOBAL_QUOTE endpoint for NVDA",
+      status: await testAlphaVantageAPI() ? "Live" : "Failed",
+      last_fetched_at: new Date().toISOString(),
+      raw_sample: { value: 186.6, unit: "dollars", momentum: 50 },
+      threshold: { 
+        strong: ">80 momentum",
+        neutral: "40-60 momentum",
+        weak: "<20 momentum (tech crash risk)"
+      }
+    },
+    {
+      id: 28,
+      name: "SOX Semiconductor Index",
+      pillar: "Pillar 1: Momentum & Technical",
+      source_url: "https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=SOXX",
+      api_endpoint: "/api/ccpi (via Alpha Vantage)",
+      fetch_method: "Alpha Vantage GLOBAL_QUOTE endpoint for SOXX ETF",
+      status: await testAlphaVantageAPI() ? "Live" : "Failed",
+      last_fetched_at: new Date().toISOString(),
+      raw_sample: { value: 283.56, unit: "index" },
+      threshold: { 
+        weak: "<4500 (chip selloff)",
+        baseline: "5000",
+        strong: ">5500"
+      }
+    },
+    {
+      id: 29,
+      name: "TED Spread (3M LIBOR - 3M T-Bill)",
+      pillar: "Pillar 4: Macro",
+      source_url: "https://fred.stlouisfed.org/series/TEDRATE",
+      api_endpoint: "/api/ccpi (via FRED)",
+      fetch_method: "FRED series TEDRATE (TED Spread)",
+      status: await testFREDAPI() ? "Live" : "Failed",
+      last_fetched_at: new Date().toISOString(),
+      raw_sample: { value: 0.25, unit: "percent" },
+      threshold: { 
+        normal: "<0.35%",
+        warning: "0.5-0.75%",
+        crisis: ">1.0% (banking stress)"
+      }
+    },
+    {
+      id: 30,
+      name: "US Dollar Index (DXY)",
+      pillar: "Pillar 4: Macro",
+      source_url: "https://fred.stlouisfed.org/series/DTWEXBGS",
+      api_endpoint: "/api/ccpi (via FRED)",
+      fetch_method: "FRED series DTWEXBGS (Trade Weighted U.S. Dollar Index)",
+      status: await testFREDAPI() ? "Live" : "Failed",
+      last_fetched_at: new Date().toISOString(),
+      raw_sample: { value: 103, unit: "index" },
+      threshold: { 
+        weak: "<95",
+        normal: "100-105",
+        strong: ">110 (tech earnings headwind)"
+      }
+    },
+    {
+      id: 31,
+      name: "ISM Manufacturing PMI",
+      pillar: "Pillar 4: Macro",
+      source_url: "https://fred.stlouisfed.org/series/MANEMP",
+      api_endpoint: "/api/ccpi (via FRED)",
+      fetch_method: "FRED series MANEMP (ISM Manufacturing PMI)",
+      status: await testFREDAPI() ? "Live" : "Failed",
+      last_fetched_at: new Date().toISOString(),
+      raw_sample: { value: 48, unit: "index" },
+      threshold: { 
+        contraction: "<50 (recession warning)",
+        neutral: "50",
+        expansion: ">52"
+      }
+    },
+    {
+      id: 32,
+      name: "Fed Reverse Repo Facility",
+      pillar: "Pillar 4: Macro",
+      source_url: "https://fred.stlouisfed.org/series/RRPONTSYD",
+      api_endpoint: "/api/ccpi (via FRED)",
+      fetch_method: "FRED series RRPONTSYD (Overnight Reverse Repurchase Agreements)",
+      status: await testFREDAPI() ? "Live" : "Failed",
+      last_fetched_at: new Date().toISOString(),
+      raw_sample: { value: 450, unit: "billion_usd" },
+      threshold: { 
+        loose: "<500B (ample liquidity)",
+        normal: "1000B",
+        tight: ">2000B (liquidity drain)"
+      }
     }
   ]
   
@@ -525,121 +621,4 @@ async function auditCCPIAggregation() {
 
 async function auditConfidenceLogic() {
   return {
-    formula: "Confidence = (varianceAlignment × 0.25) + (directionalConsistency × 0.30) + (crossPillarCorrelation × 0.20) + (vixAlignment × 0.15) + (canaryAgreement × 0.10)",
-    components: [
-      {
-        name: "Variance Alignment",
-        weight: 0.25,
-        logic: "100 - (stdDev × 2.5). Low variance between pillars = high confidence"
-      },
-      {
-        name: "Directional Consistency",
-        weight: 0.30,
-        logic: "% of pillars in same risk zone (low/moderate/high). 6/6 agreement = 100%"
-      },
-      {
-        name: "Cross-Pillar Correlation",
-        weight: 0.20,
-        logic: "Technical should correlate with Sentiment, Valuation with Macro. Measures expected relationships"
-      },
-      {
-        name: "VIX Alignment",
-        weight: 0.15,
-        logic: "VIX implied stress should match pillar mean. Validates market pricing"
-      },
-      {
-        name: "Canary Agreement",
-        weight: 0.10,
-        logic: "# of active warnings / 25 total indicators. More warnings = stronger signal"
-      }
-    ],
-    output: "0-100 scale. >80 = high confidence, <40 = conflicting signals"
-  }
-}
-
-async function auditCanarySignals() {
-  return {
-    total_possible: 26,
-    logic: "Each indicator has specific thresholds. When breached, generates canary signal.",
-    severity_levels: {
-      high: "Critical threshold breached (e.g., VIX > 30, Buffett > 160%)",
-      medium: "Warning threshold breached (e.g., VIX > 20, Buffett > 120%)",
-      low: "Watch threshold breached (minor warnings)"
-    },
-    trigger_conditions: [
-      { indicator: "QQQ Daily Return", high: "<-2%", medium: "<-1%", low: "<-0.5%" },
-      { indicator: "QQQ Consecutive Down", high: "4+ days", medium: "2-3 days", low: "1 day" },
-      { indicator: "QQQ Below SMA20", high: "Yes + downtrend", medium: "Yes", low: "Approaching" },
-      { indicator: "QQQ Below SMA50", high: "Yes + downtrend", medium: "Yes", low: "Approaching" },
-      { indicator: "QQQ Below Bollinger", high: "Yes + volatility spike", medium: "Yes", low: "Approaching" },
-      { indicator: "S&P P/E", high: ">25x", medium: ">18x", low: ">16x" },
-      { indicator: "Yield Curve", high: "<-0.3%", medium: "<0%", low: "<0.2%" },
-      { indicator: "Buffett Indicator", high: ">200%", medium: ">180%", low: ">150%" },
-      { indicator: "Put/Call Ratio (CBOE)", high: "<0.7", medium: "<0.85", low: ">1.1" },
-      { indicator: "AAII Bullish Sentiment", high: ">50%", medium: "45-50%", low: "30-45%" },
-      { indicator: "Short Interest Ratio (SPY)", high: "<1.5", medium: "<2.5", low: ">3.5" },
-      { indicator: "US Debt-to-GDP", high: ">130%", medium: ">120%", low: ">110%" }
-    ],
-    alert_levels: [
-      { canaries: "0-8", alert: "Normal", action: "Monitor" },
-      { canaries: "9-16", alert: "Elevated", action: "Increase hedges" },
-      { canaries: "17-23", alert: "High Alert", action: "Defensive positioning" },
-      { canaries: "24-26", alert: "Maximum", action: "Full defense mode" }
-    ]
-  }
-}
-
-// Helper functions to test API connectivity
-async function testFREDAPI() {
-  const FRED_API_KEY = process.env.FRED_API_KEY
-  if (!FRED_API_KEY) return false
-  
-  try {
-    const response = await fetch(`https://api.stlouisfed.org/fred/series/observations?series_id=DFF&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
-      signal: AbortSignal.timeout(5000)
-    })
-    return response.ok
-  } catch {
-    return false
-  }
-}
-
-async function testAlphaVantageAPI() {
-  const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY
-  if (!ALPHA_VANTAGE_API_KEY) return false
-  
-  try {
-    const response = await fetch(`https://www.alphavantage.co/query?function=VIX_90DAY&apikey=${ALPHA_VANTAGE_API_KEY}`, {
-      signal: AbortSignal.timeout(5000)
-    })
-    return response.ok
-  } catch {
-    return false
-  }
-}
-
-async function testApifyAPI() {
-  const APIFY_API_TOKEN = process.env.APIFY_API_TOKEN
-  if (!APIFY_API_TOKEN) return false
-  
-  // Don't actually call Apify in audit (expensive), just check if token exists
-  return true
-}
-
-async function testMarketBreadthAPI() {
-  return "Baseline"
-}
-
-async function testPolygonAPI() {
-  const POLYGON_API_KEY = process.env.POLYGON_API_KEY
-  if (!POLYGON_API_KEY) return false
-  
-  try {
-    const response = await fetch(`https://api.polygon.io/v2/aggs/ticker/QQQ/range/1/day/2025-01-01/2025-01-02?apiKey=${POLYGON_API_KEY}`, {
-      signal: AbortSignal.timeout(5000)
-    })
-    return response.ok
-  } catch {
-    return false
-  }
-}
+    formula: "Confidence = (varianceAlignment ×
