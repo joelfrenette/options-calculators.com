@@ -40,7 +40,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="pt-0">
       <header className="border-b border-gray-200 bg-white shadow-sm">
         <div className="container mx-auto px-4">
           <div className="max-w-[1400px] mx-auto">

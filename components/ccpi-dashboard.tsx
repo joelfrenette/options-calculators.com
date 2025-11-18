@@ -290,7 +290,7 @@ export function CcpiDashboard() {
             
             
             
-            <div className="pt-16">
+            <div className="pt-0">
               <div className="relative">
                 {/* Gradient bar */}
                 <div className="h-16 bg-gradient-to-r from-green-600 via-[20%] via-lime-500 via-[40%] via-yellow-500 via-[60%] via-orange-500 via-[80%] via-red-500 to-[100%] to-red-700 rounded-lg shadow-inner" />
@@ -356,7 +356,7 @@ export function CcpiDashboard() {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button className="text-gray-400 hover:text-gray-600">
-                        <Info className="h-5 w-5" />
+                        
                       </button>
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs p-3">
@@ -416,13 +416,10 @@ export function CcpiDashboard() {
             
             {/* Original Summary */}
             <div className="space-y-2">
-              <p className="text-sm text-blue-800 font-medium">{data.summary.headline}</p>
+              
               <ul className="space-y-1">
                 {data.summary.bullets.map((bullet, i) => (
-                  <li key={i} className="text-sm text-blue-700 flex items-start gap-2">
-                    <span className="text-blue-400 mt-1">•</span>
-                    <span>{bullet}</span>
-                  </li>
+                  null
                 ))}
               </ul>
             </div>
