@@ -41,10 +41,10 @@ export async function GET() {
     const macro = await computeMacroPillar(data)           // NEW: Pillar 4 - Macro (10%)
     
     let baseCCPI = Math.round(
-      momentum * 0.40 +
+      momentum * 0.35 +      // Updated from 0.40 to 0.35
       riskAppetite * 0.30 +
-      valuation * 0.20 +
-      macro * 0.10
+      valuation * 0.15 +     // Updated from 0.20 to 0.15
+      macro * 0.20           // Updated from 0.10 to 0.20
     )
     
     const crashAmplifiers = calculateCrashAmplifiers(data)
@@ -126,7 +126,16 @@ export async function GET() {
         aiCapexGrowth: data.aiCapexGrowth,
         aiRevenueGrowth: data.aiRevenueGrowth,
         gpuPricingPremium: data.gpuPricingPremium,
-        aiJobPostingsGrowth: data.aiJobPostingsGrowth
+        aiJobPostingsGrowth: data.aiJobPostingsGrowth,
+        
+        // Phase 1 indicators
+        nvidiaPrice: data.nvidiaPrice,
+        nvidiaMomentum: data.nvidiaMomentum,
+        soxIndex: data.soxIndex,
+        tedSpread: data.tedSpread,
+        dxyIndex: data.dxyIndex,
+        ismPMI: data.ismPMI,
+        fedReverseRepo: data.fedReverseRepo
       },
       canaries,
       activeCanaries: canaries.filter(c => c.severity === 'high' || c.severity === 'medium').length,
@@ -295,7 +304,14 @@ async function fetchMarketData() {
     aaiiBearish: aaiData.bearish,
     aaiiSpread: aaiData.spread,
     
-    apiStatus
+    // Phase 1 indicators
+    nvidiaPrice: fredData?.nvidiaPrice || 800,
+    nvidiaMomentum: fredData?.nvidiaMomentum || 50,
+    soxIndex: alphaVantageData?.soxIndex || 5000,
+    tedSpread: fredData?.tedSpread || 0.25,
+    dxyIndex: fredData?.dxyIndex || 103,
+    ismPMI: fredData?.ismPMI || 48,
+    fedReverseRepo: fredData?.fedReverseRepo || 450
   }
 }
 
@@ -307,51 +323,121 @@ async function fetchFREDIndicators() {
       fedFundsRate: 5.33, 
       junkSpread: 3.5, 
       yieldCurve: 0.25,
-      debtToGDP: 123 // Added baseline for Debt-to-GDP
+      debtToGDP: 123,
+      tedSpread: 0.25,
+      dxyIndex: 103,
+      ismPMI: 48,
+      fedReverseRepo: 450
     }
   }
   
   try {
     const baseUrl = 'https://api.stlouisfed.org/fred/series/observations'
-    const [fedFundsRes, junkSpreadRes, yieldCurveRes, debtToGDPRes] = await Promise.all([
+    const [fedFundsRes, junkSpreadRes, yieldCurveRes, debtToGDPRes, tedSpreadRes, dxyRes, ismRes, rrpRes] = await Promise.all([
       fetch(`${baseUrl}?series_id=DFF&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
       fetch(`${baseUrl}?series_id=BAMLH0A0HYM2&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
       fetch(`${baseUrl}?series_id=T10Y2Y&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
-      fetch(`${baseUrl}?series_id=GFDEGDQ188S&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) })
+      fetch(`${baseUrl}?series_id=GFDEGDQ188S&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
+      fetch(`${baseUrl}?series_id=TEDRATE&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
+      fetch(`${baseUrl}?series_id=DTWEXBGS&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
+      fetch(`${baseUrl}?series_id=MANEMP&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
+      fetch(`${baseUrl}?series_id=RRPONTSYD&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) })
     ])
     
-    const [fedFunds, junkSpread, yieldCurve, debtToGDP] = await Promise.all([
+    const [fedFunds, junkSpread, yieldCurve, debtToGDP, tedSpread, dxy, ism, rrp] = await Promise.all([
       fedFundsRes.json(),
       junkSpreadRes.json(),
       yieldCurveRes.json(),
-      debtToGDPRes.json()
+      debtToGDPRes.json(),
+      tedSpreadRes.json(),
+      dxyRes.json(),
+      ismRes.json(),
+      rrpRes.json()
     ])
     
     return {
       fedFundsRate: parseFloat(fedFunds.observations[0]?.value || '5.33'),
       junkSpread: parseFloat(junkSpread.observations[0]?.value || '3.5'),
       yieldCurve: parseFloat(yieldCurve.observations[0]?.value || '0.25'),
-      debtToGDP: parseFloat(debtToGDP.observations[0]?.value || '123') // Parse Debt-to-GDP
+      debtToGDP: parseFloat(debtToGDP.observations[0]?.value || '123'),
+      tedSpread: parseFloat(tedSpread.observations[0]?.value || '0.25'),
+      dxyIndex: parseFloat(dxy.observations[0]?.value || '103'),
+      ismPMI: parseFloat(ism.observations[0]?.value || '48'),
+      fedReverseRepo: parseFloat(rrp.observations[0]?.value || '450')
     }
   } catch (error) {
     return { 
       fedFundsRate: 5.33, 
       junkSpread: 3.5, 
       yieldCurve: 0.25,
-      debtToGDP: 123
+      debtToGDP: 123,
+      tedSpread: 0.25,
+      dxyIndex: 103,
+      ismPMI: 48,
+      fedReverseRepo: 450
     }
   }
 }
 
 async function fetchAlphaVantageIndicators() {
-  // Placeholder - returns baseline values
-  return {
-    vix: 18,
-    vxn: 19,
-    rvx: 20,
-    atr: 35,
-    ltv: 0.12,
-    spotVol: 0.22
+  const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY
+  
+  if (!ALPHA_VANTAGE_API_KEY) {
+    return {
+      vix: 18,
+      vxn: 19,
+      rvx: 20,
+      atr: 35,
+      ltv: 0.12,
+      spotVol: 0.22,
+      nvidiaPrice: 800,
+      nvidiaMomentum: 50,
+      soxIndex: 5000
+    }
+  }
+  
+  try {
+    const [nvidiaRes, soxRes] = await Promise.all([
+      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=NVDA&apikey=${ALPHA_VANTAGE_API_KEY}`, { signal: AbortSignal.timeout(10000) }),
+      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=SOXX&apikey=${ALPHA_VANTAGE_API_KEY}`, { signal: AbortSignal.timeout(10000) })
+    ])
+    
+    const [nvidiaData, soxData] = await Promise.all([
+      nvidiaRes.json(),
+      soxRes.json()
+    ])
+    
+    const nvidiaPrice = parseFloat(nvidiaData?.['Global Quote']?.['05. price'] || '800')
+    const nvidiaChange = parseFloat(nvidiaData?.['Global Quote']?.['09. change'] || '0')
+    const nvidiaMomentum = nvidiaChange > 0 ? 100 : 0
+    const soxIndex = parseFloat(soxData?.['Global Quote']?.['05. price'] || '5000')
+    
+    console.log(`[v0] Alpha Vantage Phase 1: NVDA=${nvidiaPrice}, SOX=${soxIndex}`)
+    
+    return {
+      vix: 18,
+      vxn: 19,
+      rvx: 20,
+      atr: 35,
+      ltv: 0.12,
+      spotVol: 0.22,
+      nvidiaPrice,
+      nvidiaMomentum,
+      soxIndex
+    }
+  } catch (error) {
+    console.error("[v0] Alpha Vantage Phase 1 error:", error)
+    return {
+      vix: 18,
+      vxn: 19,
+      rvx: 20,
+      atr: 35,
+      ltv: 0.12,
+      spotVol: 0.22,
+      nvidiaPrice: 800,
+      nvidiaMomentum: 50,
+      soxIndex: 5000
+    }
   }
 }
 
@@ -484,7 +570,16 @@ async function computeMomentumPillar(data: Awaited<ReturnType<typeof fetchMarket
   else if (data.bullishPercent > 60) score += 10
   else if (data.bullishPercent < 30) score += 5  // Oversold (contrarian)
   
-  console.log("[v0] Pillar 1 - Momentum & Technical:", score)
+  if (data.nvidiaMomentum > 80) score += 10
+  else if (data.nvidiaMomentum < 20) score += 25  // Falling NVDA = tech crash risk
+  
+  // Comparing to historical baseline of 5000
+  const soxDeviation = ((data.soxIndex - 5000) / 5000) * 100
+  if (soxDeviation < -15) score += 30  // Major chip selloff
+  else if (soxDeviation < -10) score += 20
+  else if (soxDeviation < -5) score += 10
+  
+  console.log("[v0] Pillar 1 - Momentum & Technical (35% weight):", score)
   return Math.min(100, Math.max(0, score))
 }
 
@@ -585,7 +680,28 @@ async function computeMacroPillar(data: Awaited<ReturnType<typeof fetchMarketDat
   else if (data.debtToGDP > 110) score += 20
   else if (data.debtToGDP > 100) score += 12
   
-  console.log("[v0] Pillar 4 - Macro Economic:", score)
+  if (data.tedSpread > 1.0) score += 40  // Extreme banking stress
+  else if (data.tedSpread > 0.75) score += 30
+  else if (data.tedSpread > 0.50) score += 20
+  else if (data.tedSpread > 0.35) score += 10
+  
+  if (data.dxyIndex > 115) score += 35  // Very strong dollar
+  else if (data.dxyIndex > 110) score += 28
+  else if (data.dxyIndex > 105) score += 20
+  else if (data.dxyIndex > 100) score += 10
+  
+  if (data.ismPMI < 42) score += 40  // Deep contraction
+  else if (data.ismPMI < 46) score += 30
+  else if (data.ismPMI < 50) score += 20  // Contraction
+  else if (data.ismPMI < 52) score += 5
+  
+  // High RRP = tight liquidity
+  if (data.fedReverseRepo > 2000) score += 30  // Extreme liquidity drain
+  else if (data.fedReverseRepo > 1500) score += 22
+  else if (data.fedReverseRepo > 1000) score += 15
+  else if (data.fedReverseRepo > 500) score += 8
+  
+  console.log("[v0] Pillar 4 - Macro Economic (20% weight):", score)
   return Math.min(100, Math.max(0, score))
 }
 
@@ -882,6 +998,50 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     canaries.push({ signal: `US Debt-to-GDP at ${data.debtToGDP.toFixed(0)}% - Fiscal crisis risk`, pillar: "Macro", severity: "high" })
   } else if (data.debtToGDP > 110) {
     canaries.push({ signal: `US Debt-to-GDP at ${data.debtToGDP.toFixed(0)}% - Elevated fiscal burden`, pillar: "Macro", severity: "medium" })
+  }
+  
+  
+  // NVIDIA Momentum (Pillar 1)
+  if (data.nvidiaMomentum < 20) {
+    canaries.push({ signal: `NVIDIA momentum at ${data.nvidiaMomentum} - AI sector weakness`, pillar: "Momentum & Technical", severity: "high" })
+  } else if (data.nvidiaMomentum < 40) {
+    canaries.push({ signal: `NVIDIA momentum at ${data.nvidiaMomentum} - Tech leadership fading`, pillar: "Momentum & Technical", severity: "medium" })
+  }
+  
+  // SOX Semiconductor Index (Pillar 1)
+  const soxDeviation = ((data.soxIndex - 5000) / 5000) * 100
+  if (soxDeviation < -15) {
+    canaries.push({ signal: `SOX down ${Math.abs(soxDeviation).toFixed(1)}% - Chip sector crash`, pillar: "Momentum & Technical", severity: "high" })
+  } else if (soxDeviation < -10) {
+    canaries.push({ signal: `SOX down ${Math.abs(soxDeviation).toFixed(1)}% - Semiconductor weakness`, pillar: "Momentum & Technical", severity: "medium" })
+  }
+  
+  // TED Spread (Pillar 4)
+  if (data.tedSpread > 1.0) {
+    canaries.push({ signal: `TED Spread at ${data.tedSpread.toFixed(2)}% - Banking system stress`, pillar: "Macro", severity: "high" })
+  } else if (data.tedSpread > 0.50) {
+    canaries.push({ signal: `TED Spread at ${data.tedSpread.toFixed(2)}% - Credit market tension`, pillar: "Macro", severity: "medium" })
+  }
+  
+  // DXY Dollar Index (Pillar 4)
+  if (data.dxyIndex > 115) {
+    canaries.push({ signal: `Dollar Index at ${data.dxyIndex.toFixed(1)} - Extreme dollar strength hurts tech`, pillar: "Macro", severity: "high" })
+  } else if (data.dxyIndex > 105) {
+    canaries.push({ signal: `Dollar Index at ${data.dxyIndex.toFixed(1)} - Strong dollar headwind`, pillar: "Macro", severity: "medium" })
+  }
+  
+  // ISM PMI (Pillar 4)
+  if (data.ismPMI < 46) {
+    canaries.push({ signal: `ISM PMI at ${data.ismPMI.toFixed(1)} - Manufacturing contraction`, pillar: "Macro", severity: "high" })
+  } else if (data.ismPMI < 50) {
+    canaries.push({ signal: `ISM PMI at ${data.ismPMI.toFixed(1)} - Weak manufacturing`, pillar: "Macro", severity: "medium" })
+  }
+  
+  // Fed Reverse Repo (Pillar 4)
+  if (data.fedReverseRepo > 2000) {
+    canaries.push({ signal: `Fed RRP at $${data.fedReverseRepo.toFixed(0)}B - Severe liquidity drain`, pillar: "Macro", severity: "high" })
+  } else if (data.fedReverseRepo > 1000) {
+    canaries.push({ signal: `Fed RRP at $${data.fedReverseRepo.toFixed(0)}B - Tight liquidity conditions`, pillar: "Macro", severity: "medium" })
   }
   
   return canaries
