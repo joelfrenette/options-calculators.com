@@ -551,15 +551,15 @@ export function CcpiDashboard() {
                     <span className="font-bold">${data.indicators.nvidiaPrice.toFixed(0)} | {data.indicators.nvidiaMomentum}/100</span>
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                     <div className="absolute inset-0 bg-gray-200" style={{ 
                       marginLeft: `${data.indicators.nvidiaMomentum}%` 
                     }} />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Falling: {'<'}20 (Tech crash risk)</span>
-                    <span>Neutral: 40-60</span>
                     <span>Strong: {'>'}80</span>
+                    <span>Neutral: 40-60</span>
+                    <span>Falling: {'<'}20 (Tech crash risk)</span>
                   </div>
                 </div>
               )}
@@ -572,15 +572,15 @@ export function CcpiDashboard() {
                     <span className="font-bold">{data.indicators.soxIndex.toFixed(0)}</span>
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                     <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.soxIndex - 4000) / 2000) * 100))}%` 
+                      marginLeft: `${100 - Math.min(100, Math.max(0, ((data.indicators.soxIndex - 4000) / 2000) * 100))}%` 
                     }} />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Weak: {'<'}4500</span>
-                    <span>Baseline: 5000</span>
                     <span>Strong: {'>'}5500</span>
+                    <span>Baseline: 5000</span>
+                    <span>Weak: {'<'}4500</span>
                   </div>
                 </div>
               )}
@@ -1278,15 +1278,15 @@ export function CcpiDashboard() {
                     <span className="font-bold">{data.indicators.equityRiskPremium.toFixed(2)}%</span>
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                     <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, Math.max(0, 100 - ((data.indicators.equityRiskPremium - 1) / 5) * 100))}%` 
+                      marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.equityRiskPremium - 1) / 5) * 100))}%` 
                     }} />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Overvalued: {'<'}2%</span>
-                    <span>Fair: 3-4%</span>
                     <span>Attractive: {'>'}5%</span>
+                    <span>Fair: 3-4%</span>
+                    <span>Overvalued: {'<'}2%</span>
                   </div>
                 </div>
               )}
@@ -1353,15 +1353,15 @@ export function CcpiDashboard() {
                     <span className="font-bold">{data.indicators.ismPMI.toFixed(1)}</span>
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                     <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.ismPMI - 40) / 20) * 100))}%` 
+                      marginLeft: `${Math.min(100, Math.max(0, 100 - ((data.indicators.ismPMI - 40) / 20) * 100))}%` 
                     }} />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Contraction: {'<'}50</span>
-                    <span>Neutral: 50</span>
                     <span>Expansion: {'>'}52</span>
+                    <span>Neutral: 50</span>
+                    <span>Contraction: {'<'}50</span>
                   </div>
                 </div>
               )}

@@ -9,12 +9,25 @@ import {
   scrapeShortInterest
 } from '@/lib/scraping-bee'
 import { fetchApifyYahooFinance as fetchApifyYahooFinanceUtil } from '@/lib/apify-yahoo-finance'
-import { 
-  fetchShillerCAPEWithGrok,
-  fetchShortInterestWithGrok,
-  fetchMag7ConcentrationWithGrok,
-  fetchQQQPEWithGrok
-} from '@/lib/grok-market-data'
+
+import {
+  getShillerCAPE,
+  getShortInterest,
+  getMag7Concentration,
+  getQQQPE,
+  getBuffettIndicator,
+  getPutCallRatio,
+  getAAIIBullish,
+  getVIX,
+  getNVIDIAPrice,
+  getSOXIndex,
+  getISMPMI,
+  getSPXPE,
+  getFearGreed,
+  getYieldCurve
+} from '@/lib/unified-ai-fallback'
+
+import { fetchShillerCAPEWithGrok } from '@/lib/grok-market-data' // Kept Grok for now as a fallback
 
 interface DataSourceStatus {
   live: boolean
@@ -178,6 +191,45 @@ async function fetchMarketData() {
     shortInterest: { live: false, source: 'baseline', lastUpdated: new Date().toISOString() }
   }
   
+  const [
+    shillerCAPEResult,
+    shortInterestResult,
+    mag7Result,
+    qqqPEResult,
+    buffettResult,
+    putCallResult,
+    aaiiBullishResult,
+    vixResult,
+    nvidiaPriceResult,
+    soxIndexResult,
+    ismPMIResult
+  ] = await Promise.all([
+    getShillerCAPE(),
+    getShortInterest(),
+    getMag7Concentration(),
+    getQQQPE(),
+    getBuffettIndicator(),
+    getPutCallRatio(),
+    getAAIIBullish(),
+    getVIX(),
+    getNVIDIAPrice(),
+    getSOXIndex(),
+    getISMPMI()
+  ])
+  
+  console.log("[v0] AI Fallback Summary:")
+  console.log(`  Shiller CAPE: ${shillerCAPEResult.value} (${shillerCAPEResult.source})`)
+  console.log(`  Short Interest: ${shortInterestResult.value} (${shortInterestResult.source})`)
+  console.log(`  Mag7 Concentration: ${mag7Result.value} (${mag7Result.source})`)
+  console.log(`  QQQ P/E: ${qqqPEResult.value} (${qqqPEResult.source})`)
+  console.log(`  Buffett Indicator: ${buffettResult.value} (${buffettResult.source})`)
+  console.log(`  Put/Call Ratio: ${putCallResult.value} (${putCallResult.source})`)
+  console.log(`  AAII Bullish: ${aaiiBullishResult.value} (${aaiiBullishResult.source})`)
+  console.log(`  VIX: ${vixResult.value} (${vixResult.source})`)
+  console.log(`  NVIDIA Price: ${nvidiaPriceResult.value} (${nvidiaPriceResult.source})`)
+  console.log(`  SOX Index: ${soxIndexResult.value} (${soxIndexResult.source})`)
+  console.log(`  ISM PMI: ${ismPMIResult.value} (${ismPMIResult.source})`)
+  
   const results = await Promise.allSettled([
     fetchQQQTechnicalsData(),
     fetchVIXTermStructure(),
@@ -189,10 +241,7 @@ async function fetchMarketData() {
     scrapeBuffettIndicator(),
     scrapePutCallRatio(),
     scrapeAAIISentiment(),
-    scrapeShortInterest(),
-    // Fetch QQQ PE and Mag7 Concentration with Grok
-    fetchQQQPEWithGrok(),
-    fetchMag7ConcentrationWithGrok()
+    scrapeShortInterest()
   ])
   
   const qqqData = results[0].status === 'fulfilled' ? results[0].value : null
@@ -202,16 +251,11 @@ async function fetchMarketData() {
   const apifyData = results[4].status === 'fulfilled' ? results[4].value : null
   const qqqFundamentals = results[5].status === 'fulfilled' ? results[5].value : null
   const sentimentData = results[6].status === 'fulfilled' ? results[6].value : null
-  const buffettData = results[7].status === 'fulfilled' ? results[7].value : { ratio: 180, status: 'baseline' }
-  const putCallData = results[8].status === 'fulfilled' ? results[8].value : { ratio: 0.95, status: 'baseline' }
-  const aaiData = results[9].status === 'fulfilled' ? results[9].value : { bullish: 35, bearish: 30, neutral: 35, spread: 5, status: 'baseline' }
-  const shortInterestData = results[10].status === 'fulfilled' ? results[10].value : { spyShortRatio: 2.5, status: 'baseline' }
+  const buffettData = results[7].status === 'fulfilled' ? results[7].value : { ratio: buffettResult.value, status: buffettResult.source }
+  const putCallData = results[8].status === 'fulfilled' ? results[8].value : { ratio: putCallResult.value, status: putCallResult.source }
+  const aaiData = results[9].status === 'fulfilled' ? results[9].value : { bullish: aaiiBullishResult.value, bearish: 30, neutral: 35, spread: 5, status: aaiiBullishResult.source }
+  const shortInterestData = results[10].status === 'fulfilled' ? results[10].value : { spyShortRatio: shortInterestResult.value, status: shortInterestResult.source }
   
-  // Use Grok-fetched QQQ PE and Mag7 Concentration
-  const qqqPE = results[11].status === 'fulfilled' ? results[11].value : null
-  const mag7Concentration = results[12].status === 'fulfilled' ? results[12].value : null
-  
-  // Update API status
   apiStatus.technical = {
     live: qqqData?.source === 'live',
     source: qqqData?.source || 'baseline',
@@ -220,19 +264,19 @@ async function fetchMarketData() {
   
   apiStatus.vixTerm = {
     live: vixTermData?.source === 'live',
-    source: vixTermData?.source || 'baseline',
+    source: vixTermData?.source || vixResult.source,
     lastUpdated: new Date().toISOString()
   }
   
   apiStatus.fred = {
     live: results[2].status === 'fulfilled',
-    source: results[2].status === 'fulfilled' ? 'FRED API' : 'baseline',
+    source: results[2].status === 'fulfilled' ? 'FRED API' : ismPMIResult.source,
     lastUpdated: new Date().toISOString()
   }
   
   apiStatus.alphaVantage = {
     live: results[3].status === 'fulfilled',
-    source: results[3].status === 'fulfilled' ? 'Alpha Vantage API' : 'baseline',
+    source: results[3].status === 'fulfilled' ? 'Alpha Vantage API' : `${nvidiaPriceResult.source} / ${soxIndexResult.source}`,
     lastUpdated: new Date().toISOString()
   }
   
@@ -250,25 +294,25 @@ async function fetchMarketData() {
   
   apiStatus.buffett = {
     live: buffettData.status === 'live',
-    source: buffettData.status === 'live' ? 'ScrapingBee' : 'baseline',
+    source: buffettData.status === 'live' ? 'ScrapingBee' : buffettResult.source,
     lastUpdated: new Date().toISOString()
   }
   
   apiStatus.putCall = {
     live: putCallData.status === 'live',
-    source: putCallData.status === 'live' ? 'ScrapingBee' : 'baseline',
+    source: putCallData.status === 'live' ? 'ScrapingBee' : putCallResult.source,
     lastUpdated: new Date().toISOString()
   }
   
   apiStatus.aaii = {
     live: aaiData.status === 'live',
-    source: aaiData.status === 'live' ? 'ScrapingBee' : 'baseline',
+    source: aaiData.status === 'live' ? 'ScrapingBee' : aaiiBullishResult.source,
     lastUpdated: new Date().toISOString()
   }
   
   apiStatus.shortInterest = {
     live: shortInterestData.status === 'live',
-    source: shortInterestData.status === 'live' ? 'ScrapingBee' : 'baseline',
+    source: shortInterestData.status === 'live' ? 'ScrapingBee' : shortInterestResult.source,
     lastUpdated: new Date().toISOString()
   }
   
@@ -285,8 +329,8 @@ async function fetchMarketData() {
     qqqSMA200Proximity: qqqData?.sma200Proximity || 0,
     qqqBollingerProximity: qqqData?.bollingerProximity || 0,
     
-    // Volatility
-    vix: alphaVantageData?.vix || 18,
+    // Volatility (use AI fallback for VIX)
+    vix: alphaVantageData?.vix || vixResult.value,
     vxn: alphaVantageData?.vxn || 19,
     rvx: alphaVantageData?.rvx || 20,
     atr: alphaVantageData?.atr || 35,
@@ -297,25 +341,25 @@ async function fetchMarketData() {
     highLowIndex: undefined,
     bullishPercent: 58,
     
-    // Valuation
+    // Valuation (use AI fallback)
     spxPE: apifyData?.spxPE || 22.5,
     spxPS: apifyData?.spxPS || 2.8,
-    qqqPE: qqqPE || qqqFundamentals?.data?.forwardPE || qqqFundamentals?.data?.trailingPE || 32,
-    mag7Concentration: mag7Concentration || alphaVantageData?.mag7Concentration || 55,
-    shillerCAPE: fredData?.shillerCAPE || 30,
+    qqqPE: qqqPEResult.value,
+    mag7Concentration: mag7Result.value,
+    shillerCAPE: shillerCAPEResult.value,
     equityRiskPremium: calculateEquityRiskPremium(apifyData?.spxPE || 22.5, fredData?.yieldCurve10Y || 4.5),
     
     // Macro
     fedFundsRate: fredData?.fedFundsRate || 5.33,
     junkSpread: fredData?.junkSpread || 3.5,
     yieldCurve: fredData?.yieldCurve || 0.25,
-    debtToGDP: fredData?.debtToGDP || 123, // Added Debt-to-GDP to data object
+    debtToGDP: fredData?.debtToGDP || 123,
     
-    // Sentiment
+    // Sentiment (use AI fallback)
     putCallRatio: putCallData.ratio,
     fearGreedIndex: sentimentData?.fearGreed || null,
     etfFlows: apifyData?.etfFlows,
-    shortInterest: shortInterestData.spyShortRatio,
+    shortInterest: shortInterestResult.value,
     
     // AI Structural
     aiCapexGrowth: 40,
@@ -323,19 +367,19 @@ async function fetchMarketData() {
     gpuPricingPremium: 20,
     aiJobPostingsGrowth: -5,
     
-    // New indicators
-    buffettIndicator: buffettData.ratio,
-    aaiiBullish: aaiData.bullish,
-    aaiiBearish: aaiData.bearish,
-    aaiiSpread: aaiData.spread,
+    // New indicators (use AI fallback)
+    buffettIndicator: buffettResult.value,
+    aaiiBullish: aaiiBullishResult.value,
+    aaiiBearish: aaiData.bearish || 30,
+    aaiiSpread: aaiData.spread || 5,
     
-    // Phase 1 indicators
-    nvidiaPrice: fredData?.nvidiaPrice || 800,
+    // Phase 1 indicators (use AI fallback)
+    nvidiaPrice: nvidiaPriceResult.value,
     nvidiaMomentum: fredData?.nvidiaMomentum || 50,
-    soxIndex: alphaVantageData?.soxIndex || 5000,
+    soxIndex: soxIndexResult.value,
     tedSpread: fredData?.tedSpread || 0.25,
     dxyIndex: fredData?.dxyIndex || 103,
-    ismPMI: fredData?.ismPMI || 48,
+    ismPMI: ismPMIResult.value,
     fedReverseRepo: fredData?.fedReverseRepo || 450,
     
     apiStatus
@@ -378,7 +422,7 @@ async function fetchFREDIndicators() {
       fetch(`${baseUrl}?series_id=GFDEGDQ188S&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
       fetch(`${baseUrl}?series_id=TEDRATE&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
       fetch(`${baseUrl}?series_id=DTWEXBGS&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
-      fetch(`${baseUrl}?series_id=MANEMP&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
+      fetch(`${baseUrl}?series_id=NAPMPMI&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
       fetch(`${baseUrl}?series_id=RRPONTSYD&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
       fetch(`${baseUrl}?series_id=DGS10&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) })
     ])
