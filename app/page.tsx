@@ -53,7 +53,12 @@ export default function Home() {
                   height={32}
                   className="h-8 w-8"
                 />
-                <h1 className="text-xl md:text-2xl font-bold text-gray-900">OPTIONS-CALCULATORS.COM</h1>
+                <a 
+                  href="https://OPTIONS-CALCULATORS.COM" 
+                  className="text-xl md:text-2xl font-bold text-gray-900 hover:text-primary transition-colors"
+                >
+                  OPTIONS-CALCULATORS.COM
+                </a>
               </div>
 
               <RotatingAdBanner />
@@ -251,7 +256,7 @@ export default function Home() {
               © 2025 OPTIONS-CALCULATORS.COM - Professional Tools for Options Traders
             </p>
             <p className="text-center text-xs text-gray-500 leading-relaxed max-w-4xl mx-auto">
-              This website and its free AI-powered tools (including calculators, predictions, and analyses) are for
+              This <a href="https://www.options-calculators.com/login" className="text-gray-500 hover:text-primary transition-colors">website</a> and its free AI-powered tools (including calculators, predictions, and analyses) are for
               educational and entertainment purposes only and do not constitute financial, investment, legal, or
               professional advice of any kind. We are not financial advisors, brokers, or certified professionals; all
               content is based on algorithms, formulas, and third-party data that may contain errors, inaccuracies, or
