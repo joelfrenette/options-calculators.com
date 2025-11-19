@@ -41,9 +41,9 @@ export async function POST(request: Request) {
     if (!response.ok) {
       const errorText = await response.text()
       
-      // Silently log 503 errors (service unavailable) without bubbling them up
-      if (response.status === 503) {
-        console.log('[v0] ScrapingBee 503: Service temporarily unavailable, will use AI fallback')
+      // Silently log 503 (service unavailable) and 500 (timeout) errors without bubbling them up
+      if (response.status === 503 || response.status === 500) {
+        console.log(`[v0] ScrapingBee ${response.status}: Service temporarily unavailable, will use AI fallback`)
       } else {
         console.error('[v0] ScrapingBee API Error:', response.status, errorText)
       }
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
         success: false,
         error: 'ScrapingBee request failed',
         status: response.status,
-        message: response.status === 503 ? 'Service temporarily unavailable' : errorText
+        message: response.status === 503 || response.status === 500 ? 'Service temporarily unavailable' : errorText
       }, { status: 200 }) // Changed from response.status to 200 to prevent error bubbling
     }
 
