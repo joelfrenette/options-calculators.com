@@ -5,7 +5,14 @@ const google = createGoogleGenerativeAI({
   apiKey: process.env.GOOGLE_AI_API_KEY || 'gen-lang-client-0100065741'
 })
 
+// All functions now return null immediately without making API calls
+// Uncomment the actual implementation below once Gemini quota is restored
+
 export async function fetchMarketDataWithGemini(indicatorName: string, context?: string): Promise<number | null> {
+  // DISABLED: Return null immediately to skip Gemini and use Grok fallback
+  return null
+  
+  /* DISABLED CODE - Uncomment when Gemini quota is restored
   try {
     console.log(`[v0] Google Gemini: Fetching ${indicatorName}...`)
     
@@ -55,103 +62,62 @@ Respond with ONLY the number, nothing else.`
     console.error(`[v0] Google Gemini: Error fetching ${indicatorName}:`, errorMessage)
     return null
   }
+  */
 }
 
 // Specific helper functions for ALL CCPI indicators
 export async function fetchShillerCAPEWithGemini(): Promise<number | null> {
-  return await fetchMarketDataWithGemini(
-    "Shiller CAPE ratio (cyclically adjusted price-to-earnings ratio for S&P 500)",
-    "Current value as of today"
-  )
+  return null // DISABLED: await fetchMarketDataWithGemini(...)
 }
 
 export async function fetchShortInterestWithGemini(): Promise<number | null> {
-  return await fetchMarketDataWithGemini(
-    "SPY ETF short interest ratio as percentage of float",
-    "Current short interest percentage"
-  )
+  return null // DISABLED
 }
 
 export async function fetchMag7ConcentrationWithGemini(): Promise<number | null> {
-  return await fetchMarketDataWithGemini(
-    "Magnificent 7 stocks (AAPL, MSFT, GOOGL, AMZN, NVDA, TSLA, META) market cap as percentage of S&P 500",
-    "Current concentration percentage"
-  )
+  return null // DISABLED
 }
 
 export async function fetchQQQPEWithGemini(): Promise<number | null> {
-  return await fetchMarketDataWithGemini(
-    "QQQ ETF forward price-to-earnings ratio",
-    "Current forward P/E for Invesco QQQ Trust"
-  )
+  return null // DISABLED
 }
 
 export async function fetchBuffettIndicatorWithGemini(): Promise<number | null> {
-  return await fetchMarketDataWithGemini(
-    "Buffett Indicator (Total US Market Cap divided by GDP as percentage)",
-    "Current Wilshire 5000 to GDP ratio"
-  )
+  return null // DISABLED
 }
 
 export async function fetchPutCallRatioWithGemini(): Promise<number | null> {
-  return await fetchMarketDataWithGemini(
-    "CBOE total put/call ratio",
-    "Current equity put/call volume ratio"
-  )
+  return null // DISABLED
 }
 
 export async function fetchAAIIBullishWithGemini(): Promise<number | null> {
-  return await fetchMarketDataWithGemini(
-    "AAII investor sentiment survey bullish percentage",
-    "Current percentage of bullish individual investors"
-  )
+  return null // DISABLED
 }
 
 export async function fetchVIXWithGemini(): Promise<number | null> {
-  return await fetchMarketDataWithGemini(
-    "CBOE Volatility Index (VIX)",
-    "Current VIX spot price"
-  )
+  return null // DISABLED
 }
 
 export async function fetchNVIDIAPriceWithGemini(): Promise<number | null> {
-  return await fetchMarketDataWithGemini(
-    "NVIDIA (NVDA) stock price",
-    "Current NVDA stock price in USD"
-  )
+  return null // DISABLED
 }
 
 export async function fetchSOXIndexWithGemini(): Promise<number | null> {
-  return await fetchMarketDataWithGemini(
-    "PHLX Semiconductor Sector Index (SOX)",
-    "Current SOX index level"
-  )
+  return null // DISABLED
 }
 
 export async function fetchISMPMIWithGemini(): Promise<number | null> {
-  return await fetchMarketDataWithGemini(
-    "ISM Manufacturing PMI (Purchasing Managers Index)",
-    "Current ISM manufacturing index value"
-  )
+  return null // DISABLED
 }
 
 export async function fetchSPXPEWithGemini(): Promise<number | null> {
-  return await fetchMarketDataWithGemini(
-    "S&P 500 forward price-to-earnings ratio",
-    "Current S&P 500 forward P/E multiple"
-  )
+  return null // DISABLED
 }
 
 export async function fetchFearGreedWithGemini(): Promise<number | null> {
-  return await fetchMarketDataWithGemini(
-    "CNN Fear & Greed Index",
-    "Current market sentiment index (0-100 scale)"
-  )
+  return null // DISABLED
 }
 
 export async function fetchYieldCurveWithGemini(): Promise<number | null> {
-  return await fetchMarketDataWithGemini(
-    "US Treasury 10-Year minus 2-Year yield spread",
-    "Current 10Y-2Y spread in basis points"
-  )
+  return null // DISABLED
 }

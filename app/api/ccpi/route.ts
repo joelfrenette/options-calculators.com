@@ -414,7 +414,7 @@ async function fetchFREDIndicators() {
     
     const [
       fedFundsRes, junkSpreadRes, yieldCurveRes, debtToGDPRes, tedSpreadRes, 
-      dxyRes, ismRes, rrpRes, treasury10YRes
+      dxyRes, rrpRes, treasury10YRes
     ] = await Promise.all([
       fetch(`${baseUrl}?series_id=DFF&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
       fetch(`${baseUrl}?series_id=BAMLH0A0HYM2&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
@@ -422,14 +422,13 @@ async function fetchFREDIndicators() {
       fetch(`${baseUrl}?series_id=GFDEGDQ188S&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
       fetch(`${baseUrl}?series_id=TEDRATE&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
       fetch(`${baseUrl}?series_id=DTWEXBGS&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
-      fetch(`${baseUrl}?series_id=NAPMPMI&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
       fetch(`${baseUrl}?series_id=RRPONTSYD&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
       fetch(`${baseUrl}?series_id=DGS10&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) })
     ])
     
     const [
       fedFunds, junkSpread, yieldCurve, debtToGDP, tedSpread, 
-      dxy, ism, rrp, treasury10Y
+      dxy, rrp, treasury10Y
     ] = await Promise.all([
       fedFundsRes.json(),
       junkSpreadRes.json(),
@@ -437,7 +436,6 @@ async function fetchFREDIndicators() {
       debtToGDPRes.json(),
       tedSpreadRes.json(),
       dxyRes.json(),
-      ismRes.json(),
       rrpRes.json(),
       treasury10YRes.json()
     ])
@@ -446,19 +444,19 @@ async function fetchFREDIndicators() {
     const shillerCAPE = await fetchShillerCAPEWithGrok()
     
     return {
-      fedFundsRate: parseFloat(fedFunds.observations[0]?.value || '5.33'),
-      junkSpread: parseFloat(junkSpread.observations[0]?.value || '3.5'),
-      yieldCurve: parseFloat(yieldCurve.observations[0]?.value || '0.25'),
-      debtToGDP: parseFloat(debtToGDP.observations[0]?.value || '123'),
-      tedSpread: parseFloat(tedSpread.observations[0]?.value || '0.25'),
-      dxyIndex: parseFloat(dxy.observations[0]?.value || '103'),
-      ismPMI: parseFloat(ism.observations[0]?.value || '48'),
-      fedReverseRepo: parseFloat(rrp.observations[0]?.value || '450'),
-      shillerCAPE, // Use Grok-fetched value
-      yieldCurve10Y: parseFloat(treasury10Y.observations[0]?.value || '4.5')
+      fedFundsRate: parseFloat(fedFunds.observations?.[0]?.value || '5.33'),
+      junkSpread: parseFloat(junkSpread.observations?.[0]?.value || '3.5'),
+      yieldCurve: parseFloat(yieldCurve.observations?.[0]?.value || '0.25'),
+      debtToGDP: parseFloat(debtToGDP.observations?.[0]?.value || '123'),
+      tedSpread: parseFloat(tedSpread.observations?.[0]?.value || '0.25'),
+      dxyIndex: parseFloat(dxy.observations?.[0]?.value || '103'),
+      ismPMI: 48, // Will be overridden by AI fallback
+      fedReverseRepo: parseFloat(rrp.observations?.[0]?.value || '450'),
+      shillerCAPE,
+      yieldCurve10Y: parseFloat(treasury10Y.observations?.[0]?.value || '4.5')
     }
   } catch (error) {
-    console.error("[v0] FRED API error:", error)
+    console.error("[v0] FRED API error:", error instanceof Error ? error.message : String(error))
     const shillerCAPE = await fetchShillerCAPEWithGrok()
     
     return { 
