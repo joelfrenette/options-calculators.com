@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server"
-import { fetchMarketBreadth as fetchMarketBreadthData } from "@/lib/market-breadth"
 import { fetchVIXTermStructure } from "@/lib/vix-term-structure"
-import { fetchQQQTechnicals as fetchQQQTechnicalsData } from '@/lib/qqq-technicals'
+import { fetchQQQTechnicals as fetchQQQTechnicalsData } from "@/lib/qqq-technicals"
 import {
   scrapeBuffettIndicator,
   scrapePutCallRatio,
   scrapeAAIISentiment,
-  scrapeShortInterest
-} from '@/lib/scraping-bee'
-import { fetchApifyYahooFinance as fetchApifyYahooFinanceUtil } from '@/lib/apify-yahoo-finance'
+  scrapeShortInterest,
+} from "@/lib/scraping-bee"
+import { fetchApifyYahooFinance as fetchApifyYahooFinanceUtil } from "@/lib/apify-yahoo-finance"
 
 import {
   getShillerCAPE,
@@ -21,10 +20,10 @@ import {
   getVIX,
   getNVIDIAPrice,
   getSOXIndex,
-  getISMPMI
-} from '@/lib/unified-ai-fallback'
+  getISMPMI,
+} from "@/lib/unified-ai-fallback"
 
-import { fetchShillerCAPEWithGrok } from '@/lib/grok-market-data' // Kept Grok for now as a fallback
+import { fetchShillerCAPEWithGrok } from "@/lib/grok-market-data" // Kept Grok for now as a fallback
 
 interface DataSourceStatus {
   live: boolean
@@ -49,30 +48,29 @@ export async function GET() {
   try {
     console.log("[v0] CCPI GET: Starting...")
 
-    // Fetch market data
     console.log("[v0] CCPI GET: Fetching market data...")
     const data = await fetchMarketData()
     console.log("[v0] CCPI GET: Market data fetched successfully")
 
     // Compute 4 new pillar scores
     console.log("[v0] CCPI GET: Computing pillars...")
-    const momentum = await computeMomentumPillar(data)      // NEW: Pillar 1 - Momentum & Technical (40%)
+    const momentum = await computeMomentumPillar(data) // NEW: Pillar 1 - Momentum & Technical (40%)
     console.log("[v0] CCPI GET: Momentum pillar computed:", momentum)
 
     const riskAppetite = await computeRiskAppetitePillar(data) // NEW: Pillar 2 - Risk Appetite (30%)
     console.log("[v0] CCPI GET: Risk appetite pillar computed:", riskAppetite)
 
-    const valuation = await computeValuationPillar(data)    // NEW: Pillar 3 - Valuation (20%)
+    const valuation = await computeValuationPillar(data) // NEW: Pillar 3 - Valuation (20%)
     console.log("[v0] CCPI GET: Valuation pillar computed:", valuation)
 
-    const macro = await computeMacroPillar(data)           // NEW: Pillar 4 - Macro (10%)
+    const macro = await computeMacroPillar(data) // NEW: Pillar 4 - Macro (10%)
     console.log("[v0] CCPI GET: Macro pillar computed:", macro)
 
-    let baseCCPI = Math.round(
-      momentum * 0.35 +      // Updated from 0.40 to 0.35
-      riskAppetite * 0.30 +
-      valuation * 0.15 +     // Updated from 0.20 to 0.15
-      macro * 0.20           // Updated from 0.10 to 0.20
+    const baseCCPI = Math.round(
+      momentum * 0.35 + // Updated from 0.40 to 0.35
+        riskAppetite * 0.3 +
+        valuation * 0.15 + // Updated from 0.20 to 0.15
+        macro * 0.2, // Updated from 0.10 to 0.20
     )
 
     const crashAmplifiers = calculateCrashAmplifiers(data)
@@ -102,11 +100,17 @@ export async function GET() {
     console.log("[v0] CCPI GET: Playbook retrieved")
 
     console.log("[v0] CCPI GET: Generating summary...")
-    const summary = generateWeeklySummary(finalCCPI, confidence, regime, { momentum, riskAppetite, valuation, macro }, data, canaries)
+    const summary = generateWeeklySummary(
+      finalCCPI,
+      confidence,
+      regime,
+      { momentum, riskAppetite, valuation, macro },
+      data,
+      canaries,
+    )
     console.log("[v0] CCPI GET: Summary generated")
 
-    console.log("[v0] CCPI GET: Returning response...")
-    return NextResponse.json({
+    const response = {
       ccpi: finalCCPI,
       baseCCPI,
       crashAmplifiers: crashAmplifiers.bonuses,
@@ -117,10 +121,10 @@ export async function GET() {
       playbook,
       summary,
       pillars: {
-        momentum,        // Pillar 1: 40% weight
-        riskAppetite,   // Pillar 2: 30% weight
-        valuation,      // Pillar 3: 20% weight
-        macro           // Pillar 4: 10% weight
+        momentum,
+        riskAppetite,
+        valuation,
+        macro,
       },
       indicators: {
         // Technical & Price Action
@@ -184,35 +188,50 @@ export async function GET() {
         qqqPE: data.qqqPE,
         mag7Concentration: data.mag7Concentration,
         shillerCAPE: data.shillerCAPE,
-        equityRiskPremium: data.equityRiskPremium
+        equityRiskPremium: data.equityRiskPremium,
       },
       canaries,
-      activeCanaries: canaries.filter(c => c.severity === 'high' || c.severity === 'medium').length,
+      activeCanaries: canaries.filter((c) => c.severity === "high" || c.severity === "medium").length,
       totalIndicators: 38,
       apiStatus: data.apiStatus,
-      timestamp: new Date().toISOString()
-    })
+      timestamp: new Date().toISOString(),
+      cachedAt: new Date().toISOString(), // Added cache timestamp
+    }
+
+    try {
+      await fetch(new URL("/api/ccpi/cache", process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(response),
+      })
+    } catch (cacheError) {
+      console.warn("[v0] Failed to cache CCPI data:", cacheError)
+      // Don't fail the request if caching fails
+    }
+
+    console.log("[v0] CCPI GET: Returning response...")
+    return NextResponse.json(response)
   } catch (error) {
     console.error("[v0] CCPI GET Error:", error)
     return NextResponse.json(
       { error: "Internal server error", details: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }
 
 async function fetchMarketData() {
   const apiStatus: APIStatusTracker = {
-    technical: { live: false, source: 'baseline', lastUpdated: new Date().toISOString() },
-    vixTerm: { live: false, source: 'baseline', lastUpdated: new Date().toISOString() },
-    fred: { live: false, source: 'baseline', lastUpdated: new Date().toISOString() },
-    alphaVantage: { live: false, source: 'baseline', lastUpdated: new Date().toISOString() },
-    apify: { live: false, source: 'baseline', lastUpdated: new Date().toISOString() },
-    fearGreed: { live: false, source: 'baseline', lastUpdated: new Date().toISOString() },
-    buffett: { live: false, source: 'baseline', lastUpdated: new Date().toISOString() },
-    putCall: { live: false, source: 'baseline', lastUpdated: new Date().toISOString() },
-    aaii: { live: false, source: 'baseline', lastUpdated: new Date().toISOString() },
-    shortInterest: { live: false, source: 'baseline', lastUpdated: new Date().toISOString() }
+    technical: { live: false, source: "baseline", lastUpdated: new Date().toISOString() },
+    vixTerm: { live: false, source: "baseline", lastUpdated: new Date().toISOString() },
+    fred: { live: false, source: "baseline", lastUpdated: new Date().toISOString() },
+    alphaVantage: { live: false, source: "baseline", lastUpdated: new Date().toISOString() },
+    apify: { live: false, source: "baseline", lastUpdated: new Date().toISOString() },
+    fearGreed: { live: false, source: "baseline", lastUpdated: new Date().toISOString() },
+    buffett: { live: false, source: "baseline", lastUpdated: new Date().toISOString() },
+    putCall: { live: false, source: "baseline", lastUpdated: new Date().toISOString() },
+    aaii: { live: false, source: "baseline", lastUpdated: new Date().toISOString() },
+    shortInterest: { live: false, source: "baseline", lastUpdated: new Date().toISOString() },
   }
 
   const [
@@ -226,7 +245,7 @@ async function fetchMarketData() {
     vixResult,
     nvidiaPriceResult,
     soxIndexResult,
-    ismPMIResult
+    ismPMIResult,
   ] = await Promise.all([
     getShillerCAPE(),
     getShortInterest(),
@@ -238,7 +257,7 @@ async function fetchMarketData() {
     getVIX(),
     getNVIDIAPrice(),
     getSOXIndex(),
-    getISMPMI()
+    getISMPMI(),
   ])
 
   console.log("[v0] AI Fallback Summary:")
@@ -259,85 +278,99 @@ async function fetchMarketData() {
     fetchVIXTermStructure(),
     fetchFREDIndicators(),
     fetchAlphaVantageIndicators(),
-    fetchApifyYahooFinanceUtil('SPY'),
-    fetchApifyYahooFinanceUtil('QQQ'),
+    fetchApifyYahooFinanceUtil("SPY"),
+    fetchApifyYahooFinanceUtil("QQQ"),
     fetchAAIISentiment(),
     scrapeBuffettIndicator(),
     scrapePutCallRatio(),
     scrapeAAIISentiment(),
-    scrapeShortInterest()
+    scrapeShortInterest(),
   ])
 
-  const qqqData = results[0].status === 'fulfilled' ? results[0].value : null
-  const vixTermData = results[1].status === 'fulfilled' ? results[1].value : null
-  const fredData = results[2].status === 'fulfilled' ? results[2].value : null
-  const alphaVantageData = results[3].status === 'fulfilled' ? results[3].value : null
-  const apifyData = results[4].status === 'fulfilled' ? results[4].value : null
-  const qqqFundamentals = results[5].status === 'fulfilled' ? results[5].value : null
-  const sentimentData = results[6].status === 'fulfilled' ? results[6].value : null
-  const buffettData = results[7].status === 'fulfilled' ? results[7].value : { ratio: buffettResult.value, status: buffettResult.source }
-  const putCallData = results[8].status === 'fulfilled' ? results[8].value : { ratio: putCallResult.value, status: putCallResult.source }
-  const aaiData = results[9].status === 'fulfilled' ? results[9].value : { bullish: aaiiBullishResult.value, bearish: 30, neutral: 35, spread: 5, status: aaiiBullishResult.source }
-  const shortInterestData = results[10].status === 'fulfilled' ? results[10].value : { spyShortRatio: shortInterestResult.value, status: shortInterestResult.source }
+  const qqqData = results[0].status === "fulfilled" ? results[0].value : null
+  const vixTermData = results[1].status === "fulfilled" ? results[1].value : null
+  const fredData = results[2].status === "fulfilled" ? results[2].value : null
+  const alphaVantageData = results[3].status === "fulfilled" ? results[3].value : null
+  const apifyData = results[4].status === "fulfilled" ? results[4].value : null
+  const qqqFundamentals = results[5].status === "fulfilled" ? results[5].value : null
+  const sentimentData = results[6].status === "fulfilled" ? results[6].value : null
+  const buffettData =
+    results[7].status === "fulfilled" ? results[7].value : { ratio: buffettResult.value, status: buffettResult.source }
+  const putCallData =
+    results[8].status === "fulfilled" ? results[8].value : { ratio: putCallResult.value, status: putCallResult.source }
+  const aaiData =
+    results[9].status === "fulfilled"
+      ? results[9].value
+      : { bullish: aaiiBullishResult.value, bearish: 30, neutral: 35, spread: 5, status: aaiiBullishResult.source }
+  const shortInterestData =
+    results[10].status === "fulfilled"
+      ? results[10].value
+      : { spyShortRatio: shortInterestResult.value, status: shortInterestResult.source }
 
   apiStatus.technical = {
-    live: qqqData?.source === 'live',
-    source: qqqData?.source || 'baseline',
-    lastUpdated: new Date().toISOString()
+    live: qqqData?.source === "live",
+    source: qqqData?.source || "baseline",
+    lastUpdated: new Date().toISOString(),
   }
 
   apiStatus.vixTerm = {
-    live: vixTermData?.source === 'live',
+    live: vixTermData?.source === "live",
     source: vixTermData?.source || vixResult.source,
-    lastUpdated: new Date().toISOString()
+    lastUpdated: new Date().toISOString(),
   }
 
   apiStatus.fred = {
-    live: results[2].status === 'fulfilled',
-    source: results[2].status === 'fulfilled' ? 'FRED API' : ismPMIResult.source,
-    lastUpdated: new Date().toISOString()
+    live: results[2].status === "fulfilled",
+    source: results[2].status === "fulfilled" ? "FRED API" : ismPMIResult.source,
+    lastUpdated: new Date().toISOString(),
   }
 
   apiStatus.alphaVantage = {
-    live: results[3].status === 'fulfilled',
-    source: results[3].status === 'fulfilled' ? 'Alpha Vantage API' : `${nvidiaPriceResult.source} / ${soxIndexResult.source}`,
-    lastUpdated: new Date().toISOString()
+    live: results[3].status === "fulfilled",
+    source:
+      results[3].status === "fulfilled"
+        ? "Alpha Vantage API"
+        : `${nvidiaPriceResult.source} / ${soxIndexResult.source}`,
+    lastUpdated: new Date().toISOString(),
   }
 
   apiStatus.apify = {
-    live: apifyData?.dataSource && !apifyData.dataSource.includes('baseline'),
-    source: apifyData?.dataSource || 'baseline',
-    lastUpdated: new Date().toISOString()
+    live: apifyData?.dataSource && !apifyData.dataSource.includes("baseline"),
+    source: apifyData?.dataSource || "baseline",
+    lastUpdated: new Date().toISOString(),
   }
 
   apiStatus.fearGreed = {
-    live: sentimentData?.dataSource && !sentimentData.dataSource.includes('baseline') && !sentimentData.dataSource.includes('failed'),
-    source: sentimentData?.dataSource || 'baseline',
-    lastUpdated: new Date().toISOString()
+    live:
+      sentimentData?.dataSource &&
+      !sentimentData.dataSource.includes("baseline") &&
+      !sentimentData.dataSource.includes("failed"),
+    source: sentimentData?.dataSource || "baseline",
+    lastUpdated: new Date().toISOString(),
   }
 
   apiStatus.buffett = {
-    live: buffettData.status === 'live',
-    source: buffettData.status === 'live' ? 'ScrapingBee' : buffettResult.source,
-    lastUpdated: new Date().toISOString()
+    live: buffettData.status === "live",
+    source: buffettData.status === "live" ? "ScrapingBee" : buffettResult.source,
+    lastUpdated: new Date().toISOString(),
   }
 
   apiStatus.putCall = {
-    live: putCallData.status === 'live',
-    source: putCallData.status === 'live' ? 'ScrapingBee' : putCallResult.source,
-    lastUpdated: new Date().toISOString()
+    live: putCallData.status === "live",
+    source: putCallData.status === "live" ? "ScrapingBee" : putCallResult.source,
+    lastUpdated: new Date().toISOString(),
   }
 
   apiStatus.aaii = {
-    live: aaiData.status === 'live',
-    source: aaiData.status === 'live' ? 'ScrapingBee' : aaiiBullishResult.source,
-    lastUpdated: new Date().toISOString()
+    live: aaiData.status === "live",
+    source: aaiData.status === "live" ? "ScrapingBee" : aaiiBullishResult.source,
+    lastUpdated: new Date().toISOString(),
   }
 
   apiStatus.shortInterest = {
-    live: shortInterestData.status === 'live',
-    source: shortInterestData.status === 'live' ? 'ScrapingBee' : shortInterestResult.source,
-    lastUpdated: new Date().toISOString()
+    live: shortInterestData.status === "live",
+    source: shortInterestData.status === "live" ? "ScrapingBee" : shortInterestResult.source,
+    lastUpdated: new Date().toISOString(),
   }
 
   return {
@@ -406,7 +439,7 @@ async function fetchMarketData() {
     ismPMI: ismPMIResult.value,
     fedReverseRepo: fredData?.fedReverseRepo || 450,
 
-    apiStatus
+    apiStatus,
   }
 }
 
@@ -429,31 +462,42 @@ async function fetchFREDIndicators() {
       ismPMI: 48,
       fedReverseRepo: 450,
       shillerCAPE: 30,
-      yieldCurve10Y: 4.5
+      yieldCurve10Y: 4.5,
     }
   }
 
   try {
-    const baseUrl = 'https://api.stlouisfed.org/fred/series/observations'
+    const baseUrl = "https://api.stlouisfed.org/fred/series/observations"
 
-    const [
-      fedFundsRes, junkSpreadRes, yieldCurveRes, debtToGDPRes, tedSpreadRes,
-      dxyRes, rrpRes, treasury10YRes
-    ] = await Promise.all([
-      fetch(`${baseUrl}?series_id=DFF&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
-      fetch(`${baseUrl}?series_id=BAMLH0A0HYM2&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
-      fetch(`${baseUrl}?series_id=T10Y2Y&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
-      fetch(`${baseUrl}?series_id=GFDEGDQ188S&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
-      fetch(`${baseUrl}?series_id=TEDRATE&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
-      fetch(`${baseUrl}?series_id=DTWEXBGS&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
-      fetch(`${baseUrl}?series_id=RRPONTSYD&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) }),
-      fetch(`${baseUrl}?series_id=DGS10&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, { signal: AbortSignal.timeout(10000) })
-    ])
+    const [fedFundsRes, junkSpreadRes, yieldCurveRes, debtToGDPRes, tedSpreadRes, dxyRes, rrpRes, treasury10YRes] =
+      await Promise.all([
+        fetch(`${baseUrl}?series_id=DFF&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
+          signal: AbortSignal.timeout(10000),
+        }),
+        fetch(`${baseUrl}?series_id=BAMLH0A0HYM2&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
+          signal: AbortSignal.timeout(10000),
+        }),
+        fetch(`${baseUrl}?series_id=T10Y2Y&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
+          signal: AbortSignal.timeout(10000),
+        }),
+        fetch(`${baseUrl}?series_id=GFDEGDQ188S&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
+          signal: AbortSignal.timeout(10000),
+        }),
+        fetch(`${baseUrl}?series_id=TEDRATE&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
+          signal: AbortSignal.timeout(10000),
+        }),
+        fetch(`${baseUrl}?series_id=DTWEXBGS&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
+          signal: AbortSignal.timeout(10000),
+        }),
+        fetch(`${baseUrl}?series_id=RRPONTSYD&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
+          signal: AbortSignal.timeout(10000),
+        }),
+        fetch(`${baseUrl}?series_id=DGS10&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
+          signal: AbortSignal.timeout(10000),
+        }),
+      ])
 
-    const [
-      fedFunds, junkSpread, yieldCurve, debtToGDP, tedSpread,
-      dxy, rrp, treasury10Y
-    ] = await Promise.all([
+    const [fedFunds, junkSpread, yieldCurve, debtToGDP, tedSpread, dxy, rrp, treasury10Y] = await Promise.all([
       fedFundsRes.json(),
       junkSpreadRes.json(),
       yieldCurveRes.json(),
@@ -461,23 +505,23 @@ async function fetchFREDIndicators() {
       tedSpreadRes.json(),
       dxyRes.json(),
       rrpRes.json(),
-      treasury10YRes.json()
+      treasury10YRes.json(),
     ])
 
     console.log("[v0] FRED: Attempting to fetch Shiller CAPE with Grok...")
     const shillerCAPE = await fetchShillerCAPEWithGrok()
 
     return {
-      fedFundsRate: parseFloat(fedFunds.observations?.[0]?.value || '5.33'),
-      junkSpread: parseFloat(junkSpread.observations?.[0]?.value || '3.5'),
-      yieldCurve: parseFloat(yieldCurve.observations?.[0]?.value || '0.25'),
-      debtToGDP: parseFloat(debtToGDP.observations?.[0]?.value || '123'),
-      tedSpread: parseFloat(tedSpread.observations?.[0]?.value || '0.25'),
-      dxyIndex: parseFloat(dxy.observations?.[0]?.value || '103'),
+      fedFundsRate: Number.parseFloat(fedFunds.observations?.[0]?.value || "5.33"),
+      junkSpread: Number.parseFloat(junkSpread.observations?.[0]?.value || "3.5"),
+      yieldCurve: Number.parseFloat(yieldCurve.observations?.[0]?.value || "0.25"),
+      debtToGDP: Number.parseFloat(debtToGDP.observations?.[0]?.value || "123"),
+      tedSpread: Number.parseFloat(tedSpread.observations?.[0]?.value || "0.25"),
+      dxyIndex: Number.parseFloat(dxy.observations?.[0]?.value || "103"),
       ismPMI: 48, // Will be overridden by AI fallback
-      fedReverseRepo: parseFloat(rrp.observations?.[0]?.value || '450'),
+      fedReverseRepo: Number.parseFloat(rrp.observations?.[0]?.value || "450"),
       shillerCAPE,
-      yieldCurve10Y: parseFloat(treasury10Y.observations?.[0]?.value || '4.5')
+      yieldCurve10Y: Number.parseFloat(treasury10Y.observations?.[0]?.value || "4.5"),
     }
   } catch (error) {
     console.error("[v0] FRED API error:", error instanceof Error ? error.message : String(error))
@@ -493,7 +537,7 @@ async function fetchFREDIndicators() {
       ismPMI: 48,
       fedReverseRepo: 450,
       shillerCAPE,
-      yieldCurve10Y: 4.5
+      yieldCurve10Y: 4.5,
     }
   }
 }
@@ -512,20 +556,36 @@ async function fetchAlphaVantageIndicators() {
       nvidiaPrice: 800,
       nvidiaMomentum: 50,
       soxIndex: 5000,
-      mag7Concentration: 55
+      mag7Concentration: 55,
     }
   }
 
   try {
     const [nvidiaRes, soxRes, aaplRes, msftRes, googlRes, amznRes, metaRes, tslaRes] = await Promise.all([
-      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=NVDA&apikey=${ALPHA_VANTAGE_API_KEY}`, { signal: AbortSignal.timeout(10000) }),
-      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=SOXX&apikey=${ALPHA_VANTAGE_API_KEY}`, { signal: AbortSignal.timeout(10000) }),
-      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AAPL&apikey=${ALPHA_VANTAGE_API_KEY}`, { signal: AbortSignal.timeout(10000) }),
-      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=MSFT&apikey=${ALPHA_VANTAGE_API_KEY}`, { signal: AbortSignal.timeout(10000) }),
-      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=GOOGL&apikey=${ALPHA_VANTAGE_API_KEY}`, { signal: AbortSignal.timeout(10000) }),
-      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AMZN&apikey=${ALPHA_VANTAGE_API_KEY}`, { signal: AbortSignal.timeout(10000) }),
-      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=META&apikey=${ALPHA_VANTAGE_API_KEY}`, { signal: AbortSignal.timeout(10000) }),
-      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=TSLA&apikey=${ALPHA_VANTAGE_API_KEY}`, { signal: AbortSignal.timeout(10000) })
+      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=NVDA&apikey=${ALPHA_VANTAGE_API_KEY}`, {
+        signal: AbortSignal.timeout(10000),
+      }),
+      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=SOXX&apikey=${ALPHA_VANTAGE_API_KEY}`, {
+        signal: AbortSignal.timeout(10000),
+      }),
+      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AAPL&apikey=${ALPHA_VANTAGE_API_KEY}`, {
+        signal: AbortSignal.timeout(10000),
+      }),
+      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=MSFT&apikey=${ALPHA_VANTAGE_API_KEY}`, {
+        signal: AbortSignal.timeout(10000),
+      }),
+      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=GOOGL&apikey=${ALPHA_VANTAGE_API_KEY}`, {
+        signal: AbortSignal.timeout(10000),
+      }),
+      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AMZN&apikey=${ALPHA_VANTAGE_API_KEY}`, {
+        signal: AbortSignal.timeout(10000),
+      }),
+      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=META&apikey=${ALPHA_VANTAGE_API_KEY}`, {
+        signal: AbortSignal.timeout(10000),
+      }),
+      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=TSLA&apikey=${ALPHA_VANTAGE_API_KEY}`, {
+        signal: AbortSignal.timeout(10000),
+      }),
     ])
 
     const [nvidiaData, soxData, aaplData, msftData, googlData, amznData, metaData, tslaData] = await Promise.all([
@@ -536,23 +596,26 @@ async function fetchAlphaVantageIndicators() {
       googlRes.json(),
       amznRes.json(),
       metaRes.json(),
-      tslaRes.json()
+      tslaRes.json(),
     ])
 
-    const nvidiaPrice = parseFloat(nvidiaData?.['Global Quote']?.['05. price'] || '800')
-    const nvidiaChange = parseFloat(nvidiaData?.['Global Quote']?.['09. change'] || '0')
+    const nvidiaPrice = Number.parseFloat(nvidiaData?.["Global Quote"]?.["05. price"] || "800")
+    const nvidiaChange = Number.parseFloat(nvidiaData?.["Global Quote"]?.["09. change"] || "0")
     const nvidiaMomentum = nvidiaChange > 0 ? 100 : 0
-    const soxIndex = parseFloat(soxData?.['Global Quote']?.['05. price'] || '5000')
+    const soxIndex = Number.parseFloat(soxData?.["Global Quote"]?.["05. price"] || "5000")
 
     // This is a proxy based on stock price strength
-    const mag7Avg = [aaplData, msftData, googlData, amznData, metaData, tslaData, nvidiaData]
-      .map(d => parseFloat(d?.['Global Quote']?.['10. change percent']?.replace('%', '') || '0'))
-      .reduce((a, b) => a + b, 0) / 7
+    const mag7Avg =
+      [aaplData, msftData, googlData, amznData, metaData, tslaData, nvidiaData]
+        .map((d) => Number.parseFloat(d?.["Global Quote"]?.["10. change percent"]?.replace("%", "") || "0"))
+        .reduce((a, b) => a + b, 0) / 7
 
     // Higher = more concentrated (using simplified proxy)
     const mag7Concentration = 55 + (mag7Avg > 0 ? 5 : -5)
 
-    console.log(`[v0] Alpha Vantage Phase 2: NVDA=${nvidiaPrice}, SOX=${soxIndex}, Mag7=${mag7Concentration.toFixed(1)}%`)
+    console.log(
+      `[v0] Alpha Vantage Phase 2: NVDA=${nvidiaPrice}, SOX=${soxIndex}, Mag7=${mag7Concentration.toFixed(1)}%`,
+    )
 
     return {
       vix: 18,
@@ -564,7 +627,7 @@ async function fetchAlphaVantageIndicators() {
       nvidiaPrice,
       nvidiaMomentum,
       soxIndex,
-      mag7Concentration
+      mag7Concentration,
     }
   } catch (error) {
     console.error("[v0] Alpha Vantage error:", error)
@@ -578,7 +641,7 @@ async function fetchAlphaVantageIndicators() {
       nvidiaPrice: 800,
       nvidiaMomentum: 50,
       soxIndex: 5000,
-      mag7Concentration: 55
+      mag7Concentration: 55,
     }
   }
 }
@@ -587,7 +650,7 @@ async function fetchApifyYahooFinance() {
   try {
     console.log("[v0] CCPI: Attempting to fetch from Apify Yahoo Finance...")
 
-    const result = await fetchApifyYahooFinanceUtil('SPY')
+    const result = await fetchApifyYahooFinanceUtil("SPY")
 
     console.log(`[v0] CCPI: Apify data source: ${result.dataSource}`)
     if (result.actorUsed) {
@@ -599,8 +662,8 @@ async function fetchApifyYahooFinance() {
       return {
         spxPE: 22.5,
         spxPS: 2.8,
-        dataSource: result.dataSource || 'baseline-apify-no-data',
-        etfFlows: -2.0
+        dataSource: result.dataSource || "baseline-apify-no-data",
+        etfFlows: -2.0,
       }
     }
 
@@ -609,33 +672,33 @@ async function fetchApifyYahooFinance() {
     return {
       spxPE: data.forwardPE || data.trailingPE || 22.5,
       spxPS: data.priceToSales || 2.8,
-      dataSource: result.dataSource || 'apify-live',
+      dataSource: result.dataSource || "apify-live",
       actorUsed: result.actorUsed,
       etfFlows: data.netInflows || -2.0,
       marketCap: data.marketCap,
       volume: data.volume,
-      price: data.currentPrice
+      price: data.currentPrice,
     }
   } catch (error) {
     console.error("[v0] CCPI: Apify fetch error:", error instanceof Error ? error.message : String(error))
     return {
       spxPE: 22.5,
       spxPS: 2.8,
-      dataSource: 'baseline-apify-error',
-      etfFlows: -2.0
+      dataSource: "baseline-apify-error",
+      etfFlows: -2.0,
     }
   }
 }
 
 async function fetchAAIISentiment() {
   try {
-    const fgRes = await fetch('https://api.alternative.me/fng/?limit=1', { signal: AbortSignal.timeout(10000) })
+    const fgRes = await fetch("https://api.alternative.me/fng/?limit=1", { signal: AbortSignal.timeout(10000) })
     if (fgRes.ok) {
       const fgData = await fgRes.json()
       if (fgData?.data?.[0]) {
         return {
-          fearGreed: parseInt(fgData.data[0].value),
-          dataSource: 'fear-greed-live'
+          fearGreed: Number.parseInt(fgData.data[0].value),
+          dataSource: "fear-greed-live",
         }
       }
     }
@@ -645,12 +708,11 @@ async function fetchAAIISentiment() {
 
   return {
     fearGreed: null,
-    dataSource: 'baseline'
+    dataSource: "baseline",
   }
 }
 
 async function computeMomentumPillar(data: Awaited<ReturnType<typeof fetchMarketData>>): Promise<number> {
-
   let totalScore = 0
   const indicators = []
 
@@ -664,7 +726,7 @@ async function computeMomentumPillar(data: Awaited<ReturnType<typeof fetchMarket
     return 0 // Healthy range = low risk
   })()
   totalScore += nvidiaScore
-  indicators.push({ name: 'NVIDIA Momentum', score: nvidiaScore, weight: 6 })
+  indicators.push({ name: "NVIDIA Momentum", score: nvidiaScore, weight: 6 })
 
   // Indicator 2: SOX Semiconductor Index (Weight: 6/100)
   const soxScore = (() => {
@@ -675,7 +737,7 @@ async function computeMomentumPillar(data: Awaited<ReturnType<typeof fetchMarket
     return 0 // Strong chips = low risk
   })()
   totalScore += soxScore
-  indicators.push({ name: 'SOX Index', score: soxScore, weight: 6 })
+  indicators.push({ name: "SOX Index", score: soxScore, weight: 6 })
 
   // Indicator 3: QQQ Daily Return (Weight: 8/100) - 5× downside amplifier
   const qqqReturnScore = (() => {
@@ -687,7 +749,7 @@ async function computeMomentumPillar(data: Awaited<ReturnType<typeof fetchMarket
     return 0 // Flat or up = low risk
   })()
   totalScore += qqqReturnScore
-  indicators.push({ name: 'QQQ Daily Return', score: qqqReturnScore, weight: 8 })
+  indicators.push({ name: "QQQ Daily Return", score: qqqReturnScore, weight: 8 })
 
   // Indicator 4: QQQ Consecutive Down Days (Weight: 5/100)
   const consecDownScore = (() => {
@@ -697,7 +759,7 @@ async function computeMomentumPillar(data: Awaited<ReturnType<typeof fetchMarket
     return 0
   })()
   totalScore += consecDownScore
-  indicators.push({ name: 'QQQ Consecutive Down Days', score: consecDownScore, weight: 5 })
+  indicators.push({ name: "QQQ Consecutive Down Days", score: consecDownScore, weight: 5 })
 
   // Indicator 5: QQQ Below 20-Day SMA (Weight: 5/100)
   const sma20Score = (() => {
@@ -707,7 +769,7 @@ async function computeMomentumPillar(data: Awaited<ReturnType<typeof fetchMarket
     return 0
   })()
   totalScore += sma20Score
-  indicators.push({ name: 'QQQ Below SMA20', score: sma20Score, weight: 5 })
+  indicators.push({ name: "QQQ Below SMA20", score: sma20Score, weight: 5 })
 
   // Indicator 6: QQQ Below 50-Day SMA (Weight: 7/100)
   const sma50Score = (() => {
@@ -717,7 +779,7 @@ async function computeMomentumPillar(data: Awaited<ReturnType<typeof fetchMarket
     return 0
   })()
   totalScore += sma50Score
-  indicators.push({ name: 'QQQ Below SMA50', score: sma50Score, weight: 7 })
+  indicators.push({ name: "QQQ Below SMA50", score: sma50Score, weight: 7 })
 
   // Indicator 7: QQQ Below 200-Day SMA (Weight: 10/100)
   const sma200Score = (() => {
@@ -727,7 +789,7 @@ async function computeMomentumPillar(data: Awaited<ReturnType<typeof fetchMarket
     return 0
   })()
   totalScore += sma200Score
-  indicators.push({ name: 'QQQ Below SMA200', score: sma200Score, weight: 10 })
+  indicators.push({ name: "QQQ Below SMA200", score: sma200Score, weight: 10 })
 
   // Indicator 8: QQQ Below Bollinger Band (Weight: 6/100)
   const bollingerScore = (() => {
@@ -737,7 +799,7 @@ async function computeMomentumPillar(data: Awaited<ReturnType<typeof fetchMarket
     return 0
   })()
   totalScore += bollingerScore
-  indicators.push({ name: 'QQQ Bollinger Band', score: bollingerScore, weight: 6 })
+  indicators.push({ name: "QQQ Bollinger Band", score: bollingerScore, weight: 6 })
 
   // Indicator 9: VIX Fear Gauge (Weight: 9/100)
   const vixScore = (() => {
@@ -748,7 +810,7 @@ async function computeMomentumPillar(data: Awaited<ReturnType<typeof fetchMarket
     return 0
   })()
   totalScore += vixScore
-  indicators.push({ name: 'VIX', score: vixScore, weight: 9 })
+  indicators.push({ name: "VIX", score: vixScore, weight: 9 })
 
   // Indicator 10: VXN Nasdaq Volatility (Weight: 7/100)
   const vxnScore = (() => {
@@ -758,7 +820,7 @@ async function computeMomentumPillar(data: Awaited<ReturnType<typeof fetchMarket
     return 0
   })()
   totalScore += vxnScore
-  indicators.push({ name: 'VXN', score: vxnScore, weight: 7 })
+  indicators.push({ name: "VXN", score: vxnScore, weight: 7 })
 
   // Indicator 11: RVX Russell 2000 Volatility (Weight: 5/100)
   const rvxScore = (() => {
@@ -767,7 +829,7 @@ async function computeMomentumPillar(data: Awaited<ReturnType<typeof fetchMarket
     return 0
   })()
   totalScore += rvxScore
-  indicators.push({ name: 'RVX', score: rvxScore, weight: 5 })
+  indicators.push({ name: "RVX", score: rvxScore, weight: 5 })
 
   // Indicator 12: VIX Term Structure (Weight: 6/100)
   const vixTermScore = (() => {
@@ -776,7 +838,7 @@ async function computeMomentumPillar(data: Awaited<ReturnType<typeof fetchMarket
     return 0
   })()
   totalScore += vixTermScore
-  indicators.push({ name: 'VIX Term Structure', score: vixTermScore, weight: 6 })
+  indicators.push({ name: "VIX Term Structure", score: vixTermScore, weight: 6 })
 
   // Indicator 13: ATR Average True Range (Weight: 5/100)
   const atrScore = (() => {
@@ -786,17 +848,17 @@ async function computeMomentumPillar(data: Awaited<ReturnType<typeof fetchMarket
     return 0
   })()
   totalScore += atrScore
-  indicators.push({ name: 'ATR', score: atrScore, weight: 5 })
+  indicators.push({ name: "ATR", score: atrScore, weight: 5 })
 
   // Indicator 14: LTV Long-term Volatility (Weight: 5/100)
   const ltvScore = (() => {
-    if (data.ltv > 0.20) return 5
+    if (data.ltv > 0.2) return 5
     if (data.ltv > 0.15) return 3
     if (data.ltv > 0.12) return 1
     return 0
   })()
   totalScore += ltvScore
-  indicators.push({ name: 'LTV', score: ltvScore, weight: 5 })
+  indicators.push({ name: "LTV", score: ltvScore, weight: 5 })
 
   // Indicator 15: Bullish Percent Index (Weight: 5/100)
   const bullishPercentScore = (() => {
@@ -807,7 +869,7 @@ async function computeMomentumPillar(data: Awaited<ReturnType<typeof fetchMarket
     return 0
   })()
   totalScore += bullishPercentScore
-  indicators.push({ name: 'Bullish Percent', score: bullishPercentScore, weight: 5 })
+  indicators.push({ name: "Bullish Percent", score: bullishPercentScore, weight: 5 })
 
   // Indicator 16: Yield Curve (Weight: 5/100)
   const yieldCurveScore = (() => {
@@ -818,7 +880,7 @@ async function computeMomentumPillar(data: Awaited<ReturnType<typeof fetchMarket
     return 0
   })()
   totalScore += yieldCurveScore
-  indicators.push({ name: 'Yield Curve', score: yieldCurveScore, weight: 5 })
+  indicators.push({ name: "Yield Curve", score: yieldCurveScore, weight: 5 })
 
   console.log("[v0] Pillar 1 - Momentum & Technical (35% weight):", totalScore)
   console.log("[v0] Indicator Breakdown:", indicators)
@@ -836,98 +898,98 @@ async function computeRiskAppetitePillar(data: Awaited<ReturnType<typeof fetchMa
   // Indicator 1: Put/Call Ratio (Weight: 18/100)
   const putCallScore = (() => {
     const ratio = data.putCallRatio
-    if (ratio < 0.6) return 18  // Extreme complacency
+    if (ratio < 0.6) return 18 // Extreme complacency
     if (ratio < 0.7) return 14
     if (ratio < 0.9) return 10
-    if (ratio > 1.3) return 8   // Extreme fear (contrarian)
+    if (ratio > 1.3) return 8 // Extreme fear (contrarian)
     if (ratio > 1.1) return 4
     return 0
   })()
   totalScore += putCallScore
-  indicators.push({ name: 'Put/Call Ratio', score: putCallScore, weight: 18 })
+  indicators.push({ name: "Put/Call Ratio", score: putCallScore, weight: 18 })
 
   // Indicator 2: Fear & Greed Index (Weight: 15/100)
   const fearGreedScore = (() => {
     if (data.fearGreedIndex === null) return 0
-    if (data.fearGreedIndex > 80) return 15  // Extreme greed
+    if (data.fearGreedIndex > 80) return 15 // Extreme greed
     if (data.fearGreedIndex > 70) return 12
     if (data.fearGreedIndex > 60) return 8
-    if (data.fearGreedIndex < 20) return 8   // Extreme fear (contrarian)
+    if (data.fearGreedIndex < 20) return 8 // Extreme fear (contrarian)
     if (data.fearGreedIndex < 30) return 4
     return 0
   })()
   totalScore += fearGreedScore
-  indicators.push({ name: 'Fear & Greed Index', score: fearGreedScore, weight: 15 })
+  indicators.push({ name: "Fear & Greed Index", score: fearGreedScore, weight: 15 })
 
   // Indicator 3: AAII Bullish Sentiment (Weight: 16/100)
   const aaiiScore = (() => {
     const bullish = data.aaiiBullish || 35
-    if (bullish > 55) return 16  // Retail euphoria
+    if (bullish > 55) return 16 // Retail euphoria
     if (bullish > 50) return 12
     if (bullish > 45) return 8
-    if (bullish < 25) return 6   // Extreme pessimism (contrarian)
+    if (bullish < 25) return 6 // Extreme pessimism (contrarian)
     if (bullish < 30) return 3
     return 0
   })()
   totalScore += aaiiScore
-  indicators.push({ name: 'AAII Bullish', score: aaiiScore, weight: 16 })
+  indicators.push({ name: "AAII Bullish", score: aaiiScore, weight: 16 })
 
   // Indicator 4: SPY Short Interest Ratio (Weight: 13/100)
   const shortInterestScore = (() => {
     const short = data.shortInterest || 2.5
-    if (short < 1.5) return 13   // Extreme complacency
+    if (short < 1.5) return 13 // Extreme complacency
     if (short < 2.0) return 10
     if (short < 3.0) return 6
-    if (short > 8.0) return 8    // High positioning (contrarian)
+    if (short > 8.0) return 8 // High positioning (contrarian)
     if (short > 6.0) return 4
     return 0
   })()
   totalScore += shortInterestScore
-  indicators.push({ name: 'Short Interest', score: shortInterestScore, weight: 13 })
+  indicators.push({ name: "Short Interest", score: shortInterestScore, weight: 13 })
 
   // Indicator 5: ATR - Average True Range (Weight: 10/100)
   const atrScore = (() => {
-    if (data.atr > 50) return 10  // Extreme volatility
+    if (data.atr > 50) return 10 // Extreme volatility
     if (data.atr > 40) return 7
     if (data.atr > 30) return 4
-    if (data.atr < 20) return 2   // Calm before storm
+    if (data.atr < 20) return 2 // Calm before storm
     return 0
   })()
   totalScore += atrScore
-  indicators.push({ name: 'ATR', score: atrScore, weight: 10 })
+  indicators.push({ name: "ATR", score: atrScore, weight: 10 })
 
   // Indicator 6: LTV - Long-term Volatility (Weight: 10/100)
   const ltvScore = (() => {
-    if (data.ltv > 0.20) return 10  // Sustained instability
+    if (data.ltv > 0.2) return 10 // Sustained instability
     if (data.ltv > 0.15) return 7
     if (data.ltv > 0.12) return 4
-    if (data.ltv < 0.08) return 2   // Complacency
+    if (data.ltv < 0.08) return 2 // Complacency
     return 0
   })()
   totalScore += ltvScore
-  indicators.push({ name: 'LTV', score: ltvScore, weight: 10 })
+  indicators.push({ name: "LTV", score: ltvScore, weight: 10 })
 
   // Indicator 7: Bullish Percent Index (Weight: 10/100)
   const bullishPercentScore = (() => {
-    if (data.bullishPercent > 70) return 10  // Overbought
+    if (data.bullishPercent > 70) return 10 // Overbought
     if (data.bullishPercent > 60) return 7
     if (data.bullishPercent > 55) return 4
-    if (data.bullishPercent < 30) return 4   // Oversold (contrarian)
+    if (data.bullishPercent < 30) return 4 // Oversold (contrarian)
     return 0
   })()
   totalScore += bullishPercentScore
-  indicators.push({ name: 'Bullish Percent', score: bullishPercentScore, weight: 10 })
+  indicators.push({ name: "Bullish Percent", score: bullishPercentScore, weight: 10 })
 
   // Indicator 8: Yield Curve (10Y-2Y) (Weight: 8/100)
   const yieldCurveScore = (() => {
-    if (data.yieldCurve < -1.0) return 8  // Deep inversion
+    if (data.yieldCurve < -1.0) return 8 // Deep inversion
     if (data.yieldCurve < -0.5) return 6
     if (data.yieldCurve < -0.2) return 4
     if (data.yieldCurve < 0) return 2
     return 0
   })()
   totalScore += yieldCurveScore
-  indicators.push({ name: 'Yield Curve', score: yieldCurveScore, weight: 8 })
+  indicators.push({ name: "Yield Curve", score: yieldCurveScore, weight: 8 })
 
   console.log("[v0] Pillar 2 - Risk Appetite & Volatility:", totalScore)
   console.log("[v0] Indicator Breakdown:", indicators)
@@ -937,88 +999,87 @@ async function computeRiskAppetitePillar(data: Awaited<ReturnType<typeof fetchMa
 }
 
 async function computeValuationPillar(data: Awaited<ReturnType<typeof fetchMarketData>>): Promise<number> {
-
   let totalScore = 0
   const indicators = []
 
   // Indicator 1: S&P 500 Forward P/E (Weight: 18/100)
   const spxPEScore = (() => {
-    if (data.spxPE > 30) return 18       // Extreme overvaluation
+    if (data.spxPE > 30) return 18 // Extreme overvaluation
     if (data.spxPE > 25) return 14
-    if (data.spxPE > 22) return 10       // Current: 22.5
+    if (data.spxPE > 22) return 10 // Current: 22.5
     if (data.spxPE > 18) return 6
     return 2
   })()
   totalScore += spxPEScore
-  indicators.push({ name: 'S&P 500 Forward P/E', score: spxPEScore, weight: 18 })
+  indicators.push({ name: "S&P 500 Forward P/E", score: spxPEScore, weight: 18 })
 
   // Indicator 2: S&P 500 Price-to-Sales (Weight: 12/100)
   const spxPSScore = (() => {
-    if (data.spxPS > 3.5) return 12      // Extreme
+    if (data.spxPS > 3.5) return 12 // Extreme
     if (data.spxPS > 3.0) return 10
-    if (data.spxPS > 2.5) return 7       // Current: 2.8
+    if (data.spxPS > 2.5) return 7 // Current: 2.8
     if (data.spxPS > 2.0) return 4
     return 0
   })()
   totalScore += spxPSScore
-  indicators.push({ name: 'S&P 500 Price-to-Sales', score: spxPSScore, weight: 12 })
+  indicators.push({ name: "S&P 500 Price-to-Sales", score: spxPSScore, weight: 12 })
 
   // Indicator 3: Buffett Indicator (Market Cap / GDP) (Weight: 16/100)
   const buffettScore = (() => {
     const buffett = data.buffettIndicator || 180
-    if (buffett > 200) return 16         // Danger: >200%
+    if (buffett > 200) return 16 // Danger: >200%
     if (buffett > 180) return 13
-    if (buffett > 150) return 9          // Warning: 150-180%
-    if (buffett > 120) return 5          // Fair: 120-150%
-    return 0                             // Undervalued: <120%
+    if (buffett > 150) return 9 // Warning: 150-180%
+    if (buffett > 120) return 5 // Fair: 120-150%
+    return 0 // Undervalued: <120%
   })()
   totalScore += buffettScore
-  indicators.push({ name: 'Buffett Indicator', score: buffettScore, weight: 16 })
+  indicators.push({ name: "Buffett Indicator", score: buffettScore, weight: 16 })
 
   // Indicator 4: QQQ Forward P/E (AI-Specific Valuation) (Weight: 16/100)
   const qqqPEScore = (() => {
-    if (data.qqqPE > 40) return 16       // Bubble territory
+    if (data.qqqPE > 40) return 16 // Bubble territory
     if (data.qqqPE > 35) return 13
     if (data.qqqPE > 30) return 10
-    if (data.qqqPE > 25) return 6        // Current: 25.8
+    if (data.qqqPE > 25) return 6 // Current: 25.8
     return 2
   })()
   totalScore += qqqPEScore
-  indicators.push({ name: 'QQQ Forward P/E', score: qqqPEScore, weight: 16 })
+  indicators.push({ name: "QQQ Forward P/E", score: qqqPEScore, weight: 16 })
 
   // Indicator 5: Magnificent 7 Concentration (Crash Contagion Risk) (Weight: 15/100)
   const mag7Score = (() => {
-    if (data.mag7Concentration > 65) return 15  // Extreme concentration
+    if (data.mag7Concentration > 65) return 15 // Extreme concentration
     if (data.mag7Concentration > 60) return 12
     if (data.mag7Concentration > 55) return 9
     if (data.mag7Concentration > 50) return 6
-    if (data.mag7Concentration > 45) return 3   // Current: 48.2%
+    if (data.mag7Concentration > 45) return 3 // Current: 48.2%
     return 0
   })()
   totalScore += mag7Score
-  indicators.push({ name: 'Magnificent 7 Concentration', score: mag7Score, weight: 15 })
+  indicators.push({ name: "Magnificent 7 Concentration", score: mag7Score, weight: 15 })
 
   // Indicator 6: Shiller CAPE Ratio (10-Year Cyclical Valuation) (Weight: 13/100)
   const shillerScore = (() => {
-    if (data.shillerCAPE > 35) return 13   // Historic overvaluation
-    if (data.shillerCAPE > 30) return 10   // Current: 32.4
+    if (data.shillerCAPE > 35) return 13 // Historic overvaluation
+    if (data.shillerCAPE > 30) return 10 // Current: 32.4
     if (data.shillerCAPE > 25) return 7
     if (data.shillerCAPE > 20) return 4
     return 0
   })()
   totalScore += shillerScore
-  indicators.push({ name: 'Shiller CAPE Ratio', score: shillerScore, weight: 13 })
+  indicators.push({ name: "Shiller CAPE Ratio", score: shillerScore, weight: 13 })
 
   // Indicator 7: Equity Risk Premium (Earnings Yield - 10Y Treasury) (Weight: 10/100)
   const erpScore = (() => {
-    if (data.equityRiskPremium < 1.5) return 10  // Severely overpriced
+    if (data.equityRiskPremium < 1.5) return 10 // Severely overpriced
     if (data.equityRiskPremium < 2.0) return 8
     if (data.equityRiskPremium < 3.0) return 5
     if (data.equityRiskPremium < 4.0) return 2
-    return 0  // Attractive: >4%
+    return 0 // Attractive: >4%
   })()
   totalScore += erpScore
-  indicators.push({ name: 'Equity Risk Premium', score: erpScore, weight: 10 })
+  indicators.push({ name: "Equity Risk Premium", score: erpScore, weight: 10 })
 
   console.log("[v0] Pillar 3 - Valuation & Market Structure:", totalScore)
   console.log("[v0] Indicator Breakdown:", indicators)
@@ -1033,40 +1094,40 @@ async function computeMacroPillar(data: Awaited<ReturnType<typeof fetchMarketDat
 
   // Indicator 1: TED Spread - Banking System Stress (Weight: 15/100)
   const tedSpreadScore = (() => {
-    if (data.tedSpread > 1.0) return 15     // Extreme banking stress
+    if (data.tedSpread > 1.0) return 15 // Extreme banking stress
     if (data.tedSpread > 0.75) return 12
-    if (data.tedSpread > 0.50) return 9
+    if (data.tedSpread > 0.5) return 9
     if (data.tedSpread > 0.35) return 5
     return 0
   })()
   totalScore += tedSpreadScore
-  indicators.push({ name: 'TED Spread', score: tedSpreadScore, weight: 15 })
+  indicators.push({ name: "TED Spread", score: tedSpreadScore, weight: 15 })
 
   // Indicator 2: US Dollar Index (DXY) - Tech Headwind (Weight: 14/100)
   const dxyScore = (() => {
-    if (data.dxyIndex > 115) return 14     // Very strong dollar hurts tech
+    if (data.dxyIndex > 115) return 14 // Very strong dollar hurts tech
     if (data.dxyIndex > 110) return 11
     if (data.dxyIndex > 105) return 7
     if (data.dxyIndex > 100) return 3
     return 0
   })()
   totalScore += dxyScore
-  indicators.push({ name: 'US Dollar Index', score: dxyScore, weight: 14 })
+  indicators.push({ name: "US Dollar Index", score: dxyScore, weight: 14 })
 
   // Indicator 3: ISM Manufacturing PMI - Economic Leading (Weight: 18/100)
   const ismScore = (() => {
-    if (data.ismPMI < 42) return 18        // Deep contraction
+    if (data.ismPMI < 42) return 18 // Deep contraction
     if (data.ismPMI < 46) return 14
-    if (data.ismPMI < 50) return 10        // Contraction
+    if (data.ismPMI < 50) return 10 // Contraction
     if (data.ismPMI < 52) return 4
     return 0
   })()
   totalScore += ismScore
-  indicators.push({ name: 'ISM Manufacturing PMI', score: ismScore, weight: 18 })
+  indicators.push({ name: "ISM Manufacturing PMI", score: ismScore, weight: 18 })
 
   // Indicator 4: Fed Funds Rate - Restrictive Policy (Weight: 17/100)
   const fedFundsScore = (() => {
-    if (data.fedFundsRate > 6.0) return 17   // Extremely restrictive
+    if (data.fedFundsRate > 6.0) return 17 // Extremely restrictive
     if (data.fedFundsRate > 5.5) return 14
     if (data.fedFundsRate > 5.0) return 10
     if (data.fedFundsRate > 4.5) return 7
@@ -1074,22 +1135,22 @@ async function computeMacroPillar(data: Awaited<ReturnType<typeof fetchMarketDat
     return 0
   })()
   totalScore += fedFundsScore
-  indicators.push({ name: 'Fed Funds Rate', score: fedFundsScore, weight: 17 })
+  indicators.push({ name: "Fed Funds Rate", score: fedFundsScore, weight: 17 })
 
   // Indicator 5: Fed Reverse Repo - Liquidity Conditions (Weight: 13/100)
   const rrpScore = (() => {
-    if (data.fedReverseRepo > 2000) return 13  // Extreme liquidity drain
+    if (data.fedReverseRepo > 2000) return 13 // Extreme liquidity drain
     if (data.fedReverseRepo > 1500) return 10
     if (data.fedReverseRepo > 1000) return 7
     if (data.fedReverseRepo > 500) return 3
     return 0
   })()
   totalScore += rrpScore
-  indicators.push({ name: 'Fed Reverse Repo', score: rrpScore, weight: 13 })
+  indicators.push({ name: "Fed Reverse Repo", score: rrpScore, weight: 13 })
 
   // Indicator 6: Junk Bond Spread - Credit Stress (Weight: 12/100)
   const junkSpreadScore = (() => {
-    if (data.junkSpread > 10) return 12     // Severe credit stress
+    if (data.junkSpread > 10) return 12 // Severe credit stress
     if (data.junkSpread > 8) return 10
     if (data.junkSpread > 6) return 7
     if (data.junkSpread > 5) return 4
@@ -1097,18 +1158,18 @@ async function computeMacroPillar(data: Awaited<ReturnType<typeof fetchMarketDat
     return 0
   })()
   totalScore += junkSpreadScore
-  indicators.push({ name: 'Junk Bond Spread', score: junkSpreadScore, weight: 12 })
+  indicators.push({ name: "Junk Bond Spread", score: junkSpreadScore, weight: 12 })
 
   // Indicator 7: US Debt-to-GDP Ratio - Fiscal Burden (Weight: 11/100)
   const debtScore = (() => {
-    if (data.debtToGDP > 130) return 11     // Fiscal crisis risk
+    if (data.debtToGDP > 130) return 11 // Fiscal crisis risk
     if (data.debtToGDP > 120) return 9
     if (data.debtToGDP > 110) return 6
     if (data.debtToGDP > 100) return 3
     return 0
   })()
   totalScore += debtScore
-  indicators.push({ name: 'US Debt-to-GDP', score: debtScore, weight: 11 })
+  indicators.push({ name: "US Debt-to-GDP", score: debtScore, weight: 11 })
 
   console.log("[v0] Pillar 4 - Macro (20% weight):", totalScore)
   console.log("[v0] Indicator Breakdown:", indicators)
@@ -1129,7 +1190,10 @@ function calculateCrashAmplifiers(data: Awaited<ReturnType<typeof fetchMarketDat
 
   // QQQ drops ≥9% in 1 day → +40 (replaces +25)
   else if (data.qqqDailyReturn <= -9) {
-    bonuses.push({ reason: `QQQ crashed ${Math.abs(data.qqqDailyReturn).toFixed(1)}% in one day (EXTREME)`, points: 40 })
+    bonuses.push({
+      reason: `QQQ crashed ${Math.abs(data.qqqDailyReturn).toFixed(1)}% in one day (EXTREME)`,
+      points: 40,
+    })
     totalBonus += 40
   }
 
@@ -1166,13 +1230,17 @@ function calculateCrashAmplifiers(data: Awaited<ReturnType<typeof fetchMarketDat
   return { bonuses, totalBonus }
 }
 
-function computeCertaintyScore(pillars: Record<string, number>, data: Awaited<ReturnType<typeof fetchMarketData>>, canaryCount: number): number {
+function computeCertaintyScore(
+  pillars: Record<string, number>,
+  data: Awaited<ReturnType<typeof fetchMarketData>>,
+  canaryCount: number,
+): number {
   const values = Object.values(pillars)
   const mean = values.reduce((a, b) => a + b, 0) / values.length
   const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length
   const stdDev = Math.sqrt(variance)
 
-  const varianceAlignment = Math.max(0, 100 - (stdDev * 3.0))
+  const varianceAlignment = Math.max(0, 100 - stdDev * 3.0)
   const canaryAgreement = Math.min(100, (canaryCount / 15) * 100)
 
   return Math.round(varianceAlignment * 0.7 + canaryAgreement * 0.3)
@@ -1200,8 +1268,8 @@ function getPlaybook(regime: ReturnType<typeof determineRegime>) {
       equities: "60-80%",
       defensive: "5-10%",
       cash: "10-20%",
-      alternatives: "5-10%"
-    }
+      alternatives: "5-10%",
+    },
   }
 }
 
@@ -1211,15 +1279,15 @@ function generateWeeklySummary(
   regime: ReturnType<typeof determineRegime>,
   pillars: Record<string, number>,
   data: Awaited<ReturnType<typeof fetchMarketData>>,
-  canaries: Array<{ signal: string; pillar: string; severity: "high" | "medium" | "low" }>
+  canaries: Array<{ signal: string; pillar: string; severity: "high" | "medium" | "low" }>,
 ) {
   return {
     headline: `CCPI at ${ccpi} with ${confidence}% confidence`,
     bullets: [
       `Momentum pillar at ${pillars.momentum}/100`,
       `Risk Appetite pillar at ${pillars.riskAppetite}/100`,
-      `${canaries.length} active warning signals`
-    ]
+      `${canaries.length} active warning signals`,
+    ],
   }
 }
 
@@ -1228,260 +1296,535 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
 
   // 1. QQQ Daily Return
   if (data.qqqDailyReturn <= -6) {
-    canaries.push({ signal: `QQQ crashed ${Math.abs(data.qqqDailyReturn).toFixed(1)}% - Momentum loss`, pillar: "Momentum & Technical", severity: "high" })
+    canaries.push({
+      signal: `QQQ crashed ${Math.abs(data.qqqDailyReturn).toFixed(1)}% - Momentum loss`,
+      pillar: "Momentum & Technical",
+      severity: "high",
+    })
   } else if (data.qqqDailyReturn <= -3) {
-    canaries.push({ signal: `QQQ dropped ${Math.abs(data.qqqDailyReturn).toFixed(1)}% - Sharp decline`, pillar: "Momentum & Technical", severity: "medium" })
+    canaries.push({
+      signal: `QQQ dropped ${Math.abs(data.qqqDailyReturn).toFixed(1)}% - Sharp decline`,
+      pillar: "Momentum & Technical",
+      severity: "medium",
+    })
   }
 
   // 2. QQQ Consecutive Down Days
   if (data.qqqConsecDown >= 5) {
-    canaries.push({ signal: `${data.qqqConsecDown} consecutive down days - Trend break`, pillar: "Momentum & Technical", severity: "high" })
+    canaries.push({
+      signal: `${data.qqqConsecDown} consecutive down days - Trend break`,
+      pillar: "Momentum & Technical",
+      severity: "high",
+    })
   } else if (data.qqqConsecDown >= 3) {
-    canaries.push({ signal: `${data.qqqConsecDown} consecutive down days`, pillar: "Momentum & Technical", severity: "medium" })
+    canaries.push({
+      signal: `${data.qqqConsecDown} consecutive down days`,
+      pillar: "Momentum & Technical",
+      severity: "medium",
+    })
   }
 
   // 3. QQQ Below 20-Day SMA
   if (data.qqqBelowSMA20 && data.qqqSMA20Proximity >= 100) {
-    canaries.push({ signal: "QQQ breached 20-day SMA - Short-term support lost", pillar: "Momentum & Technical", severity: "high" })
+    canaries.push({
+      signal: "QQQ breached 20-day SMA - Short-term support lost",
+      pillar: "Momentum & Technical",
+      severity: "high",
+    })
   } else if (data.qqqSMA20Proximity >= 50) {
-    canaries.push({ signal: `QQQ approaching 20-day SMA (${data.qqqSMA20Proximity.toFixed(0)}% proximity)`, pillar: "Momentum & Technical", severity: "medium" })
+    canaries.push({
+      signal: `QQQ approaching 20-day SMA (${data.qqqSMA20Proximity.toFixed(0)}% proximity)`,
+      pillar: "Momentum & Technical",
+      severity: "medium",
+    })
   }
 
   // 4. QQQ Below 50-Day SMA
   if (data.qqqBelowSMA50 && data.qqqSMA50Proximity >= 100) {
-    canaries.push({ signal: "QQQ breached 50-day SMA - Medium-term trend broken", pillar: "Momentum & Technical", severity: "high" })
+    canaries.push({
+      signal: "QQQ breached 50-day SMA - Medium-term trend broken",
+      pillar: "Momentum & Technical",
+      severity: "high",
+    })
   } else if (data.qqqSMA50Proximity >= 50) {
-    canaries.push({ signal: `QQQ approaching 50-day SMA (${data.qqqSMA50Proximity.toFixed(0)}% proximity)`, pillar: "Momentum & Technical", severity: "medium" })
+    canaries.push({
+      signal: `QQQ approaching 50-day SMA (${data.qqqSMA50Proximity.toFixed(0)}% proximity)`,
+      pillar: "Momentum & Technical",
+      severity: "medium",
+    })
   }
 
   // 5. QQQ Below 200-Day SMA
   if (data.qqqBelowSMA200 && data.qqqSMA200Proximity >= 100) {
-    canaries.push({ signal: "QQQ breached 200-day SMA - Long-term bull market in question", pillar: "Momentum & Technical", severity: "high" })
+    canaries.push({
+      signal: "QQQ breached 200-day SMA - Long-term bull market in question",
+      pillar: "Momentum & Technical",
+      severity: "high",
+    })
   } else if (data.qqqSMA200Proximity >= 50) {
-    canaries.push({ signal: `QQQ approaching 200-day SMA (${data.qqqSMA200Proximity.toFixed(0)}% proximity)`, pillar: "Momentum & Technical", severity: "medium" })
+    canaries.push({
+      signal: `QQQ approaching 200-day SMA (${data.qqqSMA200Proximity.toFixed(0)}% proximity)`,
+      pillar: "Momentum & Technical",
+      severity: "medium",
+    })
   }
 
   // 6. QQQ Below Bollinger Band
   if (data.qqqBelowBollinger && data.qqqBollingerProximity >= 100) {
-    canaries.push({ signal: "QQQ breached lower Bollinger Band - Oversold territory", pillar: "Momentum & Technical", severity: "high" })
+    canaries.push({
+      signal: "QQQ breached lower Bollinger Band - Oversold territory",
+      pillar: "Momentum & Technical",
+      severity: "high",
+    })
   } else if (data.qqqBollingerProximity >= 50) {
-    canaries.push({ signal: `QQQ approaching Bollinger Band (${data.qqqBollingerProximity.toFixed(0)}% proximity)`, pillar: "Momentum & Technical", severity: "medium" })
+    canaries.push({
+      signal: `QQQ approaching Bollinger Band (${data.qqqBollingerProximity.toFixed(0)}% proximity)`,
+      pillar: "Momentum & Technical",
+      severity: "medium",
+    })
   }
 
   // 7. VIX (Fear Gauge)
   if (data.vix > 35) {
-    canaries.push({ signal: `VIX at ${data.vix.toFixed(1)} - Extreme fear`, pillar: "Momentum & Technical", severity: "high" })
+    canaries.push({
+      signal: `VIX at ${data.vix.toFixed(1)} - Extreme fear`,
+      pillar: "Momentum & Technical",
+      severity: "high",
+    })
   } else if (data.vix > 25) {
-    canaries.push({ signal: `VIX at ${data.vix.toFixed(1)} - Elevated fear`, pillar: "Momentum & Technical", severity: "medium" })
+    canaries.push({
+      signal: `VIX at ${data.vix.toFixed(1)} - Elevated fear`,
+      pillar: "Momentum & Technical",
+      severity: "medium",
+    })
   }
 
   // 8. VXN (Nasdaq Volatility)
   if (data.vxn > 35) {
-    canaries.push({ signal: `VXN at ${data.vxn.toFixed(1)} - Nasdaq panic`, pillar: "Momentum & Technical", severity: "high" })
+    canaries.push({
+      signal: `VXN at ${data.vxn.toFixed(1)} - Nasdaq panic`,
+      pillar: "Momentum & Technical",
+      severity: "high",
+    })
   } else if (data.vxn > 25) {
-    canaries.push({ signal: `VXN at ${data.vxn.toFixed(1)} - Nasdaq volatility elevated`, pillar: "Momentum & Technical", severity: "medium" })
+    canaries.push({
+      signal: `VXN at ${data.vxn.toFixed(1)} - Nasdaq volatility elevated`,
+      pillar: "Momentum & Technical",
+      severity: "medium",
+    })
   }
 
   // 9. RVX (Russell 2000 Volatility)
   if (data.rvx > 35) {
-    canaries.push({ signal: `RVX at ${data.rvx.toFixed(1)} - Small-cap stress`, pillar: "Momentum & Technical", severity: "high" })
+    canaries.push({
+      signal: `RVX at ${data.rvx.toFixed(1)} - Small-cap stress`,
+      pillar: "Momentum & Technical",
+      severity: "high",
+    })
   } else if (data.rvx > 25) {
-    canaries.push({ signal: `RVX at ${data.rvx.toFixed(1)} - Small-cap volatility rising`, pillar: "Momentum & Technical", severity: "medium" })
+    canaries.push({
+      signal: `RVX at ${data.rvx.toFixed(1)} - Small-cap volatility rising`,
+      pillar: "Momentum & Technical",
+      severity: "medium",
+    })
   }
 
   // 10. VIX Term Structure
   if (data.vixTermInverted || data.vixTermStructure < 0.8) {
-    canaries.push({ signal: `VIX term structure inverted (${data.vixTermStructure.toFixed(2)}) - Immediate fear`, pillar: "Momentum & Technical", severity: "high" })
+    canaries.push({
+      signal: `VIX term structure inverted (${data.vixTermStructure.toFixed(2)}) - Immediate fear`,
+      pillar: "Momentum & Technical",
+      severity: "high",
+    })
   } else if (data.vixTermStructure < 1.2) {
-    canaries.push({ signal: `VIX term structure flattening (${data.vixTermStructure.toFixed(2)})`, pillar: "Momentum & Technical", severity: "medium" })
+    canaries.push({
+      signal: `VIX term structure flattening (${data.vixTermStructure.toFixed(2)})`,
+      pillar: "Momentum & Technical",
+      severity: "medium",
+    })
   }
 
   // 11. ATR - Average True Range
   if (data.atr > 50) {
-    canaries.push({ signal: `ATR at ${data.atr.toFixed(1)} - Extreme volatility`, pillar: "Momentum & Technical", severity: "high" })
+    canaries.push({
+      signal: `ATR at ${data.atr.toFixed(1)} - Extreme volatility`,
+      pillar: "Momentum & Technical",
+      severity: "high",
+    })
   } else if (data.atr > 40) {
-    canaries.push({ signal: `ATR at ${data.atr.toFixed(1)} - Elevated volatility`, pillar: "Momentum & Technical", severity: "medium" })
+    canaries.push({
+      signal: `ATR at ${data.atr.toFixed(1)} - Elevated volatility`,
+      pillar: "Momentum & Technical",
+      severity: "medium",
+    })
   }
 
   // 12. LTV - Long-term Volatility
-  if (data.ltv > 0.20) {
-    canaries.push({ signal: `Long-term volatility at ${(data.ltv * 100).toFixed(1)}% - Sustained instability`, pillar: "Momentum & Technical", severity: "high" })
+  if (data.ltv > 0.2) {
+    canaries.push({
+      signal: `Long-term volatility at ${(data.ltv * 100).toFixed(1)}% - Sustained instability`,
+      pillar: "Momentum & Technical",
+      severity: "high",
+    })
   } else if (data.ltv > 0.15) {
-    canaries.push({ signal: `Long-term volatility at ${(data.ltv * 100).toFixed(1)}% - Rising`, pillar: "Momentum & Technical", severity: "medium" })
+    canaries.push({
+      signal: `Long-term volatility at ${(data.ltv * 100).toFixed(1)}% - Rising`,
+      pillar: "Momentum & Technical",
+      severity: "medium",
+    })
   }
 
   // 13. Bullish Percent Index
   if (data.bullishPercent > 70) {
-    canaries.push({ signal: `Bullish Percent at ${data.bullishPercent}% - Overbought danger`, pillar: "Momentum & Technical", severity: "high" })
+    canaries.push({
+      signal: `Bullish Percent at ${data.bullishPercent}% - Overbought danger`,
+      pillar: "Momentum & Technical",
+      severity: "high",
+    })
   } else if (data.bullishPercent > 60) {
-    canaries.push({ signal: `Bullish Percent at ${data.bullishPercent}% - Elevated optimism`, pillar: "Momentum & Technical", severity: "medium" })
+    canaries.push({
+      signal: `Bullish Percent at ${data.bullishPercent}% - Elevated optimism`,
+      pillar: "Momentum & Technical",
+      severity: "medium",
+    })
   }
-
 
   // 14. Put/Call Ratio
   if (data.putCallRatio < 0.6) {
-    canaries.push({ signal: `Put/Call at ${data.putCallRatio.toFixed(2)} - Extreme complacency`, pillar: "Risk Appetite & Volatility", severity: "high" })
+    canaries.push({
+      signal: `Put/Call at ${data.putCallRatio.toFixed(2)} - Extreme complacency`,
+      pillar: "Risk Appetite & Volatility",
+      severity: "high",
+    })
   } else if (data.putCallRatio < 0.85) {
-    canaries.push({ signal: `Put/Call at ${data.putCallRatio.toFixed(2)} - Low hedging activity`, pillar: "Risk Appetite & Volatility", severity: "medium" })
+    canaries.push({
+      signal: `Put/Call at ${data.putCallRatio.toFixed(2)} - Low hedging activity`,
+      pillar: "Risk Appetite & Volatility",
+      severity: "medium",
+    })
   }
 
   // 15. Fear & Greed Index
   if (data.fearGreedIndex !== null) {
     if (data.fearGreedIndex > 80) {
-      canaries.push({ signal: `Fear & Greed at ${data.fearGreedIndex} - Extreme greed`, pillar: "Risk Appetite & Volatility", severity: "high" })
+      canaries.push({
+        signal: `Fear & Greed at ${data.fearGreedIndex} - Extreme greed`,
+        pillar: "Risk Appetite & Volatility",
+        severity: "high",
+      })
     } else if (data.fearGreedIndex > 70) {
-      canaries.push({ signal: `Fear & Greed at ${data.fearGreedIndex} - Elevated greed`, pillar: "Risk Appetite & Volatility", severity: "medium" })
+      canaries.push({
+        signal: `Fear & Greed at ${data.fearGreedIndex} - Elevated greed`,
+        pillar: "Risk Appetite & Volatility",
+        severity: "medium",
+      })
     }
   }
 
   // 16. AAII Bullish Sentiment
   const aaiiBullish = data.aaiiBullish || 35
   if (aaiiBullish > 55) {
-    canaries.push({ signal: `AAII Bullish at ${aaiiBullish}% - Retail euphoria`, pillar: "Risk Appetite & Volatility", severity: "high" })
+    canaries.push({
+      signal: `AAII Bullish at ${aaiiBullish}% - Retail euphoria`,
+      pillar: "Risk Appetite & Volatility",
+      severity: "high",
+    })
   } else if (aaiiBullish > 45) {
-    canaries.push({ signal: `AAII Bullish at ${aaiiBullish}% - Elevated retail optimism`, pillar: "Risk Appetite & Volatility", severity: "medium" })
+    canaries.push({
+      signal: `AAII Bullish at ${aaiiBullish}% - Elevated retail optimism`,
+      pillar: "Risk Appetite & Volatility",
+      severity: "medium",
+    })
   }
 
   // 17. SPY Short Interest Ratio
   const shortInterest = data.shortInterest || 2.5
   if (shortInterest < 1.5) {
-    canaries.push({ signal: `Short Interest at ${shortInterest.toFixed(1)}% - Extreme complacency`, pillar: "Risk Appetite & Volatility", severity: "high" })
+    canaries.push({
+      signal: `Short Interest at ${shortInterest.toFixed(1)}% - Extreme complacency`,
+      pillar: "Risk Appetite & Volatility",
+      severity: "high",
+    })
   } else if (shortInterest < 2.5) {
-    canaries.push({ signal: `Short Interest at ${shortInterest.toFixed(1)}% - Low positioning`, pillar: "Risk Appetite & Volatility", severity: "medium" })
+    canaries.push({
+      signal: `Short Interest at ${shortInterest.toFixed(1)}% - Low positioning`,
+      pillar: "Risk Appetite & Volatility",
+      severity: "medium",
+    })
   }
 
   // 18. Tech ETF Flows
   if (data.etfFlows !== undefined) {
     if (data.etfFlows < -3.0) {
-      canaries.push({ signal: `ETF outflows at $${Math.abs(data.etfFlows).toFixed(1)}B - Capital flight`, pillar: "Risk Appetite & Volatility", severity: "high" })
+      canaries.push({
+        signal: `ETF outflows at $${Math.abs(data.etfFlows).toFixed(1)}B - Capital flight`,
+        pillar: "Risk Appetite & Volatility",
+        severity: "high",
+      })
     } else if (data.etfFlows < -1.5) {
-      canaries.push({ signal: `ETF outflows at $${Math.abs(data.etfFlows).toFixed(1)}B - Selling pressure`, pillar: "Risk Appetite & Volatility", severity: "medium" })
+      canaries.push({
+        signal: `ETF outflows at $${Math.abs(data.etfFlows).toFixed(1)}B - Selling pressure`,
+        pillar: "Risk Appetite & Volatility",
+        severity: "medium",
+      })
     }
   }
 
   // 19. Yield Curve (10Y-2Y)
   if (data.yieldCurve < -1.0) {
-    canaries.push({ signal: `Yield curve inverted ${Math.abs(data.yieldCurve).toFixed(2)}% - Deep inversion`, pillar: "Risk Appetite & Volatility", severity: "high" })
+    canaries.push({
+      signal: `Yield curve inverted ${Math.abs(data.yieldCurve).toFixed(2)}% - Deep inversion`,
+      pillar: "Risk Appetite & Volatility",
+      severity: "high",
+    })
   } else if (data.yieldCurve < -0.2) {
-    canaries.push({ signal: `Yield curve inverted ${Math.abs(data.yieldCurve).toFixed(2)}%`, pillar: "Risk Appetite & Volatility", severity: "medium" })
+    canaries.push({
+      signal: `Yield curve inverted ${Math.abs(data.yieldCurve).toFixed(2)}%`,
+      pillar: "Risk Appetite & Volatility",
+      severity: "medium",
+    })
   }
-
 
   // 20. S&P 500 Forward P/E
   if (data.spxPE > 30) {
-    canaries.push({ signal: `S&P 500 P/E at ${data.spxPE.toFixed(1)} - Extreme overvaluation`, pillar: "Valuation & Market Structure", severity: "high" })
+    canaries.push({
+      signal: `S&P 500 P/E at ${data.spxPE.toFixed(1)} - Extreme overvaluation`,
+      pillar: "Valuation & Market Structure",
+      severity: "high",
+    })
   } else if (data.spxPE > 22) {
-    canaries.push({ signal: `S&P 500 P/E at ${data.spxPE.toFixed(1)} - Above historical average`, pillar: "Valuation & Market Structure", severity: "medium" })
+    canaries.push({
+      signal: `S&P 500 P/E at ${data.spxPE.toFixed(1)} - Above historical average`,
+      pillar: "Valuation & Market Structure",
+      severity: "medium",
+    })
   }
 
   // 21. S&P 500 Price-to-Sales
   if (data.spxPS > 3.5) {
-    canaries.push({ signal: `S&P 500 P/S at ${data.spxPS.toFixed(1)} - Extremely expensive`, pillar: "Valuation & Market Structure", severity: "high" })
+    canaries.push({
+      signal: `S&P 500 P/S at ${data.spxPS.toFixed(1)} - Extremely expensive`,
+      pillar: "Valuation & Market Structure",
+      severity: "high",
+    })
   } else if (data.spxPS > 2.5) {
-    canaries.push({ signal: `S&P 500 P/S at ${data.spxPS.toFixed(1)} - Elevated valuation`, pillar: "Valuation & Market Structure", severity: "medium" })
+    canaries.push({
+      signal: `S&P 500 P/S at ${data.spxPS.toFixed(1)} - Elevated valuation`,
+      pillar: "Valuation & Market Structure",
+      severity: "medium",
+    })
   }
 
   // 22. Buffett Indicator (Market Cap / GDP)
   const buffett = data.buffettIndicator || 180
   if (buffett > 200) {
-    canaries.push({ signal: `Buffett Indicator at ${buffett.toFixed(0)}% - Significantly overvalued`, pillar: "Valuation & Market Structure", severity: "high" })
+    canaries.push({
+      signal: `Buffett Indicator at ${buffett.toFixed(0)}% - Significantly overvalued`,
+      pillar: "Valuation & Market Structure",
+      severity: "high",
+    })
   } else if (buffett > 150) {
-    canaries.push({ signal: `Buffett Indicator at ${buffett.toFixed(0)}% - Above fair value`, pillar: "Valuation & Market Structure", severity: "medium" })
+    canaries.push({
+      signal: `Buffett Indicator at ${buffett.toFixed(0)}% - Above fair value`,
+      pillar: "Valuation & Market Structure",
+      severity: "medium",
+    })
   }
-
 
   // 23. Fed Funds Rate
   if (data.fedFundsRate > 6.0) {
-    canaries.push({ signal: `Fed Funds at ${data.fedFundsRate.toFixed(2)}% - Extremely restrictive`, pillar: "Macro", severity: "high" })
+    canaries.push({
+      signal: `Fed Funds at ${data.fedFundsRate.toFixed(2)}% - Extremely restrictive`,
+      pillar: "Macro",
+      severity: "high",
+    })
   } else if (data.fedFundsRate > 5.0) {
-    canaries.push({ signal: `Fed Funds at ${data.fedFundsRate.toFixed(2)}% - Restrictive policy`, pillar: "Macro", severity: "medium" })
+    canaries.push({
+      signal: `Fed Funds at ${data.fedFundsRate.toFixed(2)}% - Restrictive policy`,
+      pillar: "Macro",
+      severity: "medium",
+    })
   }
 
   // 24. Junk Bond Spread
   if (data.junkSpread > 8) {
-    canaries.push({ signal: `Junk Bond Spread at ${data.junkSpread.toFixed(2)}% - Severe credit stress`, pillar: "Macro", severity: "high" })
+    canaries.push({
+      signal: `Junk Bond Spread at ${data.junkSpread.toFixed(2)}% - Severe credit stress`,
+      pillar: "Macro",
+      severity: "high",
+    })
   } else if (data.junkSpread > 5) {
-    canaries.push({ signal: `Junk Bond Spread at ${data.junkSpread.toFixed(2)}% - Credit tightening`, pillar: "Macro", severity: "medium" })
+    canaries.push({
+      signal: `Junk Bond Spread at ${data.junkSpread.toFixed(2)}% - Credit tightening`,
+      pillar: "Macro",
+      severity: "medium",
+    })
   }
 
   // 25. US Debt-to-GDP Ratio
   if (data.debtToGDP > 130) {
-    canaries.push({ signal: `US Debt-to-GDP at ${data.debtToGDP.toFixed(0)}% - Fiscal crisis risk`, pillar: "Macro", severity: "high" })
+    canaries.push({
+      signal: `US Debt-to-GDP at ${data.debtToGDP.toFixed(0)}% - Fiscal crisis risk`,
+      pillar: "Macro",
+      severity: "high",
+    })
   } else if (data.debtToGDP > 110) {
-    canaries.push({ signal: `US Debt-to-GDP at ${data.debtToGDP.toFixed(0)}% - Elevated fiscal burden`, pillar: "Macro", severity: "medium" })
+    canaries.push({
+      signal: `US Debt-to-GDP at ${data.debtToGDP.toFixed(0)}% - Elevated fiscal burden`,
+      pillar: "Macro",
+      severity: "medium",
+    })
   }
-
 
   // NVIDIA Momentum (Pillar 1)
   if (data.nvidiaMomentum < 20) {
-    canaries.push({ signal: `NVIDIA momentum at ${data.nvidiaMomentum} - AI sector weakness`, pillar: "Momentum & Technical", severity: "high" })
+    canaries.push({
+      signal: `NVIDIA momentum at ${data.nvidiaMomentum} - AI sector weakness`,
+      pillar: "Momentum & Technical",
+      severity: "high",
+    })
   } else if (data.nvidiaMomentum < 40) {
-    canaries.push({ signal: `NVIDIA momentum at ${data.nvidiaMomentum} - Tech leadership fading`, pillar: "Momentum & Technical", severity: "medium" })
+    canaries.push({
+      signal: `NVIDIA momentum at ${data.nvidiaMomentum} - Tech leadership fading`,
+      pillar: "Momentum & Technical",
+      severity: "medium",
+    })
   }
 
   // SOX Semiconductor Index (Pillar 1)
   const soxDeviation = ((data.soxIndex - 5000) / 5000) * 100
   if (soxDeviation < -15) {
-    canaries.push({ signal: `SOX down ${Math.abs(soxDeviation).toFixed(1)}% - Chip sector crash`, pillar: "Momentum & Technical", severity: "high" })
+    canaries.push({
+      signal: `SOX down ${Math.abs(soxDeviation).toFixed(1)}% - Chip sector crash`,
+      pillar: "Momentum & Technical",
+      severity: "high",
+    })
   } else if (soxDeviation < -10) {
-    canaries.push({ signal: `SOX down ${Math.abs(soxDeviation).toFixed(1)}% - Semiconductor weakness`, pillar: "Momentum & Technical", severity: "medium" })
+    canaries.push({
+      signal: `SOX down ${Math.abs(soxDeviation).toFixed(1)}% - Semiconductor weakness`,
+      pillar: "Momentum & Technical",
+      severity: "medium",
+    })
   }
 
   // TED Spread (Pillar 4)
   if (data.tedSpread > 1.0) {
-    canaries.push({ signal: `TED Spread at ${data.tedSpread.toFixed(2)}% - Banking system stress`, pillar: "Macro", severity: "high" })
-  } else if (data.tedSpread > 0.50) {
-    canaries.push({ signal: `TED Spread at ${data.tedSpread.toFixed(2)}% - Credit market tension`, pillar: "Macro", severity: "medium" })
+    canaries.push({
+      signal: `TED Spread at ${data.tedSpread.toFixed(2)}% - Banking system stress`,
+      pillar: "Macro",
+      severity: "high",
+    })
+  } else if (data.tedSpread > 0.5) {
+    canaries.push({
+      signal: `TED Spread at ${data.tedSpread.toFixed(2)}% - Credit market tension`,
+      pillar: "Macro",
+      severity: "medium",
+    })
   }
 
   // DXY Dollar Index (Pillar 4)
   if (data.dxyIndex > 115) {
-    canaries.push({ signal: `Dollar Index at ${data.dxyIndex.toFixed(1)} - Extreme dollar strength hurts tech`, pillar: "Macro", severity: "high" })
+    canaries.push({
+      signal: `Dollar Index at ${data.dxyIndex.toFixed(1)} - Extreme dollar strength hurts tech`,
+      pillar: "Macro",
+      severity: "high",
+    })
   } else if (data.dxyIndex > 105) {
-    canaries.push({ signal: `Dollar Index at ${data.dxyIndex.toFixed(1)} - Strong dollar headwind`, pillar: "Macro", severity: "medium" })
+    canaries.push({
+      signal: `Dollar Index at ${data.dxyIndex.toFixed(1)} - Strong dollar headwind`,
+      pillar: "Macro",
+      severity: "medium",
+    })
   }
 
   // ISM PMI (Pillar 4)
   if (data.ismPMI < 46) {
-    canaries.push({ signal: `ISM PMI at ${data.ismPMI.toFixed(1)} - Manufacturing contraction`, pillar: "Macro", severity: "high" })
+    canaries.push({
+      signal: `ISM PMI at ${data.ismPMI.toFixed(1)} - Manufacturing contraction`,
+      pillar: "Macro",
+      severity: "high",
+    })
   } else if (data.ismPMI < 50) {
-    canaries.push({ signal: `ISM PMI at ${data.ismPMI.toFixed(1)} - Weak manufacturing`, pillar: "Macro", severity: "medium" })
+    canaries.push({
+      signal: `ISM PMI at ${data.ismPMI.toFixed(1)} - Weak manufacturing`,
+      pillar: "Macro",
+      severity: "medium",
+    })
   }
 
   // Fed Reverse Repo (Pillar 4)
   if (data.fedReverseRepo > 2000) {
-    canaries.push({ signal: `Fed RRP at $${data.fedReverseRepo.toFixed(0)}B - Severe liquidity drain`, pillar: "Macro", severity: "high" })
+    canaries.push({
+      signal: `Fed RRP at $${data.fedReverseRepo.toFixed(0)}B - Severe liquidity drain`,
+      pillar: "Macro",
+      severity: "high",
+    })
   } else if (data.fedReverseRepo > 1000) {
-    canaries.push({ signal: `Fed RRP at $${data.fedReverseRepo.toFixed(0)}B - Tight liquidity conditions`, pillar: "Macro", severity: "medium" })
+    canaries.push({
+      signal: `Fed RRP at $${data.fedReverseRepo.toFixed(0)}B - Tight liquidity conditions`,
+      pillar: "Macro",
+      severity: "medium",
+    })
   }
-
 
   // QQQ P/E Ratio
   if (data.qqqPE > 40) {
-    canaries.push({ signal: `QQQ P/E at ${data.qqqPE.toFixed(1)} - AI bubble territory`, pillar: "Valuation & Market Structure", severity: "high" })
+    canaries.push({
+      signal: `QQQ P/E at ${data.qqqPE.toFixed(1)} - AI bubble territory`,
+      pillar: "Valuation & Market Structure",
+      severity: "high",
+    })
   } else if (data.qqqPE > 30) {
-    canaries.push({ signal: `QQQ P/E at ${data.qqqPE.toFixed(1)} - Tech overvaluation`, pillar: "Valuation & Market Structure", severity: "medium" })
+    canaries.push({
+      signal: `QQQ P/E at ${data.qqqPE.toFixed(1)} - Tech overvaluation`,
+      pillar: "Valuation & Market Structure",
+      severity: "medium",
+    })
   }
 
   // Mag7 Concentration
   if (data.mag7Concentration > 65) {
-    canaries.push({ signal: `Mag7 at ${data.mag7Concentration.toFixed(1)}% of QQQ - Extreme concentration risk`, pillar: "Valuation & Market Structure", severity: "high" })
+    canaries.push({
+      signal: `Mag7 at ${data.mag7Concentration.toFixed(1)}% of QQQ - Extreme concentration risk`,
+      pillar: "Valuation & Market Structure",
+      severity: "high",
+    })
   } else if (data.mag7Concentration > 55) {
-    canaries.push({ signal: `Mag7 at ${data.mag7Concentration.toFixed(1)}% of QQQ - High concentration`, pillar: "Valuation & Market Structure", severity: "medium" })
+    canaries.push({
+      signal: `Mag7 at ${data.mag7Concentration.toFixed(1)}% of QQQ - High concentration`,
+      pillar: "Valuation & Market Structure",
+      severity: "medium",
+    })
   }
 
   // Shiller CAPE
   if (data.shillerCAPE > 35) {
-    canaries.push({ signal: `Shiller CAPE at ${data.shillerCAPE.toFixed(1)} - Historic overvaluation`, pillar: "Valuation & Market Structure", severity: "high" })
+    canaries.push({
+      signal: `Shiller CAPE at ${data.shillerCAPE.toFixed(1)} - Historic overvaluation`,
+      pillar: "Valuation & Market Structure",
+      severity: "high",
+    })
   } else if (data.shillerCAPE > 28) {
-    canaries.push({ signal: `Shiller CAPE at ${data.shillerCAPE.toFixed(1)} - Elevated cyclical valuation`, pillar: "Valuation & Market Structure", severity: "medium" })
+    canaries.push({
+      signal: `Shiller CAPE at ${data.shillerCAPE.toFixed(1)} - Elevated cyclical valuation`,
+      pillar: "Valuation & Market Structure",
+      severity: "medium",
+    })
   }
 
   // Equity Risk Premium
   if (data.equityRiskPremium < 1.5) {
-    canaries.push({ signal: `Equity Risk Premium at ${data.equityRiskPremium.toFixed(2)}% - Stocks vs bonds severely overpriced`, pillar: "Valuation & Market Structure", severity: "high" })
+    canaries.push({
+      signal: `Equity Risk Premium at ${data.equityRiskPremium.toFixed(2)}% - Stocks vs bonds severely overpriced`,
+      pillar: "Valuation & Market Structure",
+      severity: "high",
+    })
   } else if (data.equityRiskPremium < 3.0) {
-    canaries.push({ signal: `Equity Risk Premium at ${data.equityRiskPremium.toFixed(2)}% - Low compensation for equity risk`, pillar: "Valuation & Market Structure", severity: "medium" })
+    canaries.push({
+      signal: `Equity Risk Premium at ${data.equityRiskPremium.toFixed(2)}% - Low compensation for equity risk`,
+      pillar: "Valuation & Market Structure",
+      severity: "medium",
+    })
   }
 
   return canaries

@@ -3,10 +3,8 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { AlertTriangle, TrendingDown, Activity, DollarSign, Users, Database, RefreshCw, Download, Settings, Layers, Info } from 'lucide-react'
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, ReferenceLine } from "recharts"
+import { AlertTriangle, TrendingDown, Activity, DollarSign, Users, RefreshCw, Download } from "lucide-react"
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface CCPIData {
@@ -16,10 +14,10 @@ interface CCPIData {
   totalBonus?: number
   certainty: number
   pillars: {
-    momentum: number        // NEW: Pillar 1 - Momentum & Technical (40%)
-    riskAppetite: number   // NEW: Pillar 2 - Risk Appetite (30%)
-    valuation: number      // NEW: Pillar 3 - Valuation (20%)
-    macro: number          // Pillar 4 - Macro (10%)
+    momentum: number // NEW: Pillar 1 - Momentum & Technical (40%)
+    riskAppetite: number // NEW: Pillar 2 - Risk Appetite (30%)
+    valuation: number // NEW: Pillar 3 - Valuation (20%)
+    macro: number // Pillar 4 - Macro (10%)
   }
   regime: {
     level: number
@@ -45,6 +43,7 @@ interface CCPIData {
   apiStatus?: Record<string, { live: boolean; source: string }> // Updated for clarity
   timestamp: string
   totalIndicators?: number // Added for the canary count display
+  cachedAt?: string // Added cache timestamp
 }
 
 interface HistoricalData {
@@ -63,86 +62,143 @@ export function CcpiDashboard() {
   const [executiveSummary, setExecutiveSummary] = useState<string | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
 
+  const [refreshProgress, setRefreshProgress] = useState(0)
+  const [refreshStatus, setRefreshStatus] = useState("")
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
   const getReadableColor = (colorName: string): string => {
     const colorMap: Record<string, string> = {
-      'green': '#16a34a',      // Green for low risk
-      'lime': '#65a30d',       // Lime for normal
-      'yellow': '#f97316',     // Orange instead of yellow for better readability
-      'orange': '#f97316',     // Orange for caution
-      'red': '#dc2626'         // Red for high alert/crash watch
+      green: "#16a34a", // Green for low risk
+      lime: "#65a30d", // Lime for normal
+      yellow: "#f97316", // Orange instead of yellow for better readability
+      orange: "#f97316", // Orange for caution
+      red: "#dc2626", // Red for high alert/crash watch
     }
-    return colorMap[colorName] || '#6b7280' // Default to gray if color not found
+    return colorMap[colorName] || "#6b7280" // Default to gray if color not found
   }
 
   const getBarColor = (percentage: number): string => {
-    if (percentage <= 33) return '#22c55e' // green-500
-    if (percentage <= 66) return '#eab308' // yellow-500
-    return '#ef4444' // red-500
+    if (percentage <= 33) return "#22c55e" // green-500
+    if (percentage <= 66) return "#eab308" // yellow-500
+    return "#ef4444" // red-500
   }
 
   const getStatusBadge = (live: boolean, source: string) => {
     if (live) {
-      return <Badge className="ml-2 bg-green-500 text-white text-xs flex items-center gap-1">
-        <span className="h-2 w-2 rounded-full bg-white"></span>
-        Live
-      </Badge>
-    } else if (source.includes('baseline') || source.includes('fallback') || source.includes('historical')) {
-      return <Badge className="ml-2 bg-amber-500 text-white text-xs flex items-center gap-1">
-        <span className="h-2 w-2 rounded-full bg-white"></span>
-        Baseline
-      </Badge>
+      return (
+        <Badge className="ml-2 bg-green-500 text-white text-xs flex items-center gap-1">
+          <span className="h-2 w-2 rounded-full bg-white"></span>
+          Live
+        </Badge>
+      )
+    } else if (source.includes("baseline") || source.includes("fallback") || source.includes("historical")) {
+      return (
+        <Badge className="ml-2 bg-amber-500 text-white text-xs flex items-center gap-1">
+          <span className="h-2 w-2 rounded-full bg-white"></span>
+          Baseline
+        </Badge>
+      )
     } else {
-      return <Badge className="ml-2 bg-red-500 text-white text-xs flex items-center gap-1">
-        <span className="h-2 w-2 rounded-full bg-white"></span>
-        Failed
-      </Badge>
+      return (
+        <Badge className="ml-2 bg-red-500 text-white text-xs flex items-center gap-1">
+          <span className="h-2 w-2 rounded-full bg-white"></span>
+          Failed
+        </Badge>
+      )
     }
   }
 
   useEffect(() => {
-    fetchData()
+    fetchCachedData()
     fetchHistory()
   }, [])
 
-  const fetchData = async () => {
+  const fetchCachedData = async () => {
     try {
       setLoading(true)
       setError(null)
+      const cachedResponse = await fetch("/api/ccpi/cache")
+
+      if (cachedResponse.ok) {
+        const cachedResult = await cachedResponse.json()
+        console.log("[v0] CCPI: Loaded cached data from", cachedResult.cachedAt)
+        setData(cachedResult)
+        await fetchExecutiveSummary(cachedResult)
+      } else {
+        // No cache, fetch fresh
+        await fetchData()
+      }
+    } catch (error) {
+      console.error("[v0] CCPI cache load error:", error)
+      await fetchData()
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchData = async () => {
+    try {
+      setIsRefreshing(true)
+      setRefreshProgress(0)
+      setRefreshStatus("Initializing...")
+      setError(null)
+
+      // Simulate progress updates (in reality, the API would stream these)
+      const progressInterval = setInterval(() => {
+        setRefreshProgress((prev) => {
+          if (prev >= 90) return prev
+          return prev + Math.random() * 10
+        })
+      }, 300)
+
+      setRefreshStatus("Fetching market data...")
       const response = await fetch("/api/ccpi")
+
+      clearInterval(progressInterval)
+      setRefreshProgress(100)
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
+
       const result = await response.json()
-      
+
       console.log("[v0] CCPI Data Loaded:", {
         ccpi: result.ccpi,
         certainty: result.certainty,
         regime: result.regime.name,
         pillars: result.pillars,
-        activeCanaries: result.canaries.filter((c: any) => c.severity === 'high' || c.severity === 'medium').length,
-        totalIndicators: 38 // Removed problematic comment
+        activeCanaries: result.canaries.filter((c: any) => c.severity === "high" || c.severity === "medium").length,
+        totalIndicators: 38, // Removed problematic comment
       })
       console.log("[v0] Pillar Breakdown (weighted contribution to CCPI):")
-      console.log("  Momentum:", result.pillars.momentum, "× 40% =", (result.pillars.momentum * 0.40).toFixed(1))
-      console.log("  Risk Appetite:", result.pillars.riskAppetite, "× 30% =", (result.pillars.riskAppetite * 0.30).toFixed(1))
-      console.log("  Valuation:", result.pillars.valuation, "× 20% =", (result.pillars.valuation * 0.20).toFixed(1))
-      console.log("  Macro:", result.pillars.macro, "× 10% =", (result.pillars.macro * 0.10).toFixed(1))
+      console.log("  Momentum:", result.pillars.momentum, "× 40% =", (result.pillars.momentum * 0.4).toFixed(1))
+      console.log(
+        "  Risk Appetite:",
+        result.pillars.riskAppetite,
+        "× 30% =",
+        (result.pillars.riskAppetite * 0.3).toFixed(1),
+      )
+      console.log("  Valuation:", result.pillars.valuation, "× 20% =", (result.pillars.valuation * 0.2).toFixed(1))
+      console.log("  Macro:", result.pillars.macro, "× 10% =", (result.pillars.macro * 0.1).toFixed(1))
 
-      const calculatedCCPI = 
-        result.pillars.momentum * 0.40 +
-        result.pillars.riskAppetite * 0.30 +
-        result.pillars.valuation * 0.20 +
-        result.pillars.macro * 0.10
+      const calculatedCCPI =
+        result.pillars.momentum * 0.4 +
+        result.pillars.riskAppetite * 0.3 +
+        result.pillars.valuation * 0.2 +
+        result.pillars.macro * 0.1
       console.log("  Calculated CCPI:", calculatedCCPI.toFixed(1), "| API CCPI:", result.ccpi)
-      
+
       setData(result)
-      
+
       await fetchExecutiveSummary(result)
     } catch (error) {
       console.error("[v0] CCPI API error:", error)
       setError(error instanceof Error ? error.message : "Failed to load CCPI data")
     } finally {
-      setLoading(false)
+      setIsRefreshing(false)
+      setRefreshProgress(0)
+      setRefreshStatus("")
     }
   }
 
@@ -155,13 +211,13 @@ export function CcpiDashboard() {
         body: JSON.stringify({
           ccpi: ccpiData.ccpi,
           certainty: ccpiData.certainty,
-          activeCanaries: ccpiData.canaries.filter(c => c.severity === 'high' || c.severity === 'medium').length,
+          activeCanaries: ccpiData.canaries.filter((c) => c.severity === "high" || c.severity === "medium").length,
           totalIndicators: 38, // Removed problematic comment
           regime: ccpiData.regime,
-          pillars: ccpiData.pillars
-        })
+          pillars: ccpiData.pillars,
+        }),
       })
-      
+
       if (response.ok) {
         const result = await response.json()
         setExecutiveSummary(result.summary)
@@ -193,7 +249,7 @@ export function CcpiDashboard() {
       <div className="flex items-center justify-center p-12">
         <div className="text-center">
           <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2 text-primary" />
-          <p className="text-sm text-gray-600">Computing CCPI scores...</p>
+          <p className="text-sm text-gray-600">Loading cached CCPI data...</p>
         </div>
       </div>
     )
@@ -205,7 +261,7 @@ export function CcpiDashboard() {
         <div className="text-center">
           <AlertTriangle className="h-8 w-8 text-red-600 mx-auto mb-2" />
           <p className="text-sm text-red-600">{error}</p>
-          <Button variant="outline" onClick={fetchData} className="mt-4">
+          <Button variant="outline" onClick={fetchData} className="mt-4 bg-transparent">
             Retry
           </Button>
         </div>
@@ -233,7 +289,7 @@ export function CcpiDashboard() {
     return { color: "green", label: "LOW RISK" }
   }
 
-  const getIndicatorStatus = (value: number, thresholds: { low: number, high: number, ideal?: number }) => {
+  const getIndicatorStatus = (value: number, thresholds: { low: number; high: number; ideal?: number }) => {
     if (thresholds.ideal !== undefined) {
       const deviation = Math.abs(value - thresholds.ideal)
       if (deviation < 5) return { color: "bg-green-500", status: "Normal" }
@@ -247,9 +303,14 @@ export function CcpiDashboard() {
 
   const pillarData = [
     { name: "Pillar 1 - Momentum & Technical", value: data.pillars.momentum, weight: "40%", icon: Activity },
-    { name: "Pillar 2 - Risk Appetite & Volatility", value: data.pillars.riskAppetite, weight: "30%", icon: TrendingDown },
+    {
+      name: "Pillar 2 - Risk Appetite & Volatility",
+      value: data.pillars.riskAppetite,
+      weight: "30%",
+      icon: TrendingDown,
+    },
     { name: "Pillar 3 - Valuation", value: data.pillars.valuation, weight: "20%", icon: DollarSign },
-    { name: "Pillar 4 - Macro", value: data.pillars.macro, weight: "10%", icon: Users }
+    { name: "Pillar 4 - Macro", value: data.pillars.macro, weight: "10%", icon: Users },
   ]
 
   const pillarChartData = pillarData.map((pillar, index) => ({
@@ -257,7 +318,7 @@ export function CcpiDashboard() {
     fullName: pillar.name,
     value: pillar.value,
     weight: pillar.weight,
-    icon: pillar.icon
+    icon: pillar.icon,
   }))
 
   const zone = getRegimeZone(data.ccpi)
@@ -265,13 +326,32 @@ export function CcpiDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Header Controls */}
-      <div className="flex items-center justify-end">
-        <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
+      <div className="flex items-center justify-between">
+        {data?.cachedAt && (
+          <div className="text-sm text-gray-600">Last updated: {new Date(data.cachedAt).toLocaleString()}</div>
+        )}
+        <Button variant="outline" size="sm" onClick={fetchData} disabled={isRefreshing}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+          {isRefreshing ? "Refreshing..." : "Refresh Data"}
         </Button>
       </div>
+
+      {isRefreshing && refreshProgress > 0 && (
+        <Card className="border-blue-300 bg-blue-50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-blue-900">{refreshStatus}</span>
+              <span className="text-sm font-semibold text-blue-700">{Math.round(refreshProgress)}%</span>
+            </div>
+            <div className="w-full bg-blue-200 rounded-full h-2.5 overflow-hidden">
+              <div
+                className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${refreshProgress}%` }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main CCPI Score Card */}
       <Card className="border-2 shadow-lg">
@@ -288,14 +368,11 @@ export function CcpiDashboard() {
         </CardHeader>
         <CardContent>
           <div className="mb-6">
-            
-            
-            
             <div className="pt-0">
               <div className="relative">
                 {/* Gradient bar */}
                 <div className="h-16 bg-gradient-to-r from-green-600 via-[20%] via-lime-500 via-[40%] via-yellow-500 via-[60%] via-orange-500 via-[80%] via-red-500 to-[100%] to-red-700 rounded-lg shadow-inner" />
-                
+
                 {/* Zone labels */}
                 <div className="absolute inset-0 flex items-center justify-between px-4 text-white text-xs font-bold">
                   <div className="text-center">
@@ -322,7 +399,7 @@ export function CcpiDashboard() {
                     <div className="text-[10px]">80-100</div>
                   </div>
                 </div>
-                
+
                 {/* Pointer indicator */}
                 <div
                   className="absolute top-0 bottom-0 w-2 bg-black shadow-lg transition-all duration-500"
@@ -348,7 +425,7 @@ export function CcpiDashboard() {
               </p>
               <p className="text-xs text-gray-500">0 = No risk, 100 = Imminent crash</p>
             </div>
-            
+
             <div className="text-center p-6 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600 mb-2">Certainty Score</p>
               <div className="flex items-center justify-center gap-2">
@@ -356,16 +433,24 @@ export function CcpiDashboard() {
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <button className="text-gray-400 hover:text-gray-600">
-                        
-                      </button>
+                      <button className="text-gray-400 hover:text-gray-600"></button>
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs p-3">
                       <p className="font-semibold mb-2">Certainty Calculation</p>
                       <p className="text-xs leading-relaxed">
-                        Based on pillar alignment variance ({Math.round((100 - (Math.max(...Object.values(data.pillars)) - Math.min(...Object.values(data.pillars)))) / 100 * 70)}% weight) 
-                        and canary agreement ({Math.round((data.canaries.filter(c => c.severity === 'high' || c.severity === 'medium').length / 15) * 30)}% weight), 
-                        adjusted for historical accuracy (82% backtest).
+                        Based on pillar alignment variance (
+                        {Math.round(
+                          ((100 -
+                            (Math.max(...Object.values(data.pillars)) - Math.min(...Object.values(data.pillars)))) /
+                            100) *
+                            70,
+                        )}
+                        % weight) and canary agreement (
+                        {Math.round(
+                          (data.canaries.filter((c) => c.severity === "high" || c.severity === "medium").length / 15) *
+                            30,
+                        )}
+                        % weight), adjusted for historical accuracy (82% backtest).
                       </p>
                     </TooltipContent>
                   </Tooltip>
@@ -373,7 +458,7 @@ export function CcpiDashboard() {
               </div>
               <p className="text-xs text-gray-500">Signal consistency & alignment</p>
             </div>
-            
+
             <div className="text-center p-6 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600 mb-2">Current Regime</p>
               <p className="text-2xl font-bold mb-1" style={{ color: getReadableColor(data.regime.color) }}>
@@ -382,18 +467,16 @@ export function CcpiDashboard() {
               <p className="text-xs text-gray-600 px-2">{data.regime.description}</p>
             </div>
           </div>
-          
+
           <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-lg shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <h4 className="font-bold text-base text-blue-900 flex items-center gap-2">
                 <Activity className="h-5 w-5 text-blue-600" />
                 Weekly Output - Executive Summary
               </h4>
-              {summaryLoading && (
-                <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
-              )}
+              {summaryLoading && <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />}
             </div>
-            
+
             {/* AI-Generated Executive Summary */}
             {executiveSummary ? (
               <div className="mb-4 p-4 bg-white rounded-lg border border-blue-200 shadow-sm">
@@ -414,15 +497,10 @@ export function CcpiDashboard() {
                 </div>
               )
             )}
-            
+
             {/* Original Summary */}
             <div className="space-y-2">
-              
-              <ul className="space-y-1">
-                {data.summary.bullets.map((bullet, i) => (
-                  null
-                ))}
-              </ul>
+              <ul className="space-y-1">{data.summary.bullets.map((bullet, i) => null)}</ul>
             </div>
           </div>
         </CardContent>
@@ -432,8 +510,8 @@ export function CcpiDashboard() {
         <Card className="border-2 border-red-600 bg-gradient-to-r from-red-50 to-orange-50 shadow-xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-red-900">
-              <AlertTriangle className="h-6 w-6 text-red-600 animate-pulse" />
-              🚨 CRASH AMPLIFIERS ACTIVE +{data.totalBonus} BONUS POINTS
+              <AlertTriangle className="h-6 w-6 text-red-600 animate-pulse" />🚨 CRASH AMPLIFIERS ACTIVE +
+              {data.totalBonus} BONUS POINTS
             </CardTitle>
             <CardDescription className="text-red-700 font-medium">
               Multiple extreme crash signals detected - CCPI boosted from {data.baseCCPI} to {data.ccpi}
@@ -442,7 +520,10 @@ export function CcpiDashboard() {
           <CardContent>
             <div className="space-y-2">
               {data.crashAmplifiers?.map((amp, i) => (
-                <div key={i} className="flex items-center justify-between p-3 bg-white rounded-lg border-2 border-red-300">
+                <div
+                  key={i}
+                  className="flex items-center justify-between p-3 bg-white rounded-lg border-2 border-red-300"
+                >
                   <span className="text-sm font-semibold text-red-900">{amp.reason}</span>
                   <Badge className="bg-red-600 text-white text-base font-bold">+{amp.points}</Badge>
                 </div>
@@ -450,8 +531,8 @@ export function CcpiDashboard() {
             </div>
             <div className="mt-4 p-3 bg-red-100 border-2 border-red-400 rounded-lg">
               <p className="text-sm text-red-900 font-bold">
-                ⚠️ CRASH AMPLIFIERS = Short-term (1-14 day) indicators that trigger 10%+ corrections.
-                Maximum bonus capped at +100 points to prevent over-signaling.
+                ⚠️ CRASH AMPLIFIERS = Short-term (1-14 day) indicators that trigger 10%+ corrections. Maximum bonus
+                capped at +100 points to prevent over-signaling.
               </p>
             </div>
           </CardContent>
@@ -466,15 +547,18 @@ export function CcpiDashboard() {
               Canaries in the Coal Mine - Active Warning Signals
             </div>
             <span className="text-2xl font-bold text-red-600">
-              {data.canaries.filter(canary => canary.severity === "high" || canary.severity === "medium").length}/{data.totalIndicators || 38}
+              {data.canaries.filter((canary) => canary.severity === "high" || canary.severity === "medium").length}/
+              {data.totalIndicators || 38}
             </span>
           </CardTitle>
-          <CardDescription>Executive summary of medium and high severity red flags across all indicators</CardDescription>
+          <CardDescription>
+            Executive summary of medium and high severity red flags across all indicators
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-3">
             {data.canaries
-              .filter(canary => canary.severity === "high" || canary.severity === "medium")
+              .filter((canary) => canary.severity === "high" || canary.severity === "medium")
               .map((canary, i) => {
                 const severityConfig = {
                   high: {
@@ -482,24 +566,29 @@ export function CcpiDashboard() {
                     textColor: "text-red-900",
                     borderColor: "border-red-400",
                     badgeColor: "bg-red-600 text-white",
-                    label: "HIGH RISK"
+                    label: "HIGH RISK",
                   },
                   medium: {
                     bgColor: "bg-yellow-100",
                     textColor: "text-yellow-900",
                     borderColor: "border-yellow-400",
                     badgeColor: "bg-yellow-600 text-white",
-                    label: "MEDIUM RISK"
-                  }
+                    label: "MEDIUM RISK",
+                  },
                 }[canary.severity]
-                
+
                 return (
-                  <div key={i} className={`flex-1 min-w-[280px] p-4 rounded-lg border-2 ${severityConfig.bgColor} ${severityConfig.borderColor}`}>
+                  <div
+                    key={i}
+                    className={`flex-1 min-w-[280px] p-4 rounded-lg border-2 ${severityConfig.bgColor} ${severityConfig.borderColor}`}
+                  >
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <Badge variant="outline" className="text-xs font-semibold">
                         {canary.pillar}
                       </Badge>
-                      <span className={`text-xs font-bold px-3 py-1 rounded-md ${severityConfig.badgeColor} shadow-sm whitespace-nowrap`}>
+                      <span
+                        className={`text-xs font-bold px-3 py-1 rounded-md ${severityConfig.badgeColor} shadow-sm whitespace-nowrap`}
+                      >
                         {severityConfig.label}
                       </span>
                     </div>
@@ -508,7 +597,7 @@ export function CcpiDashboard() {
                 )
               })}
           </div>
-          {data.canaries.filter(c => c.severity === "high" || c.severity === "medium").length === 0 && (
+          {data.canaries.filter((c) => c.severity === "high" || c.severity === "medium").length === 0 && (
             <div className="text-center py-4">
               <p className="text-sm text-green-700 font-medium">No medium or high severity warnings detected</p>
             </div>
@@ -518,10 +607,8 @@ export function CcpiDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Pillar Breakdown */}
-        
 
         {/* Canaries in the Coal Mine */}
-        
       </div>
 
       <Card>
@@ -532,7 +619,6 @@ export function CcpiDashboard() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          
           {/* Reorganized indicators into new CCPI v2.0 pillar structure */}
           <div className="space-y-4">
             <div className="flex items-center justify-between pt-12">
@@ -543,24 +629,28 @@ export function CcpiDashboard() {
               <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.momentum)}/100</span>
             </div>
             <div className="space-y-6">
-              
               {/* NVIDIA Momentum Score */}
               {data.indicators?.nvidiaPrice !== undefined && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-medium">NVIDIA Momentum Score (AI Bellwether)</span>
-                    <span className="font-bold">${data.indicators.nvidiaPrice.toFixed(0)} | {data.indicators.nvidiaMomentum}/100</span>
+                    <span className="font-bold">
+                      ${data.indicators.nvidiaPrice.toFixed(0)} | {data.indicators.nvidiaMomentum}/100
+                    </span>
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${data.indicators.nvidiaMomentum}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${data.indicators.nvidiaMomentum}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Strong: {'>'}80</span>
+                    <span>Strong: {">"}80</span>
                     <span>Neutral: 40-60</span>
-                    <span>Falling: {'<'}20 (Tech crash risk)</span>
+                    <span>Falling: {"<"}20 (Tech crash risk)</span>
                   </div>
                 </div>
               )}
@@ -574,14 +664,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${100 - Math.min(100, Math.max(0, ((data.indicators.soxIndex - 4000) / 2000) * 100))}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${100 - Math.min(100, Math.max(0, ((data.indicators.soxIndex - 4000) / 2000) * 100))}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Strong: {'>'}5500</span>
+                    <span>Strong: {">"}5500</span>
                     <span>Baseline: 5000</span>
-                    <span>Weak: {'<'}4500</span>
+                    <span>Weak: {"<"}4500</span>
                   </div>
                 </div>
               )}
@@ -595,14 +688,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, Math.max(0, (parseFloat(data.indicators.qqqDailyReturn) + 2) / 4 * 100))}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, Math.max(0, ((Number.parseFloat(data.indicators.qqqDailyReturn) + 2) / 4) * 100))}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Down: {'<'}-1%</span>
+                    <span>Down: {"<"}-1%</span>
                     <span className="text-yellow-600">Flat: -1% to +1%</span>
-                    <span>Up: {'>'} +1%</span>
+                    <span>Up: {">"} +1%</span>
                   </div>
                 </div>
               )}
@@ -616,9 +712,12 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, (data.indicators.qqqConsecDown / 5) * 100)}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, (data.indicators.qqqConsecDown / 5) * 100)}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
                     <span>Healthy: 0-1 days</span>
@@ -639,16 +738,21 @@ export function CcpiDashboard() {
                           {data.indicators.qqqSMA20Proximity.toFixed(0)}% proximity
                         </span>
                       )}
-                      <span className={`font-bold ${data.indicators.qqqBelowSMA20 ? 'text-red-600' : 'text-green-600'}`}>
-                        {data.indicators.qqqBelowSMA20 ? 'YES' : 'NO'}
+                      <span
+                        className={`font-bold ${data.indicators.qqqBelowSMA20 ? "text-red-600" : "text-green-600"}`}
+                      >
+                        {data.indicators.qqqBelowSMA20 ? "YES" : "NO"}
                       </span>
                     </div>
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${data.indicators?.qqqSMA20Proximity || 0}%`
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${data.indicators?.qqqSMA20Proximity || 0}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
                     <span>Safe: 0% (far above)</span>
@@ -669,16 +773,21 @@ export function CcpiDashboard() {
                           {data.indicators.qqqSMA50Proximity.toFixed(0)}% proximity
                         </span>
                       )}
-                      <span className={`font-bold ${data.indicators.qqqBelowSMA50 ? 'text-red-600' : 'text-green-600'}`}>
-                        {data.indicators.qqqBelowSMA50 ? 'YES' : 'NO'}
+                      <span
+                        className={`font-bold ${data.indicators.qqqBelowSMA50 ? "text-red-600" : "text-green-600"}`}
+                      >
+                        {data.indicators.qqqBelowSMA50 ? "YES" : "NO"}
                       </span>
                     </div>
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${data.indicators?.qqqSMA50Proximity || 0}%`
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${data.indicators?.qqqSMA50Proximity || 0}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
                     <span>Safe: 0% (far above)</span>
@@ -698,16 +807,21 @@ export function CcpiDashboard() {
                           {data.indicators.qqqSMA200Proximity.toFixed(0)}% proximity
                         </span>
                       )}
-                      <span className={`font-bold ${data.indicators.qqqBelowSMA200 ? 'text-red-600' : 'text-green-600'}`}>
-                        {data.indicators.qqqBelowSMA200 ? 'YES' : 'NO'}
+                      <span
+                        className={`font-bold ${data.indicators.qqqBelowSMA200 ? "text-red-600" : "text-green-600"}`}
+                      >
+                        {data.indicators.qqqBelowSMA200 ? "YES" : "NO"}
                       </span>
                     </div>
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${data.indicators?.qqqSMA200Proximity || 0}%`
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${data.indicators?.qqqSMA200Proximity || 0}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
                     <span>Safe: 0% (far above)</span>
@@ -728,16 +842,21 @@ export function CcpiDashboard() {
                           {data.indicators.qqqBollingerProximity.toFixed(0)}% proximity
                         </span>
                       )}
-                      <span className={`font-bold ${data.indicators.qqqBelowBollinger ? 'text-red-600' : 'text-green-600'}`}>
-                        {data.indicators.qqqBelowBollinger ? 'YES - OVERSOLD' : 'NO'}
+                      <span
+                        className={`font-bold ${data.indicators.qqqBelowBollinger ? "text-red-600" : "text-green-600"}`}
+                      >
+                        {data.indicators.qqqBelowBollinger ? "YES - OVERSOLD" : "NO"}
                       </span>
                     </div>
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${data.indicators?.qqqBollingerProximity || 0}%`
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${data.indicators?.qqqBollingerProximity || 0}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
                     <span>Safe: 0% (at middle band)</span>
@@ -751,16 +870,19 @@ export function CcpiDashboard() {
               {data.indicators?.qqqDeathCross !== undefined && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">QQQ Death Cross (SMA50 {'<'} SMA200)</span>
-                    <span className={`font-bold ${data.indicators.qqqDeathCross ? 'text-red-600' : 'text-green-600'}`}>
-                      {data.indicators.qqqDeathCross ? 'YES - DANGER' : 'NO'}
+                    <span className="font-medium">QQQ Death Cross (SMA50 {"<"} SMA200)</span>
+                    <span className={`font-bold ${data.indicators.qqqDeathCross ? "text-red-600" : "text-green-600"}`}>
+                      {data.indicators.qqqDeathCross ? "YES - DANGER" : "NO"}
                     </span>
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: data.indicators.qqqDeathCross ? '100%' : '0%' 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: data.indicators.qqqDeathCross ? "100%" : "0%",
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
                     <span>Golden Cross: Bullish</span>
@@ -778,14 +900,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, (data.indicators.vix / 50) * 100)}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, (data.indicators.vix / 50) * 100)}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Calm: {'<'}15</span>
+                    <span>Calm: {"<"}15</span>
                     <span className="text-yellow-600">Elevated: 15-25</span>
-                    <span>Fear: {'>'}25</span>
+                    <span>Fear: {">"}25</span>
                   </div>
                 </div>
               )}
@@ -799,14 +924,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, (data.indicators.vxn / 50) * 100)}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, (data.indicators.vxn / 50) * 100)}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Calm: {'<'}15</span>
+                    <span>Calm: {"<"}15</span>
                     <span className="text-yellow-600">Elevated: 15-25</span>
-                    <span>Panic: {'>'}35</span>
+                    <span>Panic: {">"}35</span>
                   </div>
                 </div>
               )}
@@ -820,14 +948,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, (data.indicators.rvx / 50) * 100)}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, (data.indicators.rvx / 50) * 100)}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Low: {'<'}18</span>
+                    <span>Low: {"<"}18</span>
                     <span className="text-yellow-600">Normal: 18-25</span>
-                    <span>High: {'>'}30</span>
+                    <span>High: {">"}30</span>
                   </div>
                 </div>
               )}
@@ -841,14 +972,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, Math.max(0, (2.0 - data.indicators.vixTermStructure) / 1.5 * 100))}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, Math.max(0, ((2.0 - data.indicators.vixTermStructure) / 1.5) * 100))}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Contango: {'>'}1.5 (Safe)</span>
+                    <span>Contango: {">"}1.5 (Safe)</span>
                     <span className="text-yellow-600">Normal: 1.0-1.2</span>
-                    <span className="text-red-600">Backwardation: {'<'}1.0 (FEAR)</span>
+                    <span className="text-red-600">Backwardation: {"<"}1.0 (FEAR)</span>
                   </div>
                 </div>
               )}
@@ -862,14 +996,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, (data.indicators.atr / 60) * 100)}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, (data.indicators.atr / 60) * 100)}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Low Vol: {'<'}25</span>
+                    <span>Low Vol: {"<"}25</span>
                     <span className="text-yellow-600">Normal: 25-40</span>
-                    <span>High Vol: {'>'}50</span>
+                    <span>High Vol: {">"}50</span>
                   </div>
                 </div>
               )}
@@ -883,14 +1020,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, (data.indicators.ltv / 0.3) * 100)}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, (data.indicators.ltv / 0.3) * 100)}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Stable: {'<'}10%</span>
+                    <span>Stable: {"<"}10%</span>
                     <span className="text-yellow-600">Normal: 10-15%</span>
-                    <span>Elevated: {'>'}20%</span>
+                    <span>Elevated: {">"}20%</span>
                   </div>
                 </div>
               )}
@@ -904,14 +1044,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${data.indicators.highLowIndex}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${data.indicators.highLowIndex}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Weak: {'<'}30% (bearish)</span>
+                    <span>Weak: {"<"}30% (bearish)</span>
                     <span className="text-yellow-600">Neutral: 30-50%</span>
-                    <span>Strong: {'>'}70% (bullish)</span>
+                    <span>Strong: {">"}70% (bullish)</span>
                   </div>
                 </div>
               )}
@@ -925,14 +1068,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${data.indicators.bullishPercent}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${data.indicators.bullishPercent}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Oversold: {'<'}30%</span>
+                    <span>Oversold: {"<"}30%</span>
                     <span className="text-yellow-600">Normal: 30-50%</span>
-                    <span>Overbought: {'>'}70%</span>
+                    <span>Overbought: {">"}70%</span>
                   </div>
                 </div>
               )}
@@ -948,7 +1094,6 @@ export function CcpiDashboard() {
               <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.riskAppetite)}/100</span>
             </div>
             <div className="space-y-6">
-              
               {/* Put/Call Ratio */}
               {data.indicators.putCallRatio !== undefined && (
                 <div className="space-y-2">
@@ -958,14 +1103,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, Math.max(0, (1.6 - data.indicators.putCallRatio) / 1.5 * 100))}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, Math.max(0, ((1.6 - data.indicators.putCallRatio) / 1.5) * 100))}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Safe: {'>'}1.1 (Hedging)</span>
+                    <span>Safe: {">"}1.1 (Hedging)</span>
                     <span className="text-yellow-600">Caution: 0.9-1.1</span>
-                    <span className="text-red-600">Danger: {'<'}0.7 (Complacency)</span>
+                    <span className="text-red-600">Danger: {"<"}0.7 (Complacency)</span>
                   </div>
                 </div>
               )}
@@ -979,14 +1127,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${data.indicators.fearGreedIndex}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${data.indicators.fearGreedIndex}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Fear: {'<'}30</span>
+                    <span>Fear: {"<"}30</span>
                     <span className="text-yellow-600">Neutral: 30-60</span>
-                    <span>Greed: {'>'}70</span>
+                    <span>Greed: {">"}70</span>
                   </div>
                 </div>
               )}
@@ -1000,14 +1151,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.aaiiBullish - 20) / 0.4)))}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, Math.max(0, (data.indicators.aaiiBullish - 20) / 0.4))}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Safe: {'<'}30%</span>
+                    <span>Safe: {"<"}30%</span>
                     <span className="text-yellow-600">Warning: 30-40%</span>
-                    <span className="text-red-600">Danger: {'>'}50%</span>
+                    <span className="text-red-600">Danger: {">"}50%</span>
                   </div>
                 </div>
               )}
@@ -1021,14 +1175,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, Math.max(0, (15 - (data.indicators.shortInterest * 100)) / 15 * 100))}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, Math.max(0, ((15 - data.indicators.shortInterest * 100) / 15) * 100))}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Safe: {'>'}15% (Positioned)</span>
+                    <span>Safe: {">"}15% (Positioned)</span>
                     <span className="text-yellow-600">Caution: 5-15%</span>
-                    <span className="text-red-600">Danger: {'<'}1.5% (Complacency)</span>
+                    <span className="text-red-600">Danger: {"<"}1.5% (Complacency)</span>
                   </div>
                 </div>
               )}
@@ -1042,14 +1199,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.etfFlows + 5) / 10) * 100))}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.etfFlows + 5) / 10) * 100))}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Outflows: {'<'}-$2B</span>
+                    <span>Outflows: {"<"}-$2B</span>
                     <span className="text-yellow-600">Neutral: -$2B to +$2B</span>
-                    <span>Inflows: {'>'} $2B</span>
+                    <span>Inflows: {">"} $2B</span>
                   </div>
                 </div>
               )}
@@ -1063,14 +1223,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, (data.indicators.atr / 60) * 100)}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, (data.indicators.atr / 60) * 100)}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Low Vol: {'<'}25</span>
+                    <span>Low Vol: {"<"}25</span>
                     <span className="text-yellow-600">Normal: 25-40</span>
-                    <span>High Vol: {'>'}50</span>
+                    <span>High Vol: {">"}50</span>
                   </div>
                 </div>
               )}
@@ -1084,14 +1247,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, (data.indicators.ltv / 0.3) * 100)}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, (data.indicators.ltv / 0.3) * 100)}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Stable: {'<'}10%</span>
+                    <span>Stable: {"<"}10%</span>
                     <span className="text-yellow-600">Normal: 10-15%</span>
-                    <span>Elevated: {'>'}20%</span>
+                    <span>Elevated: {">"}20%</span>
                   </div>
                 </div>
               )}
@@ -1105,14 +1271,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${data.indicators.bullishPercent}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${data.indicators.bullishPercent}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Oversold: {'<'}30%</span>
+                    <span>Oversold: {"<"}30%</span>
                     <span className="text-yellow-600">Normal: 30-50%</span>
-                    <span>Overbought: {'>'}70%</span>
+                    <span>Overbought: {">"}70%</span>
                   </div>
                 </div>
               )}
@@ -1126,14 +1295,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, Math.max(0, 100 - ((data.indicators.yieldCurve + 1) / 2) * 100))}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, Math.max(0, 100 - ((data.indicators.yieldCurve + 1) / 2) * 100))}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Normal: {'>'}0.5%</span>
+                    <span>Normal: {">"}0.5%</span>
                     <span className="text-yellow-600">Flat: 0-0.5%</span>
-                    <span>Inverted: {'<'}0%</span>
+                    <span>Inverted: {"<"}0%</span>
                   </div>
                 </div>
               )}
@@ -1149,7 +1321,6 @@ export function CcpiDashboard() {
               <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.valuation)}/100</span>
             </div>
             <div className="space-y-6">
-              
               {/* S&P 500 P/E */}
               {data.indicators.spxPE !== undefined && (
                 <div className="space-y-2">
@@ -1159,9 +1330,12 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, ((data.indicators.spxPE - 10) / 15) * 100)}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, ((data.indicators.spxPE - 10) / 15) * 100)}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
                     <span>Historical Median: 16</span>
@@ -1179,13 +1353,16 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, ((data.indicators.spxPS - 1) / 2) * 100)}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, ((data.indicators.spxPS - 1) / 2) * 100)}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Normal: {'<'}2.5</span>
-                    <span>Elevated: {'>'}3.0</span>
+                    <span>Normal: {"<"}2.5</span>
+                    <span>Elevated: {">"}3.0</span>
                   </div>
                 </div>
               )}
@@ -1199,15 +1376,18 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.buffettIndicator - 80) / 1.6)))}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, Math.max(0, (data.indicators.buffettIndicator - 80) / 1.6))}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Undervalued: {'<'}120%</span>
+                    <span>Undervalued: {"<"}120%</span>
                     <span>Fair: 120-150%</span>
                     <span>Warning: 150-180%</span>
-                    <span className="text-red-600">Danger: {'>'}200%</span>
+                    <span className="text-red-600">Danger: {">"}200%</span>
                   </div>
                 </div>
               )}
@@ -1220,14 +1400,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, ((data.indicators.qqqPE - 15) / 30) * 100)}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, ((data.indicators.qqqPE - 15) / 30) * 100)}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Fair: {'<'}25</span>
+                    <span>Fair: {"<"}25</span>
                     <span>Elevated: 30-35</span>
-                    <span>Bubble: {'>'}40</span>
+                    <span>Bubble: {">"}40</span>
                   </div>
                 </div>
               )}
@@ -1240,14 +1423,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, ((data.indicators.mag7Concentration - 40) / 30) * 100)}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, ((data.indicators.mag7Concentration - 40) / 30) * 100)}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Diversified: {'<'}50%</span>
+                    <span>Diversified: {"<"}50%</span>
                     <span>High: 55-60%</span>
-                    <span>Extreme: {'>'}65%</span>
+                    <span>Extreme: {">"}65%</span>
                   </div>
                 </div>
               )}
@@ -1260,14 +1446,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, ((data.indicators.shillerCAPE - 15) / 25) * 100)}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, ((data.indicators.shillerCAPE - 15) / 25) * 100)}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
                     <span>Historical Avg: 16-17</span>
                     <span>Elevated: 25-30</span>
-                    <span>Extreme: {'>'}35</span>
+                    <span>Extreme: {">"}35</span>
                   </div>
                 </div>
               )}
@@ -1280,14 +1469,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.equityRiskPremium - 1) / 5) * 100))}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.equityRiskPremium - 1) / 5) * 100))}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Attractive: {'>'}5%</span>
+                    <span>Attractive: {">"}5%</span>
                     <span>Fair: 3-4%</span>
-                    <span>Overvalued: {'<'}2%</span>
+                    <span>Overvalued: {"<"}2%</span>
                   </div>
                 </div>
               )}
@@ -1303,7 +1495,6 @@ export function CcpiDashboard() {
               <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.macro)}/100</span>
             </div>
             <div className="space-y-6">
-              
               {/* TED Spread */}
               {data.indicators?.tedSpread !== undefined && (
                 <div className="space-y-2">
@@ -1313,14 +1504,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, (data.indicators.tedSpread / 1.5) * 100)}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, (data.indicators.tedSpread / 1.5) * 100)}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Normal: {'<'}0.35%</span>
+                    <span>Normal: {"<"}0.35%</span>
                     <span>Warning: 0.5-0.75%</span>
-                    <span>Crisis: {'>'}1.0%</span>
+                    <span>Crisis: {">"}1.0%</span>
                   </div>
                 </div>
               )}
@@ -1334,14 +1528,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.dxyIndex - 90) / 30) * 100))}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.dxyIndex - 90) / 30) * 100))}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Weak: {'<'}95</span>
+                    <span>Weak: {"<"}95</span>
                     <span>Normal: 100-105</span>
-                    <span>Strong: {'>'}110 (Hurts tech)</span>
+                    <span>Strong: {">"}110 (Hurts tech)</span>
                   </div>
                 </div>
               )}
@@ -1355,14 +1552,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, Math.max(0, 100 - ((data.indicators.ismPMI - 40) / 20) * 100))}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, Math.max(0, 100 - ((data.indicators.ismPMI - 40) / 20) * 100))}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Expansion: {'>'}52</span>
+                    <span>Expansion: {">"}52</span>
                     <span>Neutral: 50</span>
-                    <span>Contraction: {'<'}50</span>
+                    <span>Contraction: {"<"}50</span>
                   </div>
                 </div>
               )}
@@ -1376,14 +1576,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, (data.indicators.fedFundsRate / 6) * 100)}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, (data.indicators.fedFundsRate / 6) * 100)}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Accommodative: {'<'}2%</span>
+                    <span>Accommodative: {"<"}2%</span>
                     <span className="text-yellow-600">Neutral: 2-4%</span>
-                    <span>Restrictive: {'>'}4.5%</span>
+                    <span>Restrictive: {">"}4.5%</span>
                   </div>
                 </div>
               )}
@@ -1397,14 +1600,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, (data.indicators.fedReverseRepo / 2500) * 100)}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, (data.indicators.fedReverseRepo / 2500) * 100)}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Loose: {'<'}500B</span>
+                    <span>Loose: {"<"}500B</span>
                     <span>Normal: 1000B</span>
-                    <span>Tight: {'>'}2000B</span>
+                    <span>Tight: {">"}2000B</span>
                   </div>
                 </div>
               )}
@@ -1418,14 +1624,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, ((data.indicators.junkSpread - 2) / 8) * 100)}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, ((data.indicators.junkSpread - 2) / 8) * 100)}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Tight: {'<'}3%</span>
+                    <span>Tight: {"<"}3%</span>
                     <span className="text-yellow-600">Normal: 3-5%</span>
-                    <span>Wide: {'>'}6%</span>
+                    <span>Wide: {">"}6%</span>
                   </div>
                 </div>
               )}
@@ -1439,14 +1648,17 @@ export function CcpiDashboard() {
                   </div>
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                    <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.debtToGDP - 60) / 80) * 100))}%` 
-                    }} />
+                    <div
+                      className="absolute inset-0 bg-gray-200"
+                      style={{
+                        marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.debtToGDP - 60) / 80) * 100))}%`,
+                      }}
+                    />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
-                    <span>Healthy: {'<'}90%</span>
+                    <span>Healthy: {"<"}90%</span>
                     <span className="text-yellow-600">Elevated: 100-120%</span>
-                    <span className="text-red-600">Danger: {'>'}130%</span>
+                    <span className="text-red-600">Danger: {">"}130%</span>
                   </div>
                 </div>
               )}
@@ -1474,7 +1686,8 @@ export function CcpiDashboard() {
               </div>
             </div>
             <p className="text-xs text-blue-700 mt-3">
-              Final CCPI = Σ(Pillar Score × Weight). Pillar 3 now includes 7 valuation & market structure indicators: S&P P/E, S&P P/S, Buffett Indicator, QQQ P/E, Mag7 Concentration, Shiller CAPE, and Equity Risk Premium.
+              Final CCPI = Σ(Pillar Score × Weight). Pillar 3 now includes 7 valuation & market structure indicators:
+              S&P P/E, S&P P/S, Buffett Indicator, QQQ P/E, Mag7 Concentration, Shiller CAPE, and Equity Risk Premium.
             </p>
           </div>
         </CardContent>
@@ -1505,9 +1718,9 @@ export function CcpiDashboard() {
                     "Run the wheel strategy on tech leaders (NVDA, MSFT, AAPL)",
                     "Long ITM LEAPS calls (70-80 delta) for portfolio leverage",
                     "Aggressive short strangles on high IV stocks",
-                    "Credit spreads in earnings season"
-                  ]
-                }
+                    "Credit spreads in earnings season",
+                  ],
+                },
               },
               {
                 range: "20-39",
@@ -1523,9 +1736,9 @@ export function CcpiDashboard() {
                     "Covered calls on existing positions (40-45 DTE)",
                     "Bull put spreads with 1.5-2x credit/risk ratio",
                     "Diagonal calendar spreads for income + upside",
-                    "Protective puts on core holdings (10% allocation)"
-                  ]
-                }
+                    "Protective puts on core holdings (10% allocation)",
+                  ],
+                },
               },
               {
                 range: "40-59",
@@ -1541,9 +1754,9 @@ export function CcpiDashboard() {
                     "Increase VIX call hedges (2-3 month expiry)",
                     "Roll out short puts to avoid assignment",
                     "Close winning trades early (50-60% max profit)",
-                    "Buy protective puts on concentrated positions"
-                  ]
-                }
+                    "Buy protective puts on concentrated positions",
+                  ],
+                },
               },
               {
                 range: "60-79",
@@ -1559,15 +1772,16 @@ export function CcpiDashboard() {
                     "Long put spreads on QQQ/SPY at-the-money",
                     "Close all naked short options immediately",
                     "Tactical long volatility trades (VXX calls)",
-                    "Gold miners (GDX) call options as diversification"
-                  ]
-                }
+                    "Gold miners (GDX) call options as diversification",
+                  ],
+                },
               },
               {
                 range: "80-100",
                 level: "Crash Watch",
                 signal: "SELL/HEDGE",
-                description: "Extreme crash risk. Full defensive positioning required. Prioritize capital preservation.",
+                description:
+                  "Extreme crash risk. Full defensive positioning required. Prioritize capital preservation.",
                 guidance: {
                   cashAllocation: "70-80%",
                   marketExposure: "10-30%",
@@ -1577,10 +1791,10 @@ export function CcpiDashboard() {
                     "VIX call spreads to capitalize on volatility spike",
                     "Inverse ETFs (SQQQ, SH) or long put options",
                     "Close ALL short premium positions",
-                    "Tail risk hedges: deep OTM puts on major indices"
-                  ]
-                }
-              }
+                    "Tail risk hedges: deep OTM puts on major indices",
+                  ],
+                },
+              },
             ].map((item, index) => {
               const isCurrent =
                 data.ccpi >= Number.parseInt(item.range.split("-")[0]) &&
@@ -1590,7 +1804,9 @@ export function CcpiDashboard() {
                 <div
                   key={index}
                   className={`p-4 rounded-lg border transition-colors ${
-                    isCurrent ? "border-green-500 bg-green-100 shadow-md ring-2 ring-green-300" : "border-gray-200 bg-white hover:bg-gray-50"
+                    isCurrent
+                      ? "border-green-500 bg-green-100 shadow-md ring-2 ring-green-300"
+                      : "border-gray-200 bg-white hover:bg-gray-50"
                   }`}
                 >
                   <div className="mb-3">
@@ -1672,9 +1888,9 @@ export function CcpiDashboard() {
 
           <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
             <p className="text-sm text-blue-800 leading-relaxed">
-              <strong>Note:</strong> The CCPI is most effective when used with technical analysis and portfolio stress testing.
-              CCPI scores above 60 historically precede significant drawdowns within 1-6 months. Always maintain proper position
-              sizing and use defined-risk strategies during elevated CCPI regimes.
+              <strong>Note:</strong> The CCPI is most effective when used with technical analysis and portfolio stress
+              testing. CCPI scores above 60 historically precede significant drawdowns within 1-6 months. Always
+              maintain proper position sizing and use defined-risk strategies during elevated CCPI regimes.
             </p>
           </div>
         </CardContent>
@@ -1683,7 +1899,9 @@ export function CcpiDashboard() {
       {/* Portfolio Allocation by CCPI Crash Risk Level */}
       <Card className="shadow-sm border-gray-200">
         <CardHeader className="bg-gray-50 border-b border-gray-200">
-          <CardTitle className="text-lg font-bold text-gray-900">Portfolio Allocation by CCPI Crash Risk Level</CardTitle>
+          <CardTitle className="text-lg font-bold text-gray-900">
+            Portfolio Allocation by CCPI Crash Risk Level
+          </CardTitle>
           <p className="text-sm text-gray-600 mt-1">
             Recommended asset class diversification across crash risk regimes
           </p>
@@ -1706,9 +1924,9 @@ export function CcpiDashboard() {
                     "Allocate 15-20% to options strategies for leverage and income",
                     "Hold 8-12% crypto for asymmetric upside (BTC/ETH)",
                     "Minimal cash reserves needed in low-risk environment",
-                    "Small gold allocation (3-5%) as insurance policy"
-                  ]
-                }
+                    "Small gold allocation (3-5%) as insurance policy",
+                  ],
+                },
               },
               {
                 range: "20-39",
@@ -1725,9 +1943,9 @@ export function CcpiDashboard() {
                     "Use options for income generation and tactical positioning",
                     "Reduce crypto exposure to 5-8% of portfolio",
                     "Increase gold/silver to 5-8% for diversification",
-                    "Build cash reserves to 15-25% for opportunities"
-                  ]
-                }
+                    "Build cash reserves to 15-25% for opportunities",
+                  ],
+                },
               },
               {
                 range: "40-59",
@@ -1744,9 +1962,9 @@ export function CcpiDashboard() {
                     "Shift options allocation toward hedges and put spreads",
                     "Trim crypto to minimal allocation (3-5%)",
                     "Increase gold/silver to 10-15% as safe haven",
-                    "Build substantial cash position (30-40%) for volatility"
-                  ]
-                }
+                    "Build substantial cash position (30-40%) for volatility",
+                  ],
+                },
               },
               {
                 range: "60-79",
@@ -1763,9 +1981,9 @@ export function CcpiDashboard() {
                     "Options portfolio entirely hedges and volatility plays",
                     "Exit nearly all crypto exposure due to crash risk",
                     "Gold allocation 15-20% as primary safe haven asset",
-                    "Hold 50-60% cash to deploy after market correction"
-                  ]
-                }
+                    "Hold 50-60% cash to deploy after market correction",
+                  ],
+                },
               },
               {
                 range: "80-100",
@@ -1782,10 +2000,10 @@ export function CcpiDashboard() {
                     "Options used exclusively for tail risk hedges and put spreads",
                     "Zero crypto exposure - too correlated with risk assets",
                     "Maximum gold/precious metals allocation (20-25%)",
-                    "Hold 70-80% cash reserves to deploy after crash"
-                  ]
-                }
-              }
+                    "Hold 70-80% cash reserves to deploy after crash",
+                  ],
+                },
+              },
             ].map((item, index) => {
               const isCurrent =
                 data.ccpi >= Number.parseInt(item.range.split("-")[0]) &&
@@ -1795,7 +2013,9 @@ export function CcpiDashboard() {
                 <div
                   key={index}
                   className={`p-4 rounded-lg border transition-colors ${
-                    isCurrent ? "border-green-500 bg-green-100 shadow-md ring-2 ring-green-300" : "border-gray-200 bg-white hover:bg-gray-50"
+                    isCurrent
+                      ? "border-green-500 bg-green-100 shadow-md ring-2 ring-green-300"
+                      : "border-gray-200 bg-white hover:bg-gray-50"
                   }`}
                 >
                   <div className="mb-3">
@@ -1863,9 +2083,10 @@ export function CcpiDashboard() {
 
           <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
             <p className="text-sm text-blue-800 leading-relaxed">
-              <strong>Note:</strong> These allocations represent baseline guidelines for crash risk management. Always adjust
-              based on your personal risk tolerance, time horizon, and financial goals. CCPI levels above 60 warrant significant
-              defensive positioning regardless of individual circumstances. Consult with a financial advisor for personalized advice.
+              <strong>Note:</strong> These allocations represent baseline guidelines for crash risk management. Always
+              adjust based on your personal risk tolerance, time horizon, and financial goals. CCPI levels above 60
+              warrant significant defensive positioning regardless of individual circumstances. Consult with a financial
+              advisor for personalized advice.
             </p>
           </div>
         </CardContent>
@@ -1877,7 +2098,7 @@ export function CcpiDashboard() {
           variant="outline"
           size="sm"
           onClick={() => {
-            const summary = `CCPI Weekly Outlook\n\n${data.summary.headline}\n\n${data.summary.bullets.join('\n')}\n\nCCPI Score: ${data.ccpi}\nCertainty: ${data.certainty}\nRegime: ${data.regime.name}\n\nGenerated: ${new Date(data.timestamp).toLocaleString()}`
+            const summary = `CCPI Weekly Outlook\n\n${data.summary.headline}\n\n${data.summary.bullets.join("\n")}\n\nCCPI Score: ${data.ccpi}\nCertainty: ${data.certainty}\nRegime: ${data.regime.name}\n\nGenerated: ${new Date(data.timestamp).toLocaleString()}`
             navigator.clipboard.writeText(summary)
             alert("Summary copied to clipboard!")
           }}
@@ -1891,7 +2112,6 @@ export function CcpiDashboard() {
       </div>
 
       {/* API Data Source Status - Removed as per update */}
-      
     </div>
   )
 }
