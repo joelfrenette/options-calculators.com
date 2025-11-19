@@ -6,11 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Download, LogOut, Database, Activity, CheckCircle2, XCircle, AlertCircle, Megaphone, BarChart3, TrendingUp, Gauge, Target, Github, ExternalLink, Trash2, Plus, Save, Image, Key } from 'lucide-react'
+import { Download, LogOut, Database, Activity, CheckCircle2, XCircle, AlertCircle, Megaphone, BarChart3, TrendingUp, Gauge, Target, Github, ExternalLink, Trash2, Plus, Save, Image, Key, Zap } from 'lucide-react'
 import { ApiKeysManager } from "@/components/api-keys-manager"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CcpiAuditAdmin } from "@/components/ccpi-audit-admin"
 import { ApiDataSourceStatus } from "@/components/api-data-source-status"
+import { AIStatusAdmin } from "@/components/ai-status-admin"
 
 interface ApiStatus {
   name: string
@@ -242,14 +243,22 @@ ${auditResults.codeQuality.map((check: any) => `
         </div>
 
         <Tabs defaultValue="status" className="w-full" onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-5 lg:grid-cols-6 gap-2 bg-slate-800 p-1 h-auto mb-6">
+          <TabsList className="grid grid-cols-3 lg:grid-cols-7 gap-2 bg-slate-800 p-1 h-auto mb-6">
+            <TabsTrigger value="status" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
+              <Activity className="h-4 w-4 mr-2" />
+              API Status
+            </TabsTrigger>
+            <TabsTrigger value="ai-status" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
+              <Zap className="h-4 w-4 mr-2" />
+              AI Status
+            </TabsTrigger>
             <TabsTrigger value="sources" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
               <Database className="h-4 w-4 mr-2" />
               Data Sources
             </TabsTrigger>
-            <TabsTrigger value="status" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
-              <Activity className="h-4 w-4 mr-2" />
-              API Status
+            <TabsTrigger value="keys" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
+              <Key className="h-4 w-4 mr-2" />
+              API Keys Management
             </TabsTrigger>
             <TabsTrigger value="ccpi-audit" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
               <CheckCircle2 className="h-4 w-4 mr-2" />
@@ -268,6 +277,10 @@ ${auditResults.codeQuality.map((check: any) => `
               Ads
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="ai-status">
+            <AIStatusAdmin />
+          </TabsContent>
 
           {/* Data Sources Tab */}
           <TabsContent value="sources">

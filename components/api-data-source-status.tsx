@@ -10,9 +10,11 @@ interface DataSource {
   name: string
   pillar: string
   primarySource: string
+  fallbackChain?: string[]
+  currentSource?: string
   fallback: string
   details?: string
-  status: "live" | "grokFallback" | "baseline" | "failed"
+  status: "live" | "aiFallback" | "grokFallback" | "baseline" | "failed"
   statusLabel: string
   color: "green" | "yellow" | "orange" | "red"
 }
@@ -22,6 +24,7 @@ interface DataSourceStatus {
   summary: {
     total: number
     live: number
+    aiFallback?: number
     grokFallback: number
     baseline: number
     failed: number
@@ -134,15 +137,14 @@ export function ApiDataSourceStatus() {
 
         {status && (
           <>
-            {/* Summary Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
               <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                 <div className="text-2xl font-bold text-green-700">{status.summary.live}</div>
-                <div className="text-sm text-green-600">Live Data</div>
+                <div className="text-sm text-green-600">Live API Data</div>
               </div>
               <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <div className="text-2xl font-bold text-yellow-700">{status.summary.grokFallback}</div>
-                <div className="text-sm text-yellow-600">Grok Fallback</div>
+                <div className="text-2xl font-bold text-yellow-700">{status.summary.aiFallback || status.summary.grokFallback}</div>
+                <div className="text-sm text-yellow-600">AI-Fetched Data</div>
               </div>
               <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
                 <div className="text-2xl font-bold text-orange-700">{status.summary.baseline}</div>
@@ -154,19 +156,18 @@ export function ApiDataSourceStatus() {
               </div>
             </div>
 
-            {/* Legend */}
             <div className="mb-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
               <h4 className="font-semibold text-sm mb-3 text-slate-700">Legend: Data Source Status</h4>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-green-500 rounded-full" />
-                  <span className="font-medium">Live</span>
-                  <span className="text-slate-600">- Real-time API data</span>
+                  <span className="font-medium">Live API Data</span>
+                  <span className="text-slate-600">- Real-time from primary API</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-yellow-500 rounded-full" />
-                  <span className="font-medium">Grok AI</span>
-                  <span className="text-slate-600">- AI-fetched current data</span>
+                  <span className="font-medium">AI-Fetched</span>
+                  <span className="text-slate-600">- Retrieved via AI (OpenAI/Anthropic/Groq/Grok)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-orange-500 rounded-full" />
@@ -176,12 +177,11 @@ export function ApiDataSourceStatus() {
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-red-500 rounded-full" />
                   <span className="font-medium">Failed</span>
-                  <span className="text-slate-600">- API unavailable</span>
+                  <span className="text-slate-600">- All sources unavailable</span>
                 </div>
               </div>
             </div>
 
-            {/* CCPI Calculator Data Sources */}
             <div className="space-y-4">
               <h3 className="font-semibold text-lg flex items-center gap-2">
                 <Database className="h-5 w-5 text-blue-600" />
@@ -194,13 +194,11 @@ export function ApiDataSourceStatus() {
                     key={index}
                     className="flex items-start gap-4 p-4 border rounded-lg hover:bg-slate-50 transition-colors"
                   >
-                    {/* Status Light */}
                     <div className="flex items-center gap-2 mt-1">
                       {getStatusLight(source.color)}
                       {getStatusIcon(source.color)}
                     </div>
 
-                    {/* Content */}
                     <div className="flex-1">
                       <div className="flex items-start justify-between mb-2">
                         <div>
@@ -215,10 +213,23 @@ export function ApiDataSourceStatus() {
                           <span className="font-medium text-slate-700">Primary:</span>
                           <span className="text-slate-600">{source.primarySource}</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-slate-700">Fallback:</span>
-                          <span className="text-slate-600">{source.fallback}</span>
-                        </div>
+                        {source.fallbackChain && source.fallbackChain.length > 0 ? (
+                          <div className="flex items-start gap-2">
+                            <span className="font-medium text-slate-700">Fallback Chain:</span>
+                            <span className="text-slate-600 text-xs">{source.fallbackChain.join(" → ")}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-slate-700">Fallback:</span>
+                            <span className="text-slate-600">{source.fallback}</span>
+                          </div>
+                        )}
+                        {source.currentSource && (
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-slate-700">Current Source:</span>
+                            <span className="text-slate-600 font-semibold">{source.currentSource}</span>
+                          </div>
+                        )}
                         {source.details && (
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-slate-700">Details:</span>
@@ -232,7 +243,6 @@ export function ApiDataSourceStatus() {
               </div>
             </div>
 
-            {/* Warning Notice */}
             {(status.summary.baseline > 0 || status.summary.failed > 0) && (
               <div className="mt-6 p-4 bg-yellow-50 border border-yellow-300 rounded-lg">
                 <div className="flex items-start gap-3">

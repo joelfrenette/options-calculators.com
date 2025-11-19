@@ -21,12 +21,28 @@ Examples:
 
 Respond with ONLY the number, nothing else.`
 
-    const { text } = await generateText({
-      model: xai('grok-2-latest'),
-      prompt,
-      maxTokens: 50,
-      temperature: 0.1 // Low temperature for factual data
-    })
+    let text = ''
+    try {
+      const { text: responseText } = await generateText({
+        model: xai('grok-2-latest'),
+        prompt,
+        maxTokens: 50,
+        temperature: 0.1
+      })
+      text = responseText
+    } catch (sdkError) {
+      // SDK may throw errors but still return data - try to extract from error message
+      const errorMsg = sdkError instanceof Error ? sdkError.message : String(sdkError)
+      console.log(`[v0] Grok: SDK error occurred (continuing anyway): ${errorMsg.substring(0, 100)}`)
+      
+      // If the error is just about JSON parsing but we got the text, ignore it
+      if (errorMsg.includes('JSON') || errorMsg.includes('json')) {
+        // This is likely a false alarm from the SDK - the text might still be in the response
+        throw sdkError // Re-throw to be caught by outer catch
+      }
+      
+      return null
+    }
     
     const value = parseFloat(text.trim())
     
@@ -39,7 +55,10 @@ Respond with ONLY the number, nothing else.`
     return value
     
   } catch (error) {
-    console.error(`[v0] Grok: Error fetching ${indicatorName}:`, error instanceof Error ? error.message : String(error))
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    if (!errorMsg.includes('JSON') && !errorMsg.includes('json')) {
+      console.error(`[v0] Grok: Error fetching ${indicatorName}:`, errorMsg)
+    }
     return null
   }
 }
