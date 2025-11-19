@@ -10,6 +10,7 @@ import { Download, LogOut, Database, Activity, CheckCircle2, XCircle, AlertCircl
 import { ApiKeysManager } from "@/components/api-keys-manager"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CcpiAuditAdmin } from "@/components/ccpi-audit-admin"
+import { ApiDataSourceStatus } from "@/components/api-data-source-status"
 
 interface ApiStatus {
   name: string
@@ -241,7 +242,11 @@ ${auditResults.codeQuality.map((check: any) => `
         </div>
 
         <Tabs defaultValue="status" className="w-full" onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-4 lg:grid-cols-5 gap-2 bg-slate-800 p-1 h-auto mb-6">
+          <TabsList className="grid grid-cols-5 lg:grid-cols-6 gap-2 bg-slate-800 p-1 h-auto mb-6">
+            <TabsTrigger value="sources" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
+              <Database className="h-4 w-4 mr-2" />
+              Data Sources
+            </TabsTrigger>
             <TabsTrigger value="status" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
               <Activity className="h-4 w-4 mr-2" />
               API Status
@@ -263,6 +268,11 @@ ${auditResults.codeQuality.map((check: any) => `
               Ads
             </TabsTrigger>
           </TabsList>
+
+          {/* Data Sources Tab */}
+          <TabsContent value="sources">
+            <ApiDataSourceStatus />
+          </TabsContent>
 
           {/* Status Tab */}
           <TabsContent value="status">
