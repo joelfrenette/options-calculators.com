@@ -188,7 +188,7 @@ export async function GET() {
       },
       canaries,
       activeCanaries: canaries.filter(c => c.severity === 'high' || c.severity === 'medium').length,
-      totalIndicators: canaries.length, // Dynamic count based on actual canaries generated
+      totalIndicators: 38,
       apiStatus: data.apiStatus,
       timestamp: new Date().toISOString()
     })

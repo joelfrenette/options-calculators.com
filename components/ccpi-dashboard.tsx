@@ -44,6 +44,7 @@ interface CCPIData {
   indicators?: Record<string, any>
   apiStatus?: Record<string, { live: boolean; source: string }> // Updated for clarity
   timestamp: string
+  totalIndicators?: number // Added for the canary count display
 }
 
 interface HistoricalData {
@@ -119,7 +120,7 @@ export function CcpiDashboard() {
         regime: result.regime.name,
         pillars: result.pillars,
         activeCanaries: result.canaries.filter((c: any) => c.severity === 'high' || c.severity === 'medium').length,
-        totalIndicators: 25 // Adjusted from 23 to 25 as per update
+        totalIndicators: 38 // Removed problematic comment
       })
       console.log("[v0] Pillar Breakdown (weighted contribution to CCPI):")
       console.log("  Momentum:", result.pillars.momentum, "× 40% =", (result.pillars.momentum * 0.40).toFixed(1))
@@ -155,7 +156,7 @@ export function CcpiDashboard() {
           ccpi: ccpiData.ccpi,
           certainty: ccpiData.certainty,
           activeCanaries: ccpiData.canaries.filter(c => c.severity === 'high' || c.severity === 'medium').length,
-          totalIndicators: 25, // Adjusted from 23 to 25 as per update
+          totalIndicators: 38, // Removed problematic comment
           regime: ccpiData.regime,
           pillars: ccpiData.pillars
         })
@@ -465,7 +466,7 @@ export function CcpiDashboard() {
               Canaries in the Coal Mine - Active Warning Signals
             </div>
             <span className="text-2xl font-bold text-red-600">
-              {data.canaries.filter(canary => canary.severity === "high" || canary.severity === "medium").length}/25
+              {data.canaries.filter(canary => canary.severity === "high" || canary.severity === "medium").length}/{data.totalIndicators || 38}
             </span>
           </CardTitle>
           <CardDescription>Executive summary of medium and high severity red flags across all indicators</CardDescription>
@@ -1021,7 +1022,7 @@ export function CcpiDashboard() {
                   <div className="relative w-full h-3 rounded-full overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                     <div className="absolute inset-0 bg-gray-200" style={{ 
-                      marginLeft: `${Math.min(100, Math.max(0, (0.15 - data.indicators.shortInterest) / 0.15 * 100))}%` 
+                      marginLeft: `${Math.min(100, Math.max(0, (15 - (data.indicators.shortInterest * 100)) / 15 * 100))}%` 
                     }} />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
