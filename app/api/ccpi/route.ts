@@ -21,10 +21,7 @@ import {
   getVIX,
   getNVIDIAPrice,
   getSOXIndex,
-  getISMPMI,
-  getSPXPE,
-  getFearGreed,
-  getYieldCurve
+  getISMPMI
 } from '@/lib/unified-ai-fallback'
 
 import { fetchShillerCAPEWithGrok } from '@/lib/grok-market-data' // Kept Grok for now as a fallback
@@ -50,14 +47,26 @@ interface APIStatusTracker {
 
 export async function GET() {
   try {
+    console.log("[v0] CCPI GET: Starting...")
+    
     // Fetch market data
+    console.log("[v0] CCPI GET: Fetching market data...")
     const data = await fetchMarketData()
+    console.log("[v0] CCPI GET: Market data fetched successfully")
     
     // Compute 4 new pillar scores
+    console.log("[v0] CCPI GET: Computing pillars...")
     const momentum = await computeMomentumPillar(data)      // NEW: Pillar 1 - Momentum & Technical (40%)
+    console.log("[v0] CCPI GET: Momentum pillar computed:", momentum)
+    
     const riskAppetite = await computeRiskAppetitePillar(data) // NEW: Pillar 2 - Risk Appetite (30%)
+    console.log("[v0] CCPI GET: Risk appetite pillar computed:", riskAppetite)
+    
     const valuation = await computeValuationPillar(data)    // NEW: Pillar 3 - Valuation (20%)
+    console.log("[v0] CCPI GET: Valuation pillar computed:", valuation)
+    
     const macro = await computeMacroPillar(data)           // NEW: Pillar 4 - Macro (10%)
+    console.log("[v0] CCPI GET: Macro pillar computed:", macro)
     
     let baseCCPI = Math.round(
       momentum * 0.35 +      // Updated from 0.40 to 0.35
@@ -76,12 +85,27 @@ export async function GET() {
     console.log("  Final CCPI:", finalCCPI)
     
     // Generate canary signals and other metadata
+    console.log("[v0] CCPI GET: Generating canary signals...")
     const canaries = await generateCanarySignals(data)
-    const confidence = computeCertaintyScore({ momentum, riskAppetite, valuation, macro }, data, canaries.length)
-    const regime = determineRegime(finalCCPI, canaries.length)
-    const playbook = getPlaybook(regime)
-    const summary = generateWeeklySummary(finalCCPI, confidence, regime, { momentum, riskAppetite, valuation, macro }, data, canaries)
+    console.log("[v0] CCPI GET: Canary signals generated:", canaries.length)
     
+    console.log("[v0] CCPI GET: Computing confidence...")
+    const confidence = computeCertaintyScore({ momentum, riskAppetite, valuation, macro }, data, canaries.length)
+    console.log("[v0] CCPI GET: Confidence computed:", confidence)
+    
+    console.log("[v0] CCPI GET: Determining regime...")
+    const regime = determineRegime(finalCCPI, canaries.length)
+    console.log("[v0] CCPI GET: Regime determined:", regime.name)
+    
+    console.log("[v0] CCPI GET: Getting playbook...")
+    const playbook = getPlaybook(regime)
+    console.log("[v0] CCPI GET: Playbook retrieved")
+    
+    console.log("[v0] CCPI GET: Generating summary...")
+    const summary = generateWeeklySummary(finalCCPI, confidence, regime, { momentum, riskAppetite, valuation, macro }, data, canaries)
+    console.log("[v0] CCPI GET: Summary generated")
+    
+    console.log("[v0] CCPI GET: Returning response...")
     return NextResponse.json({
       ccpi: finalCCPI,
       baseCCPI,
@@ -626,226 +650,471 @@ async function fetchAAIISentiment() {
 }
 
 async function computeMomentumPillar(data: Awaited<ReturnType<typeof fetchMarketData>>): Promise<number> {
-  let score = 0
+  // Each indicator now has explicit weight and properly defined risk thresholds
   
-  // QQQ Daily Return (5× downside amplifier)
-  if (data.qqqDailyReturn < -6) score += 50
-  else if (data.qqqDailyReturn < -3) score += 35
-  else if (data.qqqDailyReturn < -1.5) score += 20
-  else if (data.qqqDailyReturn < -1) score += 10
+  let totalScore = 0
+  const indicators = []
   
-  // QQQ Consecutive Down Days
-  if (data.qqqConsecDown >= 5) score += 20
-  else if (data.qqqConsecDown >= 3) score += 12
-  else if (data.qqqConsecDown >= 2) score += 6
+  // Indicator 1: NVIDIA Momentum Score (Weight: 6/100)
+  const nvidiaScore = (() => {
+    const momentum = data.nvidiaMomentum || 50
+    if (momentum > 80) return 6 // High momentum = overheating
+    if (momentum > 60) return 4
+    if (momentum < 20) return 6 // Falling = crash risk
+    if (momentum < 40) return 4
+    return 2
+  })()
+  totalScore += nvidiaScore
+  indicators.push({ name: 'NVIDIA Momentum', score: nvidiaScore, weight: 6 })
   
-  // QQQ Below SMAs (trend breaks)
-  if (data.qqqBelowSMA200) score += 25
-  if (data.qqqBelowSMA50) score += 18
-  if (data.qqqBelowSMA20) score += 12
+  // Indicator 2: SOX Semiconductor Index (Weight: 6/100)
+  const soxScore = (() => {
+    const soxDeviation = ((data.soxIndex - 5000) / 5000) * 100
+    if (soxDeviation < -15) return 6 // Major chip selloff
+    if (soxDeviation < -10) return 4
+    if (soxDeviation < -5) return 2
+    return 0
+  })()
+  totalScore += soxScore
+  indicators.push({ name: 'SOX Index', score: soxScore, weight: 6 })
   
-  // SMA Proximity (approaching danger)
-  score += (data.qqqSMA20Proximity / 100) * 8
-  score += (data.qqqSMA50Proximity / 100) * 12
-  score += (data.qqqSMA200Proximity / 100) * 15
+  // Indicator 3: QQQ Daily Return (Weight: 8/100) - 5× downside amplifier
+  const qqqReturnScore = (() => {
+    const ret = data.qqqDailyReturn
+    if (ret <= -6) return 8
+    if (ret <= -3) return 6
+    if (ret <= -1.5) return 4
+    if (ret <= -1) return 2
+    return 0
+  })()
+  totalScore += qqqReturnScore
+  indicators.push({ name: 'QQQ Daily Return', score: qqqReturnScore, weight: 8 })
   
-  // Bollinger Band breach
-  if (data.qqqBelowBollinger) score += 15
-  score += (data.qqqBollingerProximity / 100) * 10
+  // Indicator 4: QQQ Consecutive Down Days (Weight: 5/100)
+  const consecDownScore = (() => {
+    if (data.qqqConsecDown >= 5) return 5
+    if (data.qqqConsecDown >= 3) return 3
+    if (data.qqqConsecDown >= 2) return 2
+    return 0
+  })()
+  totalScore += consecDownScore
+  indicators.push({ name: 'QQQ Consecutive Down Days', score: consecDownScore, weight: 5 })
   
-  // VIX (fear gauge)
-  if (data.vix > 35) score += 30
-  else if (data.vix > 25) score += 20
-  else if (data.vix > 20) score += 12
-  else if (data.vix > 15) score += 6
+  // Indicator 5: QQQ Below 20-Day SMA (Weight: 5/100)
+  const sma20Score = (() => {
+    if (data.qqqBelowSMA20 && data.qqqSMA20Proximity >= 100) return 5
+    if (data.qqqSMA20Proximity >= 50) return 3
+    if (data.qqqSMA20Proximity >= 25) return 1
+    return 0
+  })()
+  totalScore += sma20Score
+  indicators.push({ name: 'QQQ Below SMA20', score: sma20Score, weight: 5 })
   
-  // VXN (Nasdaq volatility)
-  if (data.vxn > 35) score += 25
-  else if (data.vxn > 25) score += 18
-  else if (data.vxn > 20) score += 10
+  // Indicator 6: QQQ Below 50-Day SMA (Weight: 7/100)
+  const sma50Score = (() => {
+    if (data.qqqBelowSMA50 && data.qqqSMA50Proximity >= 100) return 7
+    if (data.qqqSMA50Proximity >= 50) return 5
+    if (data.qqqSMA50Proximity >= 25) return 2
+    return 0
+  })()
+  totalScore += sma50Score
+  indicators.push({ name: 'QQQ Below SMA50', score: sma50Score, weight: 7 })
   
-  // RVX (Russell volatility)
-  if (data.rvx > 35) score += 20
-  else if (data.rvx > 25) score += 12
+  // Indicator 7: QQQ Below 200-Day SMA (Weight: 10/100)
+  const sma200Score = (() => {
+    if (data.qqqBelowSMA200 && data.qqqSMA200Proximity >= 100) return 10
+    if (data.qqqSMA200Proximity >= 50) return 7
+    if (data.qqqSMA200Proximity >= 25) return 3
+    return 0
+  })()
+  totalScore += sma200Score
+  indicators.push({ name: 'QQQ Below SMA200', score: sma200Score, weight: 10 })
   
-  // VIX Term Structure (backwardation = immediate fear)
-  if (data.vixTermInverted) score += 20
-  else if (data.vixTermStructure < 0.8) score += 12
-  else if (data.vixTermStructure < 1.2) score += 6
+  // Indicator 8: QQQ Below Bollinger Band (Weight: 6/100)
+  const bollingerScore = (() => {
+    if (data.qqqBelowBollinger && data.qqqBollingerProximity >= 100) return 6
+    if (data.qqqBollingerProximity >= 50) return 4
+    if (data.qqqBollingerProximity >= 25) return 2
+    return 0
+  })()
+  totalScore += bollingerScore
+  indicators.push({ name: 'QQQ Bollinger Band', score: bollingerScore, weight: 6 })
   
-  // ATR (volatility expansion)
-  if (data.atr > 50) score += 15
-  else if (data.atr > 40) score += 10
-  else if (data.atr > 30) score += 5
+  // Indicator 9: VIX Fear Gauge (Weight: 9/100)
+  const vixScore = (() => {
+    if (data.vix > 35) return 9
+    if (data.vix > 25) return 6
+    if (data.vix > 20) return 4
+    if (data.vix > 15) return 2
+    return 0
+  })()
+  totalScore += vixScore
+  indicators.push({ name: 'VIX', score: vixScore, weight: 9 })
   
-  // LTV (long-term volatility)
-  if (data.ltv > 0.20) score += 12
-  else if (data.ltv > 0.15) score += 8
-  else if (data.ltv > 0.12) score += 4
+  // Indicator 10: VXN Nasdaq Volatility (Weight: 7/100)
+  const vxnScore = (() => {
+    if (data.vxn > 35) return 7
+    if (data.vxn > 25) return 5
+    if (data.vxn > 20) return 3
+    return 0
+  })()
+  totalScore += vxnScore
+  indicators.push({ name: 'VXN', score: vxnScore, weight: 7 })
   
-  // Bullish Percent (overbought = danger)
-  if (data.bullishPercent > 70) score += 15
-  else if (data.bullishPercent > 60) score += 10
-  else if (data.bullishPercent < 30) score += 5  // Oversold (contrarian)
+  // Indicator 11: RVX Russell 2000 Volatility (Weight: 5/100)
+  const rvxScore = (() => {
+    if (data.rvx > 35) return 5
+    if (data.rvx > 25) return 3
+    return 0
+  })()
+  totalScore += rvxScore
+  indicators.push({ name: 'RVX', score: rvxScore, weight: 5 })
   
-  if (data.nvidiaMomentum > 80) score += 10
-  else if (data.nvidiaMomentum < 20) score += 25  // Falling NVDA = tech crash risk
+  // Indicator 12: VIX Term Structure (Weight: 6/100)
+  const vixTermScore = (() => {
+    if (data.vixTermInverted || data.vixTermStructure < 0.8) return 6
+    if (data.vixTermStructure < 1.2) return 3
+    return 0
+  })()
+  totalScore += vixTermScore
+  indicators.push({ name: 'VIX Term Structure', score: vixTermScore, weight: 6 })
   
-  // Comparing to historical baseline of 5000
-  const soxDeviation = ((data.soxIndex - 5000) / 5000) * 100
-  if (soxDeviation < -15) score += 30  // Major chip selloff
-  else if (soxDeviation < -10) score += 20
-  else if (soxDeviation < -5) score += 10
+  // Indicator 13: ATR Average True Range (Weight: 5/100)
+  const atrScore = (() => {
+    if (data.atr > 50) return 5
+    if (data.atr > 40) return 3
+    if (data.atr > 30) return 1
+    return 0
+  })()
+  totalScore += atrScore
+  indicators.push({ name: 'ATR', score: atrScore, weight: 5 })
   
-  console.log("[v0] Pillar 1 - Momentum & Technical (35% weight):", score)
-  return Math.min(100, Math.max(0, score))
+  // Indicator 14: LTV Long-term Volatility (Weight: 5/100)
+  const ltvScore = (() => {
+    if (data.ltv > 0.20) return 5
+    if (data.ltv > 0.15) return 3
+    if (data.ltv > 0.12) return 1
+    return 0
+  })()
+  totalScore += ltvScore
+  indicators.push({ name: 'LTV', score: ltvScore, weight: 5 })
+  
+  // Indicator 15: Bullish Percent Index (Weight: 5/100)
+  const bullishPercentScore = (() => {
+    if (data.bullishPercent > 70) return 5
+    if (data.bullishPercent > 60) return 3
+    if (data.bullishPercent < 30) return 2 // Oversold contrarian
+    return 0
+  })()
+  totalScore += bullishPercentScore
+  indicators.push({ name: 'Bullish Percent', score: bullishPercentScore, weight: 5 })
+  
+  // Indicator 16: Yield Curve (Weight: 5/100)
+  const yieldCurveScore = (() => {
+    if (data.yieldCurve < -1.0) return 5
+    if (data.yieldCurve < -0.5) return 4
+    if (data.yieldCurve < -0.2) return 2
+    if (data.yieldCurve < 0) return 1
+    return 0
+  })()
+  totalScore += yieldCurveScore
+  indicators.push({ name: 'Yield Curve', score: yieldCurveScore, weight: 5 })
+  
+  console.log("[v0] Pillar 1 - Momentum & Technical (35% weight):", totalScore)
+  console.log("[v0] Indicator Breakdown:", indicators)
+  
+  // Return score capped at 100
+  return Math.min(100, Math.max(0, totalScore))
 }
 
 async function computeRiskAppetitePillar(data: Awaited<ReturnType<typeof fetchMarketData>>): Promise<number> {
-  let score = 0
+  // Pillar 2: Risk Appetite & Volatility (30% weight) - 8 indicators with explicit weights
   
-  // Put/Call Ratio (complacency = danger)
-  if (data.putCallRatio < 0.6) score += 35  // Extreme complacency
-  else if (data.putCallRatio < 0.7) score += 25
-  else if (data.putCallRatio < 0.85) score += 15
-  else if (data.putCallRatio > 1.3) score += 10  // Extreme fear (contrarian)
+  let totalScore = 0
+  const indicators = []
   
-  // Fear & Greed Index
-  if (data.fearGreedIndex !== null) {
-    if (data.fearGreedIndex > 80) score += 25
-    else if (data.fearGreedIndex > 75) score += 18
-    else if (data.fearGreedIndex < 20) score += 12  // Contrarian
-  }
+  // Indicator 1: Put/Call Ratio (Weight: 18/100)
+  const putCallScore = (() => {
+    const ratio = data.putCallRatio
+    if (ratio < 0.6) return 18  // Extreme complacency
+    if (ratio < 0.7) return 14
+    if (ratio < 0.9) return 10
+    if (ratio > 1.3) return 8   // Extreme fear (contrarian)
+    if (ratio > 1.1) return 4
+    return 0
+  })()
+  totalScore += putCallScore
+  indicators.push({ name: 'Put/Call Ratio', score: putCallScore, weight: 18 })
   
-  // AAII Sentiment (retail euphoria = danger)
-  const aaiiBullish = data.aaiiBullish || 35
-  if (aaiiBullish > 55) score += 30
-  else if (aaiiBullish > 50) score += 22
-  else if (aaiiBullish > 45) score += 12
-  else if (aaiiBullish < 25) score += 8  // Contrarian
+  // Indicator 2: Fear & Greed Index (Weight: 15/100)
+  const fearGreedScore = (() => {
+    if (data.fearGreedIndex === null) return 0
+    if (data.fearGreedIndex > 80) return 15  // Extreme greed
+    if (data.fearGreedIndex > 70) return 12
+    if (data.fearGreedIndex > 60) return 8
+    if (data.fearGreedIndex < 20) return 8   // Extreme fear (contrarian)
+    if (data.fearGreedIndex < 30) return 4
+    return 0
+  })()
+  totalScore += fearGreedScore
+  indicators.push({ name: 'Fear & Greed Index', score: fearGreedScore, weight: 15 })
   
-  // Short Interest (low = complacency)
-  const shortInterest = data.shortInterest || 2.5
-  if (shortInterest < 1.5) score += 30
-  else if (shortInterest < 2.0) score += 20
-  else if (shortInterest < 2.5) score += 10
+  // Indicator 3: AAII Bullish Sentiment (Weight: 16/100)
+  const aaiiScore = (() => {
+    const bullish = data.aaiiBullish || 35
+    if (bullish > 55) return 16  // Retail euphoria
+    if (bullish > 50) return 12
+    if (bullish > 45) return 8
+    if (bullish < 25) return 6   // Extreme pessimism (contrarian)
+    if (bullish < 30) return 3
+    return 0
+  })()
+  totalScore += aaiiScore
+  indicators.push({ name: 'AAII Bullish', score: aaiiScore, weight: 16 })
   
-  // Tech ETF Flows (outflows = danger)
-  if (data.etfFlows !== undefined) {
-    if (data.etfFlows < -3.0) score += 25
-    else if (data.etfFlows < -1.5) score += 15
-    else if (data.etfFlows < -0.5) score += 8
-  }
+  // Indicator 4: SPY Short Interest Ratio (Weight: 13/100)
+  const shortInterestScore = (() => {
+    const short = data.shortInterest || 2.5
+    if (short < 1.5) return 13   // Extreme complacency
+    if (short < 2.0) return 10
+    if (short < 3.0) return 6
+    if (short > 8.0) return 8    // High positioning (contrarian)
+    if (short > 6.0) return 4
+    return 0
+  })()
+  totalScore += shortInterestScore
+  indicators.push({ name: 'Short Interest', score: shortInterestScore, weight: 13 })
   
-  // Junk Bond Spread (credit stress)
-  if (data.junkSpread > 10) score += 40
-  else if (data.junkSpread > 8) score += 30
-  else if (data.junkSpread > 6) score += 20
-  else if (data.junkSpread > 5) score += 12
-  else if (data.junkSpread > 3.5) score += 6
+  // Indicator 5: ATR - Average True Range (Weight: 10/100)
+  const atrScore = (() => {
+    if (data.atr > 50) return 10  // Extreme volatility
+    if (data.atr > 40) return 7
+    if (data.atr > 30) return 4
+    if (data.atr < 20) return 2   // Calm before storm
+    return 0
+  })()
+  totalScore += atrScore
+  indicators.push({ name: 'ATR', score: atrScore, weight: 10 })
   
-  // Yield Curve (moved from macro to risk appetite)
-  if (data.yieldCurve < -1.0) score += 30
-  else if (data.yieldCurve < -0.5) score += 22
-  else if (data.yieldCurve < -0.2) score += 15
-  else if (data.yieldCurve < 0) score += 10
+  // Indicator 6: LTV - Long-term Volatility (Weight: 10/100)
+  const ltvScore = (() => {
+    if (data.ltv > 0.20) return 10  // Sustained instability
+    if (data.ltv > 0.15) return 7
+    if (data.ltv > 0.12) return 4
+    if (data.ltv < 0.08) return 2   // Complacency
+    return 0
+  })()
+  totalScore += ltvScore
+  indicators.push({ name: 'LTV', score: ltvScore, weight: 10 })
   
-  console.log("[v0] Pillar 2 - Risk Appetite & Volatility:", score)
-  return Math.min(100, Math.max(0, score))
+  // Indicator 7: Bullish Percent Index (Weight: 10/100)
+  const bullishPercentScore = (() => {
+    if (data.bullishPercent > 70) return 10  // Overbought
+    if (data.bullishPercent > 60) return 7
+    if (data.bullishPercent > 55) return 4
+    if (data.bullishPercent < 30) return 4   // Oversold (contrarian)
+    return 0
+  })()
+  totalScore += bullishPercentScore
+  indicators.push({ name: 'Bullish Percent', score: bullishPercentScore, weight: 10 })
+  
+  // Indicator 8: Yield Curve (10Y-2Y) (Weight: 8/100)
+  const yieldCurveScore = (() => {
+    if (data.yieldCurve < -1.0) return 8  // Deep inversion
+    if (data.yieldCurve < -0.5) return 6
+    if (data.yieldCurve < -0.2) return 4
+    if (data.yieldCurve < 0) return 2
+    return 0
+  })()
+  totalScore += yieldCurveScore
+  indicators.push({ name: 'Yield Curve', score: yieldCurveScore, weight: 8 })
+  
+  console.log("[v0] Pillar 2 - Risk Appetite & Volatility:", totalScore)
+  console.log("[v0] Indicator Breakdown:", indicators)
+  
+  // Return score capped at 100
+  return Math.min(100, Math.max(0, totalScore))
 }
 
 async function computeValuationPillar(data: Awaited<ReturnType<typeof fetchMarketData>>): Promise<number> {
-  let score = 0
   
-  // S&P 500 Forward P/E
-  const peDeviation = (data.spxPE - 16) / 16
-  if (data.spxPE > 30) score += 45
-  else if (data.spxPE > 25) score += 35
-  else if (data.spxPE > 22) score += 25
-  else if (data.spxPE > 18) score += 15
-  else score += Math.min(30, peDeviation * 80)
+  let totalScore = 0
+  const indicators = []
   
-  // S&P 500 Price-to-Sales
-  if (data.spxPS > 3.5) score += 30
-  else if (data.spxPS > 3.0) score += 22
-  else if (data.spxPS > 2.5) score += 15
-  else if (data.spxPS > 2.0) score += 8
+  // Indicator 1: S&P 500 Forward P/E (Weight: 18/100)
+  const spxPEScore = (() => {
+    if (data.spxPE > 30) return 18       // Extreme overvaluation
+    if (data.spxPE > 25) return 14
+    if (data.spxPE > 22) return 10       // Current: 22.5
+    if (data.spxPE > 18) return 6
+    return 2
+  })()
+  totalScore += spxPEScore
+  indicators.push({ name: 'S&P 500 Forward P/E', score: spxPEScore, weight: 18 })
   
-  // Buffett Indicator (Market Cap / GDP)
-  const buffett = data.buffettIndicator || 180
-  if (buffett > 200) score += 40
-  else if (buffett > 180) score += 30
-  else if (buffett > 150) score += 20
-  else if (buffett > 120) score += 10
+  // Indicator 2: S&P 500 Price-to-Sales (Weight: 12/100)
+  const spxPSScore = (() => {
+    if (data.spxPS > 3.5) return 12      // Extreme
+    if (data.spxPS > 3.0) return 10
+    if (data.spxPS > 2.5) return 7       // Current: 2.8
+    if (data.spxPS > 2.0) return 4
+    return 0
+  })()
+  totalScore += spxPSScore
+  indicators.push({ name: 'S&P 500 Price-to-Sales', score: spxPSScore, weight: 12 })
   
+  // Indicator 3: Buffett Indicator (Market Cap / GDP) (Weight: 16/100)
+  const buffettScore = (() => {
+    const buffett = data.buffettIndicator || 180
+    if (buffett > 200) return 16         // Danger: >200%
+    if (buffett > 180) return 13
+    if (buffett > 150) return 9          // Warning: 150-180%
+    if (buffett > 120) return 5          // Fair: 120-150%
+    return 0                             // Undervalued: <120%
+  })()
+  totalScore += buffettScore
+  indicators.push({ name: 'Buffett Indicator', score: buffettScore, weight: 16 })
   
-  // QQQ Forward P/E (AI-specific valuation)
-  if (data.qqqPE > 40) score += 35
-  else if (data.qqqPE > 35) score += 28
-  else if (data.qqqPE > 30) score += 20
-  else if (data.qqqPE > 25) score += 12
+  // Indicator 4: QQQ Forward P/E (AI-Specific Valuation) (Weight: 16/100)
+  const qqqPEScore = (() => {
+    if (data.qqqPE > 40) return 16       // Bubble territory
+    if (data.qqqPE > 35) return 13
+    if (data.qqqPE > 30) return 10
+    if (data.qqqPE > 25) return 6        // Current: 25.8
+    return 2
+  })()
+  totalScore += qqqPEScore
+  indicators.push({ name: 'QQQ Forward P/E', score: qqqPEScore, weight: 16 })
   
-  // Magnificent 7 Concentration
-  if (data.mag7Concentration > 65) score += 40
-  else if (data.mag7Concentration > 60) score += 32
-  else if (data.mag7Concentration > 55) score += 22
-  else if (data.mag7Concentration > 50) score += 12
+  // Indicator 5: Magnificent 7 Concentration (Crash Contagion Risk) (Weight: 15/100)
+  const mag7Score = (() => {
+    if (data.mag7Concentration > 65) return 15  // Extreme concentration
+    if (data.mag7Concentration > 60) return 12
+    if (data.mag7Concentration > 55) return 9
+    if (data.mag7Concentration > 50) return 6
+    if (data.mag7Concentration > 45) return 3   // Current: 48.2%
+    return 0
+  })()
+  totalScore += mag7Score
+  indicators.push({ name: 'Magnificent 7 Concentration', score: mag7Score, weight: 15 })
   
-  // Shiller CAPE Ratio
-  if (data.shillerCAPE > 35) score += 35
-  else if (data.shillerCAPE > 30) score += 28
-  else if (data.shillerCAPE > 25) score += 18
-  else if (data.shillerCAPE > 20) score += 8
+  // Indicator 6: Shiller CAPE Ratio (10-Year Cyclical Valuation) (Weight: 13/100)
+  const shillerScore = (() => {
+    if (data.shillerCAPE > 35) return 13   // Historic overvaluation
+    if (data.shillerCAPE > 30) return 10   // Current: 32.4
+    if (data.shillerCAPE > 25) return 7
+    if (data.shillerCAPE > 20) return 4
+    return 0
+  })()
+  totalScore += shillerScore
+  indicators.push({ name: 'Shiller CAPE Ratio', score: shillerScore, weight: 13 })
   
-  // Equity Risk Premium (lower = more overvalued)
-  if (data.equityRiskPremium < 1.5) score += 40
-  else if (data.equityRiskPremium < 2.0) score += 32
-  else if (data.equityRiskPremium < 3.0) score += 22
-  else if (data.equityRiskPremium < 4.0) score += 10
+  // Indicator 7: Equity Risk Premium (Earnings Yield - 10Y Treasury) (Weight: 10/100)
+  const erpScore = (() => {
+    if (data.equityRiskPremium < 1.5) return 10  // Severely overpriced
+    if (data.equityRiskPremium < 2.0) return 8
+    if (data.equityRiskPremium < 3.0) return 5
+    if (data.equityRiskPremium < 4.0) return 2
+    return 0  // Attractive: >4%
+  })()
+  totalScore += erpScore
+  indicators.push({ name: 'Equity Risk Premium', score: erpScore, weight: 10 })
   
-  console.log("[v0] Pillar 3 - Valuation & Market Structure:", score)
-  return Math.min(100, Math.max(0, score))
+  console.log("[v0] Pillar 3 - Valuation & Market Structure:", totalScore)
+  console.log("[v0] Indicator Breakdown:", indicators)
+  
+  // Return score capped at 100
+  return Math.min(100, Math.max(0, totalScore))
 }
 
 async function computeMacroPillar(data: Awaited<ReturnType<typeof fetchMarketData>>): Promise<number> {
-  let score = 0
+  let totalScore = 0
+  const indicators = []
   
-  // Fed Funds Rate (restrictive policy)
-  if (data.fedFundsRate > 6.0) score += 40
-  else if (data.fedFundsRate > 5.5) score += 32
-  else if (data.fedFundsRate > 5.0) score += 25
-  else if (data.fedFundsRate > 4.5) score += 18
-  else if (data.fedFundsRate > 4.0) score += 12
+  // Indicator 1: TED Spread - Banking System Stress (Weight: 15/100)
+  const tedSpreadScore = (() => {
+    if (data.tedSpread > 1.0) return 15     // Extreme banking stress
+    if (data.tedSpread > 0.75) return 12
+    if (data.tedSpread > 0.50) return 9
+    if (data.tedSpread > 0.35) return 5
+    return 0
+  })()
+  totalScore += tedSpreadScore
+  indicators.push({ name: 'TED Spread', score: tedSpreadScore, weight: 15 })
   
-  // US Debt-to-GDP
-  if (data.debtToGDP > 130) score += 35
-  else if (data.debtToGDP > 120) score += 28
-  else if (data.debtToGDP > 110) score += 20
-  else if (data.debtToGDP > 100) score += 12
+  // Indicator 2: US Dollar Index (DXY) - Tech Headwind (Weight: 14/100)
+  const dxyScore = (() => {
+    if (data.dxyIndex > 115) return 14     // Very strong dollar hurts tech
+    if (data.dxyIndex > 110) return 11
+    if (data.dxyIndex > 105) return 7
+    if (data.dxyIndex > 100) return 3
+    return 0
+  })()
+  totalScore += dxyScore
+  indicators.push({ name: 'US Dollar Index', score: dxyScore, weight: 14 })
   
-  if (data.tedSpread > 1.0) score += 40  // Extreme banking stress
-  else if (data.tedSpread > 0.75) score += 30
-  else if (data.tedSpread > 0.50) score += 20
-  else if (data.tedSpread > 0.35) score += 10
+  // Indicator 3: ISM Manufacturing PMI - Economic Leading (Weight: 18/100)
+  const ismScore = (() => {
+    if (data.ismPMI < 42) return 18        // Deep contraction
+    if (data.ismPMI < 46) return 14
+    if (data.ismPMI < 50) return 10        // Contraction
+    if (data.ismPMI < 52) return 4
+    return 0
+  })()
+  totalScore += ismScore
+  indicators.push({ name: 'ISM Manufacturing PMI', score: ismScore, weight: 18 })
   
-  if (data.dxyIndex > 115) score += 35  // Very strong dollar
-  else if (data.dxyIndex > 110) score += 28
-  else if (data.dxyIndex > 105) score += 20
-  else if (data.dxyIndex > 100) score += 10
+  // Indicator 4: Fed Funds Rate - Restrictive Policy (Weight: 17/100)
+  const fedFundsScore = (() => {
+    if (data.fedFundsRate > 6.0) return 17   // Extremely restrictive
+    if (data.fedFundsRate > 5.5) return 14
+    if (data.fedFundsRate > 5.0) return 10
+    if (data.fedFundsRate > 4.5) return 7
+    if (data.fedFundsRate > 4.0) return 3
+    return 0
+  })()
+  totalScore += fedFundsScore
+  indicators.push({ name: 'Fed Funds Rate', score: fedFundsScore, weight: 17 })
   
-  if (data.ismPMI < 42) score += 40  // Deep contraction
-  else if (data.ismPMI < 46) score += 30
-  else if (data.ismPMI < 50) score += 20  // Contraction
-  else if (data.ismPMI < 52) score += 5
+  // Indicator 5: Fed Reverse Repo - Liquidity Conditions (Weight: 13/100)
+  const rrpScore = (() => {
+    if (data.fedReverseRepo > 2000) return 13  // Extreme liquidity drain
+    if (data.fedReverseRepo > 1500) return 10
+    if (data.fedReverseRepo > 1000) return 7
+    if (data.fedReverseRepo > 500) return 3
+    return 0
+  })()
+  totalScore += rrpScore
+  indicators.push({ name: 'Fed Reverse Repo', score: rrpScore, weight: 13 })
   
-  // High RRP = tight liquidity
-  if (data.fedReverseRepo > 2000) score += 30  // Extreme liquidity drain
-  else if (data.fedReverseRepo > 1500) score += 22
-  else if (data.fedReverseRepo > 1000) score += 15
-  else if (data.fedReverseRepo > 500) score += 8
+  // Indicator 6: Junk Bond Spread - Credit Stress (Weight: 12/100)
+  const junkSpreadScore = (() => {
+    if (data.junkSpread > 10) return 12     // Severe credit stress
+    if (data.junkSpread > 8) return 10
+    if (data.junkSpread > 6) return 7
+    if (data.junkSpread > 5) return 4
+    if (data.junkSpread > 3.5) return 2
+    return 0
+  })()
+  totalScore += junkSpreadScore
+  indicators.push({ name: 'Junk Bond Spread', score: junkSpreadScore, weight: 12 })
   
-  console.log("[v0] Pillar 4 - Macro Economic (20% weight):", score)
-  return Math.min(100, Math.max(0, score))
+  // Indicator 7: US Debt-to-GDP Ratio - Fiscal Burden (Weight: 11/100)
+  const debtScore = (() => {
+    if (data.debtToGDP > 130) return 11     // Fiscal crisis risk
+    if (data.debtToGDP > 120) return 9
+    if (data.debtToGDP > 110) return 6
+    if (data.debtToGDP > 100) return 3
+    return 0
+  })()
+  totalScore += debtScore
+  indicators.push({ name: 'US Debt-to-GDP', score: debtScore, weight: 11 })
+  
+  console.log("[v0] Pillar 4 - Macro (20% weight):", totalScore)
+  console.log("[v0] Indicator Breakdown:", indicators)
+  
+  // Return score capped at 100
+  return Math.min(100, Math.max(0, totalScore))
 }
 
 function calculateCrashAmplifiers(data: Awaited<ReturnType<typeof fetchMarketData>>) {
@@ -956,7 +1225,6 @@ function generateWeeklySummary(
 
 async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarketData>>) {
   const canaries: Array<{ signal: string; pillar: string; severity: "high" | "medium" | "low" }> = []
-  
   
   // 1. QQQ Daily Return
   if (data.qqqDailyReturn <= -6) {

@@ -36,12 +36,13 @@ export async function scrapeUrl(
     body: JSON.stringify({ url, options })
   })
 
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.message || 'Failed to scrape URL')
+  const result = await response.json()
+  
+  if (!result.success) {
+    throw new Error(result.message || 'Failed to scrape URL')
   }
 
-  return response.json()
+  return result
 }
 
 /**

@@ -20,7 +20,6 @@ export async function POST(request: Request) {
       )
     }
 
-    // Build ScrapingBee API URL with parameters
     const params = new URLSearchParams({
       api_key: apiKey,
       url: url,
@@ -41,15 +40,21 @@ export async function POST(request: Request) {
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('[v0] ScrapingBee API Error:', response.status, errorText)
-      return NextResponse.json(
-        { 
-          error: 'ScrapingBee request failed', 
-          status: response.status,
-          message: errorText 
-        },
-        { status: response.status }
-      )
+      
+      // Silently log 503 errors (service unavailable) without bubbling them up
+      if (response.status === 503) {
+        console.log('[v0] ScrapingBee 503: Service temporarily unavailable, will use AI fallback')
+      } else {
+        console.error('[v0] ScrapingBee API Error:', response.status, errorText)
+      }
+      
+      // Return 200 with error flag so the calling function can handle fallback
+      return NextResponse.json({
+        success: false,
+        error: 'ScrapingBee request failed',
+        status: response.status,
+        message: response.status === 503 ? 'Service temporarily unavailable' : errorText
+      }, { status: 200 }) // Changed from response.status to 200 to prevent error bubbling
     }
 
     const contentType = response.headers.get('content-type')
@@ -76,10 +81,11 @@ export async function POST(request: Request) {
     console.error('[v0] ScrapingBee Error:', error)
     return NextResponse.json(
       { 
+        success: false,
         error: 'Failed to scrape URL',
         message: error instanceof Error ? error.message : 'Unknown error'
       },
-      { status: 500 }
+      { status: 200 } // Changed from 500 to 200 to prevent error bubbling
     )
   }
 }
