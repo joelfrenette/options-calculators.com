@@ -4,7 +4,18 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { CheckCircle2, XCircle, AlertCircle, TrendingUp, Gauge, Target, BarChart3, Calculator, Zap, AlertTriangle } from 'lucide-react'
+import {
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  TrendingUp,
+  Gauge,
+  Target,
+  BarChart3,
+  Calculator,
+  Zap,
+  AlertTriangle,
+} from "lucide-react"
 
 interface DataSourceStatus {
   name: string
@@ -25,26 +36,11 @@ export function RemainingSiteAudit() {
   const fetchDataSourceStatuses = async () => {
     setLoading(true)
     try {
-      const response = await fetch("/api/data-source-status")
+      const response = await fetch("/api/remaining-site-status")
       const data = await response.json()
-      
-      // Group data sources by page
-      const grouped: Record<string, DataSourceStatus[]> = {}
-      data.sources?.forEach((source: any) => {
-        const pageName = source.page || "Unknown"
-        if (!grouped[pageName]) {
-          grouped[pageName] = []
-        }
-        grouped[pageName].push({
-          name: source.indicator,
-          primary: source.primary,
-          fallbacks: [source.fallback1, source.fallback2, source.fallback3, source.fallback4].filter(Boolean),
-          status: source.status,
-          currentSource: source.currentSource || source.primary
-        })
-      })
-      
-      setDataSourceStatuses(grouped)
+
+      // Data is already grouped by tool name
+      setDataSourceStatuses(data.tools || {})
     } catch (error) {
       console.error("Failed to fetch data source statuses:", error)
     } finally {
@@ -72,7 +68,9 @@ export function RemainingSiteAudit() {
       case "live":
         return <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded font-semibold">LIVE API</span>
       case "ai":
-        return <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded font-semibold">AI FALLBACK</span>
+        return (
+          <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded font-semibold">AI FALLBACK</span>
+        )
       case "baseline":
         return <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded font-semibold">BASELINE</span>
       case "failed":
@@ -90,9 +88,10 @@ export function RemainingSiteAudit() {
       icon: <TrendingUp className="h-5 w-5" />,
       description: "Technical analysis of major indices with forecasting models",
       formula: "Trend Score = (MA Alignment × 0.4) + (RSI Signal × 0.3) + (Volume Trend × 0.3)",
-      explanation: "Combines moving average alignment, RSI momentum, and volume trends to generate buy/sell/hold signals",
+      explanation:
+        "Combines moving average alignment, RSI momentum, and volume trends to generate buy/sell/hold signals",
       dataPoints: ["Price data (daily OHLCV)", "Moving averages (20, 50, 200-day)", "RSI", "Volume"],
-      validation: "Trend signals align with price action and volume confirmation"
+      validation: "Trend signals align with price action and volume confirmation",
     },
     {
       id: "fear-greed",
@@ -100,9 +99,18 @@ export function RemainingSiteAudit() {
       icon: <Gauge className="h-5 w-5" />,
       description: "Composite sentiment indicator combining 7 market metrics",
       formula: "Fear & Greed = Σ(Indicator₁ × w₁ + ... + Indicator₇ × w₇) / 7",
-      explanation: "Weighted average of VIX, Put/Call ratio, Market momentum, Junk bond demand, Safe haven demand, Stock price breadth, Stock price strength",
-      dataPoints: ["VIX", "Put/Call Ratio", "Market Momentum", "Junk Bond Spread", "Safe Haven Demand", "Market Breadth", "Price Strength"],
-      validation: "Score of 0-100 where <25 = Extreme Fear, >75 = Extreme Greed"
+      explanation:
+        "Weighted average of VIX, Put/Call ratio, Market momentum, Junk bond demand, Safe haven demand, Stock price breadth, Stock price strength",
+      dataPoints: [
+        "VIX",
+        "Put/Call Ratio",
+        "Market Momentum",
+        "Junk Bond Spread",
+        "Safe Haven Demand",
+        "Market Breadth",
+        "Price Strength",
+      ],
+      validation: "Score of 0-100 where <25 = Extreme Fear, >75 = Extreme Greed",
     },
     {
       id: "panic-euphoria",
@@ -110,9 +118,20 @@ export function RemainingSiteAudit() {
       icon: <AlertTriangle className="h-5 w-5" />,
       description: "Citibank's Panic/Euphoria Model with 9 sentiment indicators",
       formula: "P/E Model = Σ(Z-score₁ + ... + Z-score₉) / 9",
-      explanation: "Z-scores of 9 market indicators (VIX, HY spreads, equity flows, etc.) averaged to identify extremes",
-      dataPoints: ["VIX", "High Yield Spreads", "Equity Fund Flows", "Earnings Revisions", "GDP Growth", "Credit Spreads", "Commodity Prices", "Currency Volatility", "Market Breadth"],
-      validation: "Z-score >2 = Euphoria, <-2 = Panic, triggers contrarian signals"
+      explanation:
+        "Z-scores of 9 market indicators (VIX, HY spreads, equity flows, etc.) averaged to identify extremes",
+      dataPoints: [
+        "VIX",
+        "High Yield Spreads",
+        "Equity Fund Flows",
+        "Earnings Revisions",
+        "GDP Growth",
+        "Credit Spreads",
+        "Commodity Prices",
+        "Currency Volatility",
+        "Market Breadth",
+      ],
+      validation: "Z-score >2 = Euphoria, <-2 = Panic, triggers contrarian signals",
     },
     {
       id: "vix-risk",
@@ -122,7 +141,7 @@ export function RemainingSiteAudit() {
       formula: "Recommended Cash % = min(90, max(10, VIX × 2))",
       explanation: "Dynamic cash allocation: VIX 10-15 = 20-30% cash, VIX 20-30 = 40-60% cash, VIX >40 = 80-90% cash",
       dataPoints: ["Current VIX", "VIX Historical Average", "VIX Percentile"],
-      validation: "Higher VIX = Higher cash allocation to preserve capital during volatility"
+      validation: "Higher VIX = Higher cash allocation to preserve capital during volatility",
     },
     {
       id: "fomc",
@@ -132,7 +151,7 @@ export function RemainingSiteAudit() {
       formula: "Implied Rate = 100 - Fed Funds Futures Price",
       explanation: "Fed Funds futures prices imply market expectations for future rate decisions",
       dataPoints: ["Fed Funds Futures", "Current Fed Funds Rate", "FOMC Meeting Dates"],
-      validation: "Futures-implied rates match or predict FOMC decisions within 25bps"
+      validation: "Futures-implied rates match or predict FOMC decisions within 25bps",
     },
     {
       id: "cpi-inflation",
@@ -142,7 +161,7 @@ export function RemainingSiteAudit() {
       formula: "CPI Forecast = Current CPI + (3-month trend × projection months)",
       explanation: "Projects future inflation using recent trends and seasonal adjustments",
       dataPoints: ["Monthly CPI", "Core CPI", "3-month trend", "12-month change"],
-      validation: "Forecasts align with official BLS CPI releases within 0.2%"
+      validation: "Forecasts align with official BLS CPI releases within 0.2%",
     },
     {
       id: "earnings-iv",
@@ -152,7 +171,7 @@ export function RemainingSiteAudit() {
       formula: "Expected Move = Stock Price × IV × √(DTE/365)",
       explanation: "Uses implied volatility to estimate stock price movement range after earnings, warns of IV crush",
       dataPoints: ["Current Stock Price", "Implied Volatility", "Days to Earnings", "Historical Earnings Moves"],
-      validation: "Expected move captures actual earnings move 68% of the time (1 std dev)"
+      validation: "Expected move captures actual earnings move 68% of the time (1 std dev)",
     },
     {
       id: "greeks",
@@ -162,7 +181,7 @@ export function RemainingSiteAudit() {
       formula: "Black-Scholes Model: C = S×N(d₁) - K×e^(-rT)×N(d₂)",
       explanation: "Uses Black-Scholes model to calculate Delta, Gamma, Theta, Vega, Rho for any option",
       dataPoints: ["Stock Price", "Strike Price", "DTE", "IV", "Risk-free Rate", "Dividends"],
-      validation: "Greeks calculations match broker platforms and market prices"
+      validation: "Greeks calculations match broker platforms and market prices",
     },
     {
       id: "roi",
@@ -172,7 +191,7 @@ export function RemainingSiteAudit() {
       formula: "Annualized ROI = (Premium / Capital at Risk) × (365 / DTE) × 100",
       explanation: "Converts options premium to annualized return percentage for comparison against benchmarks",
       dataPoints: ["Premium Received", "Capital at Risk", "Days to Expiration"],
-      validation: "Annualized ROI properly accounts for time value and capital efficiency"
+      validation: "Annualized ROI properly accounts for time value and capital efficiency",
     },
     {
       id: "wheel-scanner",
@@ -182,8 +201,8 @@ export function RemainingSiteAudit() {
       formula: "Score = (Premium Yield × 0.4) + (Technical Strength × 0.3) + (Fundamental Quality × 0.3)",
       explanation: "Ranks stocks based on premium yield, technical support levels, and fundamental metrics",
       dataPoints: ["Option Premiums", "IV Rank", "Price vs MA", "PE Ratio", "Revenue Growth", "Debt Levels"],
-      validation: "High-scoring stocks show consistent premium capture with manageable assignment risk"
-    }
+      validation: "High-scoring stocks show consistent premium capture with manageable assignment risk",
+    },
   ]
 
   return (
@@ -219,7 +238,6 @@ export function RemainingSiteAudit() {
               </AccordionTrigger>
               <AccordionContent>
                 <div className="pl-8 space-y-6 pt-4">
-                  
                   {/* Formula Section */}
                   <div className="bg-slate-50 p-4 rounded-lg border">
                     <h4 className="font-semibold text-sm mb-2 text-slate-900">Formula & Calculation</h4>
@@ -238,7 +256,7 @@ export function RemainingSiteAudit() {
                   {/* Data Sources Section */}
                   <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                     <h4 className="font-semibold text-sm mb-3 text-slate-900">Data Sources & Fallback Chain</h4>
-                    
+
                     {dataSourceStatuses[tool.name] && dataSourceStatuses[tool.name].length > 0 ? (
                       <div className="space-y-3">
                         {dataSourceStatuses[tool.name].map((source, idx) => (
@@ -255,14 +273,17 @@ export function RemainingSiteAudit() {
                                 </p>
                               </div>
                             </div>
-                            
+
                             <div className="ml-8 mt-2 text-xs space-y-1">
                               <p className="text-slate-700">
                                 <span className="font-semibold">Primary:</span> {source.primary}
                               </p>
-                              {source.fallbacks.length > 0 && (
+                              {(source.fallback1 || source.fallback2 || source.fallback3 || source.fallback4) && (
                                 <p className="text-slate-600">
-                                  <span className="font-semibold">Fallbacks:</span> {source.fallbacks.join(" → ")}
+                                  <span className="font-semibold">Fallbacks:</span>{" "}
+                                  {[source.fallback1, source.fallback2, source.fallback3, source.fallback4]
+                                    .filter(Boolean)
+                                    .join(" → ")}
                                 </p>
                               )}
                             </div>
@@ -271,7 +292,9 @@ export function RemainingSiteAudit() {
                       </div>
                     ) : (
                       <div className="bg-white p-4 rounded border text-center">
-                        <p className="text-sm text-slate-600">Data points required:</p>
+                        <p className="text-sm text-slate-600 mb-2">
+                          {loading ? "Loading data sources..." : "Data points required:"}
+                        </p>
                         <ul className="text-xs text-slate-500 mt-2 space-y-1">
                           {tool.dataPoints.map((point, idx) => (
                             <li key={idx}>• {point}</li>
@@ -303,7 +326,6 @@ export function RemainingSiteAudit() {
                       </div>
                     </div>
                   </div>
-
                 </div>
               </AccordionContent>
             </AccordionItem>
