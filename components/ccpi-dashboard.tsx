@@ -717,7 +717,36 @@ export default function CcpiDashboard() {
                 {data.indicators?.nvidiaPrice !== undefined && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">NVIDIA Momentum Score (AI Bellwether)</span>
+                      <span className="font-medium flex items-center gap-1">
+                        NVIDIA Momentum Score (AI Bellwether)
+                        {tooltipsEnabled && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-1">NVIDIA Momentum Score</p>
+                              <p className="text-sm">
+                                Tracks NVIDIA's price momentum as a bellwether for AI sector health and tech leadership.
+                              </p>
+                              <ul className="text-sm mt-1 space-y-1">
+                                <li>
+                                  <strong>{">"}80:</strong> Strong AI sector momentum, low crash risk
+                                </li>
+                                <li>
+                                  <strong>40-60:</strong> Neutral momentum, moderate risk
+                                </li>
+                                <li>
+                                  <strong>{"<"}20:</strong> Falling momentum, tech crash risk
+                                </li>
+                              </ul>
+                              <p className="text-xs mt-2">
+                                <strong>Impact:</strong> NVIDIA weakness often precedes broader tech selloffs
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                       <span className="font-bold">
                         ${data.indicators.nvidiaPrice.toFixed(0)} | {data.indicators.nvidiaMomentum}/100
                       </span>
@@ -743,7 +772,37 @@ export default function CcpiDashboard() {
                 {data.indicators?.soxIndex !== undefined && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">SOX Semiconductor Index (Chip Sector Health)</span>
+                      <span className="font-medium flex items-center gap-1">
+                        SOX Semiconductor Index (Chip Sector Health)
+                        {tooltipsEnabled && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-1">SOX Semiconductor Index</p>
+                              <p className="text-sm">
+                                Measures the health of the semiconductor industry, a critical leading indicator for tech
+                                sector performance.
+                              </p>
+                              <ul className="text-sm mt-1 space-y-1">
+                                <li>
+                                  <strong>{">"}5500:</strong> Strong chip sector, bullish for tech
+                                </li>
+                                <li>
+                                  <strong>~5000:</strong> Baseline level, neutral risk
+                                </li>
+                                <li>
+                                  <strong>{"<"}4500:</strong> Weak chip demand, tech crash risk
+                                </li>
+                              </ul>
+                              <p className="text-xs mt-2">
+                                <strong>Impact:</strong> Chip weakness signals broader tech sector vulnerability
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                       <span className="font-bold">{data.indicators.soxIndex.toFixed(0)}</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
@@ -1167,7 +1226,37 @@ export default function CcpiDashboard() {
                 {data.indicators.vix !== undefined && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">VIX (Fear Gauge)</span>
+                      <span className="font-medium flex items-center gap-1">
+                        VIX (Fear Gauge)
+                        {tooltipsEnabled && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-1">VIX - Fear Gauge</p>
+                              <p className="text-sm">
+                                The CBOE Volatility Index measures market expectations of 30-day forward volatility from
+                                S&P 500 options.
+                              </p>
+                              <ul className="text-sm mt-1 space-y-1">
+                                <li>
+                                  <strong>{"<"}15:</strong> Calm market, complacency risk
+                                </li>
+                                <li>
+                                  <strong>15-25:</strong> Elevated fear, normal volatility
+                                </li>
+                                <li>
+                                  <strong>{">"}25:</strong> Fear/panic mode, high crash risk
+                                </li>
+                              </ul>
+                              <p className="text-xs mt-2">
+                                <strong>Impact:</strong> Rising VIX indicates increasing fear and crash probability
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                       <span className="font-bold">{data.indicators.vix.toFixed(1)}</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
@@ -1191,7 +1280,36 @@ export default function CcpiDashboard() {
                 {data.indicators.vxn !== undefined && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">VXN (Nasdaq Volatility)</span>
+                      <span className="font-medium flex items-center gap-1">
+                        VXN (Nasdaq Volatility)
+                        {tooltipsEnabled && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-1">VXN - Nasdaq Volatility</p>
+                              <p className="text-sm">
+                                Measures expected volatility in the Nasdaq-100, tracking tech sector fear levels.
+                              </p>
+                              <ul className="text-sm mt-1 space-y-1">
+                                <li>
+                                  <strong>{"<"}15:</strong> Calm tech market, low risk
+                                </li>
+                                <li>
+                                  <strong>15-25:</strong> Elevated volatility, caution
+                                </li>
+                                <li>
+                                  <strong>{">"}35:</strong> Tech panic mode, crash risk
+                                </li>
+                              </ul>
+                              <p className="text-xs mt-2">
+                                <strong>Impact:</strong> High VXN signals tech sector instability and selloff risk
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                       <span className="font-bold">{data.indicators.vxn.toFixed(1)}</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
@@ -1215,7 +1333,37 @@ export default function CcpiDashboard() {
                 {data.indicators.rvx !== undefined && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">RVX (Russell 2000 Volatility)</span>
+                      <span className="font-medium flex items-center gap-1">
+                        RVX (Russell 2000 Volatility)
+                        {tooltipsEnabled && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-1">RVX - Russell 2000 Volatility</p>
+                              <p className="text-sm">
+                                Measures expected volatility in small-cap stocks (Russell 2000), indicating broader
+                                market stress.
+                              </p>
+                              <ul className="text-sm mt-1 space-y-1">
+                                <li>
+                                  <strong>{"<"}18:</strong> Low small-cap volatility, stable
+                                </li>
+                                <li>
+                                  <strong>18-25:</strong> Normal volatility range
+                                </li>
+                                <li>
+                                  <strong>{">"}30:</strong> High stress, crash risk for small caps
+                                </li>
+                              </ul>
+                              <p className="text-xs mt-2">
+                                <strong>Impact:</strong> Small-cap volatility often signals broader market instability
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                       <span className="font-bold">{data.indicators.rvx.toFixed(1)}</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
@@ -1239,7 +1387,36 @@ export default function CcpiDashboard() {
                 {data.indicators.vixTermStructure !== undefined && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">VIX Term Structure (Spot/1M)</span>
+                      <span className="font-medium flex items-center gap-1">
+                        VIX Term Structure (Spot/1M)
+                        {tooltipsEnabled && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-1">VIX Term Structure</p>
+                              <p className="text-sm">
+                                Ratio of spot VIX to 1-month VIX futures. Measures market structure and fear dynamics.
+                              </p>
+                              <ul className="text-sm mt-1 space-y-1">
+                                <li>
+                                  <strong>{">"}1.5:</strong> Contango - calm market, low risk
+                                </li>
+                                <li>
+                                  <strong>1.0-1.2:</strong> Normal structure, moderate risk
+                                </li>
+                                <li>
+                                  <strong>{"<"}1.0:</strong> Backwardation - panic, high crash risk
+                                </li>
+                              </ul>
+                              <p className="text-xs mt-2">
+                                <strong>Impact:</strong> Backwardation signals extreme fear and imminent crash risk
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                       <span className="font-bold">{data.indicators.vixTermStructure.toFixed(2)}</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
@@ -1263,7 +1440,37 @@ export default function CcpiDashboard() {
                 {data.indicators.atr !== undefined && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">ATR - Average True Range</span>
+                      <span className="font-medium flex items-center gap-1">
+                        ATR - Average True Range
+                        {tooltipsEnabled && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-1">ATR - Average True Range</p>
+                              <p className="text-sm">
+                                Measures market volatility by calculating the average range of price movements over 14
+                                days.
+                              </p>
+                              <ul className="text-sm mt-1 space-y-1">
+                                <li>
+                                  <strong>{"<"}25:</strong> Low volatility, stable market
+                                </li>
+                                <li>
+                                  <strong>25-40:</strong> Normal volatility range
+                                </li>
+                                <li>
+                                  <strong>{">"}50:</strong> High volatility, crash risk
+                                </li>
+                              </ul>
+                              <p className="text-xs mt-2">
+                                <strong>Impact:</strong> Rising ATR indicates increasing market instability
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                       <span className="font-bold">{data.indicators.atr.toFixed(1)}</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
@@ -1287,7 +1494,36 @@ export default function CcpiDashboard() {
                 {data.indicators.ltv !== undefined && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">LTV - Long-term Volatility</span>
+                      <span className="font-medium flex items-center gap-1">
+                        LTV - Long-term Volatility
+                        {tooltipsEnabled && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-1">LTV - Long-term Volatility</p>
+                              <p className="text-sm">
+                                Measures annualized volatility over 90 days, tracking sustained market instability.
+                              </p>
+                              <ul className="text-sm mt-1 space-y-1">
+                                <li>
+                                  <strong>{"<"}10%:</strong> Stable market, low risk
+                                </li>
+                                <li>
+                                  <strong>10-15%:</strong> Normal volatility range
+                                </li>
+                                <li>
+                                  <strong>{">"}20%:</strong> Elevated long-term risk, crash potential
+                                </li>
+                              </ul>
+                              <p className="text-xs mt-2">
+                                <strong>Impact:</strong> High LTV signals persistent market instability
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                       <span className="font-bold">{(data.indicators.ltv * 100).toFixed(1)}%</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
@@ -1335,7 +1571,36 @@ export default function CcpiDashboard() {
                 {data.indicators.bullishPercent !== undefined && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">Bullish Percent Index</span>
+                      <span className="font-medium flex items-center gap-1">
+                        Bullish Percent Index
+                        {tooltipsEnabled && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-1">Bullish Percent Index</p>
+                              <p className="text-sm">
+                                Percentage of stocks trading with bullish point & figure chart patterns.
+                              </p>
+                              <ul className="text-sm mt-1 space-y-1">
+                                <li>
+                                  <strong>{">"}70%:</strong> Overbought, correction risk
+                                </li>
+                                <li>
+                                  <strong>30-70%:</strong> Neutral zone, balanced market
+                                </li>
+                                <li>
+                                  <strong>{"<"}30%:</strong> Oversold, potential bottom or crash
+                                </li>
+                              </ul>
+                              <p className="text-xs mt-2">
+                                <strong>Impact:</strong> Extreme readings signal potential reversals or capitulation
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                       <span className="font-bold">{data.indicators.bullishPercent}%</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
@@ -1574,7 +1839,7 @@ export default function CcpiDashboard() {
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{(data.indicators.shortInterest * 100).toFixed(1)}%</span>
+                      <span className="font-bold">{data.indicators.shortInterest.toFixed(1)}%</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
