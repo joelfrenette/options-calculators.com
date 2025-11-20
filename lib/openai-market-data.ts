@@ -1,12 +1,9 @@
-import { generateText } from 'ai'
+import { generateText } from "ai"
 
-async function fetchMarketDataWithOpenAI(
-  indicator: string,
-  specificData: string = "Current value"
-): Promise<number | null> {
+async function fetchMarketDataWithOpenAI(indicator: string, specificData = "Current value"): Promise<number | null> {
   try {
     const { text } = await generateText({
-      model: 'openai/gpt-4o',
+      model: "openai/gpt-4o",
       prompt: `You are a financial data expert. Provide ONLY the current numeric value for: ${indicator}.
       
 Specific requirement: ${specificData}
@@ -21,43 +18,45 @@ Value:`,
       maxTokens: 50,
       temperature: 0.1,
     })
-    
-    const value = parseFloat(text.trim())
+
+    const value = Number.parseFloat(text.trim())
     if (!isNaN(value) && value > 0) {
       console.log(`[v0] OpenAI: Successfully fetched ${indicator} = ${value}`)
       return value
     }
-    
+
     return null
   } catch (error) {
-    // Check for rate limit errors
-    if (error instanceof Error && (
-      error.message.includes('429') || 
-      error.message.includes('rate') || 
-      error.message.includes('quota')
-    )) {
-      // Silently return null for rate limits
-      return null
-    }
-    // Log other errors
-    console.error(`[v0] OpenAI error for ${indicator}:`, error instanceof Error ? error.message : String(error))
+    // The system is designed to try OpenAI → Anthropic → Groq → Groq
+    // Logging errors here creates noise when the fallback is working as intended
     return null
   }
 }
 
 export async function fetchShillerCAPEWithOpenAI(): Promise<number | null> {
   console.log(`[v0] OpenAI: Fetching Shiller CAPE ratio (cyclically adjusted price-to-earnings ratio for S&P 500)...`)
-  return fetchMarketDataWithOpenAI("Shiller CAPE ratio (cyclically adjusted price-to-earnings ratio for S&P 500)", "Current CAPE ratio value")
+  return fetchMarketDataWithOpenAI(
+    "Shiller CAPE ratio (cyclically adjusted price-to-earnings ratio for S&P 500)",
+    "Current CAPE ratio value",
+  )
 }
 
 export async function fetchShortInterestWithOpenAI(): Promise<number | null> {
   console.log(`[v0] OpenAI: Fetching SPY ETF short interest ratio as percentage of float...`)
-  return fetchMarketDataWithOpenAI("SPY ETF short interest ratio as percentage of float", "Current short interest percentage")
+  return fetchMarketDataWithOpenAI(
+    "SPY ETF short interest ratio as percentage of float",
+    "Current short interest percentage",
+  )
 }
 
 export async function fetchMag7ConcentrationWithOpenAI(): Promise<number | null> {
-  console.log(`[v0] OpenAI: Fetching Magnificent 7 stocks (AAPL, MSFT, GOOGL, AMZN, NVDA, TSLA, META) market cap as percentage of QQQ ETF...`)
-  return fetchMarketDataWithOpenAI("Magnificent 7 stocks (AAPL, MSFT, GOOGL, AMZN, NVDA, TSLA, META) market cap as percentage of QQQ ETF", "Current percentage concentration")
+  console.log(
+    `[v0] OpenAI: Fetching Magnificent 7 stocks (AAPL, MSFT, GOOGL, AMZN, NVDA, TSLA, META) market cap as percentage of QQQ ETF...`,
+  )
+  return fetchMarketDataWithOpenAI(
+    "Magnificent 7 stocks (AAPL, MSFT, GOOGL, AMZN, NVDA, TSLA, META) market cap as percentage of QQQ ETF",
+    "Current percentage concentration",
+  )
 }
 
 export async function fetchQQQPEWithOpenAI(): Promise<number | null> {

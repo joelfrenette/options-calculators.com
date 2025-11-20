@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { AlertTriangle, TrendingDown, Activity, DollarSign, Users, RefreshCw, Download } from "lucide-react"
+import { AlertTriangle, TrendingDown, Activity, DollarSign, Users, RefreshCw, Download, BarChart3 } from "lucide-react"
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 
@@ -612,15 +612,15 @@ export function CcpiDashboard() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Pillar Breakdowns will now be inside Accordions */}
-      </div>
-
-      {/* Pillar Breakdowns now wrapped in Accordions */}
-      <Accordion type="multiple" defaultValue={["pillar1", "pillar2", "pillar3", "pillar4"]} className="space-y-4">
+      {/* Four Pillars - Collapsible Breakdown */}
+      <Accordion
+        type="multiple"
+        defaultValue={["pillar1", "pillar2", "pillar3", "pillar4"]}
+        className="space-y-4 pb-6 border-b border-gray-200"
+      >
         {/* Pillar 1 - Momentum & Technical */}
         <AccordionItem value="pillar1" className="border rounded-lg px-4">
-          <AccordionTrigger className="hover:no-underline">
+          <AccordionTrigger className="hover:no-underline py-10">
             <div className="flex items-center justify-between w-full pr-4">
               <div className="flex items-center gap-2">
                 <Activity className="h-5 w-5 text-cyan-600" />
@@ -1091,7 +1091,7 @@ export function CcpiDashboard() {
 
         {/* Pillar 2 - Risk Appetite & Volatility */}
         <AccordionItem value="pillar2" className="border rounded-lg px-4">
-          <AccordionTrigger className="hover:no-underline">
+          <AccordionTrigger className="hover:no-underline py-10">
             <div className="flex items-center justify-between w-full pr-4">
               <div className="flex items-center gap-2">
                 <TrendingDown className="h-5 w-5 text-orange-600" />
@@ -1324,10 +1324,10 @@ export function CcpiDashboard() {
 
         {/* Pillar 3 - Valuation & Market Structure */}
         <AccordionItem value="pillar3" className="border rounded-lg px-4">
-          <AccordionTrigger className="hover:no-underline">
+          <AccordionTrigger className="hover:no-underline py-10">
             <div className="flex items-center justify-between w-full pr-4">
               <div className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-blue-600" />
+                <DollarSign className="h-5 w-5 text-green-600" />
                 <span className="text-lg font-semibold">Pillar 3 - Valuation & Market Structure</span>
                 <span className="text-sm text-gray-600">Weight: 15% | 7 indicators</span>
               </div>
@@ -1502,12 +1502,12 @@ export function CcpiDashboard() {
           </AccordionContent>
         </AccordionItem>
 
-        {/* Pillar 4 - Macro */}
+        {/* Pillar 4 - Macro Economic */}
         <AccordionItem value="pillar4" className="border rounded-lg px-4">
-          <AccordionTrigger className="hover:no-underline">
+          <AccordionTrigger className="hover:no-underline py-10">
             <div className="flex items-center justify-between w-full pr-4">
               <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-green-600" />
+                <BarChart3 className="h-5 w-5 text-purple-600" />
                 <span className="text-lg font-semibold">Pillar 4 - Macro</span>
                 <span className="text-sm text-gray-600">Weight: 20% | 7 indicators</span>
               </div>
@@ -1714,12 +1714,12 @@ export function CcpiDashboard() {
         </p>
       </div>
 
-      <Accordion type="multiple" className="space-y-4">
+      <Accordion type="multiple" className="space-y-4 mt-8">
         {/* Portfolio Allocation by CCPI Crash Risk Level */}
         <AccordionItem value="portfolio-allocation" className="border-0">
           <Card className="shadow-sm border-gray-200">
             <AccordionTrigger className="hover:no-underline px-6 py-0">
-              <CardHeader className="bg-gray-50 border-b border-gray-200 w-full py-4">
+              <CardHeader className="bg-gray-50 border-b border-gray-200 w-full py-3">
                 <CardTitle className="text-lg font-bold text-gray-900 text-left">
                   Portfolio Allocation by CCPI Crash Risk Level
                 </CardTitle>
@@ -1923,7 +1923,7 @@ export function CcpiDashboard() {
         <AccordionItem value="options-strategy" className="border-0">
           <Card className="shadow-sm border-gray-200">
             <AccordionTrigger className="hover:no-underline px-6 py-0">
-              <CardHeader className="bg-gray-50 border-b border-gray-200 w-full py-4">
+              <CardHeader className="bg-gray-50 border-b border-gray-200 w-full py-3">
                 <CardTitle className="text-lg font-bold text-gray-900 text-left">
                   Options Strategy Guide by CCPI Crash Risk Level
                 </CardTitle>
