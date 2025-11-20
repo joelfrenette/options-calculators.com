@@ -758,7 +758,8 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 <div className="flex items-center gap-2">
                   <Activity className="h-5 w-5 text-cyan-600" />
                   <span className="text-lg font-semibold">Pillar 1 - Momentum & Technical</span>
-                  <span className="text-sm text-gray-600">Weight: 35% | 16 indicators</span>
+                  {/* CHANGE: Updated from 16 to 12 indicators after removing duplicates (ATR, LTV, Bullish Percent, Yield Curve) */}
+                  <span className="text-sm text-gray-600">Weight: 35% | 12 indicators</span>
                 </div>
                 <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.momentum)}/100</span>
               </div>
