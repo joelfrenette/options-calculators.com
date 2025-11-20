@@ -1503,7 +1503,7 @@ export function CcpiDashboard() {
         </AccordionItem>
 
         {/* Pillar 4 - Macro Economic */}
-        <AccordionItem value="pillar4" className="border rounded-lg px-4">
+        <AccordionItem value="pillar4" className="border border-b rounded-lg px-4">
           <AccordionTrigger className="hover:no-underline py-10">
             <div className="flex items-center justify-between w-full pr-4">
               <div className="flex items-center gap-2">
@@ -1688,7 +1688,8 @@ export function CcpiDashboard() {
         </AccordionItem>
       </Accordion>
 
-      <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+      {/* CCPI Formula Weights */}
+      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <h4 className="font-semibold text-sm mb-3 text-blue-900">CCPI Formula Weights</h4>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
           <div className="flex items-center justify-between">

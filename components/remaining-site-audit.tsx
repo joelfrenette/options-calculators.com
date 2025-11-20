@@ -258,7 +258,7 @@ export function RemainingSiteAudit() {
                   <div>
                     <h4 className="font-semibold text-sm mb-3 text-slate-900 flex items-center gap-2">
                       <Database className="h-5 w-5 text-blue-600" />
-                      CCPI Calculator Data Sources
+                      Data Sources & Fallback Chain
                     </h4>
 
                     {dataSourceStatuses[tool.name] && dataSourceStatuses[tool.name].length > 0 ? (
