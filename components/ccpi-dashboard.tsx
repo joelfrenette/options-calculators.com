@@ -1873,7 +1873,7 @@ export default function CcpiDashboard() {
                               <p className="text-sm">Weekly net inflows/outflows for technology ETFs.</p>
                               <ul className="text-sm mt-1 space-y-1">
                                 <li>
-                                  <strong>{">"} +$2B:</strong> Strong inflows, bullish sentiment
+                                  <strong>{">"} +2B:</strong> Strong inflows, bullish sentiment
                                 </li>
                                 <li>
                                   <strong>-$2B to +$2B:</strong> Neutral
