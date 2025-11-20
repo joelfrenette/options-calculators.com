@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 // import {
 //   Activity,
 //   TrendingUp,
@@ -1065,296 +1066,315 @@ export function MarketSentiment() {
         </CardContent>
       </Card>
 
-      {/* Trade Recommendations & Portfolio Guidance */}
-      <Card className="shadow-sm border-gray-200">
-        <CardHeader className="bg-gray-50 border-b border-gray-200">
-          <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <TargetIcon className="h-5 w-5 text-primary" />
-            Trade Recommendations & Portfolio Guidance
-            {refreshing && <span className="text-xs font-normal text-primary animate-pulse">(Recalculating...)</span>}
-          </CardTitle>
-          <p className="text-sm text-gray-600 mt-1">
-            Expert recommendations based on current {recommendations.level} market conditions
-          </p>
-        </CardHeader>
-        <CardContent className="pt-4">
-          <div className={`transition-opacity duration-300 ${refreshing ? "opacity-50" : "opacity-100"}`}>
-            <div className="grid md:grid-cols-2 gap-4">
-              {/* Portfolio Allocation */}
-              <div className="p-4 bg-white border-2 border-gray-200 rounded-lg">
-                <div className="flex items-center gap-2 mb-3">
-                  <DollarSignIcon className="h-5 w-5 text-primary" />
-                  <h3 className="font-bold text-gray-900">Portfolio Allocation</h3>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                    <span className="text-sm font-medium text-gray-700">Cash on Hand</span>
-                    <span className="text-sm font-bold text-primary">{recommendations.cashAllocation}</span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                    <span className="text-sm font-medium text-gray-700">Market Exposure</span>
-                    <span className="text-sm font-bold text-primary">{recommendations.marketExposure}</span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                    <span className="text-sm font-medium text-gray-700">Position Size</span>
-                    <span className="text-sm font-bold text-primary">{recommendations.positionSize}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Recommended Strategies */}
-              <div className="p-4 bg-white border-2 border-gray-200 rounded-lg">
-                <div className="flex items-center gap-2 mb-3">
-                  <LightbulbIcon className="h-5 w-5 text-primary" />
-                  <h3 className="font-bold text-gray-900">Recommended Strategies</h3>
-                </div>
-                <ul className="space-y-2">
-                  {recommendations.strategies.map((strategy, index) => (
-                    <li key={index} className="flex items-start gap-2 text-sm text-gray-700">
-                      <span className="text-primary mt-1 flex-shrink-0">•</span>
-                      <span>{strategy}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-
-            {/* Risk Management */}
-            <div className="mt-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
-              <div className="flex items-center gap-2 mb-3">
-                <ShieldIcon className="h-5 w-5 text-blue-700" />
-                <h3 className="font-bold text-blue-900">Risk Management Guidelines</h3>
-              </div>
-              <ul className="space-y-2">
-                {recommendations.riskManagement.map((tip, index) => (
-                  <li key={index} className="flex items-start gap-2 text-sm text-blue-800">
-                    <span className="text-blue-600 mt-1">✓</span>
-                    <span>{tip}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Coach Tips */}
-            <div className={`mt-4 p-4 rounded-lg border-2 ${getScoreBackground(marketData.overallScore)}`}>
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUpIcon className={`h-5 w-5 ${getScoreColor(marketData.overallScore)}`} />
-                <h3 className={`font-bold ${getScoreColor(marketData.overallScore)}`}>Expert Coach Insight</h3>
-              </div>
-              <p className={`text-sm ${getScoreColor(marketData.overallScore)}`}>{recommendations.coachTips}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="shadow-sm border-gray-200">
-        <CardHeader className="bg-gray-50 border-b border-gray-200">
-          <CardTitle className="text-lg font-bold text-gray-900">
-            Options Strategy Guide by Fear & Greed Level
-          </CardTitle>
-          <p className="text-sm text-gray-600 mt-1">Complete trading playbook across all market sentiment extremes</p>
-        </CardHeader>
-        <CardContent className="pt-4 pb-4">
-          <div className="space-y-2">
-            {allLevelGuidance.map((item, index) => {
-              const isCurrent =
-                marketData.overallScore >= Number.parseInt(item.range.split("-")[0]) &&
-                marketData.overallScore <= Number.parseInt(item.range.split("-")[1])
-
-              return (
-                <div
-                  key={index}
-                  className={`p-4 rounded-lg border transition-colors ${
-                    isCurrent ? "border-green-500 bg-green-100 shadow-md ring-2 ring-green-300" : "border-gray-200 bg-white hover:bg-gray-50"
-                  }`}
-                >
-                  <div className="mb-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <span className="font-mono text-sm font-bold text-gray-900">Score: {item.range}</span>
-                        <span
-                          className={`ml-3 font-bold text-sm ${
-                            index === 0
-                              ? "text-green-600"
-                              : index === 1
-                                ? "text-green-500"
-                                : index === 2
-                                  ? "text-yellow-600"
-                                  : index === 3
-                                    ? "text-orange-600"
-                                    : "text-red-600"
-                          }`}
-                        >
-                          {item.level}
-                        </span>
+      <Accordion type="multiple" className="space-y-0">
+        <AccordionItem value="trade-recommendations" className="border-0">
+          <Card className="shadow-sm border-gray-200">
+            <AccordionTrigger className="hover:no-underline px-6 py-4 bg-gray-50 border-b border-gray-200 rounded-t-lg">
+              <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <TargetIcon className="h-5 w-5 text-primary" />
+                Trade Recommendations & Portfolio Guidance
+                {refreshing && (
+                  <span className="text-xs font-normal text-primary animate-pulse">(Recalculating...)</span>
+                )}
+              </CardTitle>
+            </AccordionTrigger>
+            <AccordionContent>
+              <CardContent className="pt-4">
+                <div className={`transition-opacity duration-300 ${refreshing ? "opacity-50" : "opacity-100"}`}>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {/* Portfolio Allocation */}
+                    <div className="p-4 bg-white border-2 border-gray-200 rounded-lg">
+                      <div className="flex items-center gap-2 mb-3">
+                        <DollarSignIcon className="h-5 w-5 text-primary" />
+                        <h3 className="font-bold text-gray-900">Portfolio Allocation</h3>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {isCurrent && (
-                          <span className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-full">
-                            CURRENT
-                          </span>
-                        )}
-                        <span
-                          className={`px-3 py-1 text-xs font-bold rounded-full ${
-                            item.signal === "STRONG BUY"
-                              ? "bg-green-100 text-green-800"
-                              : item.signal === "BUY"
-                                ? "bg-green-100 text-green-700"
-                                : item.signal === "HOLD"
-                                  ? "bg-gray-100 text-gray-700"
-                                  : item.signal === "CAUTION"
-                                    ? "bg-orange-100 text-orange-700"
-                                    : "bg-red-100 text-red-700"
-                          }`}
-                        >
-                          {item.signal}
-                        </span>
-                      </div>
-                    </div>
-                    <p className="text-sm text-gray-600 italic">{item.description}</p>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-3 mb-3">
-                    <div className="p-3 bg-blue-50 rounded border border-blue-200">
-                      <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Cash</div>
-                      <div className="text-lg font-bold text-blue-900">{item.guidance.cashAllocation}</div>
-                    </div>
-                    <div className="p-3 bg-purple-50 rounded border border-purple-200">
-                      <div className="text-xs font-semibold text-purple-900 uppercase mb-1">Exposure</div>
-                      <div className="text-lg font-bold text-purple-900">{item.guidance.marketExposure}</div>
-                    </div>
-                    <div className="p-3 bg-gray-50 rounded border border-gray-300">
-                      <div className="text-xs font-semibold text-gray-900 uppercase mb-1">Position Size</div>
-                      <div className="text-sm font-bold text-gray-900">{item.guidance.positionSize}</div>
-                    </div>
-                  </div>
-
-                  <div className="mb-3">
-                    <div className="text-xs font-bold text-gray-900 uppercase mb-2">Top Strategies</div>
-                    <div className="space-y-1">
-                      {item.guidance.strategies.slice(0, 3).map((strategy, idx) => (
-                        <div key={idx} className="flex items-start gap-2 text-sm text-gray-700">
-                          <span className="text-primary mt-1 flex-shrink-0">•</span>
-                          <span>{strategy}</span>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                          <span className="text-sm font-medium text-gray-700">Cash on Hand</span>
+                          <span className="text-sm font-bold text-primary">{recommendations.cashAllocation}</span>
                         </div>
+                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                          <span className="text-sm font-medium text-gray-700">Market Exposure</span>
+                          <span className="text-sm font-bold text-primary">{recommendations.marketExposure}</span>
+                        </div>
+                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                          <span className="text-sm font-medium text-gray-700">Position Size</span>
+                          <span className="text-sm font-bold text-primary">{recommendations.positionSize}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Recommended Strategies */}
+                    <div className="p-4 bg-white border-2 border-gray-200 rounded-lg">
+                      <div className="flex items-center gap-2 mb-3">
+                        <LightbulbIcon className="h-5 w-5 text-primary" />
+                        <h3 className="font-bold text-gray-900">Recommended Strategies</h3>
+                      </div>
+                      <ul className="space-y-2">
+                        {recommendations.strategies.map((strategy, index) => (
+                          <li key={index} className="flex items-start gap-2 text-sm text-gray-700">
+                            <span className="text-primary mt-1 flex-shrink-0">•</span>
+                            <span>{strategy}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* Risk Management */}
+                  <div className="mt-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                    <div className="flex items-center gap-2 mb-3">
+                      <ShieldIcon className="h-5 w-5 text-blue-700" />
+                      <h3 className="font-bold text-blue-900">Risk Management Guidelines</h3>
+                    </div>
+                    <ul className="space-y-2">
+                      {recommendations.riskManagement.map((tip, index) => (
+                        <li key={index} className="flex items-start gap-2 text-sm text-blue-800">
+                          <span className="text-blue-600 mt-1">✓</span>
+                          <span>{tip}</span>
+                        </li>
                       ))}
+                    </ul>
+                  </div>
+
+                  {/* Coach Tips */}
+                  <div className={`mt-4 p-4 rounded-lg border-2 ${getScoreBackground(marketData.overallScore)}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUpIcon className={`h-5 w-5 ${getScoreColor(marketData.overallScore)}`} />
+                      <h3 className={`font-bold ${getScoreColor(marketData.overallScore)}`}>Expert Coach Insight</h3>
                     </div>
+                    <p className={`text-sm ${getScoreColor(marketData.overallScore)}`}>{recommendations.coachTips}</p>
                   </div>
                 </div>
-              )
-            })}
-          </div>
+              </CardContent>
+            </AccordionContent>
+          </Card>
+        </AccordionItem>
+      </Accordion>
 
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
-            <p className="text-sm text-blue-800 leading-relaxed">
-              <strong>Note:</strong> The Fear & Greed Index is most effective when extreme readings align with
-              technical levels. Extreme fear (0-24) with strong support levels historically produces the best
-              risk/reward for options sellers. Always maintain proper position sizing and risk management.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <Accordion type="multiple" className="space-y-0">
+        <AccordionItem value="options-strategy-guide" className="border-0">
+          <Card className="shadow-sm border-gray-200">
+            <AccordionTrigger className="hover:no-underline px-6 py-4 bg-gray-50 border-b border-gray-200 rounded-t-lg">
+              <CardTitle className="text-lg font-bold text-gray-900">
+                Options Strategy Guide by Fear & Greed Level
+              </CardTitle>
+            </AccordionTrigger>
+            <AccordionContent>
+              <CardContent className="pt-4 pb-4">
+                <div className="space-y-2">
+                  {allLevelGuidance.map((item, index) => {
+                    const isCurrent =
+                      marketData.overallScore >= Number.parseInt(item.range.split("-")[0]) &&
+                      marketData.overallScore <= Number.parseInt(item.range.split("-")[1])
 
-      {/* Portfolio Allocation by Fear & Greed Level */}
-      <Card className="shadow-sm border-gray-200">
-        <CardHeader className="bg-gray-50 border-b border-gray-200">
-          <CardTitle className="text-lg font-bold text-gray-900">Portfolio Allocation by Fear & Greed Level</CardTitle>
-          <p className="text-sm text-gray-600 mt-1">
-            Recommended asset class diversification across market sentiment levels
-          </p>
-        </CardHeader>
-        <CardContent className="pt-4 pb-4">
-          <div className="space-y-2">
-            {[
-              { range: "0-24", level: "Extreme Fear", data: getPortfolioAllocation(12) },
-              { range: "25-44", level: "Fear", data: getPortfolioAllocation(34) },
-              { range: "45-55", level: "Neutral", data: getPortfolioAllocation(50) },
-              { range: "56-74", level: "Greed", data: getPortfolioAllocation(65) },
-              { range: "75-100", level: "Extreme Greed", data: getPortfolioAllocation(87) },
-            ].map((item, index) => {
-              const isCurrent =
-                marketData.overallScore >= Number.parseInt(item.range.split("-")[0]) &&
-                marketData.overallScore <= Number.parseInt(item.range.split("-")[1])
+                    return (
+                      <div
+                        key={index}
+                        className={`p-4 rounded-lg border transition-colors ${
+                          isCurrent
+                            ? "border-green-500 bg-green-100 shadow-md ring-2 ring-green-300"
+                            : "border-gray-200 bg-white hover:bg-gray-50"
+                        }`}
+                      >
+                        <div className="mb-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div>
+                              <span className="font-mono text-sm font-bold text-gray-900">Score: {item.range}</span>
+                              <span
+                                className={`ml-3 font-bold text-sm ${
+                                  index === 0
+                                    ? "text-green-600"
+                                    : index === 1
+                                      ? "text-green-500"
+                                      : index === 2
+                                        ? "text-yellow-600"
+                                        : index === 3
+                                          ? "text-orange-600"
+                                          : "text-red-600"
+                                }`}
+                              >
+                                {item.level}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {isCurrent && (
+                                <span className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-full">
+                                  CURRENT
+                                </span>
+                              )}
+                              <span
+                                className={`px-3 py-1 text-xs font-bold rounded-full ${
+                                  item.signal === "STRONG BUY"
+                                    ? "bg-green-100 text-green-800"
+                                    : item.signal === "BUY"
+                                      ? "bg-green-100 text-green-700"
+                                      : item.signal === "HOLD"
+                                        ? "bg-gray-100 text-gray-700"
+                                        : item.signal === "CAUTION"
+                                          ? "bg-orange-100 text-orange-700"
+                                          : "bg-red-100 text-red-700"
+                                }`}
+                              >
+                                {item.signal}
+                              </span>
+                            </div>
+                          </div>
+                          <p className="text-sm text-gray-600 italic">{item.description}</p>
+                        </div>
 
-              return (
-                <div
-                  key={index}
-                  className={`p-4 rounded-lg border transition-colors ${
-                    isCurrent ? "border-green-500 bg-green-100 shadow-md ring-2 ring-green-300" : "border-gray-200 bg-white hover:bg-gray-50"
-                  }`}
-                >
-                  <div className="mb-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <span className="font-mono text-sm font-bold text-gray-900">Score {item.range}</span>
-                        <span
-                          className={`ml-3 font-bold text-sm ${
-                            index === 0
-                              ? "text-green-600"
-                              : index === 1
-                                ? "text-green-500"
-                                : index === 2
-                                  ? "text-yellow-600"
-                                  : index === 3
-                                    ? "text-orange-600"
-                                    : "text-red-600"
-                          }`}
-                        >
-                          {item.level}
-                        </span>
+                        <div className="grid grid-cols-3 gap-3 mb-3">
+                          <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                            <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Cash</div>
+                            <div className="text-lg font-bold text-blue-900">{item.guidance.cashAllocation}</div>
+                          </div>
+                          <div className="p-3 bg-purple-50 rounded border border-purple-200">
+                            <div className="text-xs font-semibold text-purple-900 uppercase mb-1">Exposure</div>
+                            <div className="text-lg font-bold text-purple-900">{item.guidance.marketExposure}</div>
+                          </div>
+                          <div className="p-3 bg-gray-50 rounded border border-gray-300">
+                            <div className="text-xs font-semibold text-gray-900 uppercase mb-1">Position Size</div>
+                            <div className="text-sm font-bold text-gray-900">{item.guidance.positionSize}</div>
+                          </div>
+                        </div>
+
+                        <div className="mb-3">
+                          <div className="text-xs font-bold text-gray-900 uppercase mb-2">Top Strategies</div>
+                          <div className="space-y-1">
+                            {item.guidance.strategies.slice(0, 3).map((strategy, idx) => (
+                              <div key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                                <span className="text-primary mt-1 flex-shrink-0">•</span>
+                                <span>{strategy}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
-                      {isCurrent && (
-                        <span className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-full">CURRENT</span>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-600 italic">{item.data.description}</p>
-                  </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
-                    <div className="p-3 bg-blue-50 rounded border border-blue-200">
-                      <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Stocks/ETFs</div>
-                      <div className="text-lg font-bold text-blue-900">{item.data.stocks}</div>
-                    </div>
-                    <div className="p-3 bg-purple-50 rounded border border-purple-200">
-                      <div className="text-xs font-semibold text-purple-900 uppercase mb-1">Options</div>
-                      <div className="text-lg font-bold text-purple-900">{item.data.options}</div>
-                    </div>
-                    <div className="p-3 bg-orange-50 rounded border border-orange-200">
-                      <div className="text-xs font-semibold text-orange-900 uppercase mb-1">BTC/Crypto</div>
-                      <div className="text-lg font-bold text-orange-900">{item.data.crypto}</div>
-                    </div>
-                    <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
-                      <div className="text-xs font-semibold text-yellow-900 uppercase mb-1">Gold/Silver</div>
-                      <div className="text-lg font-bold text-yellow-900">{item.data.gold}</div>
-                    </div>
-                    <div className="p-3 bg-gray-50 rounded border border-gray-300">
-                      <div className="text-xs font-semibold text-gray-900 uppercase mb-1">Cash Reserve</div>
-                      <div className="text-lg font-bold text-gray-900">{item.data.cash}</div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    {item.data.rationale.map((point, idx) => (
-                      <div key={idx} className="flex items-start gap-2 text-sm text-gray-700">
-                        <span className="text-primary mt-1 flex-shrink-0">•</span>
-                        <span>{point}</span>
-                      </div>
-                    ))}
-                  </div>
+                    )
+                  })}
                 </div>
-              )
-            })}
-          </div>
 
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
-            <p className="text-sm text-blue-800 leading-relaxed">
-              <strong>Note:</strong> These allocations are guidelines based on historical market patterns. Always adjust
-              based on your personal risk tolerance, time horizon, and financial goals. Consult with a financial advisor
-              for personalized advice.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                  <p className="text-sm text-blue-800 leading-relaxed">
+                    <strong>Note:</strong> The Fear & Greed Index is most effective when extreme readings align with
+                    technical levels. Extreme fear (0-24) with strong support levels historically produces the best
+                    risk/reward for options sellers. Always maintain proper position sizing and risk management.
+                  </p>
+                </div>
+              </CardContent>
+            </AccordionContent>
+          </Card>
+        </AccordionItem>
+      </Accordion>
+
+      <Accordion type="multiple" className="space-y-0">
+        <AccordionItem value="portfolio-allocation" className="border-0">
+          <Card className="shadow-sm border-gray-200">
+            <AccordionTrigger className="hover:no-underline px-6 py-4 bg-gray-50 border-b border-gray-200 rounded-t-lg">
+              <CardTitle className="text-lg font-bold text-gray-900">
+                Portfolio Allocation by Fear & Greed Level
+              </CardTitle>
+            </AccordionTrigger>
+            <AccordionContent>
+              <CardContent className="pt-4 pb-4">
+                <div className="space-y-2">
+                  {[
+                    { range: "0-24", level: "Extreme Fear", data: getPortfolioAllocation(12) },
+                    { range: "25-44", level: "Fear", data: getPortfolioAllocation(34) },
+                    { range: "45-55", level: "Neutral", data: getPortfolioAllocation(50) },
+                    { range: "56-74", level: "Greed", data: getPortfolioAllocation(65) },
+                    { range: "75-100", level: "Extreme Greed", data: getPortfolioAllocation(87) },
+                  ].map((item, index) => {
+                    const isCurrent =
+                      marketData.overallScore >= Number.parseInt(item.range.split("-")[0]) &&
+                      marketData.overallScore <= Number.parseInt(item.range.split("-")[1])
+
+                    return (
+                      <div
+                        key={index}
+                        className={`p-4 rounded-lg border transition-colors ${
+                          isCurrent
+                            ? "border-green-500 bg-green-100 shadow-md ring-2 ring-green-300"
+                            : "border-gray-200 bg-white hover:bg-gray-50"
+                        }`}
+                      >
+                        <div className="mb-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div>
+                              <span className="font-mono text-sm font-bold text-gray-900">Score {item.range}</span>
+                              <span
+                                className={`ml-3 font-bold text-sm ${
+                                  index === 0
+                                    ? "text-green-600"
+                                    : index === 1
+                                      ? "text-green-500"
+                                      : index === 2
+                                        ? "text-yellow-600"
+                                        : index === 3
+                                          ? "text-orange-600"
+                                          : "text-red-600"
+                                }`}
+                              >
+                                {item.level}
+                              </span>
+                            </div>
+                            {isCurrent && (
+                              <span className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-full">
+                                CURRENT
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600 italic">{item.data.description}</p>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
+                          <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                            <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Stocks/ETFs</div>
+                            <div className="text-lg font-bold text-blue-900">{item.data.stocks}</div>
+                          </div>
+                          <div className="p-3 bg-purple-50 rounded border border-purple-200">
+                            <div className="text-xs font-semibold text-purple-900 uppercase mb-1">Options</div>
+                            <div className="text-lg font-bold text-purple-900">{item.data.options}</div>
+                          </div>
+                          <div className="p-3 bg-orange-50 rounded border border-orange-200">
+                            <div className="text-xs font-semibold text-orange-900 uppercase mb-1">BTC/Crypto</div>
+                            <div className="text-lg font-bold text-orange-900">{item.data.crypto}</div>
+                          </div>
+                          <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
+                            <div className="text-xs font-semibold text-yellow-900 uppercase mb-1">Gold/Silver</div>
+                            <div className="text-lg font-bold text-yellow-900">{item.data.gold}</div>
+                          </div>
+                          <div className="p-3 bg-gray-50 rounded border border-gray-300">
+                            <div className="text-xs font-semibold text-gray-900 uppercase mb-1">Cash Reserve</div>
+                            <div className="text-lg font-bold text-gray-900">{item.data.cash}</div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          {item.data.rationale.map((point, idx) => (
+                            <div key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                              <span className="text-primary mt-1 flex-shrink-0">•</span>
+                              <span>{point}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                  <p className="text-sm text-blue-800 leading-relaxed">
+                    <strong>Note:</strong> These allocations are guidelines based on historical market patterns. Always
+                    adjust based on your personal risk tolerance, time horizon, and financial goals. Consult with a
+                    financial advisor for personalized advice.
+                  </p>
+                </div>
+              </CardContent>
+            </AccordionContent>
+          </Card>
+        </AccordionItem>
+      </Accordion>
 
       <Card className="shadow-sm border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10">
         <CardContent className="pt-4">

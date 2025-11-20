@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { RefreshCw, TrendingUp, TrendingDown, Minus, AlertTriangle, Calendar, Target } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 
@@ -1020,83 +1021,92 @@ export function FomcPredictions() {
         </Card>
       )}
 
+      {/* Wrapped strategies card in Accordion with default collapsed state */}
       {optionsStrategies.length > 0 && (
-        <Card className="shadow-lg border-2 border-primary">
-          <CardHeader className="bg-primary/5 border-b border-primary/20">
-            <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <Target className="h-6 w-6 text-primary" />
-              Recommended Options Strategies
-            </CardTitle>
-            <CardDescription className="text-base">
-              Actionable trades based on {nextMeeting?.prediction} prediction with {nextMeeting?.confidence.toFixed(0)}%
-              confidence
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="grid md:grid-cols-2 gap-4">
-              {optionsStrategies.map((strategy, index) => (
-                <Card key={index} className="border-2 border-gray-200 hover:border-primary/50 transition-colors">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="text-base font-bold text-gray-900">{strategy.name}</CardTitle>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded">
-                            {strategy.ticker}
-                          </span>
-                          <span className="text-xs text-gray-600">{strategy.type}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div>
-                      <p className="text-sm text-gray-700">{strategy.rationale}</p>
-                    </div>
+        <Accordion type="single" collapsible defaultValue="">
+          <AccordionItem value="strategies" className="border-none">
+            <Card className="shadow-lg border-2 border-primary">
+              <AccordionTrigger className="hover:no-underline">
+                <CardHeader className="bg-primary/5 border-b border-primary/20 w-full pb-4">
+                  <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                    <Target className="h-6 w-6 text-primary" />
+                    Recommended Options Strategies
+                  </CardTitle>
+                  <CardDescription className="text-base">
+                    Actionable trades based on {nextMeeting?.prediction} prediction with{" "}
+                    {nextMeeting?.confidence.toFixed(0)}% confidence
+                  </CardDescription>
+                </CardHeader>
+              </AccordionTrigger>
+              <AccordionContent>
+                <CardContent className="pt-6">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {optionsStrategies.map((strategy, index) => (
+                      <Card key={index} className="border-2 border-gray-200 hover:border-primary/50 transition-colors">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <CardTitle className="text-base font-bold text-gray-900">{strategy.name}</CardTitle>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded">
+                                  {strategy.ticker}
+                                </span>
+                                <span className="text-xs text-gray-600">{strategy.type}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div>
+                            <p className="text-sm text-gray-700">{strategy.rationale}</p>
+                          </div>
 
-                    <div className="space-y-2 text-xs">
-                      <div className="flex items-start gap-2">
-                        <span className="font-semibold text-gray-900 min-w-[70px]">Entry:</span>
-                        <span className="text-gray-700">{strategy.entry}</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <span className="font-semibold text-gray-900 min-w-[70px]">Target:</span>
-                        <span className="text-gray-700">{strategy.target}</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <span className="font-semibold text-gray-900 min-w-[70px]">Stop Loss:</span>
-                        <span className="text-gray-700">{strategy.stopLoss}</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <span className="font-semibold text-gray-900 min-w-[70px]">Timeframe:</span>
-                        <span className="text-gray-700">{strategy.timeframe}</span>
-                      </div>
-                    </div>
+                          <div className="space-y-2 text-xs">
+                            <div className="flex items-start gap-2">
+                              <span className="font-semibold text-gray-900 min-w-[70px]">Entry:</span>
+                              <span className="text-gray-700">{strategy.entry}</span>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <span className="font-semibold text-gray-900 min-w-[70px]">Target:</span>
+                              <span className="text-gray-700">{strategy.target}</span>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <span className="font-semibold text-gray-900 min-w-[70px]">Stop Loss:</span>
+                              <span className="text-gray-700">{strategy.stopLoss}</span>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <span className="font-semibold text-gray-900 min-w-[70px]">Timeframe:</span>
+                              <span className="text-gray-700">{strategy.timeframe}</span>
+                            </div>
+                          </div>
 
-                    <div className="pt-2 border-t border-gray-200">
-                      <div className="flex items-start gap-2 text-xs">
-                        <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0 text-orange-600" />
-                        <p className="text-gray-600">
-                          <span className="font-semibold">Risk:</span> {strategy.risk}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                          <div className="pt-2 border-t border-gray-200">
+                            <div className="flex items-start gap-2 text-xs">
+                              <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0 text-orange-600" />
+                              <p className="text-gray-600">
+                                <span className="font-semibold">Risk:</span> {strategy.risk}
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
 
-            <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-sm text-yellow-800">
-                <span className="font-semibold">⚠️ Important Disclaimer:</span> These strategies are for educational
-                purposes only and do not constitute financial advice. Options trading involves substantial risk and is
-                not suitable for all investors. Always conduct your own research, understand the risks, and consider
-                consulting with a licensed financial advisor before making any investment decisions. Past performance
-                does not guarantee future results.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+                  <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800">
+                      <span className="font-semibold">⚠️ Important Disclaimer:</span> These strategies are for
+                      educational purposes only and do not constitute financial advice. Options trading involves
+                      substantial risk and is not suitable for all investors. Always conduct your own research,
+                      understand the risks, and consider consulting with a licensed financial advisor before making any
+                      investment decisions. Past performance does not guarantee future results.
+                    </p>
+                  </div>
+                </CardContent>
+              </AccordionContent>
+            </Card>
+          </AccordionItem>
+        </Accordion>
       )}
     </div>
   )

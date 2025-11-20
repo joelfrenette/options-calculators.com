@@ -5,8 +5,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, TrendingUp, AlertTriangle, DollarSign, PieChart, Target, ShoppingCart, BarChart3, Info } from 'lucide-react'
+import {
+  Loader2,
+  TrendingUp,
+  AlertTriangle,
+  DollarSign,
+  PieChart,
+  Target,
+  ShoppingCart,
+  BarChart3,
+  Info,
+} from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 
 interface VixLevel {
   range: string
@@ -135,8 +146,8 @@ function getVixPortfolioAllocation(vixLevel: number): {
         "Limit options to defined-risk spreads only; avoid naked short puts",
         "Build large cash reserves for inevitable volatility spike buying opportunities",
         "Gold/defensive assets as portfolio hedges against sudden reversals",
-        "Small crypto allocation only if already profitable; avoid new entries at market peaks"
-      ]
+        "Small crypto allocation only if already profitable; avoid new entries at market peaks",
+      ],
     }
   } else if (vixLevel <= 15) {
     // Greed (VIX 12-15)
@@ -152,8 +163,8 @@ function getVixPortfolioAllocation(vixLevel: number): {
         "Selective short puts on highest-quality names only with small position sizing",
         "Continue building cash reserves for better opportunities ahead",
         "Gold as portfolio stabilizer; crypto only as tactical satellite position",
-        "Focus on risk management over aggressive growth"
-      ]
+        "Focus on risk management over aggressive growth",
+      ],
     }
   } else if (vixLevel <= 20) {
     // Slight Fear (VIX 15-20)
@@ -169,8 +180,8 @@ function getVixPortfolioAllocation(vixLevel: number): {
         "Begin DCA into quality growth stocks on minor pullbacks",
         "Options premiums still attractive for income generation",
         "Maintain tactical cash buffer for opportunistic additions",
-        "Diversified exposure across asset classes for risk balance"
-      ]
+        "Diversified exposure across asset classes for risk balance",
+      ],
     }
   } else if (vixLevel <= 25) {
     // Fear (VIX 20-25)
@@ -186,8 +197,8 @@ function getVixPortfolioAllocation(vixLevel: number): {
         "Scale up short put strategies as premiums expand significantly",
         "Deploy 10-15% of cash reserves on high-quality dip purchases",
         "Options strategies generate outsized income during volatility spikes",
-        "Maintain some cash for potential further downside but start getting aggressive"
-      ]
+        "Maintain some cash for potential further downside but start getting aggressive",
+      ],
     }
   } else if (vixLevel <= 30) {
     // Very Fearful (VIX 25-30)
@@ -203,8 +214,8 @@ function getVixPortfolioAllocation(vixLevel: number): {
         "Heavy short put activity captures massive volatility premiums",
         "Deploy cash reserves aggressively through systematic DCA approach",
         "Focus on mega-cap tech and defensive blue chips at attractive valuations",
-        "Options strategies generate outsized income during volatility spikes"
-      ]
+        "Options strategies generate outsized income during volatility spikes",
+      ],
     }
   } else {
     // Extreme Fear (VIX ≥ 30)
@@ -220,8 +231,8 @@ function getVixPortfolioAllocation(vixLevel: number): {
         "Massive options premiums available; ladder short put entries carefully to avoid catching falling knives",
         "Buy growth stocks that sold off 40-60% from highs with strong balance sheets",
         "Market panic rarely lasts; positioning for 6-12 month recovery timeframe",
-        "Keep minimal cash only for emergency margin requirements and essential liquidity"
-      ]
+        "Keep minimal cash only for emergency margin requirements and essential liquidity",
+      ],
     }
   }
 }
@@ -608,139 +619,186 @@ export function RiskCalculator() {
         </Card>
       )}
 
-      <Card className="shadow-sm border-gray-200">
-        <CardHeader className="bg-gray-50 border-b border-gray-200">
-          <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <PieChart className="h-5 w-5 text-primary" />
-            Portfolio Allocation Guidance by VIX Level
-          </CardTitle>
-          <p className="text-sm text-gray-600 mt-2">
-            Complete allocation strategies across all volatility regimes with asset class breakdowns
-          </p>
-        </CardHeader>
-        <CardContent className="pt-4 pb-4">
-          <div className="space-y-3">
-            {[
-              { range: "≤ 12", vix: 10 },
-              { range: "12-15", vix: 13.5 },
-              { range: "15-20", vix: 17.5 },
-              { range: "20-25", vix: 22.5 },
-              { range: "25-30", vix: 27.5 },
-              { range: "≥ 30", vix: 35 },
-            ].map((item, index) => {
-              const levelData = getVixPortfolioAllocation(item.vix)
-              const levelInfo = getVixLevel(item.vix)
-              const isCurrent = vixValue && vixValue >= (index === 0 ? 0 : index === 1 ? 12 : index === 2 ? 15 : index === 3 ? 20 : index === 4 ? 25 : 30) && 
-                                vixValue < (index === 5 ? 999 : index === 4 ? 30 : index === 3 ? 25 : index === 2 ? 20 : index === 1 ? 15 : 12)
+      <Accordion type="single" collapsible defaultValue="">
+        <AccordionItem value="portfolio-allocation" className="border-0">
+          <Card className="shadow-sm border-gray-200">
+            <AccordionTrigger className="hover:no-underline [&[data-state=open]>div]:rounded-b-none">
+              <CardHeader className="bg-gray-50 border-b border-gray-200 w-full py-4">
+                <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <PieChart className="h-5 w-5 text-primary" />
+                  Portfolio Allocation Guidance by VIX Level
+                </CardTitle>
+                <p className="text-sm text-gray-600 mt-2 text-left">
+                  Complete allocation strategies across all volatility regimes with asset class breakdowns
+                </p>
+              </CardHeader>
+            </AccordionTrigger>
+            <AccordionContent>
+              <CardContent className="pt-4 pb-4">
+                <div className="space-y-3">
+                  {[
+                    { range: "≤ 12", vix: 10 },
+                    { range: "12-15", vix: 13.5 },
+                    { range: "15-20", vix: 17.5 },
+                    { range: "20-25", vix: 22.5 },
+                    { range: "25-30", vix: 27.5 },
+                    { range: "≥ 30", vix: 35 },
+                  ].map((item, index) => {
+                    const levelData = getVixPortfolioAllocation(item.vix)
+                    const levelInfo = getVixLevel(item.vix)
+                    const isCurrent =
+                      vixValue &&
+                      vixValue >=
+                        (index === 0
+                          ? 0
+                          : index === 1
+                            ? 12
+                            : index === 2
+                              ? 15
+                              : index === 3
+                                ? 20
+                                : index === 4
+                                  ? 25
+                                  : 30) &&
+                      vixValue <
+                        (index === 5
+                          ? 999
+                          : index === 4
+                            ? 30
+                            : index === 3
+                              ? 25
+                              : index === 2
+                                ? 20
+                                : index === 1
+                                  ? 15
+                                  : 12)
 
-              return (
-                <div
-                  key={index}
-                  className={`p-4 rounded-lg border transition-colors ${
-                    isCurrent ? "border-green-500 bg-green-100 shadow-md ring-2 ring-green-300" : "border-gray-200 bg-white hover:bg-gray-50"
-                  }`}
-                >
-                  <div className="mb-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <span className="font-mono text-sm font-bold text-gray-900">VIX {item.range}</span>
-                        <span className={`ml-3 font-bold text-sm ${levelInfo.color}`}>
-                          {levelInfo.sentiment}
-                        </span>
+                    return (
+                      <div
+                        key={index}
+                        className={`p-4 rounded-lg border transition-colors ${
+                          isCurrent
+                            ? "border-green-500 bg-green-100 shadow-md ring-2 ring-green-300"
+                            : "border-gray-200 bg-white hover:bg-gray-50"
+                        }`}
+                      >
+                        <div className="mb-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div>
+                              <span className="font-mono text-sm font-bold text-gray-900">VIX {item.range}</span>
+                              <span className={`ml-3 font-bold text-sm ${levelInfo.color}`}>{levelInfo.sentiment}</span>
+                            </div>
+                            {isCurrent && (
+                              <span className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-full">
+                                CURRENT
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600 italic">{levelData.description}</p>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
+                          <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                            <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Stocks/ETFs</div>
+                            <div className="text-lg font-bold text-blue-900">{levelData.stocks}</div>
+                          </div>
+                          <div className="p-3 bg-purple-50 rounded border border-purple-200">
+                            <div className="text-xs font-semibold text-purple-900 uppercase mb-1">Options</div>
+                            <div className="text-lg font-bold text-purple-900">{levelData.options}</div>
+                          </div>
+                          <div className="p-3 bg-orange-50 rounded border border-orange-200">
+                            <div className="text-xs font-semibold text-orange-900 uppercase mb-1">BTC/Crypto</div>
+                            <div className="text-lg font-bold text-orange-900">{levelData.crypto}</div>
+                          </div>
+                          <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
+                            <div className="text-xs font-semibold text-yellow-900 uppercase mb-1">Gold/Silver</div>
+                            <div className="text-lg font-bold text-yellow-900">{levelData.gold}</div>
+                          </div>
+                          <div className="p-3 bg-gray-50 rounded border border-gray-300">
+                            <div className="text-xs font-semibold text-gray-900 uppercase mb-1">Cash Reserve</div>
+                            <div className="text-lg font-bold text-gray-900">{levelData.cash}</div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          {levelData.rationale.map((point, idx) => (
+                            <div key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                              <span className="text-primary mt-1 flex-shrink-0">•</span>
+                              <span>{point}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      {isCurrent && (
-                        <span className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-full">CURRENT</span>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-600 italic">{levelData.description}</p>
-                  </div>
+                    )
+                  })}
+                </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
-                    <div className="p-3 bg-blue-50 rounded border border-blue-200">
-                      <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Stocks/ETFs</div>
-                      <div className="text-lg font-bold text-blue-900">{levelData.stocks}</div>
-                    </div>
-                    <div className="p-3 bg-purple-50 rounded border border-purple-200">
-                      <div className="text-xs font-semibold text-purple-900 uppercase mb-1">Options</div>
-                      <div className="text-lg font-bold text-purple-900">{levelData.options}</div>
-                    </div>
-                    <div className="p-3 bg-orange-50 rounded border border-orange-200">
-                      <div className="text-xs font-semibold text-orange-900 uppercase mb-1">BTC/Crypto</div>
-                      <div className="text-lg font-bold text-orange-900">{levelData.crypto}</div>
-                    </div>
-                    <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
-                      <div className="text-xs font-semibold text-yellow-900 uppercase mb-1">Gold/Silver</div>
-                      <div className="text-lg font-bold text-yellow-900">{levelData.gold}</div>
-                    </div>
-                    <div className="p-3 bg-gray-50 rounded border border-gray-300">
-                      <div className="text-xs font-semibold text-gray-900 uppercase mb-1">Cash Reserve</div>
-                      <div className="text-lg font-bold text-gray-900">{levelData.cash}</div>
-                    </div>
-                  </div>
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                  <p className="text-sm text-blue-800 leading-relaxed">
+                    <strong>Note:</strong> These allocations are strategic guidelines based on historical VIX patterns
+                    and market behavior. Always adjust based on your personal risk tolerance, investment timeline, and
+                    financial objectives. VIX levels are forward-looking volatility expectations and should be combined
+                    with other market indicators for comprehensive decision-making.
+                  </p>
+                </div>
+              </CardContent>
+            </AccordionContent>
+          </Card>
+        </AccordionItem>
+      </Accordion>
 
-                  <div className="space-y-2">
-                    {levelData.rationale.map((point, idx) => (
-                      <div key={idx} className="flex items-start gap-2 text-sm text-gray-700">
-                        <span className="text-primary mt-1 flex-shrink-0">•</span>
-                        <span>{point}</span>
+      <Accordion type="single" collapsible defaultValue="">
+        <AccordionItem value="cash-suggestions" className="border-0">
+          <Card className="shadow-sm border-gray-200">
+            <AccordionTrigger className="hover:no-underline [&[data-state=open]>div]:rounded-b-none">
+              <CardHeader className="bg-gray-50 border-b border-gray-200 w-full py-4">
+                <CardTitle className="text-lg font-bold text-gray-900">
+                  Cash-On Hand Suggestions Based on VIX Levels
+                </CardTitle>
+              </CardHeader>
+            </AccordionTrigger>
+            <AccordionContent>
+              <CardContent className="pt-4 pb-4">
+                <div className="space-y-2">
+                  {VIX_LEVELS.map((level, index) => (
+                    <div
+                      key={index}
+                      className={`p-4 rounded-lg border transition-colors ${
+                        currentLevel === level
+                          ? "border-primary bg-green-50 shadow-sm"
+                          : "border-gray-200 bg-white hover:bg-gray-50"
+                      }`}
+                    >
+                      <div className="grid md:grid-cols-3 gap-4">
+                        <div className="space-y-1">
+                          <div className="font-mono text-sm font-bold text-gray-900">VIX {level.range}</div>
+                          <div className={`font-bold text-sm ${level.color}`}>{level.sentiment}</div>
+                          <div className="text-xs text-gray-600 font-medium mt-2">
+                            {level.cashMin}-{level.cashMax}% Cash
+                          </div>
+                          <div className="text-xs text-gray-600 font-medium">
+                            {level.investedMin}-{level.investedMax}% Invested
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="text-xs font-semibold text-purple-900 uppercase">Options Seller</div>
+                          <div className="text-sm text-gray-700">{level.optionsAction}</div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="text-xs font-semibold text-teal-900 uppercase">Equity Buyer</div>
+                          <div className="text-sm text-gray-700">{level.equityAction}</div>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
-            <p className="text-sm text-blue-800 leading-relaxed">
-              <strong>Note:</strong> These allocations are strategic guidelines based on historical VIX patterns and market behavior. Always adjust based on your personal risk tolerance, investment timeline, and financial objectives. VIX levels are forward-looking volatility expectations and should be combined with other market indicators for comprehensive decision-making.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="shadow-sm border-gray-200">
-        <CardHeader className="bg-gray-50 border-b border-gray-200">
-          <CardTitle className="text-lg font-bold text-gray-900">Cash-On Hand Suggestions Based on VIX Levels</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-4 pb-4">
-          <div className="space-y-2">
-            {VIX_LEVELS.map((level, index) => (
-              <div
-                key={index}
-                className={`p-4 rounded-lg border transition-colors ${
-                  currentLevel === level
-                    ? "border-primary bg-green-50 shadow-sm"
-                    : "border-gray-200 bg-white hover:bg-gray-50"
-                }`}
-              >
-                <div className="grid md:grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    <div className="font-mono text-sm font-bold text-gray-900">VIX {level.range}</div>
-                    <div className={`font-bold text-sm ${level.color}`}>{level.sentiment}</div>
-                    <div className="text-xs text-gray-600 font-medium mt-2">
-                      {level.cashMin}-{level.cashMax}% Cash
                     </div>
-                    <div className="text-xs text-gray-600 font-medium">
-                      {level.investedMin}-{level.investedMax}% Invested
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="text-xs font-semibold text-purple-900 uppercase">Options Seller</div>
-                    <div className="text-sm text-gray-700">{level.optionsAction}</div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="text-xs font-semibold text-teal-900 uppercase">Equity Buyer</div>
-                    <div className="text-sm text-gray-700">{level.equityAction}</div>
-                  </div>
+                  ))}
                 </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              </CardContent>
+            </AccordionContent>
+          </Card>
+        </AccordionItem>
+      </Accordion>
     </div>
   )
 }
