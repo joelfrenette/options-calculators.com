@@ -108,6 +108,30 @@ function calculateMA(prices: number[], period: number): number {
   return slice.reduce((sum, price) => sum + price, 0) / period
 }
 
+function calculateBollingerBands(
+  prices: number[],
+  period = 20,
+  stdDev = 2,
+): { upper: number; middle: number; lower: number } {
+  if (prices.length < period) {
+    const lastPrice = prices[prices.length - 1] || 0
+    return { upper: lastPrice, middle: lastPrice, lower: lastPrice }
+  }
+
+  const slice = prices.slice(-period)
+  const middle = slice.reduce((sum, price) => sum + price, 0) / period
+
+  // Calculate standard deviation
+  const squaredDiffs = slice.map((price) => Math.pow(price - middle, 2))
+  const variance = squaredDiffs.reduce((sum, diff) => sum + diff, 0) / period
+  const standardDeviation = Math.sqrt(variance)
+
+  const upper = middle + stdDev * standardDeviation
+  const lower = middle - stdDev * standardDeviation
+
+  return { upper, middle, lower }
+}
+
 function calculateRSI(prices: number[], period = 14): number {
   if (prices.length < period + 1) return 50
 
@@ -418,21 +442,25 @@ export async function GET() {
         momentumStrength,
       )
 
-      // Prepare historical data with forecast
       const historicalWithMA = historical.slice(-60).map((h: any, i: number) => {
         const pricesUpToIndex = prices.slice(0, historical.length - 60 + i + 1)
+        const bollingerBands = calculateBollingerBands(pricesUpToIndex, 20, 2)
         return {
           date: h.date,
           price: h.price,
           ma20: calculateMA(pricesUpToIndex, 20),
           ma50: calculateMA(pricesUpToIndex, 50),
+          ma200: calculateMA(pricesUpToIndex, 200),
+          bollingerUpper: bollingerBands.upper,
+          bollingerLower: bollingerBands.lower,
+          forecast: null, // No forecast in historical section
           support: support,
           resistance: resistance,
         }
       })
 
-      // Add forecast points
       const lastDate = new Date(historical[historical.length - 1].timestamp * 1000)
+
       for (let i = 1; i <= 30; i++) {
         const forecastDate = new Date(lastDate)
         forecastDate.setDate(forecastDate.getDate() + i)
@@ -442,14 +470,21 @@ export async function GET() {
           forecastPrice = currentPrice + ((priceTargets.target1Month - currentPrice) / 30) * i
         } else if (trendAnalysis.trend === "Bearish") {
           forecastPrice = currentPrice - ((currentPrice - priceTargets.target1Month) / 30) * i
+        } else {
+          // Neutral: trend toward midpoint
+          const midPoint = (support + resistance) / 2
+          forecastPrice = currentPrice + ((midPoint - currentPrice) / 30) * i
         }
 
         historicalWithMA.push({
           date: forecastDate.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-          price: null as any,
-          ma20: null as any,
-          ma50: null as any,
-          forecast: forecastPrice,
+          price: null as any, // No actual price in forecast
+          ma20: null as any, // Stop 20-day MA in forecast
+          ma50: null as any, // Stop 50-day MA in forecast
+          ma200: null as any, // Stop 200-day MA in forecast
+          bollingerUpper: null as any,
+          bollingerLower: null as any,
+          forecast: forecastPrice, // Show forecast line only in future
           support: support,
           resistance: resistance,
         })

@@ -724,11 +724,7 @@ export default function CcpiDashboard() {
         </Card>
 
         {/* Four Pillars - Collapsible Breakdown */}
-        <Accordion
-          type="multiple"
-          defaultValue={["pillar1", "pillar2", "pillar3", "pillar4"]}
-          className="space-y-4 pb-6 border-b border-gray-200"
-        >
+        <Accordion type="multiple" defaultValue={[]} className="space-y-4 pb-6 border-b border-gray-200">
           {/* Pillar 1 - Momentum & Technical */}
           <AccordionItem value="pillar1" className="border rounded-lg px-4">
             <AccordionTrigger className="hover:no-underline py-10">
