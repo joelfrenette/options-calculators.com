@@ -970,7 +970,9 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <TooltipTrigger asChild>
                       <Info className="h-4 w-4 text-muted-foreground cursor-help" />
                     </TooltipTrigger>
-                    <TooltipContent className="max-w-md bg-yellow-50 border-yellow-200">
+                    <TooltipContent
+                      className={`max-w-md ${data.canaries.length > 0 && data.canaries.some((c) => c.severity === "high") ? "bg-red-50 border-red-200" : "bg-yellow-50 border-yellow-200"}`}
+                    >
                       <p className="font-semibold mb-2">Early Warning System - What Are "Canaries"?</p>
                       <p className="text-sm mb-2">
                         Historically, coal miners brought canaries into mines because these birds would show signs of
@@ -1424,7 +1426,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                                 continuously.
                               </p>
                               <p className="text-xs text-gray-600">
-                                Historical pattern: Market crashes often feature 5-7+ consecutive down days as panic
+                                Historical pattern: Markets crashes often feature 5-7+ consecutive down days as panic
                                 selling takes hold. The 2020 COVID crash had 6 consecutive down days, and the 2008
                                 financial crisis had multiple 5-7 day losing streaks.
                               </p>
@@ -2342,7 +2344,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                             <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
                               <p className="font-semibold mb-2">Bullish Percent Index - Market Breadth Indicator</p>
                               <p className="text-sm mb-2">
-                                This indicator measures what percentage of stocks in an index are giving bullish
+                                This indicator measures what percentage of stocks in an index are showing bullish
                                 technical signals based on "Point & Figure" charting. It's like taking a vote among all
                                 stocks - how many are trending up vs. down?
                               </p>
@@ -2413,399 +2415,6 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                       <span>Oversold: {"<"}30%</span>
                       <span className="text-yellow-600">Normal: 30-50%</span>
                       <span>Overbought: {">"}70%</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Yield Curve - moved to Risk Appetite */}
-                {data.indicators.yieldCurve !== undefined && (
-                  <div className="space-y-2">
-                    {/* Added tooltip to Yield Curve indicator */}
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium flex items-center gap-1">
-                        Yield Curve (10Y-2Y)
-                        {/* CHANGE: Enhanced Yield Curve tooltip */}
-                        {tooltipsEnabled && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-2">Yield Curve (10Y-2Y) - Recession Predictor</p>
-                              <p className="text-sm mb-2">
-                                The yield curve compares interest rates on 2-year Treasury bonds versus 10-year Treasury
-                                bonds. It's one of the most reliable recession predictors in economics, with a nearly
-                                perfect track record.
-                              </p>
-                              <p className="text-sm mb-2">
-                                <strong>What It Measures:</strong> The difference (spread) between 10-year and 2-year
-                                Treasury yields, measured in basis points (1 basis point = 0.01%). The number tells us
-                                what bond investors think about future economic growth.
-                              </p>
-                              <p className="text-sm mb-2">
-                                <strong>Understanding Bond Yields:</strong> Normally, longer-term bonds (10-year) pay
-                                higher yields than shorter-term bonds (2-year) because you're lending money for longer
-                                and taking more risk.
-                              </p>
-                              <p className="text-sm mb-2">
-                                <strong>How to Read It:</strong>
-                              </p>
-                              <ul className="text-sm space-y-1 mb-2">
-                                <li>
-                                  • <strong>Above +100 bps:</strong> Steep curve - healthy economy, growth expected, low
-                                  recession risk
-                                </li>
-                                <li>
-                                  • <strong>+50 to +100 bps:</strong> Normal curve - steady economic growth expected
-                                </li>
-                                <li>
-                                  • <strong>0 to +50 bps:</strong> Flattening curve - growth slowing, recession risk
-                                  building
-                                </li>
-                                <li>
-                                  • <strong>Below 0 (Inverted):</strong> Inverted curve - RECESSION WARNING! Investors
-                                  expect Fed to cut rates due to economic crisis
-                                </li>
-                              </ul>
-                              <p className="text-sm mb-2">
-                                <strong>Why Inversion Predicts Recessions:</strong> When short-term rates are higher
-                                than long-term rates, it means:
-                              </p>
-                              <ul className="text-sm space-y-1 mb-2">
-                                <li>
-                                  1. The Fed has raised rates aggressively to fight inflation (making 2-year yields
-                                  high)
-                                </li>
-                                <li>
-                                  2. Bond investors expect the Fed will have to CUT rates soon due to recession (making
-                                  10-year yields lower)
-                                </li>
-                                <li>3. This "inversion" has preceded EVERY recession since 1950</li>
-                              </ul>
-                              <p className="text-sm mb-2">
-                                <strong>Data Source:</strong> U.S. Treasury Department daily yield data for 2-year and
-                                10-year government bonds.
-                              </p>
-                              <p className="text-xs text-gray-600">
-                                Historical track record: Yield curve inverted 6-24 months before recessions in 1990,
-                                2001, 2008, and 2020. It's the most reliable recession predictor known to economics.
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </span>
-                      <span className="font-bold">{data.indicators.yieldCurve.toFixed(2)}%</span>
-                    </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                      <div
-                        className="absolute inset-0 bg-gray-200"
-                        style={{
-                          marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.yieldCurve + 1) / 2) * 100))}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Normal: {">"}0.5%</span>
-                      <span className="text-yellow-600">Flat: 0-0.5%</span>
-                      <span>Inverted: {"<"}0%</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-
-          {/* Pillar 2 - Risk Appetite & Volatility */}
-          <AccordionItem value="pillar2" className="border rounded-lg px-4">
-            <AccordionTrigger className="hover:no-underline py-10">
-              <div className="flex items-center justify-between w-full pr-4">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-orange-600" />
-                  <span className="text-lg font-semibold">Pillar 2 - Risk Appetite & Volatility</span>
-                  <span className="text-sm text-gray-600">Weight: 30% | 8 indicators</span>
-                </div>
-                <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.riskAppetite)}/100</span>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent>
-              <div className="space-y-6 pt-4">
-                {/* Put/Call Ratio */}
-                {data.indicators?.putCallRatio !== undefined && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <h4 className="font-medium">Put/Call Ratio</h4>
-                      <InfoTooltip title="Put/Call Ratio measures investor sentiment by comparing the volume of bearish put options to bullish call options traded on the market. When more traders buy puts than calls, it indicates fear and defensive positioning. A ratio above 1.0 means more puts than calls (bearish), while below 0.7 suggests complacency (bullish sentiment that can precede crashes). This is calculated by dividing total put option volume by total call option volume across major exchanges like CBOE. Higher ratios during market strength can signal protective hedging before downturns, making it a leading indicator of investor anxiety." />
-                    </div>
-                    <div className="relative pt-1">
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span className="text-gray-700">Extreme Fear: &gt;1.3</span>
-                        <span className="text-gray-700">Balanced: 0.7-1.0</span>
-                        <span className="text-gray-700">Complacency: &lt;0.6</span>
-                      </div>
-                      <div className="w-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded h-4"></div>
-                      <div
-                        className="absolute top-[28px] w-1 h-6 bg-black"
-                        style={{
-                          left: `${Math.min(Math.max(((data.indicators.putCallRatio - 0.4) / 1.2) * 100, 0), 100)}%`,
-                        }}
-                      ></div>
-                    </div>
-                    <div className="flex justify-between items-center mt-2">
-                      <span className="text-2xl font-bold">{data.indicators.putCallRatio.toFixed(2)}</span>
-                      <span
-                        className={`text-sm font-medium ${
-                          data.indicators.putCallRatio > 1.0
-                            ? "text-red-600"
-                            : data.indicators.putCallRatio < 0.7
-                              ? "text-green-600"
-                              : "text-yellow-600"
-                        }`}
-                      >
-                        {data.indicators.putCallRatio > 1.0
-                          ? "High Fear"
-                          : data.indicators.putCallRatio < 0.7
-                            ? "Complacent"
-                            : "Balanced"}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Fear & Greed Index */}
-                {data.indicators.fearGreedIndex !== undefined && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <h4 className="font-medium">Fear & Greed Index</h4>
-                      <InfoTooltip title="The Fear & Greed Index is a composite score (0-100) created by CNN Money that measures market emotions by analyzing seven factors: stock price momentum, stock price strength, stock price breadth, put/call ratios, market volatility (VIX), safe haven demand (bonds vs stocks), and junk bond demand. Scores below 25 indicate 'Extreme Fear' where investors are too worried (potential buying opportunity), while scores above 75 show 'Extreme Greed' where euphoria dominates (crash warning). The index updates daily and combines these diverse sentiment signals into one number, making it easy to gauge whether fear or greed is driving the market. Historically, extreme greed readings have preceded major corrections." />
-                    </div>
-                    <div className="relative pt-1">
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span className="text-gray-700">Extreme Fear: &lt;25</span>
-                        <span className="text-gray-700">Neutral: 45-55</span>
-                        <span className="text-gray-700">Extreme Greed: &gt;75</span>
-                      </div>
-                      <div className="w-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 rounded h-4"></div>
-                      <div
-                        className="absolute top-[28px] w-1 h-6 bg-black"
-                        style={{ left: `${Math.min(Math.max(data.indicators.fearGreedIndex, 0), 100)}%` }}
-                      ></div>
-                    </div>
-                    <div className="flex justify-between items-center mt-2">
-                      <span className="text-2xl font-bold">{data.indicators.fearGreedIndex.toFixed(0)}</span>
-                      <span
-                        className={`text-sm font-medium ${
-                          data.indicators.fearGreedIndex < 25
-                            ? "text-red-600"
-                            : data.indicators.fearGreedIndex > 75
-                              ? "text-green-600"
-                              : "text-yellow-600"
-                        }`}
-                      >
-                        {data.indicators.fearGreedIndex < 25
-                          ? "Extreme Fear"
-                          : data.indicators.fearGreedIndex > 75
-                            ? "Extreme Greed"
-                            : "Neutral"}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* AAII Bullish Sentiment */}
-                {data.indicators.aaiiBullish !== undefined && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <h4 className="font-medium">AAII Bullish Sentiment</h4>
-                      <InfoTooltip title="The American Association of Individual Investors (AAII) Bullish Sentiment is a weekly survey asking individual investors whether they expect stocks to rise, fall, or stay flat over the next six months. The percentage who are bullish (expecting gains) typically ranges from 20-60%. Readings above 50% indicate excessive optimism where retail investors are overly confident (often a contrarian sell signal), while readings below 30% show pessimism (potential buy signal). This survey has been conducted since 1987 and captures the mood of everyday investors rather than professionals. Historically, when retail sentiment becomes extremely bullish, it has preceded market corrections as 'dumb money' piles in at the top." />
-                    </div>
-                    <div className="relative pt-1">
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span className="text-gray-700">Bearish: &lt;30%</span>
-                        <span className="text-gray-700">Neutral: 40-50%</span>
-                        <span className="text-gray-700">Euphoric: &gt;55%</span>
-                      </div>
-                      <div className="w-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded h-4"></div>
-                      <div
-                        className="absolute top-[28px] w-1 h-6 bg-black"
-                        style={{ left: `${Math.min(Math.max(data.indicators.aaiiBullish, 0), 100)}%` }}
-                      ></div>
-                    </div>
-                    <div className="flex justify-between items-center mt-2">
-                      <span className="text-2xl font-bold">{data.indicators.aaiiBullish.toFixed(1)}%</span>
-                      <span
-                        className={`text-sm font-medium ${
-                          data.indicators.aaiiBullish > 55
-                            ? "text-red-600"
-                            : data.indicators.aaiiBullish < 30
-                              ? "text-green-600"
-                              : "text-yellow-600"
-                        }`}
-                      >
-                        {data.indicators.aaiiBullish > 55
-                          ? "Euphoric"
-                          : data.indicators.aaiiBullish < 30
-                            ? "Bearish"
-                            : "Neutral"}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Short Interest */}
-                {data.indicators.shortInterest !== undefined && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <h4 className="font-medium">Short Interest (% of Float)</h4>
-                      <InfoTooltip title="Short Interest measures the percentage of a stock's available shares (float) that have been sold short by investors betting on price declines. For major indices like SPY (S&P 500 ETF), typical short interest is 1-3%. When short interest spikes above 5%, it indicates widespread pessimism and bearish positioning by sophisticated traders who expect market drops. However, high short interest can also fuel 'short squeeze' rallies where shorts are forced to buy back shares, temporarily pushing prices higher. The data comes from twice-monthly exchange reports and is calculated as (shares sold short / total shares available for trading) × 100. Rising short interest confirms bearish sentiment among professional investors." />
-                    </div>
-                    <div className="relative pt-1">
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span className="text-gray-700">Low: &lt;2%</span>
-                        <span className="text-gray-700">Normal: 2-4%</span>
-                        <span className="text-gray-700">High: &gt;5%</span>
-                      </div>
-                      <div className="w-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded h-4"></div>
-                      <div
-                        className="absolute top-[28px] w-1 h-6 bg-black"
-                        style={{
-                          left: `${Math.min(Math.max(((data.indicators.shortInterest - 1) / 6) * 100, 0), 100)}%`,
-                        }}
-                      ></div>
-                    </div>
-                    <div className="flex justify-between items-center mt-2">
-                      <span className="text-2xl font-bold">{data.indicators.shortInterest.toFixed(1)}%</span>
-                      <span
-                        className={`text-sm font-medium ${
-                          data.indicators.shortInterest > 5
-                            ? "text-red-600"
-                            : data.indicators.shortInterest < 2
-                              ? "text-green-600"
-                              : "text-yellow-600"
-                        }`}
-                      >
-                        {data.indicators.shortInterest > 5
-                          ? "High Shorts"
-                          : data.indicators.shortInterest < 2
-                            ? "Low Shorts"
-                            : "Normal"}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* ATR - Average True Range */}
-                {data.indicators.atr !== undefined && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <h4 className="font-medium">ATR - Average True Range</h4>
-                      <InfoTooltip title="Average True Range (ATR) measures the average volatility or 'choppiness' of price movements over 14 days, expressed in index points. For the S&P 500, typical ATR values range from 15-30 points during calm markets, but can spike to 50+ during turbulent periods. ATR increases when prices swing wildly (large daily ranges), signaling uncertainty and emotional trading. The calculation takes the greatest of: (today's high - today's low), (today's high - yesterday's close), or (yesterday's close - today's low), then averages these 'true ranges' over 14 periods. Higher ATR means bigger intraday swings and greater market stress, often preceding or during corrections. It's a pure volatility measure without directional bias." />
-                    </div>
-                    <div className="relative pt-1">
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span className="text-gray-700">Low Vol: &lt;25</span>
-                        <span className="text-gray-700">Normal: 25-40</span>
-                        <span className="text-gray-700">High Vol: &gt;50</span>
-                      </div>
-                      <div className="w-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded h-4"></div>
-                      <div
-                        className="absolute top-[28px] w-1 h-6 bg-black"
-                        style={{
-                          left: `${Math.min(Math.max(((data.indicators.atr - 10) / 60) * 100, 0), 100)}%`,
-                        }}
-                      ></div>
-                    </div>
-                    <div className="flex justify-between items-center mt-2">
-                      <span className="text-2xl font-bold">{data.indicators.atr.toFixed(1)}</span>
-                      <span
-                        className={`text-sm font-medium ${
-                          data.indicators.atr > 50
-                            ? "text-red-600"
-                            : data.indicators.atr < 25
-                              ? "text-green-600"
-                              : "text-yellow-600"
-                        }`}
-                      >
-                        {data.indicators.atr > 50 ? "High Vol" : data.indicators.atr < 25 ? "Low Vol" : "Normal"}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* LTV - Long-term Volatility */}
-                {data.indicators.ltv !== undefined && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <h4 className="font-medium">LTV - Long-term Volatility</h4>
-                      <InfoTooltip title="Long-term Volatility (LTV) measures the annualized standard deviation of daily returns over 252 trading days (one year), expressed as a percentage. It captures how much prices have varied from their average over the long term. Typical LTV for the S&P 500 is 10-15% during stable periods, but spikes to 20%+ during market stress and can exceed 30% during crashes like 2008 or 2020. The calculation uses the statistical standard deviation formula applied to daily percentage returns over the past year, then multiplied by the square root of 252 to annualize it. Higher LTV indicates sustained uncertainty and risk, while very low LTV (<10%) suggests complacency that often precedes volatility spikes. It's a backward-looking measure of realized price swings." />
-                    </div>
-                    <div className="relative pt-1">
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span className="text-gray-700">Stable: &lt;10%</span>
-                        <span className="text-gray-700">Normal: 10-15%</span>
-                        <span className="text-gray-700">Elevated: &gt;20%</span>
-                      </div>
-                      <div className="w-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded h-4"></div>
-                      <div
-                        className="absolute top-[28px] w-1 h-6 bg-black"
-                        style={{
-                          left: `${Math.min(Math.max(((data.indicators.ltv - 5) / 30) * 100, 0), 100)}%`,
-                        }}
-                      ></div>
-                    </div>
-                    <div className="flex justify-between items-center mt-2">
-                      <span className="text-2xl font-bold">{data.indicators.ltv.toFixed(1)}%</span>
-                      <span
-                        className={`text-sm font-medium ${
-                          data.indicators.ltv > 20
-                            ? "text-red-600"
-                            : data.indicators.ltv < 10
-                              ? "text-green-600"
-                              : "text-yellow-600"
-                        }`}
-                      >
-                        {data.indicators.ltv > 20 ? "Elevated" : data.indicators.ltv < 10 ? "Stable" : "Normal"}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Bullish Percent Index */}
-                {data.indicators.bullishPercent !== undefined && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <h4 className="font-medium">Bullish Percent Index</h4>
-                      <InfoTooltip title="The Bullish Percent Index (BPI) measures the percentage of stocks in a major index (like the S&P 500) that are currently showing bullish point-and-figure chart patterns. The index ranges from 0-100%, with readings above 70% indicating overbought conditions where too many stocks are extended (crash risk), and readings below 30% showing oversold conditions (potential bottoms). The BPI is calculated by analyzing point-and-figure charts for each stock and determining if its pattern is bullish (buy signal) or bearish, then computing the percentage that are bullish. Readings above 70% historically precede market tops as fewer stocks can join the rally, while readings below 30% often mark capitulation bottoms. It's a breadth indicator showing market-wide trend strength." />
-                    </div>
-                    <div className="relative pt-1">
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span className="text-gray-700">Oversold: &lt;30%</span>
-                        <span className="text-gray-700">Normal: 30-50%</span>
-                        <span className="text-gray-700">Overbought: &gt;70%</span>
-                      </div>
-                      <div className="w-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded h-4"></div>
-                      <div
-                        className="absolute top-[28px] w-1 h-6 bg-black"
-                        style={{ left: `${Math.min(Math.max(data.indicators.bullishPercent, 0), 100)}%` }}
-                      ></div>
-                    </div>
-                    <div className="flex justify-between items-center mt-2">
-                      <span className="text-2xl font-bold">{data.indicators.bullishPercent.toFixed(0)}%</span>
-                      <span
-                        className={`text-sm font-medium ${
-                          data.indicators.bullishPercent > 70
-                            ? "text-red-600"
-                            : data.indicators.bullishPercent < 30
-                              ? "text-green-600"
-                              : "text-yellow-600"
-                        }`}
-                      >
-                        {data.indicators.bullishPercent > 70
-                          ? "Overbought"
-                          : data.indicators.bullishPercent < 30
-                            ? "Oversold"
-                            : "Normal"}
-                      </span>
                     </div>
                   </div>
                 )}
@@ -3250,7 +2859,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
           </AccordionItem>
 
           {/* Pillar 4 - Macro Economic */}
-          <AccordionItem value="pillar4" className="border border-b rounded-lg px-4">
+          <AccordionItem value="pillar4" className="border rounded-lg px-4">
             <AccordionTrigger className="hover:no-underline py-10">
               <div className="flex items-center justify-between w-full pr-4">
                 <div className="flex items-center gap-2">
@@ -3294,7 +2903,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                               </ul>
                               <p className="text-xs mt-2">
                                 <strong>Impact:</strong> Widening TED spread signals increasing fear of bank defaults
-                                and credit crunch
+                                and credit tightening
                               </p>
                             </TooltipContent>
                           </Tooltip>
