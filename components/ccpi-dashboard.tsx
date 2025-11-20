@@ -115,31 +115,25 @@ export default function CcpiDashboard() {
   }
 
   useEffect(() => {
-    fetchCachedData()
+    loadFromLocalStorage()
     fetchHistory()
   }, [])
 
-  const fetchCachedData = async () => {
+  const loadFromLocalStorage = () => {
     try {
-      setLoading(true)
-      setError(null)
-      const cachedResponse = await fetch("/api/ccpi/cache")
-
-      if (cachedResponse.ok) {
-        const cachedResult = await cachedResponse.json()
-        console.log("[v0] CCPI: Loaded cached data from", cachedResult.cachedAt)
-        setData(cachedResult)
-        await fetchExecutiveSummary(cachedResult)
+      const cached = localStorage.getItem("ccpi-data")
+      if (cached) {
+        const parsedData = JSON.parse(cached)
+        console.log("[v0] CCPI: Loaded from localStorage", parsedData.cachedAt)
+        setData(parsedData)
+        // Don't fetch executive summary on initial load to speed things up
       } else {
-        console.log("[v0] CCPI: No cached data available, auto-fetching fresh data...")
-        await fetchData()
+        console.log("[v0] CCPI: No cached data in localStorage")
+        setError("No cached data available. Click refresh to load fresh data.")
       }
     } catch (error) {
-      console.error("[v0] CCPI cache load error:", error)
-      console.log("[v0] CCPI: Cache error, auto-fetching fresh data...")
-      await fetchData()
-    } finally {
-      setLoading(false)
+      console.error("[v0] CCPI localStorage load error:", error)
+      setError("No cached data available. Click refresh to load fresh data.")
     }
   }
 
@@ -209,21 +203,33 @@ export default function CcpiDashboard() {
         result.pillars.macro * 0.1
       console.log("  Calculated CCPI:", calculatedCCPI.toFixed(1), "| API CCPI:", result.ccpi)
 
-      setData(result)
+      const cachedData = {
+        ...result,
+        cachedAt: new Date().toISOString(),
+      }
+
+      setData(cachedData)
+
+      try {
+        localStorage.setItem("ccpi-data", JSON.stringify(cachedData))
+        console.log("[v0] CCPI data saved to localStorage")
+      } catch (storageError) {
+        console.error("[v0] Failed to save to localStorage:", storageError)
+      }
 
       try {
         await fetch("/api/ccpi/cache", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(result),
+          body: JSON.stringify(cachedData),
         })
-        console.log("[v0] CCPI data cached successfully")
+        console.log("[v0] CCPI data cached to API")
       } catch (cacheError) {
         console.error("[v0] Failed to cache CCPI data:", cacheError)
         // Don't fail the whole operation if caching fails
       }
 
-      await fetchExecutiveSummary(result)
+      await fetchExecutiveSummary(cachedData)
     } catch (error) {
       console.error("[v0] CCPI API error:", error)
       setError(error instanceof Error ? error.message : "Failed to load CCPI data")
@@ -359,6 +365,24 @@ export default function CcpiDashboard() {
 
   return (
     <TooltipProvider delayDuration={300}>
+      {isRefreshing && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 h-2">
+          <div
+            className="h-full bg-gradient-to-r from-green-400 via-blue-400 to-purple-400 transition-all duration-300 ease-out"
+            style={{ width: `${refreshProgress}%` }}
+          />
+        </div>
+      )}
+
+      {isRefreshing && refreshStatus && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-black/80 text-white px-6 py-3 rounded-full shadow-lg backdrop-blur-sm">
+          <div className="flex items-center gap-3">
+            <RefreshCw className="h-5 w-5 animate-spin" />
+            <span className="font-medium">{refreshStatus}</span>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -394,23 +418,7 @@ export default function CcpiDashboard() {
           </div>
         </div>
 
-        {isRefreshing && (
-          <Card className="border-blue-400 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-md">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-base font-semibold text-blue-900">{refreshStatus}</span>
-                <span className="text-base font-bold text-blue-700">{Math.round(refreshProgress)}%</span>
-              </div>
-              <div className="w-full bg-blue-200 rounded-full h-3 overflow-hidden shadow-inner">
-                <div
-                  className="bg-gradient-to-r from-blue-500 to-indigo-600 h-3 rounded-full transition-all duration-500 ease-out"
-                  style={{ width: `${refreshProgress}%` }}
-                />
-              </div>
-              <p className="text-sm text-blue-700 mt-2 text-center">Loading live market data...</p>
-            </CardContent>
-          </Card>
-        )}
+        {/* Original progress card removed as it's replaced by the fixed bar and status message */}
 
         {/* Main CCPI Score Card */}
         <Card className="border-2 shadow-lg">
