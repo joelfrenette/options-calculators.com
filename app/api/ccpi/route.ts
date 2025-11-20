@@ -726,7 +726,7 @@ async function computeMomentumPillar(data: Awaited<ReturnType<typeof fetchMarket
     // SOX scoring: Chip sector health signals tech sector strength
     // Strong chips (>5500, +10%) = 0 risk
     // Baseline (5000) = low risk (2 points)
-    // Weak chips (4500, -10%) = medium risk (4 points)
+    // Weak chips (4500, -10%) = medium risk (6 points)
     // Chip crash (<4250, -15%) = high risk (6 points)
     if (soxDeviation < -15) return 6 // Chip sector collapse
     if (soxDeviation < -10) return 4 // Significant weakness
@@ -837,20 +837,9 @@ async function computeMomentumPillar(data: Awaited<ReturnType<typeof fetchMarket
   totalScore += vixTermScore
   indicators.push({ name: "VIX Term Structure", score: vixTermScore, weight: 6 })
 
-  // Indicator 13: Yield Curve (Weight: 10/100)
-  const yieldCurveScore = (() => {
-    if (data.yieldCurve < -1.0) return 10 // Increased from 5
-    if (data.yieldCurve < -0.5) return 8 // Increased from 4
-    if (data.yieldCurve < -0.2) return 4 // Increased from 2
-    if (data.yieldCurve < 0) return 2 // Increased from 1
-    return 0
-  })()
-  totalScore += yieldCurveScore
-  indicators.push({ name: "Yield Curve", score: yieldCurveScore, weight: 10 })
-
   console.log("[v0] Pillar 1 - Momentum & Technical (35% weight):", totalScore)
   console.log("[v0] Indicator Breakdown:", indicators)
-  console.log("[v0] Total Indicators in Pillar 1: 13 (removed ATR, LTV, Bullish Percent - moved to Pillar 2)")
+  console.log("[v0] Total Indicators in Pillar 1: 12 (removed Yield Curve duplicate - kept in Pillar 2)")
 
   // Return score capped at 100
   return Math.min(100, Math.max(0, totalScore))
