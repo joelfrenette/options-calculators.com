@@ -202,7 +202,7 @@ export async function GET() {
       await fetch(new URL("/api/ccpi/cache", process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(response),
+        body: JSON.JSON.stringify(response),
       })
     } catch (cacheError) {
       console.warn("[v0] Failed to cache CCPI data:", cacheError)
@@ -736,10 +736,15 @@ async function computeMomentumPillar(data: Awaited<ReturnType<typeof fetchMarket
   // Indicator 2: SOX Semiconductor Index (Weight: 6/100)
   const soxScore = (() => {
     const soxDeviation = ((data.soxIndex - 5000) / 5000) * 100
-    if (soxDeviation < -15) return 6 // Chip crash
-    if (soxDeviation < -10) return 4
-    if (soxDeviation < -5) return 2
-    return 0 // Strong chips = low risk
+    // SOX scoring: Chip sector health signals tech sector strength
+    // Strong chips (>5500, +10%) = 0 risk
+    // Baseline (5000) = low risk (2 points)
+    // Weak chips (4500, -10%) = medium risk (4 points)
+    // Chip crash (<4250, -15%) = high risk (6 points)
+    if (soxDeviation < -15) return 6 // Chip sector collapse
+    if (soxDeviation < -10) return 4 // Significant weakness
+    if (soxDeviation < -5) return 2 // Mild weakness
+    return 0 // Strong or neutral chips = low crash risk
   })()
   totalScore += soxScore
   indicators.push({ name: "SOX Index", score: soxScore, weight: 6 })
