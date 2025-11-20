@@ -841,50 +841,20 @@ async function computeMomentumPillar(data: Awaited<ReturnType<typeof fetchMarket
   totalScore += vixTermScore
   indicators.push({ name: "VIX Term Structure", score: vixTermScore, weight: 6 })
 
-  // Indicator 13: ATR Average True Range (Weight: 5/100)
-  const atrScore = (() => {
-    if (data.atr > 50) return 5
-    if (data.atr > 40) return 3
-    if (data.atr > 30) return 1
-    return 0
-  })()
-  totalScore += atrScore
-  indicators.push({ name: "ATR", score: atrScore, weight: 5 })
-
-  // Indicator 14: LTV Long-term Volatility (Weight: 5/100)
-  const ltvScore = (() => {
-    if (data.ltv > 0.2) return 5
-    if (data.ltv > 0.15) return 3
-    if (data.ltv > 0.12) return 1
-    return 0
-  })()
-  totalScore += ltvScore
-  indicators.push({ name: "LTV", score: ltvScore, weight: 5 })
-
-  // Indicator 15: Bullish Percent Index (Weight: 5/100)
-  const bullishPercentScore = (() => {
-    if (data.bullishPercent > 70) return 5 // Overbought danger
-    if (data.bullishPercent > 60) return 3
-    if (data.bullishPercent < 30) return 4 // Oversold panic
-    if (data.bullishPercent < 40) return 2
-    return 0
-  })()
-  totalScore += bullishPercentScore
-  indicators.push({ name: "Bullish Percent", score: bullishPercentScore, weight: 5 })
-
-  // Indicator 16: Yield Curve (Weight: 5/100)
+  // Indicator 13: Yield Curve (Weight: 10/100)
   const yieldCurveScore = (() => {
-    if (data.yieldCurve < -1.0) return 5
-    if (data.yieldCurve < -0.5) return 4
-    if (data.yieldCurve < -0.2) return 2
-    if (data.yieldCurve < 0) return 1
+    if (data.yieldCurve < -1.0) return 10 // Increased from 5
+    if (data.yieldCurve < -0.5) return 8 // Increased from 4
+    if (data.yieldCurve < -0.2) return 4 // Increased from 2
+    if (data.yieldCurve < 0) return 2 // Increased from 1
     return 0
   })()
   totalScore += yieldCurveScore
-  indicators.push({ name: "Yield Curve", score: yieldCurveScore, weight: 5 })
+  indicators.push({ name: "Yield Curve", score: yieldCurveScore, weight: 10 })
 
   console.log("[v0] Pillar 1 - Momentum & Technical (35% weight):", totalScore)
   console.log("[v0] Indicator Breakdown:", indicators)
+  console.log("[v0] Total Indicators in Pillar 1: 13 (removed ATR, LTV, Bullish Percent - moved to Pillar 2)")
 
   // Return score capped at 100
   return Math.min(100, Math.max(0, totalScore))
@@ -948,38 +918,36 @@ async function computeRiskAppetitePillar(data: Awaited<ReturnType<typeof fetchMa
   totalScore += shortInterestScore
   indicators.push({ name: "Short Interest", score: shortInterestScore, weight: 13 })
 
-  // Indicator 5: ATR - Average True Range (Weight: 10/100)
+  // Indicator 5: ATR - Average True Range (Weight: 5/100) - Moved from Pillar 1
   const atrScore = (() => {
-    if (data.atr > 50) return 10 // Extreme volatility
-    if (data.atr > 40) return 7
-    if (data.atr > 30) return 4
-    if (data.atr < 20) return 2 // Calm before storm
+    if (data.atr > 50) return 5
+    if (data.atr > 40) return 3
+    if (data.atr > 30) return 1
     return 0
   })()
   totalScore += atrScore
-  indicators.push({ name: "ATR", score: atrScore, weight: 10 })
+  indicators.push({ name: "ATR", score: atrScore, weight: 5 })
 
-  // Indicator 6: LTV - Long-term Volatility (Weight: 10/100)
+  // Indicator 6: LTV - Long-term Volatility (Weight: 5/100) - Moved from Pillar 1
   const ltvScore = (() => {
-    if (data.ltv > 0.2) return 10 // Sustained instability
-    if (data.ltv > 0.15) return 7
-    if (data.ltv > 0.12) return 4
-    if (data.ltv < 0.08) return 2 // Complacency
+    if (data.ltv > 0.2) return 5
+    if (data.ltv > 0.15) return 3
+    if (data.ltv > 0.12) return 1
     return 0
   })()
   totalScore += ltvScore
-  indicators.push({ name: "LTV", score: ltvScore, weight: 10 })
+  indicators.push({ name: "LTV", score: ltvScore, weight: 5 })
 
-  // Indicator 7: Bullish Percent Index (Weight: 10/100)
+  // Indicator 7: Bullish Percent Index (Weight: 5/100) - Moved from Pillar 1
   const bullishPercentScore = (() => {
-    if (data.bullishPercent > 70) return 10 // Overbought
-    if (data.bullishPercent > 60) return 7
-    if (data.bullishPercent > 55) return 4
-    if (data.bullishPercent < 30) return 4 // Oversold (contrarian)
+    if (data.bullishPercent > 70) return 5 // Overbought danger
+    if (data.bullishPercent > 60) return 3
+    if (data.bullishPercent < 30) return 4 // Oversold panic
+    if (data.bullishPercent < 40) return 2
     return 0
   })()
   totalScore += bullishPercentScore
-  indicators.push({ name: "Bullish Percent", score: bullishPercentScore, weight: 10 })
+  indicators.push({ name: "Bullish Percent", score: bullishPercentScore, weight: 5 })
 
   // Indicator 8: Yield Curve (10Y-2Y) (Weight: 8/100)
   const yieldCurveScore = (() => {
