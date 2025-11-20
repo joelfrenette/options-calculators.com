@@ -1490,38 +1490,37 @@ export default function CcpiDashboard() {
                 {/* ATR - Average True Range */}
                 {data.indicators.atr !== undefined && (
                   <div className="space-y-2">
-                    {/* CHANGE: Added tooltip to Pillar 2 ATR to match Pillar 1 */}
                     <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">ATR - Average True Range</span>
+                      <span className="font-medium flex items-center gap-1">
+                        ATR - Average True Range
                         {tooltipsEnabled && (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Info className="w-4 h-4 text-blue-500 cursor-help" />
-                              </TooltipTrigger>
-                              <TooltipContent className="max-w-xs">
-                                <p className="font-semibold mb-1">ATR - Average True Range</p>
-                                <p className="text-xs mb-2">
-                                  14-day average of daily price ranges (high-low), measuring market volatility and
-                                  intraday movement magnitude.
-                                </p>
-                                <p className="text-xs mb-2">
-                                  <strong>Impact on Crash Prediction:</strong> Rising ATR indicates increasing
-                                  volatility and potential instability. ATR spikes often precede or accompany market
-                                  crashes.
-                                </p>
-                                <p className="text-xs">
-                                  <span className="text-green-600">Good: {"<"}25</span> (stable, low volatility) •
-                                  <span className="text-yellow-600"> Warning: 25-40</span> (elevated volatility) •
-                                  <span className="text-red-600"> Danger: {">"}50</span> (extreme volatility, panic
-                                  conditions)
-                                </p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-purple-50 border-purple-200">
+                              <p className="font-semibold mb-1">ATR - Average True Range</p>
+                              <p className="text-sm">
+                                14-day average of daily high-low price ranges measuring volatility.
+                              </p>
+                              <ul className="text-sm mt-1 space-y-1">
+                                <li>
+                                  <strong>{"<"}25:</strong> Low volatility, stable market
+                                </li>
+                                <li>
+                                  <strong>25-40:</strong> Normal volatility
+                                </li>
+                                <li>
+                                  <strong>{">"}50:</strong> High volatility, increased crash risk
+                                </li>
+                              </ul>
+                              <p className="text-xs mt-2">
+                                <strong>Impact:</strong> Extreme ATR spikes often precede market corrections and crashes
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
                         )}
-                      </div>
+                      </span>
                       <span className="font-bold">{data.indicators.atr.toFixed(1)}</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
@@ -1552,24 +1551,25 @@ export default function CcpiDashboard() {
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
+                            <TooltipContent className="max-w-xs bg-purple-50 border-purple-200">
                               <p className="font-semibold mb-1">LTV - Long-term Volatility</p>
                               <p className="text-sm">
-                                Measures annualized volatility over 90 days, tracking sustained market instability.
+                                90-day rolling standard deviation of returns measuring sustained instability.
                               </p>
                               <ul className="text-sm mt-1 space-y-1">
                                 <li>
-                                  <strong>{"<"}10%:</strong> Stable market, low risk
+                                  <strong>{"<"}10%:</strong> Stable, low-risk environment
                                 </li>
                                 <li>
-                                  <strong>10-15%:</strong> Normal volatility range
+                                  <strong>10-15%:</strong> Normal market volatility
                                 </li>
                                 <li>
-                                  <strong>{">"}20%:</strong> Elevated long-term risk, crash potential
+                                  <strong>{">"}20%:</strong> Elevated volatility, crash risk increasing
                                 </li>
                               </ul>
                               <p className="text-xs mt-2">
-                                <strong>Impact:</strong> High LTV signals persistent market instability
+                                <strong>Impact:</strong> Sustained high LTV indicates structural instability and crash
+                                vulnerability
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -1594,30 +1594,6 @@ export default function CcpiDashboard() {
                   </div>
                 )}
 
-                {/* High-Low Index (Market Breadth) */}
-                {data.indicators.highLowIndex !== undefined && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">High-Low Index (Market Breadth)</span>
-                      <span className="font-bold">{data.indicators.highLowIndex}%</span>
-                    </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
-                      <div
-                        className="absolute inset-0 bg-gray-200"
-                        style={{
-                          marginLeft: `${data.indicators.highLowIndex}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Weak: {"<"}30% (bearish)</span>
-                      <span className="text-yellow-600">Neutral: 30-50%</span>
-                      <span>Strong: {">"}70% (bullish)</span>
-                    </div>
-                  </div>
-                )}
-
                 {/* Bullish Percent Index */}
                 {data.indicators.bullishPercent !== undefined && (
                   <div className="space-y-2">
@@ -1629,24 +1605,22 @@ export default function CcpiDashboard() {
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
+                            <TooltipContent className="max-w-xs bg-purple-50 border-purple-200">
                               <p className="font-semibold mb-1">Bullish Percent Index</p>
-                              <p className="text-sm">
-                                Percentage of stocks trading with bullish point & figure chart patterns.
-                              </p>
+                              <p className="text-sm">% of stocks with bullish Point & Figure chart patterns.</p>
                               <ul className="text-sm mt-1 space-y-1">
                                 <li>
-                                  <strong>{">"}70%:</strong> Overbought, correction risk
+                                  <strong>{"<"}30%:</strong> Oversold, panic selling (potential bottom)
                                 </li>
                                 <li>
-                                  <strong>30-70%:</strong> Neutral zone, balanced market
+                                  <strong>30-50%:</strong> Normal, healthy market breadth
                                 </li>
                                 <li>
-                                  <strong>{"<"}30%:</strong> Oversold, potential bottom or crash
+                                  <strong>{">"}70%:</strong> Overbought, correction risk increases
                                 </li>
                               </ul>
                               <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Extreme readings signal potential reversals or capitulation
+                                <strong>Impact:</strong> Extreme readings ({">"}80% or {"<"}20%) often precede reversals
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -2469,7 +2443,7 @@ export default function CcpiDashboard() {
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.equityRiskPremium - 1) / 5) * 100))}%`,
+                          marginLeft: `${Math.min(100, Math.max(0, ((6 - data.indicators.equityRiskPremium) / 6) * 100))}%`,
                         }}
                       />
                     </div>
