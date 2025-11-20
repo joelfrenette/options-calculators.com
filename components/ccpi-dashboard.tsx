@@ -42,6 +42,9 @@ interface CCPIData {
     signal: string
     pillar: string
     severity: "high" | "medium" | "low"
+    indicatorWeight?: number
+    pillarWeight?: number
+    impactScore?: number
   }>
   indicators?: Record<string, any>
   apiStatus?: Record<string, { live: boolean; source: string }> // Updated for clarity
@@ -59,7 +62,7 @@ interface HistoricalData {
   }>
 }
 
-export default function CcpiDashboard() {
+export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
   const [data, setData] = useState<CCPIData | null>(null)
   const [history, setHistory] = useState<HistoricalData | null>(null)
   const [loading, setLoading] = useState(false)
@@ -282,6 +285,21 @@ export default function CcpiDashboard() {
     } catch (error) {
       console.error("[v0] Failed to fetch CCPI history:", error)
     }
+  }
+
+  const sortCanaries = (canaries: CCPIData["canaries"]) => {
+    return [...canaries].sort((a, b) => {
+      // First sort by severity: high before medium before low
+      if (a.severity === "high" && b.severity !== "high") return -1
+      if (a.severity !== "high" && b.severity === "high") return 1
+      if (a.severity === "medium" && b.severity === "low") return -1
+      if (a.severity === "low" && b.severity === "medium") return 1
+
+      // Within same severity, sort by impact score descending
+      const impactA = a.impactScore ?? 0
+      const impactB = b.impactScore ?? 0
+      return impactB - impactA
+    })
   }
 
   if (loading) {
@@ -646,8 +664,8 @@ export default function CcpiDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-3">
-              {data.canaries
+            <div className="flex flex-wrap gap-4">
+              {sortCanaries(data.canaries)
                 .filter((canary) => canary.severity === "high" || canary.severity === "medium")
                 .map((canary, i) => {
                   const severityConfig = {
@@ -676,11 +694,18 @@ export default function CcpiDashboard() {
                         <Badge variant="outline" className="text-xs font-semibold">
                           {canary.pillar}
                         </Badge>
-                        <span
-                          className={`text-xs font-bold px-3 py-1 rounded-md ${severityConfig.badgeColor} shadow-sm whitespace-nowrap`}
-                        >
-                          {severityConfig.label}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {canary.impactScore !== undefined && (
+                            <span className="text-xs font-mono text-muted-foreground">
+                              Impact: {canary.impactScore.toFixed(2)}
+                            </span>
+                          )}
+                          <span
+                            className={`text-xs font-bold px-3 py-1 rounded-md ${severityConfig.badgeColor} shadow-sm whitespace-nowrap`}
+                          >
+                            {severityConfig.label}
+                          </span>
+                        </div>
                       </div>
                       {/* Added tooltip to each canary card */}
                       <div className="flex items-start gap-2">
@@ -699,12 +724,15 @@ export default function CcpiDashboard() {
                                   ? "This indicator has breached a critical threshold, signaling elevated crash risk. Historical data shows increased volatility when this condition persists."
                                   : "This indicator is showing warning signs. While not critical yet, it suggests increasing caution and risk monitoring."}
                               </p>
-                              <p className="text-xs font-medium">
-                                Impact:{" "}
-                                {canary.severity === "high"
-                                  ? "Significantly increases crash probability"
-                                  : "Moderately increases crash probability"}
-                              </p>
+                              {canary.indicatorWeight !== undefined && canary.pillarWeight !== undefined && (
+                                <p className="text-xs font-medium mt-2">
+                                  Indicator Weight: {canary.indicatorWeight}/100 in pillar
+                                  <br />
+                                  Pillar Weight: {canary.pillarWeight}% of CCPI
+                                  <br />
+                                  Combined Impact: {canary.impactScore?.toFixed(2)}
+                                </p>
+                              )}
                             </TooltipContent>
                           </Tooltip>
                         )}

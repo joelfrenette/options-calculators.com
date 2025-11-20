@@ -687,19 +687,15 @@ async function fetchApifyYahooFinance() {
 }
 
 async function fetchAAIISentiment() {
-  try {
-    const fgRes = await fetch("https://api.alternative.me/fng/?limit=1", { signal: AbortSignal.timeout(10000) })
-    if (fgRes.ok) {
-      const fgData = await fgRes.json()
-      if (fgData?.data?.[0]) {
-        return {
-          fearGreed: Number.parseInt(fgData.data[0].value),
-          dataSource: "fear-greed-live",
-        }
+  const fgRes = await fetch("https://api.alternative.me/fng/?limit=1", { signal: AbortSignal.timeout(10000) })
+  if (fgRes.ok) {
+    const fgData = await fgRes.json()
+    if (fgData?.data?.[0]) {
+      return {
+        fearGreed: Number.parseInt(fgData.data[0].value),
+        dataSource: "fear-greed-live",
       }
     }
-  } catch (error) {
-    // Fall through to baseline
   }
 
   return {
@@ -1261,540 +1257,774 @@ function generateWeeklySummary(
 }
 
 async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarketData>>) {
-  const canaries: Array<{ signal: string; pillar: string; severity: "high" | "medium" | "low" }> = []
+  const canaries: Array<{
+    signal: string
+    pillar: string
+    severity: "high" | "medium" | "low"
+    indicatorWeight: number
+    pillarWeight: number
+    impactScore: number
+  }> = []
 
-  // 1. QQQ Daily Return
+  // Pillar weights in the CCPI calculation
+  const pillarWeights = {
+    "Momentum & Technical": 0.35,
+    "Risk Appetite & Volatility": 0.3,
+    "Valuation & Market Structure": 0.15,
+    Macro: 0.2,
+  }
+
+  // 1. QQQ Daily Return (Weight: 8/100 in Pillar 1)
   if (data.qqqDailyReturn <= -6) {
     canaries.push({
       signal: `QQQ crashed ${Math.abs(data.qqqDailyReturn).toFixed(1)}% - Momentum loss`,
       pillar: "Momentum & Technical",
       severity: "high",
+      indicatorWeight: 8,
+      pillarWeight: 35,
+      impactScore: 8 * 0.35,
     })
   } else if (data.qqqDailyReturn <= -3) {
     canaries.push({
       signal: `QQQ dropped ${Math.abs(data.qqqDailyReturn).toFixed(1)}% - Sharp decline`,
       pillar: "Momentum & Technical",
       severity: "medium",
+      indicatorWeight: 8,
+      pillarWeight: 35,
+      impactScore: 8 * 0.35,
     })
   }
 
-  // 2. QQQ Consecutive Down Days
+  // 2. QQQ Consecutive Down Days (Weight: 5/100 in Pillar 1)
   if (data.qqqConsecDown >= 5) {
     canaries.push({
       signal: `${data.qqqConsecDown} consecutive down days - Trend break`,
       pillar: "Momentum & Technical",
       severity: "high",
+      indicatorWeight: 5,
+      pillarWeight: 35,
+      impactScore: 5 * 0.35,
     })
   } else if (data.qqqConsecDown >= 3) {
     canaries.push({
       signal: `${data.qqqConsecDown} consecutive down days`,
       pillar: "Momentum & Technical",
       severity: "medium",
+      indicatorWeight: 5,
+      pillarWeight: 35,
+      impactScore: 5 * 0.35,
     })
   }
 
-  // 3. QQQ Below 20-Day SMA
+  // 3. QQQ Below 20-Day SMA (Weight: 5/100 in Pillar 1)
   if (data.qqqBelowSMA20 && data.qqqSMA20Proximity >= 100) {
     canaries.push({
       signal: "QQQ breached 20-day SMA - Short-term support lost",
       pillar: "Momentum & Technical",
       severity: "high",
+      indicatorWeight: 5,
+      pillarWeight: 35,
+      impactScore: 5 * 0.35,
     })
   } else if (data.qqqSMA20Proximity >= 50) {
     canaries.push({
       signal: `QQQ approaching 20-day SMA (${data.qqqSMA20Proximity.toFixed(0)}% proximity)`,
       pillar: "Momentum & Technical",
       severity: "medium",
+      indicatorWeight: 5,
+      pillarWeight: 35,
+      impactScore: 5 * 0.35,
     })
   }
 
-  // 4. QQQ Below 50-Day SMA
+  // 4. QQQ Below 50-Day SMA (Weight: 7/100 in Pillar 1)
   if (data.qqqBelowSMA50 && data.qqqSMA50Proximity >= 100) {
     canaries.push({
       signal: "QQQ breached 50-day SMA - Medium-term trend broken",
       pillar: "Momentum & Technical",
       severity: "high",
+      indicatorWeight: 7,
+      pillarWeight: 35,
+      impactScore: 7 * 0.35,
     })
   } else if (data.qqqSMA50Proximity >= 50) {
     canaries.push({
       signal: `QQQ approaching 50-day SMA (${data.qqqSMA50Proximity.toFixed(0)}% proximity)`,
       pillar: "Momentum & Technical",
       severity: "medium",
+      indicatorWeight: 7,
+      pillarWeight: 35,
+      impactScore: 7 * 0.35,
     })
   }
 
-  // 5. QQQ Below 200-Day SMA
+  // 5. QQQ Below 200-Day SMA (Weight: 10/100 in Pillar 1)
   if (data.qqqBelowSMA200 && data.qqqSMA200Proximity >= 100) {
     canaries.push({
       signal: "QQQ breached 200-day SMA - Long-term bull market in question",
       pillar: "Momentum & Technical",
       severity: "high",
+      indicatorWeight: 10,
+      pillarWeight: 35,
+      impactScore: 10 * 0.35,
     })
   } else if (data.qqqSMA200Proximity >= 50) {
     canaries.push({
       signal: `QQQ approaching 200-day SMA (${data.qqqSMA200Proximity.toFixed(0)}% proximity)`,
       pillar: "Momentum & Technical",
       severity: "medium",
+      indicatorWeight: 10,
+      pillarWeight: 35,
+      impactScore: 10 * 0.35,
     })
   }
 
-  // 6. QQQ Below Bollinger Band
+  // 6. QQQ Below Bollinger Band (Weight: 6/100 in Pillar 1)
   if (data.qqqBelowBollinger && data.qqqBollingerProximity >= 100) {
     canaries.push({
       signal: "QQQ breached lower Bollinger Band - Oversold territory",
       pillar: "Momentum & Technical",
       severity: "high",
+      indicatorWeight: 6,
+      pillarWeight: 35,
+      impactScore: 6 * 0.35,
     })
   } else if (data.qqqBollingerProximity >= 50) {
     canaries.push({
       signal: `QQQ approaching Bollinger Band (${data.qqqBollingerProximity.toFixed(0)}% proximity)`,
       pillar: "Momentum & Technical",
       severity: "medium",
+      indicatorWeight: 6,
+      pillarWeight: 35,
+      impactScore: 6 * 0.35,
     })
   }
 
-  // 7. VIX (Fear Gauge)
+  // 7. VIX (Weight: 9/100 in Pillar 1)
   if (data.vix > 35) {
     canaries.push({
       signal: `VIX at ${data.vix.toFixed(1)} - Extreme fear`,
       pillar: "Momentum & Technical",
       severity: "high",
+      indicatorWeight: 9,
+      pillarWeight: 35,
+      impactScore: 9 * 0.35,
     })
   } else if (data.vix > 25) {
     canaries.push({
       signal: `VIX at ${data.vix.toFixed(1)} - Elevated fear`,
       pillar: "Momentum & Technical",
       severity: "medium",
+      indicatorWeight: 9,
+      pillarWeight: 35,
+      impactScore: 9 * 0.35,
     })
   }
 
-  // 8. VXN (Nasdaq Volatility)
+  // 8. VXN (Weight: 7/100 in Pillar 1)
   if (data.vxn > 35) {
     canaries.push({
       signal: `VXN at ${data.vxn.toFixed(1)} - Nasdaq panic`,
       pillar: "Momentum & Technical",
       severity: "high",
+      indicatorWeight: 7,
+      pillarWeight: 35,
+      impactScore: 7 * 0.35,
     })
   } else if (data.vxn > 25) {
     canaries.push({
       signal: `VXN at ${data.vxn.toFixed(1)} - Nasdaq volatility elevated`,
       pillar: "Momentum & Technical",
       severity: "medium",
+      indicatorWeight: 7,
+      pillarWeight: 35,
+      impactScore: 7 * 0.35,
     })
   }
 
-  // 9. RVX (Russell 2000 Volatility)
+  // 9. RVX (Weight: 5/100 in Pillar 1)
   if (data.rvx > 35) {
     canaries.push({
       signal: `RVX at ${data.rvx.toFixed(1)} - Small-cap stress`,
       pillar: "Momentum & Technical",
       severity: "high",
+      indicatorWeight: 5,
+      pillarWeight: 35,
+      impactScore: 5 * 0.35,
     })
   } else if (data.rvx > 25) {
     canaries.push({
       signal: `RVX at ${data.rvx.toFixed(1)} - Small-cap volatility rising`,
       pillar: "Momentum & Technical",
       severity: "medium",
+      indicatorWeight: 5,
+      pillarWeight: 35,
+      impactScore: 5 * 0.35,
     })
   }
 
-  // 10. VIX Term Structure
+  // 10. VIX Term Structure (Weight: 6/100 in Pillar 1)
   if (data.vixTermInverted || data.vixTermStructure < 0.8) {
     canaries.push({
       signal: `VIX term structure inverted (${data.vixTermStructure.toFixed(2)}) - Immediate fear`,
       pillar: "Momentum & Technical",
       severity: "high",
+      indicatorWeight: 6,
+      pillarWeight: 35,
+      impactScore: 6 * 0.35,
     })
   } else if (data.vixTermStructure < 1.2) {
     canaries.push({
       signal: `VIX term structure flattening (${data.vixTermStructure.toFixed(2)})`,
       pillar: "Momentum & Technical",
       severity: "medium",
+      indicatorWeight: 6,
+      pillarWeight: 35,
+      impactScore: 6 * 0.35,
     })
   }
 
-  // 11. ATR - Average True Range
+  // 11. ATR (Weight: 5/100 in Pillar 2)
   if (data.atr > 50) {
     canaries.push({
       signal: `ATR at ${data.atr.toFixed(1)} - Extreme volatility`,
-      pillar: "Momentum & Technical",
+      pillar: "Risk Appetite & Volatility",
       severity: "high",
+      indicatorWeight: 5,
+      pillarWeight: 30,
+      impactScore: 5 * 0.3,
     })
   } else if (data.atr > 40) {
     canaries.push({
       signal: `ATR at ${data.atr.toFixed(1)} - Elevated volatility`,
-      pillar: "Momentum & Technical",
+      pillar: "Risk Appetite & Volatility",
       severity: "medium",
+      indicatorWeight: 5,
+      pillarWeight: 30,
+      impactScore: 5 * 0.3,
     })
   }
 
-  // 12. LTV - Long-term Volatility
+  // 12. LTV (Weight: 5/100 in Pillar 2)
   if (data.ltv > 0.2) {
     canaries.push({
       signal: `Long-term volatility at ${(data.ltv * 100).toFixed(1)}% - Sustained instability`,
-      pillar: "Momentum & Technical",
+      pillar: "Risk Appetite & Volatility",
       severity: "high",
+      indicatorWeight: 5,
+      pillarWeight: 30,
+      impactScore: 5 * 0.3,
     })
   } else if (data.ltv > 0.15) {
     canaries.push({
       signal: `Long-term volatility at ${(data.ltv * 100).toFixed(1)}% - Rising`,
-      pillar: "Momentum & Technical",
+      pillar: "Risk Appetite & Volatility",
       severity: "medium",
+      indicatorWeight: 5,
+      pillarWeight: 30,
+      impactScore: 5 * 0.3,
     })
   }
 
-  // 13. Bullish Percent Index
+  // 13. Bullish Percent (Weight: 5/100 in Pillar 2)
   if (data.bullishPercent > 70) {
     canaries.push({
       signal: `Bullish Percent at ${data.bullishPercent}% - Overbought danger`,
-      pillar: "Momentum & Technical",
+      pillar: "Risk Appetite & Volatility",
       severity: "high",
+      indicatorWeight: 5,
+      pillarWeight: 30,
+      impactScore: 5 * 0.3,
     })
   } else if (data.bullishPercent > 60) {
     canaries.push({
       signal: `Bullish Percent at ${data.bullishPercent}% - Elevated optimism`,
-      pillar: "Momentum & Technical",
+      pillar: "Risk Appetite & Volatility",
       severity: "medium",
+      indicatorWeight: 5,
+      pillarWeight: 30,
+      impactScore: 5 * 0.3,
     })
   }
 
-  // 14. Put/Call Ratio
+  // 14. Put/Call Ratio (Weight: 18/100 in Pillar 2)
   if (data.putCallRatio < 0.6) {
     canaries.push({
       signal: `Put/Call at ${data.putCallRatio.toFixed(2)} - Extreme complacency`,
       pillar: "Risk Appetite & Volatility",
       severity: "high",
+      indicatorWeight: 18,
+      pillarWeight: 30,
+      impactScore: 18 * 0.3,
     })
   } else if (data.putCallRatio < 0.85) {
     canaries.push({
       signal: `Put/Call at ${data.putCallRatio.toFixed(2)} - Low hedging activity`,
       pillar: "Risk Appetite & Volatility",
       severity: "medium",
+      indicatorWeight: 18,
+      pillarWeight: 30,
+      impactScore: 18 * 0.3,
     })
   }
 
-  // 15. Fear & Greed Index
+  // 15. Fear & Greed (Weight: 15/100 in Pillar 2)
   if (data.fearGreedIndex !== null) {
     if (data.fearGreedIndex > 80) {
       canaries.push({
         signal: `Fear & Greed at ${data.fearGreedIndex} - Extreme greed`,
         pillar: "Risk Appetite & Volatility",
         severity: "high",
+        indicatorWeight: 15,
+        pillarWeight: 30,
+        impactScore: 15 * 0.3,
       })
     } else if (data.fearGreedIndex > 70) {
       canaries.push({
         signal: `Fear & Greed at ${data.fearGreedIndex} - Elevated greed`,
         pillar: "Risk Appetite & Volatility",
         severity: "medium",
+        indicatorWeight: 15,
+        pillarWeight: 30,
+        impactScore: 15 * 0.3,
       })
     }
   }
 
-  // 16. AAII Bullish Sentiment
+  // 16. AAII Bullish (Weight: 16/100 in Pillar 2)
   const aaiiBullish = data.aaiiBullish || 35
   if (aaiiBullish > 55) {
     canaries.push({
       signal: `AAII Bullish at ${aaiiBullish}% - Retail euphoria`,
       pillar: "Risk Appetite & Volatility",
       severity: "high",
+      indicatorWeight: 16,
+      pillarWeight: 30,
+      impactScore: 16 * 0.3,
     })
   } else if (aaiiBullish > 45) {
     canaries.push({
       signal: `AAII Bullish at ${aaiiBullish}% - Elevated retail optimism`,
       pillar: "Risk Appetite & Volatility",
       severity: "medium",
+      indicatorWeight: 16,
+      pillarWeight: 30,
+      impactScore: 16 * 0.3,
     })
   }
 
-  // 17. SPY Short Interest Ratio
+  // 17. Short Interest (Weight: 13/100 in Pillar 2)
   const shortInterest = data.shortInterest || 2.5
   if (shortInterest < 1.5) {
     canaries.push({
       signal: `Short Interest at ${shortInterest.toFixed(1)}% - Extreme complacency`,
       pillar: "Risk Appetite & Volatility",
       severity: "high",
+      indicatorWeight: 13,
+      pillarWeight: 30,
+      impactScore: 13 * 0.3,
     })
   } else if (shortInterest < 2.5) {
     canaries.push({
       signal: `Short Interest at ${shortInterest.toFixed(1)}% - Low positioning`,
       pillar: "Risk Appetite & Volatility",
       severity: "medium",
+      indicatorWeight: 13,
+      pillarWeight: 30,
+      impactScore: 13 * 0.3,
     })
   }
 
-  // 18. Tech ETF Flows
+  // 18. ETF Flows (Weight: 8/100 in Pillar 2)
   if (data.etfFlows !== undefined) {
     if (data.etfFlows < -3.0) {
       canaries.push({
         signal: `ETF outflows at $${Math.abs(data.etfFlows).toFixed(1)}B - Capital flight`,
         pillar: "Risk Appetite & Volatility",
         severity: "high",
+        indicatorWeight: 8,
+        pillarWeight: 30,
+        impactScore: 8 * 0.3,
       })
     } else if (data.etfFlows < -1.5) {
       canaries.push({
         signal: `ETF outflows at $${Math.abs(data.etfFlows).toFixed(1)}B - Selling pressure`,
         pillar: "Risk Appetite & Volatility",
         severity: "medium",
+        indicatorWeight: 8,
+        pillarWeight: 30,
+        impactScore: 8 * 0.3,
       })
     }
   }
 
-  // 19. Yield Curve (10Y-2Y)
+  // 19. Yield Curve (Weight: 10/100 in Pillar 1, but also 8/100 in Pillar 2)
+  // Note: Yield Curve is in Pillar 1, but the risk appetite pillar also considers it.
+  // We'll use Pillar 1's weight here as it's primarily a momentum/macro indicator.
   if (data.yieldCurve < -1.0) {
     canaries.push({
       signal: `Yield curve inverted ${Math.abs(data.yieldCurve).toFixed(2)}% - Deep inversion`,
-      pillar: "Risk Appetite & Volatility",
+      pillar: "Momentum & Technical",
       severity: "high",
+      indicatorWeight: 10,
+      pillarWeight: 35,
+      impactScore: 10 * 0.35,
     })
   } else if (data.yieldCurve < -0.2) {
     canaries.push({
       signal: `Yield curve inverted ${Math.abs(data.yieldCurve).toFixed(2)}%`,
-      pillar: "Risk Appetite & Volatility",
+      pillar: "Momentum & Technical",
       severity: "medium",
+      indicatorWeight: 10,
+      pillarWeight: 35,
+      impactScore: 10 * 0.35,
     })
   }
 
-  // 20. S&P 500 Forward P/E
+  // 20. S&P 500 P/E (Weight: 18/100 in Pillar 3)
   if (data.spxPE > 30) {
     canaries.push({
       signal: `S&P 500 P/E at ${data.spxPE.toFixed(1)} - Extreme overvaluation`,
       pillar: "Valuation & Market Structure",
       severity: "high",
+      indicatorWeight: 18,
+      pillarWeight: 15,
+      impactScore: 18 * 0.15,
     })
   } else if (data.spxPE > 22) {
     canaries.push({
       signal: `S&P 500 P/E at ${data.spxPE.toFixed(1)} - Above historical average`,
       pillar: "Valuation & Market Structure",
       severity: "medium",
+      indicatorWeight: 18,
+      pillarWeight: 15,
+      impactScore: 18 * 0.15,
     })
   }
 
-  // 21. S&P 500 Price-to-Sales
+  // 21. S&P 500 P/S (Weight: 12/100 in Pillar 3)
   if (data.spxPS > 3.5) {
     canaries.push({
       signal: `S&P 500 P/S at ${data.spxPS.toFixed(1)} - Extremely expensive`,
       pillar: "Valuation & Market Structure",
       severity: "high",
+      indicatorWeight: 12,
+      pillarWeight: 15,
+      impactScore: 12 * 0.15,
     })
   } else if (data.spxPS > 2.5) {
     canaries.push({
       signal: `S&P 500 P/S at ${data.spxPS.toFixed(1)} - Elevated valuation`,
       pillar: "Valuation & Market Structure",
       severity: "medium",
+      indicatorWeight: 12,
+      pillarWeight: 15,
+      impactScore: 12 * 0.15,
     })
   }
 
-  // 22. Buffett Indicator (Market Cap / GDP)
+  // 22. Buffett Indicator (Weight: 16/100 in Pillar 3)
   const buffett = data.buffettIndicator || 180
   if (buffett > 200) {
     canaries.push({
       signal: `Buffett Indicator at ${buffett.toFixed(0)}% - Significantly overvalued`,
       pillar: "Valuation & Market Structure",
       severity: "high",
+      indicatorWeight: 16,
+      pillarWeight: 15,
+      impactScore: 16 * 0.15,
     })
   } else if (buffett > 150) {
     canaries.push({
       signal: `Buffett Indicator at ${buffett.toFixed(0)}% - Above fair value`,
       pillar: "Valuation & Market Structure",
       severity: "medium",
+      indicatorWeight: 16,
+      pillarWeight: 15,
+      impactScore: 16 * 0.15,
     })
   }
 
-  // 23. Fed Funds Rate
+  // 23. Fed Funds Rate (Weight: 17/100 in Pillar 4)
   if (data.fedFundsRate > 6.0) {
     canaries.push({
       signal: `Fed Funds at ${data.fedFundsRate.toFixed(2)}% - Extremely restrictive`,
       pillar: "Macro",
       severity: "high",
+      indicatorWeight: 17,
+      pillarWeight: 20,
+      impactScore: 17 * 0.2,
     })
   } else if (data.fedFundsRate > 5.0) {
     canaries.push({
       signal: `Fed Funds at ${data.fedFundsRate.toFixed(2)}% - Restrictive policy`,
       pillar: "Macro",
       severity: "medium",
+      indicatorWeight: 17,
+      pillarWeight: 20,
+      impactScore: 17 * 0.2,
     })
   }
 
-  // 24. Junk Bond Spread
+  // 24. Junk Spread (Weight: 12/100 in Pillar 4)
   if (data.junkSpread > 8) {
     canaries.push({
       signal: `Junk Bond Spread at ${data.junkSpread.toFixed(2)}% - Severe credit stress`,
       pillar: "Macro",
       severity: "high",
+      indicatorWeight: 12,
+      pillarWeight: 20,
+      impactScore: 12 * 0.2,
     })
   } else if (data.junkSpread > 5) {
     canaries.push({
       signal: `Junk Bond Spread at ${data.junkSpread.toFixed(2)}% - Credit tightening`,
       pillar: "Macro",
       severity: "medium",
+      indicatorWeight: 12,
+      pillarWeight: 20,
+      impactScore: 12 * 0.2,
     })
   }
 
-  // 25. US Debt-to-GDP Ratio
+  // 25. Debt-to-GDP (Weight: 11/100 in Pillar 4)
   if (data.debtToGDP > 130) {
     canaries.push({
       signal: `US Debt-to-GDP at ${data.debtToGDP.toFixed(0)}% - Fiscal crisis risk`,
       pillar: "Macro",
       severity: "high",
+      indicatorWeight: 11,
+      pillarWeight: 20,
+      impactScore: 11 * 0.2,
     })
   } else if (data.debtToGDP > 110) {
     canaries.push({
       signal: `US Debt-to-GDP at ${data.debtToGDP.toFixed(0)}% - Elevated fiscal burden`,
       pillar: "Macro",
       severity: "medium",
+      indicatorWeight: 11,
+      pillarWeight: 20,
+      impactScore: 11 * 0.2,
     })
   }
 
-  // NVIDIA Momentum (Pillar 1)
+  // NVIDIA Momentum (Weight: 6/100 in Pillar 1)
   if (data.nvidiaMomentum < 20) {
     canaries.push({
       signal: `NVIDIA momentum at ${data.nvidiaMomentum} - AI sector weakness`,
       pillar: "Momentum & Technical",
       severity: "high",
+      indicatorWeight: 6,
+      pillarWeight: 35,
+      impactScore: 6 * 0.35,
     })
   } else if (data.nvidiaMomentum < 40) {
     canaries.push({
       signal: `NVIDIA momentum at ${data.nvidiaMomentum} - Tech leadership fading`,
       pillar: "Momentum & Technical",
       severity: "medium",
+      indicatorWeight: 6,
+      pillarWeight: 35,
+      impactScore: 6 * 0.35,
     })
   }
 
-  // SOX Semiconductor Index (Pillar 1)
+  // SOX Index (Weight: 6/100 in Pillar 1)
   const soxDeviation = ((data.soxIndex - 5000) / 5000) * 100
   if (soxDeviation < -15) {
     canaries.push({
       signal: `SOX down ${Math.abs(soxDeviation).toFixed(1)}% - Chip sector crash`,
       pillar: "Momentum & Technical",
       severity: "high",
+      indicatorWeight: 6,
+      pillarWeight: 35,
+      impactScore: 6 * 0.35,
     })
   } else if (soxDeviation < -10) {
     canaries.push({
       signal: `SOX down ${Math.abs(soxDeviation).toFixed(1)}% - Semiconductor weakness`,
       pillar: "Momentum & Technical",
       severity: "medium",
+      indicatorWeight: 6,
+      pillarWeight: 35,
+      impactScore: 6 * 0.35,
     })
   }
 
-  // TED Spread (Pillar 4)
+  // TED Spread (Weight: 15/100 in Pillar 4)
   if (data.tedSpread > 1.0) {
     canaries.push({
       signal: `TED Spread at ${data.tedSpread.toFixed(2)}% - Banking system stress`,
       pillar: "Macro",
       severity: "high",
+      indicatorWeight: 15,
+      pillarWeight: 20,
+      impactScore: 15 * 0.2,
     })
   } else if (data.tedSpread > 0.5) {
     canaries.push({
       signal: `TED Spread at ${data.tedSpread.toFixed(2)}% - Credit market tension`,
       pillar: "Macro",
       severity: "medium",
+      indicatorWeight: 15,
+      pillarWeight: 20,
+      impactScore: 15 * 0.2,
     })
   }
 
-  // DXY Dollar Index (Pillar 4)
+  // DXY Dollar Index (Weight: 14/100 in Pillar 4)
   if (data.dxyIndex > 115) {
     canaries.push({
       signal: `Dollar Index at ${data.dxyIndex.toFixed(1)} - Extreme dollar strength hurts tech`,
       pillar: "Macro",
       severity: "high",
+      indicatorWeight: 14,
+      pillarWeight: 20,
+      impactScore: 14 * 0.2,
     })
   } else if (data.dxyIndex > 105) {
     canaries.push({
       signal: `Dollar Index at ${data.dxyIndex.toFixed(1)} - Strong dollar headwind`,
       pillar: "Macro",
       severity: "medium",
+      indicatorWeight: 14,
+      pillarWeight: 20,
+      impactScore: 14 * 0.2,
     })
   }
 
-  // ISM PMI (Pillar 4)
+  // ISM PMI (Weight: 18/100 in Pillar 4)
   if (data.ismPMI < 46) {
     canaries.push({
       signal: `ISM PMI at ${data.ismPMI.toFixed(1)} - Manufacturing contraction`,
       pillar: "Macro",
       severity: "high",
+      indicatorWeight: 18,
+      pillarWeight: 20,
+      impactScore: 18 * 0.2,
     })
   } else if (data.ismPMI < 50) {
     canaries.push({
       signal: `ISM PMI at ${data.ismPMI.toFixed(1)} - Weak manufacturing`,
       pillar: "Macro",
       severity: "medium",
+      indicatorWeight: 18,
+      pillarWeight: 20,
+      impactScore: 18 * 0.2,
     })
   }
 
-  // Fed Reverse Repo (Pillar 4)
+  // Fed Reverse Repo (Weight: 13/100 in Pillar 4)
   if (data.fedReverseRepo > 2000) {
     canaries.push({
       signal: `Fed RRP at $${data.fedReverseRepo.toFixed(0)}B - Severe liquidity drain`,
       pillar: "Macro",
       severity: "high",
+      indicatorWeight: 13,
+      pillarWeight: 20,
+      impactScore: 13 * 0.2,
     })
   } else if (data.fedReverseRepo > 1000) {
     canaries.push({
       signal: `Fed RRP at $${data.fedReverseRepo.toFixed(0)}B - Tight liquidity conditions`,
       pillar: "Macro",
       severity: "medium",
+      indicatorWeight: 13,
+      pillarWeight: 20,
+      impactScore: 13 * 0.2,
     })
   }
 
-  // QQQ P/E Ratio
+  // QQQ P/E (Weight: 16/100 in Pillar 3)
   if (data.qqqPE > 40) {
     canaries.push({
       signal: `QQQ P/E at ${data.qqqPE.toFixed(1)} - AI bubble territory`,
       pillar: "Valuation & Market Structure",
       severity: "high",
+      indicatorWeight: 16,
+      pillarWeight: 15,
+      impactScore: 16 * 0.15,
     })
   } else if (data.qqqPE > 30) {
     canaries.push({
       signal: `QQQ P/E at ${data.qqqPE.toFixed(1)} - Tech overvaluation`,
       pillar: "Valuation & Market Structure",
       severity: "medium",
+      indicatorWeight: 16,
+      pillarWeight: 15,
+      impactScore: 16 * 0.15,
     })
   }
 
-  // Mag7 Concentration
+  // Mag7 Concentration (Weight: 15/100 in Pillar 3)
   if (data.mag7Concentration > 65) {
     canaries.push({
       signal: `Mag7 at ${data.mag7Concentration.toFixed(1)}% of QQQ - Extreme concentration risk`,
       pillar: "Valuation & Market Structure",
       severity: "high",
+      indicatorWeight: 15,
+      pillarWeight: 15,
+      impactScore: 15 * 0.15,
     })
   } else if (data.mag7Concentration > 55) {
     canaries.push({
       signal: `Mag7 at ${data.mag7Concentration.toFixed(1)}% of QQQ - High concentration`,
       pillar: "Valuation & Market Structure",
       severity: "medium",
+      indicatorWeight: 15,
+      pillarWeight: 15,
+      impactScore: 15 * 0.15,
     })
   }
 
-  // Shiller CAPE
+  // Shiller CAPE (Weight: 13/100 in Pillar 3)
   if (data.shillerCAPE > 35) {
     canaries.push({
       signal: `Shiller CAPE at ${data.shillerCAPE.toFixed(1)} - Historic overvaluation`,
       pillar: "Valuation & Market Structure",
       severity: "high",
+      indicatorWeight: 13,
+      pillarWeight: 15,
+      impactScore: 13 * 0.15,
     })
   } else if (data.shillerCAPE > 28) {
     canaries.push({
       signal: `Shiller CAPE at ${data.shillerCAPE.toFixed(1)} - Elevated cyclical valuation`,
       pillar: "Valuation & Market Structure",
       severity: "medium",
+      indicatorWeight: 13,
+      pillarWeight: 15,
+      impactScore: 13 * 0.15,
     })
   }
 
-  // Equity Risk Premium
+  // Equity Risk Premium (Weight: 10/100 in Pillar 3)
   if (data.equityRiskPremium < 1.5) {
     canaries.push({
       signal: `Equity Risk Premium at ${data.equityRiskPremium.toFixed(2)}% - Stocks vs bonds severely overpriced`,
       pillar: "Valuation & Market Structure",
       severity: "high",
+      indicatorWeight: 10,
+      pillarWeight: 15,
+      impactScore: 10 * 0.15,
     })
   } else if (data.equityRiskPremium < 3.0) {
     canaries.push({
       signal: `Equity Risk Premium at ${data.equityRiskPremium.toFixed(2)}% - Low compensation for equity risk`,
       pillar: "Valuation & Market Structure",
       severity: "medium",
+      indicatorWeight: 10,
+      pillarWeight: 15,
+      impactScore: 10 * 0.15,
     })
   }
 
-  return canaries
+  return canaries.sort((a, b) => {
+    // First sort by severity: high before medium
+    if (a.severity === "high" && b.severity !== "high") return -1
+    if (a.severity !== "high" && b.severity === "high") return 1
+
+    // Within same severity, sort by impact score descending
+    return b.impactScore - a.impactScore
+  })
 }
