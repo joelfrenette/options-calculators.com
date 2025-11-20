@@ -1439,38 +1439,38 @@ export default function CcpiDashboard() {
                 {/* ATR - Average True Range */}
                 {data.indicators.atr !== undefined && (
                   <div className="space-y-2">
+                    {/* CHANGE: Added tooltip to Pillar 2 ATR to match Pillar 1 */}
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium flex items-center gap-1">
-                        ATR - Average True Range
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">ATR - Average True Range</span>
                         {tooltipsEnabled && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-1">ATR - Average True Range</p>
-                              <p className="text-sm">
-                                Measures market volatility by calculating the average range of price movements over 14
-                                days.
-                              </p>
-                              <ul className="text-sm mt-1 space-y-1">
-                                <li>
-                                  <strong>{"<"}25:</strong> Low volatility, stable market
-                                </li>
-                                <li>
-                                  <strong>25-40:</strong> Normal volatility range
-                                </li>
-                                <li>
-                                  <strong>{">"}50:</strong> High volatility, crash risk
-                                </li>
-                              </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Rising ATR indicates increasing market instability
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Info className="w-4 h-4 text-blue-500 cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <p className="font-semibold mb-1">ATR - Average True Range</p>
+                                <p className="text-xs mb-2">
+                                  14-day average of daily price ranges (high-low), measuring market volatility and
+                                  intraday movement magnitude.
+                                </p>
+                                <p className="text-xs mb-2">
+                                  <strong>Impact on Crash Prediction:</strong> Rising ATR indicates increasing
+                                  volatility and potential instability. ATR spikes often precede or accompany market
+                                  crashes.
+                                </p>
+                                <p className="text-xs">
+                                  <span className="text-green-600">Good: {"<"}25</span> (stable, low volatility) •
+                                  <span className="text-yellow-600"> Warning: 25-40</span> (elevated volatility) •
+                                  <span className="text-red-600"> Danger: {">"}50</span> (extreme volatility, panic
+                                  conditions)
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         )}
-                      </span>
+                      </div>
                       <span className="font-bold">{data.indicators.atr.toFixed(1)}</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
