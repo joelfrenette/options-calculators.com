@@ -121,6 +121,7 @@ export default function CcpiDashboard() {
 
   const fetchCachedData = async () => {
     try {
+      setLoading(true)
       setError(null)
       const cachedResponse = await fetch("/api/ccpi/cache")
 
@@ -130,14 +131,14 @@ export default function CcpiDashboard() {
         setData(cachedResult)
         await fetchExecutiveSummary(cachedResult)
       } else {
-        setLoading(true)
+        console.log("[v0] CCPI: No cached data available, auto-fetching fresh data...")
         await fetchData()
-        setLoading(false)
       }
     } catch (error) {
       console.error("[v0] CCPI cache load error:", error)
-      setLoading(true)
+      console.log("[v0] CCPI: Cache error, auto-fetching fresh data...")
       await fetchData()
+    } finally {
       setLoading(false)
     }
   }
@@ -145,23 +146,36 @@ export default function CcpiDashboard() {
   const fetchData = async () => {
     try {
       setIsRefreshing(true)
-      setRefreshProgress(0)
-      setRefreshStatus("Initializing...")
+      setLoading(true) // Also set loading to true
+      setRefreshProgress(5)
+      setRefreshStatus("Initializing CCPI calculation...")
       setError(null)
 
       // Simulate progress updates (in reality, the API would stream these)
       const progressInterval = setInterval(() => {
         setRefreshProgress((prev) => {
           if (prev >= 90) return prev
-          return prev + Math.random() * 10
+          return prev + Math.random() * 8
         })
-      }, 300)
+        // Update status messages during fetch
+        setRefreshStatus((prev) => {
+          const messages = [
+            "Fetching market data...",
+            "Analyzing technical indicators...",
+            "Computing sentiment metrics...",
+            "Evaluating valuation signals...",
+            "Processing macro indicators...",
+            "Calculating CCPI score...",
+          ]
+          return messages[Math.floor(Math.random() * messages.length)]
+        })
+      }, 800)
 
-      setRefreshStatus("Fetching market data...")
       const response = await fetch("/api/ccpi")
 
       clearInterval(progressInterval)
       setRefreshProgress(100)
+      setRefreshStatus("Complete!")
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -197,11 +211,17 @@ export default function CcpiDashboard() {
 
       setData(result)
 
-      await fetch("/api/ccpi/cache", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(result),
-      })
+      try {
+        await fetch("/api/ccpi/cache", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(result),
+        })
+        console.log("[v0] CCPI data cached successfully")
+      } catch (cacheError) {
+        console.error("[v0] Failed to cache CCPI data:", cacheError)
+        // Don't fail the whole operation if caching fails
+      }
 
       await fetchExecutiveSummary(result)
     } catch (error) {
@@ -209,6 +229,7 @@ export default function CcpiDashboard() {
       setError(error instanceof Error ? error.message : "Failed to load CCPI data")
     } finally {
       setIsRefreshing(false)
+      setLoading(false) // Clear loading state
       setRefreshProgress(0)
       setRefreshStatus("")
     }
@@ -373,19 +394,20 @@ export default function CcpiDashboard() {
           </div>
         </div>
 
-        {isRefreshing && refreshProgress > 0 && (
-          <Card className="border-blue-300 bg-blue-50">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-blue-900">{refreshStatus}</span>
-                <span className="text-sm font-semibold text-blue-700">{Math.round(refreshProgress)}%</span>
+        {isRefreshing && (
+          <Card className="border-blue-400 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-md">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-base font-semibold text-blue-900">{refreshStatus}</span>
+                <span className="text-base font-bold text-blue-700">{Math.round(refreshProgress)}%</span>
               </div>
-              <div className="w-full bg-blue-200 rounded-full h-2.5 overflow-hidden">
+              <div className="w-full bg-blue-200 rounded-full h-3 overflow-hidden shadow-inner">
                 <div
-                  className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+                  className="bg-gradient-to-r from-blue-500 to-indigo-600 h-3 rounded-full transition-all duration-500 ease-out"
                   style={{ width: `${refreshProgress}%` }}
                 />
               </div>
+              <p className="text-sm text-blue-700 mt-2 text-center">Loading live market data...</p>
             </CardContent>
           </Card>
         )}
@@ -1199,7 +1221,36 @@ export default function CcpiDashboard() {
                 {data.indicators?.qqqDeathCross !== undefined && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">QQQ Death Cross (SMA50 {"<"} SMA200)</span>
+                      <span className="font-medium flex items-center gap-1">
+                        QQQ Death Cross (SMA50 {"<"} SMA200)
+                        {tooltipsEnabled && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-red-50 border-red-200">
+                              <p className="font-semibold mb-1">Death Cross</p>
+                              <p className="text-sm">
+                                A death cross occurs when the 50-day moving average crosses below the 200-day moving
+                                average, signaling long-term bearish momentum.
+                              </p>
+                              <ul className="text-sm mt-1 space-y-1">
+                                <li>
+                                  <strong>NO (Golden Cross):</strong> 50-day above 200-day = Bullish trend, low risk
+                                </li>
+                                <li>
+                                  <strong>YES (Death Cross):</strong> 50-day below 200-day = Bearish trend, high crash
+                                  risk
+                                </li>
+                              </ul>
+                              <p className="text-xs mt-2">
+                                <strong>Impact:</strong> Death crosses historically precede extended market declines and
+                                crashes
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                       <span
                         className={`font-bold ${data.indicators.qqqDeathCross ? "text-red-600" : "text-green-600"}`}
                       >

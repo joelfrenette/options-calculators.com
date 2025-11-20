@@ -1,12 +1,7 @@
 import { NextResponse } from "next/server"
 import { fetchVIXTermStructure } from "@/lib/vix-term-structure"
 import { fetchQQQTechnicals as fetchQQQTechnicalsData } from "@/lib/qqq-technicals"
-import {
-  scrapeBuffettIndicator,
-  scrapePutCallRatio,
-  scrapeAAIISentiment,
-  scrapeShortInterest,
-} from "@/lib/scraping-bee"
+import { scrapeBuffettIndicator, scrapePutCallRatio, scrapeAAIISentiment } from "@/lib/scraping-bee"
 import { fetchApifyYahooFinance as fetchApifyYahooFinanceUtil } from "@/lib/apify-yahoo-finance"
 
 import {
@@ -284,7 +279,6 @@ async function fetchMarketData() {
     scrapeBuffettIndicator(),
     scrapePutCallRatio(),
     scrapeAAIISentiment(),
-    scrapeShortInterest(),
   ])
 
   const qqqData = results[0].status === "fulfilled" ? results[0].value : null
@@ -302,10 +296,7 @@ async function fetchMarketData() {
     results[9].status === "fulfilled"
       ? results[9].value
       : { bullish: aaiiBullishResult.value, bearish: 30, neutral: 35, spread: 5, status: aaiiBullishResult.source }
-  const shortInterestData =
-    results[10].status === "fulfilled"
-      ? results[10].value
-      : { spyShortRatio: shortInterestResult.value, status: shortInterestResult.source }
+  const shortInterestData = { spyShortRatio: shortInterestResult.value, status: shortInterestResult.source }
 
   apiStatus.technical = {
     live: qqqData?.source === "live",
@@ -416,7 +407,7 @@ async function fetchMarketData() {
     putCallRatio: putCallData.ratio,
     fearGreedIndex: sentimentData?.fearGreed || null,
     etfFlows: apifyData?.etfFlows,
-    shortInterest: shortInterestResult.value,
+    shortInterest: shortInterestResult.value, // Using AI fallback directly
 
     // AI Structural
     aiCapexGrowth: 40,
