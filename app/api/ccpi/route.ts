@@ -601,7 +601,12 @@ async function fetchAlphaVantageIndicators() {
 
     const nvidiaPrice = Number.parseFloat(nvidiaData?.["Global Quote"]?.["05. price"] || "800")
     const nvidiaChange = Number.parseFloat(nvidiaData?.["Global Quote"]?.["09. change"] || "0")
-    const nvidiaMomentum = nvidiaChange > 0 ? 100 : 0
+    const nvidiaChangePercent = Number.parseFloat(
+      nvidiaData?.["Global Quote"]?.["10. change percent"]?.replace("%", "") || "0",
+    )
+    // Map momentum to 0-100 scale: -10% = 100 (high risk), 0% = 50, +10% = 0 (low risk)
+    const nvidiaMomentum = Math.min(100, Math.max(0, 50 - nvidiaChangePercent * 5))
+
     const soxIndex = Number.parseFloat(soxData?.["Global Quote"]?.["05. price"] || "5000")
 
     // This is a proxy based on stock price strength
@@ -614,7 +619,7 @@ async function fetchAlphaVantageIndicators() {
     const mag7Concentration = 55 + (mag7Avg > 0 ? 5 : -5)
 
     console.log(
-      `[v0] Alpha Vantage Phase 2: NVDA=${nvidiaPrice}, SOX=${soxIndex}, Mag7=${mag7Concentration.toFixed(1)}%`,
+      `[v0] Alpha Vantage Phase 2: NVDA=${nvidiaPrice}, Change=${nvidiaChangePercent}%, Momentum=${nvidiaMomentum.toFixed(1)}, SOX=${soxIndex}, Mag7=${mag7Concentration.toFixed(1)}%`,
     )
 
     return {
