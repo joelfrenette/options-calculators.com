@@ -613,29 +613,25 @@ export function CcpiDashboard() {
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Pillar Breakdown */}
-
-        {/* Canaries in the Coal Mine */}
+        {/* Pillar Breakdowns will now be inside Accordions */}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>CCPI v2.0: Four Pillar Breakdown (Optimized for Crash Prediction)</CardTitle>
-          <CardDescription>
-            Individual stress scores across momentum, risk appetite, valuation, and macro dimensions
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {/* Reorganized indicators into new CCPI v2.0 pillar structure */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between pt-12">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
+      {/* Pillar Breakdowns now wrapped in Accordions */}
+      <Accordion type="multiple" defaultValue={["pillar1", "pillar2", "pillar3", "pillar4"]} className="space-y-4">
+        {/* Pillar 1 - Momentum & Technical */}
+        <AccordionItem value="pillar1" className="border rounded-lg px-4">
+          <AccordionTrigger className="hover:no-underline">
+            <div className="flex items-center justify-between w-full pr-4">
+              <div className="flex items-center gap-2">
                 <Activity className="h-5 w-5 text-cyan-600" />
-                Pillar 1 - Momentum & Technical (35% weight)
-              </h3>
+                <span className="text-lg font-semibold">Pillar 1 - Momentum & Technical</span>
+                <span className="text-sm text-gray-600">Weight: 35% | 16 indicators</span>
+              </div>
               <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.momentum)}/100</span>
             </div>
-            <div className="space-y-6">
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-6 pt-4">
               {/* NVIDIA Momentum Score */}
               {data.indicators?.nvidiaPrice !== undefined && (
                 <div className="space-y-2">
@@ -1090,17 +1086,23 @@ export function CcpiDashboard() {
                 </div>
               )}
             </div>
-          </div>
+          </AccordionContent>
+        </AccordionItem>
 
-          <div className="space-y-4 mt-12 border-t pt-12">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
+        {/* Pillar 2 - Risk Appetite & Volatility */}
+        <AccordionItem value="pillar2" className="border rounded-lg px-4">
+          <AccordionTrigger className="hover:no-underline">
+            <div className="flex items-center justify-between w-full pr-4">
+              <div className="flex items-center gap-2">
                 <TrendingDown className="h-5 w-5 text-orange-600" />
-                Pillar 2 - Risk Appetite & Volatility (30% weight)
-              </h3>
+                <span className="text-lg font-semibold">Pillar 2 - Risk Appetite & Volatility</span>
+                <span className="text-sm text-gray-600">Weight: 30% | 8 indicators</span>
+              </div>
               <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.riskAppetite)}/100</span>
             </div>
-            <div className="space-y-6">
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-6 pt-4">
               {/* Put/Call Ratio */}
               {data.indicators.putCallRatio !== undefined && (
                 <div className="space-y-2">
@@ -1317,17 +1319,23 @@ export function CcpiDashboard() {
                 </div>
               )}
             </div>
-          </div>
+          </AccordionContent>
+        </AccordionItem>
 
-          <div className="space-y-4 mt-12 border-t pt-12">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
+        {/* Pillar 3 - Valuation & Market Structure */}
+        <AccordionItem value="pillar3" className="border rounded-lg px-4">
+          <AccordionTrigger className="hover:no-underline">
+            <div className="flex items-center justify-between w-full pr-4">
+              <div className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5 text-blue-600" />
-                Pillar 3 - Valuation & Market Structure (15% weight)
-              </h3>
+                <span className="text-lg font-semibold">Pillar 3 - Valuation & Market Structure</span>
+                <span className="text-sm text-gray-600">Weight: 15% | 7 indicators</span>
+              </div>
               <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.valuation)}/100</span>
             </div>
-            <div className="space-y-6">
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-6 pt-4">
               {/* S&P 500 P/E */}
               {data.indicators.spxPE !== undefined && (
                 <div className="space-y-2">
@@ -1491,17 +1499,23 @@ export function CcpiDashboard() {
                 </div>
               )}
             </div>
-          </div>
+          </AccordionContent>
+        </AccordionItem>
 
-          <div className="space-y-4 mt-12 border-t pt-12">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
+        {/* Pillar 4 - Macro */}
+        <AccordionItem value="pillar4" className="border rounded-lg px-4">
+          <AccordionTrigger className="hover:no-underline">
+            <div className="flex items-center justify-between w-full pr-4">
+              <div className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-green-600" />
-                Pillar 4 - Macro (20% weight)
-              </h3>
+                <span className="text-lg font-semibold">Pillar 4 - Macro</span>
+                <span className="text-sm text-gray-600">Weight: 20% | 7 indicators</span>
+              </div>
               <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.macro)}/100</span>
             </div>
-            <div className="space-y-6">
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-6 pt-4">
               {/* TED Spread */}
               {data.indicators?.tedSpread !== undefined && (
                 <div className="space-y-2">
@@ -1670,35 +1684,35 @@ export function CcpiDashboard() {
                 </div>
               )}
             </div>
-          </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <h4 className="font-semibold text-sm mb-3 text-blue-900">CCPI Formula Weights</h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-blue-700">Technical & Price:</span>
-                <span className="font-bold text-blue-900">35%</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-blue-700">Risk Appetite:</span>
-                <span className="font-bold text-blue-900">30%</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-blue-700">Valuation:</span>
-                <span className="font-bold text-blue-900">15%</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-blue-700">Macro:</span>
-                <span className="font-bold text-blue-900">20%</span>
-              </div>
-            </div>
-            <p className="text-xs text-blue-700 mt-3">
-              Final CCPI = Σ(Pillar Score × Weight). Pillar 3 now includes 7 valuation & market structure indicators:
-              S&P P/E, S&P P/S, Buffett Indicator, QQQ P/E, Mag7 Concentration, Shiller CAPE, and Equity Risk Premium.
-            </p>
+      <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <h4 className="font-semibold text-sm mb-3 text-blue-900">CCPI Formula Weights</h4>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-blue-700">Technical & Price:</span>
+            <span className="font-bold text-blue-900">35%</span>
           </div>
-        </CardContent>
-      </Card>
+          <div className="flex items-center justify-between">
+            <span className="text-blue-700">Risk Appetite:</span>
+            <span className="font-bold text-blue-900">30%</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-blue-700">Valuation:</span>
+            <span className="font-bold text-blue-900">15%</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-blue-700">Macro:</span>
+            <span className="font-bold text-blue-900">20%</span>
+          </div>
+        </div>
+        <p className="text-xs text-blue-700 mt-3">
+          Final CCPI = Σ(Pillar Score × Weight). Pillar 3 now includes 7 valuation & market structure indicators: S&P
+          P/E, S&P P/S, Buffett Indicator, QQQ P/E, Mag7 Concentration, Shiller CAPE, and Equity Risk Premium.
+        </p>
+      </div>
 
       <Accordion type="multiple" className="space-y-4">
         {/* Portfolio Allocation by CCPI Crash Risk Level */}
