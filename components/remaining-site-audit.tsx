@@ -15,12 +15,13 @@ import {
   Calculator,
   Zap,
   AlertTriangle,
+  Database,
 } from "lucide-react"
 
 interface DataSourceStatus {
   name: string
   primary: string
-  fallbacks: string[]
+  fallbackChain: string[]
   status: "live" | "ai" | "baseline" | "failed"
   currentSource: string
 }
@@ -254,75 +255,116 @@ export function RemainingSiteAudit() {
                   </div>
 
                   {/* Data Sources Section */}
-                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <h4 className="font-semibold text-sm mb-3 text-slate-900">Data Sources & Fallback Chain</h4>
+                  <div>
+                    <h4 className="font-semibold text-sm mb-3 text-slate-900 flex items-center gap-2">
+                      <Database className="h-5 w-5 text-blue-600" />
+                      CCPI Calculator Data Sources
+                    </h4>
 
                     {dataSourceStatuses[tool.name] && dataSourceStatuses[tool.name].length > 0 ? (
                       <div className="space-y-3">
                         {dataSourceStatuses[tool.name].map((source, idx) => (
-                          <div key={idx} className="bg-white p-3 rounded border">
-                            <div className="flex items-start gap-3 mb-2">
-                              {getStatusIcon(source.status)}
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <p className="font-semibold text-sm">{source.name}</p>
-                                  {getStatusBadge(source.status)}
+                          <div
+                            key={idx}
+                            className="bg-white p-4 rounded-lg border-2 hover:border-blue-200 transition-colors"
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="mt-0.5">{getStatusIcon(source.status)}</div>
+                              <div className="flex-1 space-y-2">
+                                <div>
+                                  <h5 className="font-semibold text-sm text-slate-900 mb-0.5">{source.name}</h5>
+                                  <p className="text-xs text-slate-500">
+                                    {source.status === "live"
+                                      ? "Momentum & Technical"
+                                      : source.status === "ai"
+                                        ? "Risk Appetite & Volatility"
+                                        : source.status === "baseline"
+                                          ? "Valuation & Market Structure"
+                                          : "Macro Economic"}
+                                  </p>
                                 </div>
-                                <p className="text-xs text-slate-600">
-                                  <span className="font-semibold">Current Source:</span> {source.currentSource}
-                                </p>
-                              </div>
-                            </div>
 
-                            <div className="ml-8 mt-2 text-xs space-y-1">
-                              <p className="text-slate-700">
-                                <span className="font-semibold">Primary:</span> {source.primary}
-                              </p>
-                              {(source.fallback1 || source.fallback2 || source.fallback3 || source.fallback4) && (
-                                <p className="text-slate-600">
-                                  <span className="font-semibold">Fallbacks:</span>{" "}
-                                  {[source.fallback1, source.fallback2, source.fallback3, source.fallback4]
-                                    .filter(Boolean)
-                                    .join(" → ")}
-                                </p>
-                              )}
+                                <div className="space-y-1 text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-slate-700 min-w-[80px]">Primary:</span>
+                                    <span className="text-blue-600 font-medium">{source.primary}</span>
+                                  </div>
+
+                                  <div className="flex items-start gap-2">
+                                    <span className="font-semibold text-slate-700 min-w-[80px]">Fallback Chain:</span>
+                                    <span className="text-slate-600 flex-1">
+                                      {source.fallbackChain && source.fallbackChain.length > 0
+                                        ? source.fallbackChain.join(" → ")
+                                        : "OpenAI GPT-4o → Anthropic Claude → Groq Llama → Grok xAI"}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-slate-700 min-w-[80px]">Current Source:</span>
+                                    <span
+                                      className={`font-medium ${
+                                        source.status === "live"
+                                          ? "text-green-600"
+                                          : source.status === "ai"
+                                            ? "text-yellow-600"
+                                            : source.status === "baseline"
+                                              ? "text-orange-600"
+                                              : "text-red-600"
+                                      }`}
+                                    >
+                                      {source.currentSource}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div className="bg-white p-4 rounded border text-center">
-                        <p className="text-sm text-slate-600 mb-2">
+                      <div className="bg-slate-50 p-6 rounded-lg border border-slate-200">
+                        <p className="text-sm text-slate-600 mb-3 text-center font-medium">
                           {loading ? "Loading data sources..." : "Data points required:"}
                         </p>
-                        <ul className="text-xs text-slate-500 mt-2 space-y-1">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                           {tool.dataPoints.map((point, idx) => (
-                            <li key={idx}>• {point}</li>
+                            <div key={idx} className="flex items-center gap-2 text-sm text-slate-700">
+                              <div className="h-1.5 w-1.5 rounded-full bg-blue-600"></div>
+                              <span>{point}</span>
+                            </div>
                           ))}
-                        </ul>
+                        </div>
                       </div>
                     )}
                   </div>
 
                   {/* Status Legend */}
-                  <div className="bg-slate-50 p-3 rounded border text-xs">
-                    <p className="font-semibold text-slate-900 mb-2">Status Legend:</p>
-                    <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                    <p className="font-semibold text-xs text-slate-900 mb-3 uppercase tracking-wide">Status Legend:</p>
+                    <div className="grid grid-cols-2 gap-3">
                       <div className="flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        <span className="text-slate-700">Live API - Real-time data</span>
+                        <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                        <span className="text-xs text-slate-700">
+                          <span className="font-semibold">Live API</span> - Real-time data
+                        </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4 text-yellow-600" />
-                        <span className="text-slate-700">AI Fallback - AI-fetched current data</span>
+                        <AlertCircle className="h-4 w-4 text-yellow-600 flex-shrink-0" />
+                        <span className="text-xs text-slate-700">
+                          <span className="font-semibold">AI Fallback</span> - AI-fetched current data
+                        </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4 text-orange-600" />
-                        <span className="text-slate-700">Baseline - Historical average</span>
+                        <AlertTriangle className="h-4 w-4 text-orange-600 flex-shrink-0" />
+                        <span className="text-xs text-slate-700">
+                          <span className="font-semibold">Baseline</span> - Historical average
+                        </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <XCircle className="h-4 w-4 text-red-600" />
-                        <span className="text-slate-700">Failed - API unavailable</span>
+                        <XCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
+                        <span className="text-xs text-slate-700">
+                          <span className="font-semibold">Failed</span> - API unavailable
+                        </span>
                       </div>
                     </div>
                   </div>
