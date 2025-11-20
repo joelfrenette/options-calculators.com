@@ -504,17 +504,17 @@ export function CcpiAuditAdmin() {
           name: "SPY Short Interest Ratio",
           formula: "Bearish Positioning = SPY ETF short interest as % of float",
           executiveSummary:
-            "Measures bearish bets on S&P 500. IMPORTANT: Low short interest (<2%) signals complacency and crash risk because there are fewer bears positioned for downside. High short interest (>6%) indicates healthy skepticism and more positioned traders. Extremely high values (>8%) can trigger short squeezes.",
+            "Measures bearish bets on S&P 500. Higher short interest indicates bearish sentiment and increased crash risk. Low short interest (2-3%) suggests bullish confidence and lower immediate crash risk, while high short interest (>6%) signals bearish positioning and elevated market stress.",
           currentValue: `${ccpi.indicators.shortInterest.toFixed(1)}%`,
           ranges: {
-            safe: "3-6% (healthy skepticism, bears positioned)",
-            warning: "2-3% or 6-8%",
-            danger: "Below 2% (extreme complacency - HIGH CRASH RISK) or Above 8% (crowded short trade)",
+            safe: "2-3% (bullish confidence, low stress)",
+            warning: "3-5% (normal range)",
+            danger: "Below 2% (too complacent) or Above 6% (bearish stress), >8% (extreme bearish sentiment)",
           },
           dataSources: getDataSourceForIndicator("Short Interest", dataSources),
           canaryThresholds: {
-            medium: "<3% or >6%",
-            high: "<1.5% (nobody hedging - DANGER) or >8% (overcrowded)",
+            medium: "<2% or >5%",
+            high: "<1.5% (extreme complacency) or >8% (extreme bearish positioning)",
           },
         },
         {

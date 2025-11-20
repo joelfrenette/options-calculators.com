@@ -1820,18 +1820,19 @@ export default function CcpiDashboard() {
                               <p className="text-sm">Percentage of shares sold short relative to float.</p>
                               <ul className="text-sm mt-1 space-y-1">
                                 <li>
-                                  <strong>{">"} 6%:</strong> Healthy skepticism, positioned for downside
+                                  <strong>{">"} 6%:</strong> High short interest - bearish sentiment increases crash
+                                  risk
                                 </li>
                                 <li>
                                   <strong>2-6%:</strong> Normal range
                                 </li>
                                 <li>
-                                  <strong>{"<"} 2%:</strong> Extreme complacency - very few bears, high crash risk
+                                  <strong>{"<"} 2%:</strong> Low short interest - bullish confidence, lower crash risk
                                 </li>
                               </ul>
                               <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Low short interest means fewer bears to cover in a rally and
-                                more unprotected longs vulnerable to crashes
+                                <strong>Impact:</strong> Higher short interest indicates bearish positioning and
+                                increased market stress
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -1839,9 +1840,8 @@ export default function CcpiDashboard() {
                       </span>
                       <span className="font-bold">{data.indicators.shortInterest.toFixed(1)}%</span>
                     </div>
-                    {/* Fixed gradient: RED left (danger/low) → YELLOW middle → GREEN right (safe/high) */}
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
@@ -1850,8 +1850,8 @@ export default function CcpiDashboard() {
                       />
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
-                      <span>Danger: {"<"}2% (Complacent)</span>
-                      <span>Safe: {">"}6% (Positioned)</span>
+                      <span>Safe: {"<"}2% (Bullish)</span>
+                      <span>Danger: {">"}6% (Bearish)</span>
                     </div>
                   </div>
                 )}
