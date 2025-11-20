@@ -504,17 +504,17 @@ export function CcpiAuditAdmin() {
           name: "SPY Short Interest Ratio",
           formula: "Bearish Positioning = SPY ETF short interest as % of float",
           executiveSummary:
-            "Measures bearish bets on S&P 500. Values below 2% signal complacency; very high values can trigger short squeezes.",
+            "Measures bearish bets on S&P 500. IMPORTANT: Low short interest (<2%) signals complacency and crash risk because there are fewer bears positioned for downside. High short interest (>6%) indicates healthy skepticism and more positioned traders. Extremely high values (>8%) can trigger short squeezes.",
           currentValue: `${ccpi.indicators.shortInterest.toFixed(1)}%`,
           ranges: {
-            safe: "3-6% (healthy skepticism)",
+            safe: "3-6% (healthy skepticism, bears positioned)",
             warning: "2-3% or 6-8%",
-            danger: "Below 2% (extreme complacency) or Above 8% (crowded short)",
+            danger: "Below 2% (extreme complacency - HIGH CRASH RISK) or Above 8% (crowded short trade)",
           },
           dataSources: getDataSourceForIndicator("Short Interest", dataSources),
           canaryThresholds: {
             medium: "<3% or >6%",
-            high: "<1.5% (nobody hedging) or >8% (crowded trade)",
+            high: "<1.5% (nobody hedging - DANGER) or >8% (overcrowded)",
           },
         },
         {
@@ -571,7 +571,7 @@ export function CcpiAuditAdmin() {
           name: "Yield Curve (10Y-2Y)",
           formula: "Recession Indicator = 10Y Treasury - 2Y Treasury",
           executiveSummary:
-            "Inverted curve signals loss of confidence in near-term economy, often preceding recessions and market crashes.",
+            "Inverted yield curve signals loss of confidence in near-term economy, often preceding recessions and market crashes.",
           currentValue: `${ccpi.indicators.yieldCurve.toFixed(2)}%`,
           ranges: {
             safe: "Above 0%",

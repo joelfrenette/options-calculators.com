@@ -1820,20 +1820,18 @@ export default function CcpiDashboard() {
                               <p className="text-sm">Percentage of shares sold short relative to float.</p>
                               <ul className="text-sm mt-1 space-y-1">
                                 <li>
-                                  <strong>{">"} 15%:</strong> High short interest, indicates bearishness, potential for
-                                  short squeeze
+                                  <strong>{">"} 6%:</strong> Healthy skepticism, positioned for downside
                                 </li>
                                 <li>
-                                  <strong>5-15%:</strong> Normal
+                                  <strong>2-6%:</strong> Normal range
                                 </li>
                                 <li>
-                                  <strong>{"<"} 1.5%:</strong> Very low short interest, indicates complacency, high
-                                  crash risk
+                                  <strong>{"<"} 2%:</strong> Extreme complacency - very few bears, high crash risk
                                 </li>
                               </ul>
                               <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Extremely low short interest suggests fewer bears to cover,
-                                increasing crash risk
+                                <strong>Impact:</strong> Low short interest means fewer bears to cover in a rally and
+                                more unprotected longs vulnerable to crashes
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -1841,19 +1839,19 @@ export default function CcpiDashboard() {
                       </span>
                       <span className="font-bold">{data.indicators.shortInterest.toFixed(1)}%</span>
                     </div>
+                    {/* Fixed gradient: RED left (danger/low) → YELLOW middle → GREEN right (safe/high) */}
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, Math.max(0, ((15 - data.indicators.shortInterest * 100) / 15) * 100))}%`,
+                          marginLeft: `${Math.min(100, Math.max(0, (data.indicators.shortInterest / 10) * 100))}%`,
                         }}
                       />
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
-                      <span>Safe: {">"}15% (Positioned)</span>
-                      <span className="text-yellow-600">Caution: 5-15%</span>
-                      <span className="text-red-600">Danger: {"<"}1.5% (Complacency)</span>
+                      <span>Danger: {"<"}2% (Complacent)</span>
+                      <span>Safe: {">"}6% (Positioned)</span>
                     </div>
                   </div>
                 )}
@@ -3149,7 +3147,6 @@ export default function CcpiDashboard() {
                           strategies: [
                             "Buy VIX calls for crash insurance (60-90 DTE)",
                             "Long put spreads on QQQ/SPY at-the-money",
-                            "Close all naked short options immediately",
                             "Tactical long volatility trades (VXX calls)",
                             "Gold miners (GDX) call options as diversification",
                           ],
