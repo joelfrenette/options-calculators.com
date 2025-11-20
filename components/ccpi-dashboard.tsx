@@ -513,28 +513,47 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 <p className="text-sm text-gray-600 mb-2">Certainty Score</p>
                 <div className="flex items-center justify-center gap-2">
                   <p className="text-5xl font-bold text-blue-600">{data.certainty}%</p>
+                  {/* CHANGE: Enhanced Certainty Score tooltip with clearer explanation */}
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button className="text-gray-400 hover:text-gray-600"></button>
                       </TooltipTrigger>
-                      <TooltipContent className="max-w-xs p-3">
-                        <p className="font-semibold mb-2">Certainty Calculation</p>
-                        <p className="text-xs leading-relaxed">
-                          Based on pillar alignment variance (
+                      <TooltipContent className="max-w-md p-3">
+                        <p className="font-semibold mb-2">Certainty Score - How Confident Are We?</p>
+                        <p className="text-sm leading-relaxed mb-2">
+                          This score measures how confident we are in our crash prediction. Think of it like weather
+                          forecasting - sometimes all the data points to rain (high certainty), other times the forecast
+                          is less clear (low certainty).
+                        </p>
+                        <p className="text-sm leading-relaxed mb-2">
+                          <strong>How It's Calculated:</strong>
+                        </p>
+                        <ul className="text-sm space-y-1 mb-2">
+                          <li>
+                            • <strong>70% weight:</strong> How much our 4 pillars agree with each other (when all
+                            pillars point the same direction, we're more confident)
+                          </li>
+                          <li>
+                            • <strong>30% weight:</strong> How many warning signals ("canaries") are triggered across
+                            all indicators
+                          </li>
+                        </ul>
+                        <p className="text-xs text-gray-600">
+                          Current calculation:{" "}
                           {Math.round(
                             ((100 -
                               (Math.max(...Object.values(data.pillars)) - Math.min(...Object.values(data.pillars)))) /
                               100) *
                               70,
                           )}
-                          % weight) and canary agreement (
+                          % from pillar alignment +{" "}
                           {Math.round(
                             (data.canaries.filter((c) => c.severity === "high" || c.severity === "medium").length /
                               15) *
                               30,
                           )}
-                          % weight), adjusted for historical accuracy (82% backtest).
+                          % from active warnings
                         </p>
                       </TooltipContent>
                     </Tooltip>
@@ -630,26 +649,39 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5 text-red-600" />
                 Canaries in the Coal Mine - Active Warning Signals
+                {/* CHANGE: Enhanced Canaries section tooltip */}
                 {tooltipsEnabled && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Info className="h-4 w-4 text-muted-foreground cursor-help" />
                     </TooltipTrigger>
                     <TooltipContent className="max-w-md bg-yellow-50 border-yellow-200">
-                      <p className="font-semibold mb-1">Early Warning System</p>
-                      <p className="text-sm">
-                        Like canaries in coal mines detected toxic gases, these indicators flag dangerous market
-                        conditions before a crash. Each warning represents a specific threshold breach across our 38
-                        indicators.
+                      <p className="font-semibold mb-2">Early Warning System - What Are "Canaries"?</p>
+                      <p className="text-sm mb-2">
+                        Historically, coal miners brought canaries into mines because these birds would show signs of
+                        distress before dangerous gases reached toxic levels for humans. Similarly, these market
+                        indicators give us early warning signs before a potential crash.
                       </p>
-                      <ul className="text-sm mt-2 space-y-1">
+                      <p className="text-sm mb-2">
+                        Each warning appears when a specific market indicator crosses a dangerous threshold - like when
+                        market valuations get extremely high, volatility spikes dramatically, or investor sentiment
+                        becomes too one-sided.
+                      </p>
+                      <ul className="text-sm mt-2 space-y-2">
                         <li>
-                          <strong>High Risk (Red):</strong> Critical threshold breached - immediate attention required
+                          <strong className="text-red-600">High Risk (Red):</strong> Critical danger zone - this
+                          indicator has reached levels historically associated with market crashes. Immediate attention
+                          recommended.
                         </li>
                         <li>
-                          <strong>Medium Risk (Yellow):</strong> Warning threshold breached - caution advised
+                          <strong className="text-yellow-600">Medium Risk (Yellow):</strong> Warning zone - this
+                          indicator is showing concerning signs but hasn't reached critical levels yet. Increased
+                          caution advised.
                         </li>
                       </ul>
+                      <p className="text-xs mt-2 text-gray-600">
+                        We monitor {data.canaries.length} total warning signals across all 34 market indicators.
+                      </p>
                     </TooltipContent>
                   </Tooltip>
                 )}
@@ -707,7 +739,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                           </span>
                         </div>
                       </div>
-                      {/* Added tooltip to each canary card */}
+                      {/* CHANGE: Enhanced individual canary card tooltips */}
                       <div className="flex items-start gap-2">
                         <p className={`text-sm font-semibold ${severityConfig.textColor} flex-1`}>{canary.signal}</p>
                         {tooltipsEnabled && (
@@ -716,22 +748,36 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                               <Info className="h-4 w-4 text-muted-foreground cursor-help flex-shrink-0 mt-0.5" />
                             </TooltipTrigger>
                             <TooltipContent
-                              className={`max-w-xs ${canary.severity === "high" ? "bg-red-50 border-red-200" : "bg-yellow-50 border-yellow-200"}`}
+                              className={`max-w-md ${canary.severity === "high" ? "bg-red-50 border-red-200" : "bg-yellow-50 border-yellow-200"}`}
                             >
-                              <p className="font-semibold mb-1">{canary.signal}</p>
-                              <p className="text-sm">
+                              <p className="font-semibold mb-2">{canary.signal}</p>
+                              <p className="text-sm mb-2">
                                 {canary.severity === "high"
-                                  ? "This indicator has breached a critical threshold, signaling elevated crash risk. Historical data shows increased volatility when this condition persists."
-                                  : "This indicator is showing warning signs. While not critical yet, it suggests increasing caution and risk monitoring."}
+                                  ? "This indicator has crossed into the danger zone. Historical data shows that when this indicator reaches these levels, market crashes or significant corrections often follow within weeks to months. The specific threshold has been breached based on historical crash patterns."
+                                  : "This indicator is flashing a warning sign. While not at critical levels yet, it's showing patterns that have preceded market downturns in the past. This suggests increased caution and closer monitoring of market conditions."}
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>Why This Matters:</strong> The {canary.pillar} pillar, where this indicator
+                                belongs, helps us understand{" "}
+                                {canary.pillar === "Pillar 1"
+                                  ? "price momentum and technical breakdowns"
+                                  : canary.pillar === "Pillar 2"
+                                    ? "investor fear and risk appetite"
+                                    : canary.pillar === "Pillar 3"
+                                      ? "whether stocks are overvalued"
+                                      : "broader economic health"}
+                                . When multiple canaries trigger in the same pillar, it strengthens the crash warning
+                                signal.
                               </p>
                               {canary.indicatorWeight !== undefined && canary.pillarWeight !== undefined && (
-                                <p className="text-xs font-medium mt-2">
-                                  Indicator Weight: {canary.indicatorWeight}/100 in pillar
-                                  <br />
-                                  Pillar Weight: {canary.pillarWeight}% of CCPI
-                                  <br />
-                                  Combined Impact: {canary.impactScore?.toFixed(2)}
-                                </p>
+                                <div className="text-xs bg-white/50 p-2 rounded mt-2">
+                                  <p className="font-semibold mb-1">Impact Calculation:</p>
+                                  <p>• Indicator importance within its pillar: {canary.indicatorWeight}/100 points</p>
+                                  <p>• Pillar's weight in overall CCPI: {canary.pillarWeight}%</p>
+                                  <p className="font-semibold mt-1">
+                                    Combined impact on CCPI score: {canary.impactScore?.toFixed(2)} points
+                                  </p>
+                                </div>
                               )}
                             </TooltipContent>
                           </Tooltip>
@@ -772,29 +818,48 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         NVIDIA Momentum Score (AI Bellwether)
+                        {/* CHANGE: Enhanced NVIDIA Momentum tooltip */}
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-1">NVIDIA Momentum Score</p>
-                              <p className="text-sm">
-                                Tracks NVIDIA's price momentum as a bellwether for AI sector health and tech leadership.
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">NVIDIA Momentum Score - The AI Sector Bellwether</p>
+                              <p className="text-sm mb-2">
+                                NVIDIA has become the most important indicator of AI and technology sector health. As
+                                the leading AI chip maker, NVIDIA's stock performance often predicts broader tech market
+                                movements.
                               </p>
-                              <ul className="text-sm mt-1 space-y-1">
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> This score combines NVIDIA's recent price trend with
+                                trading volume and relative strength compared to the overall market. Higher scores mean
+                                strong momentum (bullish), lower scores mean weakening momentum (bearish).
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  <strong>{">"}80:</strong> Strong AI sector momentum, low crash risk
+                                  • <strong>Above 80:</strong> NVIDIA is in a strong uptrend - tech sector is healthy,
+                                  lower crash risk
                                 </li>
                                 <li>
-                                  <strong>40-60:</strong> Neutral momentum, moderate risk
+                                  • <strong>40-60:</strong> Neutral momentum - tech sector is treading water, moderate
+                                  risk
                                 </li>
                                 <li>
-                                  <strong>{"<"}20:</strong> Falling momentum, tech crash risk
+                                  • <strong>Below 20:</strong> NVIDIA is falling - tech sector weakness often leads to
+                                  broader market selloffs
                                 </li>
                               </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> NVIDIA weakness often precedes broader tech selloffs
+                              <p className="text-sm mb-2">
+                                <strong>Data Source:</strong> Real-time price data from major stock exchanges, analyzed
+                                using technical momentum indicators.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Why it matters: NVIDIA's market cap exceeds $3 trillion, making it one of the largest
+                                companies in the world. When it falls, it can drag down entire indexes.
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -827,30 +892,48 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         SOX Semiconductor Index (Chip Sector Health)
+                        {/* CHANGE: Enhanced SOX Index tooltip */}
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-1">SOX Semiconductor Index</p>
-                              <p className="text-sm">
-                                Measures the health of the semiconductor industry, a critical leading indicator for tech
-                                sector performance.
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">SOX Semiconductor Index - Chip Sector Health Check</p>
+                              <p className="text-sm mb-2">
+                                The SOX (PHLX Semiconductor Sector Index) tracks 30 of the largest semiconductor
+                                companies. Think of semiconductors as the building blocks of all modern technology -
+                                they're in everything from smartphones to cars to data centers.
                               </p>
-                              <ul className="text-sm mt-1 space-y-1">
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> The combined stock price performance of major chip
+                                makers including NVIDIA, AMD, Intel, Taiwan Semiconductor, and others. This index is
+                                often called a "leading indicator" because chip demand tends to slow before broader
+                                economic slowdowns.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  <strong>{">"}5500:</strong> Strong chip sector, bullish for tech
+                                  • <strong>Above 5500:</strong> Chip sector is strong - healthy tech ecosystem, low
+                                  crash risk
                                 </li>
                                 <li>
-                                  <strong>~5000:</strong> Baseline level, neutral risk
+                                  • <strong>Around 5000 (baseline):</strong> Normal levels - tech sector is stable
                                 </li>
                                 <li>
-                                  <strong>{"<"}4500:</strong> Weak chip demand, tech crash risk
+                                  • <strong>Below 4500:</strong> Chip sector weakness - may signal broader tech and
+                                  economic problems ahead
                                 </li>
                               </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Chip weakness signals broader tech sector vulnerability
+                              <p className="text-sm mb-2">
+                                <strong>Data Source:</strong> Philadelphia Stock Exchange (PHLX), updated daily based on
+                                trading prices of semiconductor stocks.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Historical note: The SOX Index often peaks 6-12 months before major market corrections,
+                                making it an important early warning indicator.
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -882,28 +965,55 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         QQQ Daily Return (5× downside amplifier)
+                        {/* CHANGE: Enhanced QQQ Daily Return tooltip */}
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-1">QQQ Daily Return</p>
-                              <p className="text-sm">Tracks the daily percentage change in the Nasdaq-100 ETF (QQQ).</p>
-                              <ul className="text-sm mt-1 space-y-1">
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">QQQ Daily Return - Tech Sector Daily Performance</p>
+                              <p className="text-sm mb-2">
+                                QQQ is an ETF (Exchange Traded Fund) that tracks the Nasdaq-100 Index - the 100 largest
+                                non-financial companies on the Nasdaq stock exchange. This includes major tech companies
+                                like Apple, Microsoft, Amazon, Google, and Meta (Facebook).
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> The percentage change in QQQ's price from yesterday's
+                                close to today's close. It tells us whether big tech stocks went up or down today, and
+                                by how much.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>The 5× Downside Amplifier:</strong> We give extra weight to negative days
+                                because research shows markets fall faster than they rise. A -2% day gets treated as
+                                more significant than a +2% day in our crash calculations.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  <strong>{">"} +1%:</strong> Strong bullish momentum, low crash risk
+                                  • <strong>Above +1%:</strong> Tech stocks are rallying - bullish momentum, lower crash
+                                  risk
                                 </li>
                                 <li>
-                                  <strong>-1% to +1%:</strong> Neutral momentum, moderate risk
+                                  • <strong>-1% to +1%:</strong> Normal daily fluctuation - neutral market conditions
                                 </li>
                                 <li>
-                                  <strong>{"<"} -1%:</strong> Bearish momentum, increased crash risk
+                                  • <strong>Below -1%:</strong> Tech stocks are selling off - bearish pressure,
+                                  increased crash risk
+                                </li>
+                                <li>
+                                  • <strong>Below -3%:</strong> Sharp selloff - panic selling may be beginning
                                 </li>
                               </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Large negative moves indicate selling pressure and risk-off
-                                sentiment
+                              <p className="text-sm mb-2">
+                                <strong>Data Source:</strong> Real-time pricing from Nasdaq stock exchange, updated
+                                every trading day.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Why it matters: The Nasdaq-100 represents about 40% of the total U.S. stock market
+                                value, so its daily moves significantly impact the overall market.
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -939,28 +1049,53 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         QQQ Consecutive Down Days
+                        {/* CHANGE: Enhanced QQQ Consecutive Down Days tooltip */}
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-1">Consecutive Down Days</p>
-                              <p className="text-sm">Counts how many trading days in a row QQQ has closed lower.</p>
-                              <ul className="text-sm mt-1 space-y-1">
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">QQQ Consecutive Down Days - Losing Streak Tracker</p>
+                              <p className="text-sm mb-2">
+                                This indicator counts how many trading days in a row the QQQ (Nasdaq-100 tech stocks)
+                                has closed lower than the previous day. Think of it like a sports team's losing streak -
+                                the longer it goes, the more concerning it becomes.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> Simply the number of consecutive days where QQQ's
+                                closing price was lower than the day before. It resets to zero whenever QQQ has an up
+                                day.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>Why Consecutive Losses Matter:</strong> Markets typically bounce back and forth
+                                between up and down days. When we see multiple consecutive down days, it suggests
+                                persistent selling pressure rather than normal volatility. This pattern often precedes
+                                larger market declines.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  <strong>0-1 days:</strong> Healthy market, minimal crash risk
+                                  • <strong>0-1 days:</strong> Healthy market - normal buying and selling balance
                                 </li>
                                 <li>
-                                  <strong>2-3 days:</strong> Warning sign, increasing risk
+                                  • <strong>2-3 days:</strong> Warning sign - sellers are gaining control, watch closely
                                 </li>
                                 <li>
-                                  <strong>4+ days:</strong> Dangerous selling pressure, high crash risk
+                                  • <strong>4+ days:</strong> Danger zone - sustained selling pressure often leads to
+                                  accelerated declines
                                 </li>
                               </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Extended selling streaks often precede larger corrections or
-                                crashes
+                              <p className="text-sm mb-2">
+                                <strong>Data Source:</strong> Daily closing prices from Nasdaq exchange, tracked
+                                continuously.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Historical pattern: Market crashes often feature 5-7+ consecutive down days as panic
+                                selling takes hold. The 2020 COVID crash had 6 consecutive down days, and the 2008
+                                financial crisis had multiple 5-7 day losing streaks.
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -992,29 +1127,48 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         QQQ Below 20-Day SMA
+                        {/* CHANGE: Add tooltips for QQQ Below SMAs - these appear to be missing */}
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-1">20-Day Simple Moving Average</p>
-                              <p className="text-sm">
-                                Short-term trend indicator. Breach signals near-term momentum shift.
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">QQQ Below 20-Day SMA - Short-Term Trend</p>
+                              <p className="text-sm mb-2">
+                                SMA stands for "Simple Moving Average" - it's the average closing price over the last 20
+                                trading days (about one month). Think of it like a smoothed-out trend line that filters
+                                out daily noise to show the short-term direction.
                               </p>
-                              <ul className="text-sm mt-1 space-y-1">
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> Whether today's QQQ price is above or below its
+                                20-day average price. Traders use this to identify whether the short-term trend is up
+                                (price above average) or down (price below average).
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  <strong>Above SMA20:</strong> Bullish short-term trend, low risk
+                                  • <strong>0% (far above):</strong> QQQ is trading well above its 20-day average -
+                                  strong short-term uptrend
                                 </li>
                                 <li>
-                                  <strong>Near SMA20 (50%):</strong> Testing support, moderate risk
+                                  • <strong>~50%:</strong> QQQ is near its 20-day average - neutral, no clear short-term
+                                  trend
                                 </li>
                                 <li>
-                                  <strong>Below SMA20:</strong> Bearish short-term trend, elevated risk
+                                  • <strong>100% (breached):</strong> QQQ has dropped below its 20-day average -
+                                  short-term downtrend developing, increased crash risk
                                 </li>
                               </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Breaking below 20-day SMA often triggers technical selling
+                              <p className="text-sm mb-2">
+                                <strong>Calculation:</strong> Add up the closing prices from the last 20 trading days,
+                                divide by 20. Compare today's price to this average.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Trading signal: When price crosses below the 20-day SMA, many traders interpret this as
+                                a "sell" signal, which can create self-fulfilling selling pressure.
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -1062,25 +1216,39 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-1">50-Day Simple Moving Average</p>
-                              <p className="text-sm">
-                                Medium-term trend indicator. Key support level watched by institutions.
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">QQQ Below 50-Day SMA - Medium-Term Trend</p>
+                              <p className="text-sm mb-2">
+                                The 50-day SMA is a key medium-term trend indicator watched by institutional investors.
+                                It represents the average price over the last 10 weeks (roughly 2.5 months).
                               </p>
-                              <ul className="text-sm mt-1 space-y-1">
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> Whether QQQ's price is currently trading above or
+                                below its 50-day moving average. A break below this level is a significant bearish
+                                signal.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  <strong>Above SMA50:</strong> Healthy medium-term trend, low risk
+                                  • <strong>Above SMA50:</strong> Healthy medium-term uptrend, low risk
                                 </li>
                                 <li>
-                                  <strong>Near SMA50 (50%):</strong> Critical support test, moderate risk
+                                  • <strong>~50% proximity:</strong> Testing critical support, moderate risk
                                 </li>
                                 <li>
-                                  <strong>Below SMA50:</strong> Broken support, high crash risk
+                                  • <strong>Below SMA50 (100% breached):</strong> Broken support, major bearish signal,
+                                  high crash risk
                                 </li>
                               </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Breaking below 50-day SMA signals weakening trend and triggers
-                                institutional selling
+                              <p className="text-sm mb-2">
+                                <strong>Data Source:</strong> Calculated from 50 days of closing prices for QQQ.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Institutional Significance: Many large funds use the 50-day SMA as a benchmark for trend
+                                following. Breaking below it can trigger significant selling pressure from these
+                                entities.
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -1128,25 +1296,39 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-1">200-Day Simple Moving Average</p>
-                              <p className="text-sm">
-                                Long-term trend indicator and major support/resistance. Most critical technical level.
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">QQQ Below 200-Day SMA - Long-Term Trend</p>
+                              <p className="text-sm mb-2">
+                                The 200-day SMA is the most critical long-term technical indicator, representing the
+                                average price over the last 40 weeks (about 9 months). A break below this level signals
+                                a major shift from a bull market to a bear market.
                               </p>
-                              <ul className="text-sm mt-1 space-y-1">
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> Whether QQQ's price is trading above or below its
+                                200-day moving average. This is the ultimate test of the long-term trend's health.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  <strong>Above SMA200:</strong> Bull market confirmed, low crash risk
+                                  • <strong>Above SMA200:</strong> Confirmed bull market, low crash risk
                                 </li>
                                 <li>
-                                  <strong>Near SMA200 (50%):</strong> Major support test, elevated risk
+                                  • <strong>~50% proximity:</strong> Testing major support, high risk
                                 </li>
                                 <li>
-                                  <strong>Below SMA200:</strong> Bear market territory, very high crash risk
+                                  • <strong>Below SMA200 (100% breached):</strong> Bear market confirmed, very high
+                                  crash risk
                                 </li>
                               </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Breaking below 200-day SMA historically precedes major market
-                                crashes
+                              <p className="text-sm mb-2">
+                                <strong>Data Source:</strong> Calculated from 200 days of closing prices for QQQ.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Historically: The 200-day SMA has acted as a major support/resistance level in all major
+                                market cycles. Breaking below it has consistently marked the beginning of significant
+                                bear markets and precedes major crashes.
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -1194,25 +1376,38 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-1">Bollinger Band (Lower)</p>
-                              <p className="text-sm">
-                                Volatility-based indicator showing 2 standard deviations below 20-day average.
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">QQQ Below Bollinger Band (Lower) - Oversold Signal</p>
+                              <p className="text-sm mb-2">
+                                Bollinger Bands are volatility indicators. The lower band represents a price level two
+                                standard deviations below the 20-day moving average. When QQQ falls below this band, it
+                                signals that the price is unusually low and the market may be oversold.
                               </p>
-                              <ul className="text-sm mt-1 space-y-1">
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> Whether QQQ's current price is below the lower
+                                Bollinger Band.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  <strong>Above band:</strong> Normal trading, low risk
+                                  • <strong>0% (far above):</strong> Normal trading range, low risk
                                 </li>
                                 <li>
-                                  <strong>Near band (50%):</strong> Approaching oversold, moderate risk
+                                  • <strong>~50% proximity:</strong> Approaching oversold territory, moderate risk
                                 </li>
                                 <li>
-                                  <strong>Below band:</strong> Oversold/panic selling, high crash risk
+                                  • <strong>100% (breached):</strong> Significantly oversold, high crash risk signal
                                 </li>
                               </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Breaking below lower band signals extreme volatility and
-                                potential capitulation
+                              <p className="text-sm mb-2">
+                                <strong>Calculation:</strong> Lower Band = 20-Day SMA - (2 * 20-Day Standard Deviation).
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Trading implication: While touching or slightly breaking the lower band can signal
+                                buying opportunities, a significant sustained break below it often precedes sharp
+                                downward moves as panic selling takes hold.
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -1259,24 +1454,37 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-red-50 border-red-200">
-                              <p className="font-semibold mb-1">Death Cross</p>
-                              <p className="text-sm">
-                                A death cross occurs when the 50-day moving average crosses below the 200-day moving
-                                average, signaling long-term bearish momentum.
+                            <TooltipContent className="max-w-md bg-red-50 border-red-200">
+                              <p className="font-semibold mb-2">Death Cross - Major Bearish Signal</p>
+                              <p className="text-sm mb-2">
+                                A "Death Cross" occurs when the 50-day moving average (medium-term trend) crosses BELOW
+                                the 200-day moving average (long-term trend). This is a widely watched bearish signal
+                                that historically precedes major market declines.
                               </p>
-                              <ul className="text-sm mt-1 space-y-1">
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> The crossover point between the 50-day SMA and the
+                                200-day SMA for QQQ.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  <strong>NO (Golden Cross):</strong> 50-day above 200-day = Bullish trend, low risk
+                                  • <strong>NO (Golden Cross):</strong> 50-day SMA is above 200-day SMA - bullish
+                                  long-term trend, low crash risk
                                 </li>
                                 <li>
-                                  <strong>YES (Death Cross):</strong> 50-day below 200-day = Bearish trend, high crash
-                                  risk
+                                  • <strong>YES (Death Cross):</strong> 50-day SMA is below 200-day SMA - bearish
+                                  long-term trend, high crash risk
                                 </li>
                               </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Death crosses historically precede extended market declines and
-                                crashes
+                              <p className="text-sm mb-2">
+                                <strong>Data Source:</strong> Daily closing prices for QQQ, used to calculate 50-day and
+                                200-day SMAs.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Historical context: Major death crosses for the S&P 500 occurred in 1974, 2000, 2007,
+                                2020, and 2022, preceding significant bear markets and crashes.
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -1310,30 +1518,52 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         VIX (Fear Gauge)
+                        {/* CHANGE: Enhanced VIX tooltip */}
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-1">VIX - Fear Gauge</p>
-                              <p className="text-sm">
-                                The CBOE Volatility Index measures market expectations of 30-day forward volatility from
-                                S&P 500 options.
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">VIX - The "Fear Gauge" of the Stock Market</p>
+                              <p className="text-sm mb-2">
+                                The VIX (Volatility Index) is often called the market's "fear gauge." It doesn't measure
+                                whether stocks are going up or down - it measures how much investors expect stocks to
+                                swing around in the next 30 days.
                               </p>
-                              <ul className="text-sm mt-1 space-y-1">
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> The VIX is calculated from S&P 500 options prices.
+                                When investors are nervous and buy lots of insurance (put options) against market drops,
+                                the VIX goes up. When investors are calm and confident, the VIX stays low.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  <strong>{"<"}15:</strong> Calm market, complacency risk
+                                  • <strong>Below 15:</strong> Market is calm - investors are complacent, low volatility
+                                  (but can signal danger if TOO calm)
                                 </li>
                                 <li>
-                                  <strong>15-25:</strong> Elevated fear, normal volatility
+                                  • <strong>15-25:</strong> Normal volatility - healthy market fluctuations
                                 </li>
                                 <li>
-                                  <strong>{">"}25:</strong> Fear/panic mode, high crash risk
+                                  • <strong>Above 25:</strong> Fear is rising - investors are worried about potential
+                                  losses
+                                </li>
+                                <li>
+                                  • <strong>Above 40:</strong> Panic mode - extreme fear, crashes often occur at these
+                                  levels
                                 </li>
                               </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Rising VIX indicates increasing fear and crash probability
+                              <p className="text-sm mb-2">
+                                <strong>Data Source:</strong> Calculated by the Chicago Board Options Exchange (CBOE)
+                                using real-time options prices on the S&P 500 index, updated every 15 seconds during
+                                market hours.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Historical spikes: 2008 Financial Crisis (VIX hit 80), 2020 COVID Crash (VIX hit 82),
+                                2022 Ukraine War (VIX hit 36).
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -1364,29 +1594,51 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         VXN (Nasdaq Volatility)
+                        {/* CHANGE: Enhanced VXN tooltip */}
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-1">VXN - Nasdaq Volatility</p>
-                              <p className="text-sm">
-                                Measures expected volatility in the Nasdaq-100, tracking tech sector fear levels.
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">VXN - Nasdaq Volatility (Tech Fear Gauge)</p>
+                              <p className="text-sm mb-2">
+                                VXN is like the VIX, but specifically for the Nasdaq-100 tech stocks instead of the
+                                broader S&P 500. Since tech stocks tend to be more volatile than the overall market, VXN
+                                helps us measure fear specifically in the technology sector.
                               </p>
-                              <ul className="text-sm mt-1 space-y-1">
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> Expected volatility (price swings) in Nasdaq-100
+                                stocks over the next 30 days, calculated from options prices on the QQQ ETF. Higher VXN
+                                means traders expect bigger tech stock price movements.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>Why Tech Volatility Matters:</strong> Technology companies often fall harder and
+                                faster than other sectors during market crashes because they typically have higher
+                                valuations and are seen as riskier investments.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  <strong>{"<"}15:</strong> Calm tech market, low risk
+                                  • <strong>Below 15:</strong> Tech sector is calm - low volatility, stable conditions
                                 </li>
                                 <li>
-                                  <strong>15-25:</strong> Elevated volatility, caution
+                                  • <strong>15-25:</strong> Normal tech volatility - healthy fluctuation range
                                 </li>
                                 <li>
-                                  <strong>{">"}35:</strong> Tech panic mode, crash risk
+                                  • <strong>Above 35:</strong> Tech sector panic - elevated fear, increased crash risk
+                                  for tech stocks
                                 </li>
                               </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> High VXN signals tech sector instability and selloff risk
+                              <p className="text-sm mb-2">
+                                <strong>Data Source:</strong> Chicago Board Options Exchange (CBOE), calculated from
+                                Nasdaq-100 options prices.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                VXN tends to spike higher than VIX during tech selloffs, making it an early warning
+                                system for tech-led market crashes.
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -1417,30 +1669,51 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         RVX (Russell 2000 Volatility)
+                        {/* CHANGE: Enhanced RVX tooltip */}
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-1">RVX - Russell 2000 Volatility</p>
-                              <p className="text-sm">
-                                Measures expected volatility in small-cap stocks (Russell 2000), indicating broader
-                                market stress.
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">RVX - Russell 2000 Volatility (Small Cap Fear)</p>
+                              <p className="text-sm mb-2">
+                                RVX measures expected volatility in the Russell 2000 Index, which tracks 2,000 small
+                                American companies. Small companies are often more vulnerable during economic downturns,
+                                so RVX can be an early warning signal.
                               </p>
-                              <ul className="text-sm mt-1 space-y-1">
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> Expected 30-day price swings in small-cap stocks,
+                                calculated from Russell 2000 ETF (IWM) options prices. Small companies tend to be more
+                                volatile than large companies, so RVX is typically higher than VIX.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>Why Small Caps Matter:</strong> Small companies are often the "canary in the
+                                coal mine" - they struggle first during economic slowdowns because they have less cash,
+                                less pricing power, and more debt relative to their size.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  <strong>{"<"}18:</strong> Low small-cap volatility, stable
+                                  • <strong>Below 18:</strong> Small caps are stable - healthy economic conditions
                                 </li>
                                 <li>
-                                  <strong>18-25:</strong> Normal volatility range
+                                  • <strong>18-25:</strong> Normal small-cap volatility - standard risk levels
                                 </li>
                                 <li>
-                                  <strong>{">"}30:</strong> High stress, crash risk for small caps
+                                  • <strong>Above 30:</strong> Small caps are in trouble - economic stress, increased
+                                  crash risk
                                 </li>
                               </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Small-cap volatility often signals broader market instability
+                              <p className="text-sm mb-2">
+                                <strong>Data Source:</strong> Chicago Board Options Exchange (CBOE), derived from
+                                Russell 2000 options.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Leading indicator: RVX often spikes before VIX during the early stages of market
+                                selloffs, as smart money sells risky small caps first.
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -1471,29 +1744,54 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         VIX Term Structure (Spot/1M)
+                        {/* CHANGE: Enhanced VIX Term Structure tooltip */}
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-1">VIX Term Structure</p>
-                              <p className="text-sm">
-                                Ratio of spot VIX to 1-month VIX futures. Measures market structure and fear dynamics.
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">VIX Term Structure - Fear Now vs. Fear Later</p>
+                              <p className="text-sm mb-2">
+                                This indicator compares today's VIX (spot VIX - fear right now) to VIX futures one month
+                                out. It tells us whether traders think volatility will increase or decrease over the
+                                next month.
                               </p>
-                              <ul className="text-sm mt-1 space-y-1">
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> The ratio of current VIX to 1-month VIX futures. When
+                                spot VIX is higher than futures (ratio above 1.0), the market structure is "inverted" -
+                                a warning sign called "backwardation."
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>Understanding Backwardation:</strong> Normally, traders expect volatility to be
+                                higher in the future than today, so VIX futures trade above spot VIX (ratio below 1.0).
+                                But during market stress, fear spikes so high RIGHT NOW that it exceeds future
+                                expectations - this is backwardation, and it's dangerous.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  <strong>{">"}1.5:</strong> Contango - calm market, low risk
+                                  • <strong>Below 1.0 (Contango):</strong> Normal market structure - today's fear is
+                                  lower than expected future fear. Safe.
                                 </li>
                                 <li>
-                                  <strong>1.0-1.2:</strong> Normal structure, moderate risk
+                                  • <strong>1.0-1.2 (Slight Backwardation):</strong> Market stress building - fear is
+                                  elevated but manageable
                                 </li>
                                 <li>
-                                  <strong>{"<"}1.0:</strong> Backwardation - panic, high crash risk
+                                  • <strong>Above 1.2 (Deep Backwardation):</strong> Market panic - immediate fear
+                                  dominates, crash conditions forming
                                 </li>
                               </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Backwardation signals extreme fear and imminent crash risk
+                              <p className="text-sm mb-2">
+                                <strong>Data Source:</strong> CBOE spot VIX and VIX futures contracts, updated
+                                continuously during trading.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Crisis signal: During the 2008 crash and 2020 COVID crash, VIX term structure went into
+                                deep backwardation (ratios above 1.5) as panic set in.
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -1524,29 +1822,61 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         ATR - Average True Range
+                        {/* CHANGE: Enhanced ATR tooltip */}
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-purple-50 border-purple-200">
-                              <p className="font-semibold mb-1">ATR - Average True Range</p>
-                              <p className="text-sm">
-                                14-day average of daily high-low price ranges measuring volatility.
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">ATR - Average True Range (Daily Price Swings)</p>
+                              <p className="text-sm mb-2">
+                                ATR measures how much the market typically moves up and down each day. It's like
+                                measuring the waves in the ocean - bigger waves (higher ATR) mean rougher seas (more
+                                volatility).
                               </p>
-                              <ul className="text-sm mt-1 space-y-1">
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> The average of daily price ranges over the past 14
+                                trading days. It calculates the difference between each day's high and low price, then
+                                averages those differences. Expressed as a dollar amount or points.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>Why Daily Swings Matter:</strong> When markets start swinging wildly (high ATR),
+                                it indicates uncertainty and fear. Professional traders use ATR to set stop-losses and
+                                position sizes - they trade smaller when ATR is high because risk is elevated.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  <strong>{"<"}25:</strong> Low volatility, stable market
+                                  • <strong>Below 25:</strong> Low volatility - calm, stable market with small daily
+                                  swings
                                 </li>
                                 <li>
-                                  <strong>25-40:</strong> Normal volatility
+                                  • <strong>25-40:</strong> Normal volatility - typical market fluctuations
                                 </li>
                                 <li>
-                                  <strong>{">"}50:</strong> High volatility, increased crash risk
+                                  • <strong>Above 50:</strong> High volatility - large daily swings indicate stress and
+                                  uncertainty
+                                </li>
+                                <li>
+                                  • <strong>Above 70:</strong> Extreme volatility - panic-level price swings, crash
+                                  conditions
                                 </li>
                               </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Extreme ATR spikes often precede market corrections and crashes
+                              <p className="text-sm mb-2">
+                                <strong>Calculation Example:</strong> If SPY ranged from $500 low to $510 high (10-point
+                                range) for 14 days straight, ATR would be 10. But if it then has a day with a $500-$530
+                                range (30 points), ATR would start increasing, signaling rising volatility.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>Data Source:</strong> Calculated from daily high, low, and close prices from
+                                stock exchanges.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Professional use: Traders multiply ATR by 2-3 to set stop-loss levels. If ATR is $10,
+                                they might risk $20-30 per share, knowing that's typical volatility.
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -1577,30 +1907,71 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         LTV - Long-term Volatility
+                        {/* CHANGE: Enhanced LTV tooltip */}
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-purple-50 border-purple-200">
-                              <p className="font-semibold mb-1">LTV - Long-term Volatility</p>
-                              <p className="text-sm">
-                                90-day rolling standard deviation of returns measuring sustained instability.
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">
+                                LTV - Long-Term Volatility (90-Day Price Variability)
                               </p>
-                              <ul className="text-sm mt-1 space-y-1">
+                              <p className="text-sm mb-2">
+                                While ATR measures short-term (14-day) volatility, LTV looks at longer-term (90-day)
+                                volatility patterns. It's like zooming out from daily waves to see the overall sea
+                                conditions over three months.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> The standard deviation of daily returns over the past
+                                90 trading days, expressed as an annualized percentage. This statistical measure shows
+                                how much prices have been bouncing around over the last quarter.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>Understanding Standard Deviation:</strong> Imagine if the average daily return
+                                is 0%, standard deviation tells us how far from 0% prices typically swing. Higher
+                                standard deviation = more unpredictable, wider price swings.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  <strong>{"<"}10%:</strong> Stable, low-risk environment
+                                  • <strong>Below 10%:</strong> Very stable market - prices are predictable, low crash
+                                  risk
                                 </li>
                                 <li>
-                                  <strong>10-15%:</strong> Normal market volatility
+                                  • <strong>10-15%:</strong> Normal volatility - healthy market fluctuations
                                 </li>
                                 <li>
-                                  <strong>{">"}20%:</strong> Elevated volatility, crash risk increasing
+                                  • <strong>15-20%:</strong> Elevated volatility - market is getting choppy, increased
+                                  uncertainty
+                                </li>
+                                <li>
+                                  • <strong>Above 20%:</strong> High long-term volatility - sustained market stress,
+                                  elevated crash risk
+                                </li>
+                                <li>
+                                  • <strong>Above 30%:</strong> Extreme long-term volatility - prolonged crisis
+                                  conditions
                                 </li>
                               </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Sustained high LTV indicates structural instability and crash
-                                vulnerability
+                              <p className="text-sm mb-2">
+                                <strong>Why 90 Days Matters:</strong> Short-term volatility spikes can be temporary
+                                reactions to news. But when volatility stays elevated for 90 days, it suggests
+                                fundamental market problems that won't go away quickly.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>Calculation:</strong> Take daily returns for 90 days, calculate standard
+                                deviation, annualize it by multiplying by √252 (trading days in a year).
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>Data Source:</strong> Calculated from 90 days of closing prices from stock
+                                exchanges.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Historical context: LTV stayed above 25% for months during 2008-2009 financial crisis
+                                and March-June 2020 COVID crash, signaling prolonged market distress.
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -1631,27 +2002,66 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         Bullish Percent Index
+                        {/* CHANGE: Enhanced Bullish Percent Index tooltip */}
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-purple-50 border-purple-200">
-                              <p className="font-semibold mb-1">Bullish Percent Index</p>
-                              <p className="text-sm">% of stocks with bullish Point & Figure chart patterns.</p>
-                              <ul className="text-sm mt-1 space-y-1">
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">Bullish Percent Index - Market Breadth Indicator</p>
+                              <p className="text-sm mb-2">
+                                This indicator measures what percentage of stocks in an index are giving bullish
+                                technical signals based on "Point & Figure" charting. It's like taking a vote among all
+                                stocks - how many are trending up vs. down?
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> The percentage of stocks in the S&P 500 that have
+                                "bullish" chart patterns according to Point & Figure methodology. Each stock gets a
+                                simple yes/no vote: is its chart pattern bullish or bearish?
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>Understanding Point & Figure Charts:</strong> Instead of showing every price
+                                move, Point & Figure charts only mark significant reversals in trend. A stock is
+                                "bullish" when its chart shows a pattern of higher highs and higher lows (uptrend
+                                intact).
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  <strong>{"<"}30%:</strong> Oversold, panic selling (potential bottom)
+                                  • <strong>Below 30%:</strong> Extreme bearishness - most stocks are in downtrends, but
+                                  often marks bottoms (contrarian buy)
                                 </li>
                                 <li>
-                                  <strong>30-50%:</strong> Normal, healthy market breadth
+                                  • <strong>30-50%:</strong> Bearish market - more stocks declining than advancing
                                 </li>
                                 <li>
-                                  <strong>{">"}70%:</strong> Overbought, correction risk increases
+                                  • <strong>50-70%:</strong> Bullish market - more stocks advancing than declining,
+                                  healthy
+                                </li>
+                                <li>
+                                  • <strong>Above 70%:</strong> Extreme bullishness - most stocks overbought, dangerous
+                                  (contrarian sell)
+                                </li>
+                                <li>
+                                  • <strong>Above 80%:</strong> Euphoria - market is extremely overbought, crash risk
+                                  very high
                                 </li>
                               </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Extreme readings ({">"}80% or {"<"}20%) often precede reversals
+                              <p className="text-sm mb-2">
+                                <strong>Market Breadth Concept:</strong> It's healthier when many stocks participate in
+                                a rally (high breadth) than when just a few big stocks drive indexes higher while most
+                                stocks fall (low breadth). Declining breadth often precedes crashes.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>Data Source:</strong> Compiled from Point & Figure charts of S&P 500 stocks,
+                                updated daily.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Historical pattern: Readings above 75% preceded major tops in 2000 (dot-com bubble),
+                                2007 (pre-financial crisis), and early 2020 (pre-COVID crash).
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -1700,31 +2110,57 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         Put/Call Ratio
+                        {/* CHANGE: Enhanced Put/Call Ratio tooltip */}
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-orange-50 border-orange-200">
-                              <p className="font-semibold mb-1">Put/Call Ratio</p>
-                              <p className="text-sm">
-                                Measures the volume of put options traded relative to call options.
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">Put/Call Ratio - Fear vs. Greed in Options</p>
+                              <p className="text-sm mb-2">
+                                This ratio compares how many put options (bets that stocks will fall) are being bought
+                                versus call options (bets that stocks will rise). It's like a voting system where
+                                traders vote with their money about market direction.
                               </p>
-                              <ul className="text-sm mt-1 space-y-1">
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> Total put option volume divided by total call option
+                                volume across all stocks. The number tells us whether more traders are protecting
+                                against losses (buying puts) or betting on gains (buying calls).
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  <strong>{">"} 1.1:</strong> High put volume, indicates fear/hedging, low crash risk
+                                  • <strong>Below 0.7:</strong> Extreme greed - too many people betting on gains, danger
+                                  of complacency (contrarian bearish signal)
                                 </li>
                                 <li>
-                                  <strong>0.9 - 1.1:</strong> Balanced, neutral risk
+                                  • <strong>0.7-1.0:</strong> Balanced sentiment - healthy mix of optimism and caution
                                 </li>
                                 <li>
-                                  <strong>{"<"} 0.7:</strong> Low put volume, high call volume, indicates complacency,
-                                  high crash risk
+                                  • <strong>Above 1.0:</strong> Fear rising - more puts than calls, investors buying
+                                  protection
+                                </li>
+                                <li>
+                                  • <strong>Above 1.3:</strong> Extreme fear - panic buying of puts, often marks market
+                                  bottoms (contrarian bullish)
                                 </li>
                               </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Extreme ratios can signal market tops (complacency) or bottoms
-                                (fear)
+                              <p className="text-sm mb-2">
+                                <strong>The Contrarian Twist:</strong> Extreme readings often signal the opposite of
+                                what you'd expect. When EVERYONE is buying puts (extreme fear), there may be no one left
+                                to sell, leading to a bounce. When NO ONE is buying puts (extreme complacency), that's
+                                when crashes happen.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>Data Source:</strong> Options Clearing Corporation (OCC) and exchange data,
+                                aggregated daily across all equity options.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Historical pattern: Put/Call ratios below 0.6 preceded the 2000 dot-com bubble peak and
+                                2021 meme stock mania - extreme greed before crashes.
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -1756,27 +2192,76 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         Fear & Greed Index
+                        {/* CHANGE: Enhanced Fear & Greed Index tooltip */}
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-red-50 border-red-200">
-                              <p className="font-semibold mb-1">CNN Fear & Greed Index</p>
-                              <p className="text-sm">Measures market sentiment based on 7 indicators.</p>
-                              <ul className="text-sm mt-1 space-y-1">
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">CNN Fear & Greed Index - Market Emotion Thermometer</p>
+                              <p className="text-sm mb-2">
+                                This popular index combines 7 different market indicators into a single "emotion score"
+                                from 0 (Extreme Fear) to 100 (Extreme Greed). Think of it as a thermometer for market
+                                psychology.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>The 7 Components:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  <strong>{"<"} 30 (Fear):</strong> Potential buying opportunity
+                                  1. <strong>Stock Price Momentum:</strong> How fast stocks are rising vs. their 125-day
+                                  average
                                 </li>
                                 <li>
-                                  <strong>30-60 (Neutral):</strong> Balanced sentiment
+                                  2. <strong>Stock Price Strength:</strong> Number of stocks hitting 52-week highs vs.
+                                  lows
                                 </li>
                                 <li>
-                                  <strong>{">"} 70 (Greed):</strong> Market is overbought, high crash risk
+                                  3. <strong>Stock Price Breadth:</strong> Volume of rising stocks vs. declining stocks
+                                </li>
+                                <li>
+                                  4. <strong>Put/Call Options:</strong> Protection buying vs. speculative buying
+                                </li>
+                                <li>
+                                  5. <strong>Junk Bond Demand:</strong> Risk appetite for high-yield bonds
+                                </li>
+                                <li>
+                                  6. <strong>Market Volatility:</strong> VIX level and trend
+                                </li>
+                                <li>
+                                  7. <strong>Safe Haven Demand:</strong> Stock vs. Treasury performance
                                 </li>
                               </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Extreme greed often precedes market corrections
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
+                                <li>
+                                  • <strong>0-25 (Extreme Fear):</strong> Market is panicking - often a good buying
+                                  opportunity (contrarian)
+                                </li>
+                                <li>
+                                  • <strong>25-45 (Fear):</strong> Cautious sentiment - healthy skepticism
+                                </li>
+                                <li>
+                                  • <strong>45-55 (Neutral):</strong> Balanced market psychology
+                                </li>
+                                <li>
+                                  • <strong>55-75 (Greed):</strong> Optimism building - watch for overconfidence
+                                </li>
+                                <li>
+                                  • <strong>75-100 (Extreme Greed):</strong> Dangerous complacency - crashes often
+                                  follow
+                                </li>
+                              </ul>
+                              <p className="text-sm mb-2">
+                                <strong>Data Source:</strong> Compiled by CNN Business from various market data
+                                providers, updated daily.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Contrarian indicator: Warren Buffett's famous quote applies here - "Be fearful when
+                                others are greedy, and greedy when others are fearful."
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -1808,33 +2293,59 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         AAII Bullish Sentiment
+                        {/* CHANGE: Enhanced AAII Sentiment tooltip */}
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-yellow-50 border-yellow-200">
-                              <p className="font-semibold mb-1">AAII Bullish Sentiment</p>
-                              <p className="text-sm">
-                                Surveys individual investors' bullish/bearish outlook on stocks.
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">AAII Bullish Sentiment - Individual Investor Survey</p>
+                              <p className="text-sm mb-2">
+                                AAII (American Association of Individual Investors) conducts a weekly survey asking
+                                regular investors (not Wall Street professionals) whether they think the stock market
+                                will go up, down, or stay flat over the next 6 months.
                               </p>
-                              <ul className="text-sm mt-1 space-y-1">
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> The percentage of surveyed individual investors who
+                                say they are "bullish" (optimistic) about the stock market's direction. This is a direct
+                                measure of retail investor confidence.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>Why Individual Investors Matter:</strong> Retail investors are typically wrong
+                                at major turning points. When everyone you know is excited about stocks, that's usually
+                                near a market peak. When everyone is scared and selling, that's often near a market
+                                bottom.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  <strong>{"<"} 30%:</strong> Extreme bearishness, often precedes bottoms
+                                  • <strong>Below 30%:</strong> Extreme pessimism - retail investors are scared, often
+                                  signals market bottoms (buy signal)
                                 </li>
                                 <li>
-                                  <strong>30-40%:</strong> Cautionary bearishness, increased crash risk
+                                  • <strong>30-45%:</strong> Healthy skepticism - normal cautious optimism
                                 </li>
                                 <li>
-                                  <strong>40-50%:</strong> Neutral
+                                  • <strong>45-55%:</strong> Neutral sentiment - balanced market psychology
                                 </li>
                                 <li>
-                                  <strong>{">"} 50%:</strong> Growing bullishness, elevated risk
+                                  • <strong>Above 55%:</strong> Excessive optimism - dangerous complacency building
+                                </li>
+                                <li>
+                                  • <strong>Above 60%:</strong> Euphoria - retail investors are ALL IN, crash risk is
+                                  high (sell signal)
                                 </li>
                               </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> High bullish sentiment indicates a lack of further buying power
-                                and increased risk
+                              <p className="text-sm mb-2">
+                                <strong>Data Source:</strong> AAII's weekly survey of its membership (over 150,000
+                                individual investors), published every Thursday.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Historical examples: AAII bulls hit 75% in January 2018 right before a 10% correction.
+                                They dropped to 23% in March 2020 at the COVID crash bottom - the perfect buy signal.
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -1866,29 +2377,66 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         SPY Short Interest Ratio
+                        {/* CHANGE: Enhanced Short Interest tooltip */}
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-orange-50 border-orange-200">
-                              <p className="font-semibold mb-1">Short Interest Ratio</p>
-                              <p className="text-sm">Percentage of shares sold short relative to float.</p>
-                              <ul className="text-sm mt-1 space-y-1">
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">SPY Short Interest Ratio - Professional Bearish Bets</p>
+                              <p className="text-sm mb-2">
+                                Short interest measures how many investors are betting AGAINST the market by "short
+                                selling." Short selling means borrowing shares, selling them now, and hoping to buy them
+                                back cheaper later to return them - profiting if prices fall.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> The percentage of SPY (S&P 500 ETF) shares that have
+                                been sold short but not yet bought back ("covered"). Higher percentages mean more
+                                professional traders are betting on market declines.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How Short Selling Works:</strong>
+                              </p>
+                              <ol className="text-sm space-y-1 mb-2 ml-3">
+                                <li>1. Trader borrows 100 SPY shares from a broker</li>
+                                <li>2. Sells them immediately at current price ($500 = $50,000)</li>
+                                <li>3. Waits for price to fall</li>
+                                <li>4. Buys back 100 shares at lower price ($450 = $45,000)</li>
+                                <li>5. Returns shares to broker, keeps $5,000 profit</li>
+                              </ol>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  <strong>{">"} 6%:</strong> High short interest - bearish sentiment increases crash
-                                  risk
+                                  • <strong>Below 3%:</strong> Low bearish sentiment - professional traders are
+                                  optimistic, lower crash risk
                                 </li>
                                 <li>
-                                  <strong>2-6%:</strong> Normal range
+                                  • <strong>3-6%:</strong> Normal short interest - balanced professional sentiment
                                 </li>
                                 <li>
-                                  <strong>{"<"} 2%:</strong> Low short interest - bullish confidence, lower crash risk
+                                  • <strong>Above 6%:</strong> High bearish bets - smart money expects declines,
+                                  elevated crash risk
+                                </li>
+                                <li>
+                                  • <strong>Above 10%:</strong> Extreme shorts - professionals are very bearish OR
+                                  potential short squeeze setup
                                 </li>
                               </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Higher short interest indicates bearish positioning and
-                                increased market stress
+                              <p className="text-sm mb-2">
+                                <strong>The Short Squeeze Paradox:</strong> Very high short interest can sometimes cause
+                                violent UPWARD moves ("short squeezes") when short sellers are forced to buy back shares
+                                to limit losses, driving prices higher instead of lower.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>Data Source:</strong> Exchange reports on short positions, updated twice monthly
+                                for most stocks and daily for some ETFs.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Professional indicator: Unlike retail sentiment, high short interest from hedge funds
+                                and institutions is often a reliable warning signal since these traders risk real money.
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -2044,29 +2592,71 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         Yield Curve (10Y-2Y)
+                        {/* CHANGE: Enhanced Yield Curve tooltip */}
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-green-50 border-green-200">
-                              <p className="font-semibold mb-1">Yield Curve (10Y-2Y Spread)</p>
-                              <p className="text-sm">Difference between 10-year and 2-year Treasury yields.</p>
-                              <ul className="text-sm mt-1 space-y-1">
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">Yield Curve (10Y-2Y) - Recession Predictor</p>
+                              <p className="text-sm mb-2">
+                                The yield curve compares interest rates on 2-year Treasury bonds versus 10-year Treasury
+                                bonds. It's one of the most reliable recession predictors in economics, with a nearly
+                                perfect track record.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> The difference (spread) between 10-year and 2-year
+                                Treasury yields, measured in basis points (1 basis point = 0.01%). The number tells us
+                                what bond investors think about future economic growth.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>Understanding Bond Yields:</strong> Normally, longer-term bonds (10-year) pay
+                                higher yields than shorter-term bonds (2-year) because you're lending money for longer
+                                and taking more risk.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  <strong>{">"} 0.5%:</strong> Steep curve, healthy economy, low risk
+                                  • <strong>Above +100 bps:</strong> Steep curve - healthy economy, growth expected, low
+                                  recession risk
                                 </li>
                                 <li>
-                                  <strong>0-0.5%:</strong> Flat curve, slowing growth, moderate risk
+                                  • <strong>+50 to +100 bps:</strong> Normal curve - steady economic growth expected
                                 </li>
                                 <li>
-                                  <strong>{"<"} 0% (Inverted):</strong> Inverted curve, recession signal, high crash
-                                  risk
+                                  • <strong>0 to +50 bps:</strong> Flattening curve - growth slowing, recession risk
+                                  building
+                                </li>
+                                <li>
+                                  • <strong>Below 0 (Inverted):</strong> Inverted curve - RECESSION WARNING! Investors
+                                  expect Fed to cut rates due to economic crisis
                                 </li>
                               </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Inverted yield curve has historically preceded recessions and
-                                market crashes
+                              <p className="text-sm mb-2">
+                                <strong>Why Inversion Predicts Recessions:</strong> When short-term rates are higher
+                                than long-term rates, it means:
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
+                                <li>
+                                  1. The Fed has raised rates aggressively to fight inflation (making 2-year yields
+                                  high)
+                                </li>
+                                <li>
+                                  2. Bond investors expect the Fed will have to CUT rates soon due to recession (making
+                                  10-year yields lower)
+                                </li>
+                                <li>3. This "inversion" has preceded EVERY recession since 1950</li>
+                              </ul>
+                              <p className="text-sm mb-2">
+                                <strong>Data Source:</strong> U.S. Treasury Department daily yield data for 2-year and
+                                10-year government bonds.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Historical track record: Yield curve inverted 6-24 months before recessions in 1990,
+                                2001, 2008, and 2020. It's the most reliable recession predictor known to economics.
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -2120,7 +2710,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-green-50 border-green-200">
+                            <TooltipContent className="max-w-md bg-green-50 border-green-200">
                               <p className="font-semibold mb-1">S&P 500 Forward P/E Ratio</p>
                               <p className="text-sm">Price-to-Earnings ratio based on estimated future earnings.</p>
                               <ul className="text-sm mt-1 space-y-1">
