@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { RefreshButton } from "@/components/ui/refresh-button"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 // import {
 //   Activity,
@@ -530,18 +530,7 @@ export function MarketSentiment() {
                 Visual representation of sentiment zones from extreme fear to extreme greed
               </p>
             </div>
-            <Button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              variant="outline"
-              size="sm"
-              className="bg-green-50 hover:bg-green-100 border-green-200"
-            >
-              <span className={refreshing ? "animate-spin mr-2" : "mr-2"}>
-                <RefreshIcon />
-              </span>
-              {refreshing ? "Refreshing..." : "Refresh"}
-            </Button>
+            <RefreshButton onClick={handleRefresh} loading={refreshing} />
           </div>
         </CardHeader>
         <CardContent className="pt-6">
@@ -723,18 +712,7 @@ export function MarketSentiment() {
                 <span className="text-xs font-normal text-gray-500">(Updated: {lastUpdated.toLocaleTimeString()})</span>
               )}
             </CardTitle>
-            <Button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              variant="outline"
-              size="sm"
-              className="bg-green-50 hover:bg-green-100 border-green-200"
-            >
-              <span className={refreshing ? "animate-spin mr-2" : "mr-2"}>
-                <RefreshIcon />
-              </span>
-              {refreshing ? "Refreshing..." : "Refresh"}
-            </Button>
+            <RefreshButton onClick={handleRefresh} loading={refreshing} />
           </div>
         </CardHeader>
         <CardContent className="pt-4">

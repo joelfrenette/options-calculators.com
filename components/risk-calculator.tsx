@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { RefreshButton } from "@/components/ui/refresh-button"
 import {
   Loader2,
   TrendingUp,
@@ -311,12 +312,11 @@ export function RiskCalculator() {
                 Visual representation of volatility zones from extreme calm to extreme fear
               </p>
             </div>
-            <button
+            <RefreshButton
               onClick={fetchVixData}
-              className="px-3 py-1.5 text-sm font-semibold bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors"
-            >
-              Refresh
-            </button>
+              isLoading={loading}
+              className="bg-green-50 hover:bg-green-100 border-green-200"
+            />
           </div>
         </CardHeader>
         <CardContent className="pt-6">

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { RefreshButton } from "@/components/ui/refresh-button"
 import {
   Activity,
   TrendingUp,
@@ -12,7 +12,6 @@ import {
   DollarSign,
   Shield,
   Lightbulb,
-  RefreshCw,
   Info,
   BarChart3,
   AlertTriangle,
@@ -338,13 +337,18 @@ export function PanicEuphoria() {
       {/* Panic/Euphoria Historical Scale */}
       <Card className="shadow-sm border-gray-200">
         <CardHeader className="bg-gray-50 border-b border-gray-200">
-          <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-purple-600" />
-            Panic/Euphoria Historical Scale
-          </CardTitle>
-          <p className="text-sm text-gray-600 mt-1">
-            Visual representation of sentiment zones from extreme panic to extreme euphoria
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-purple-600" />
+                Panic/Euphoria Historical Scale
+              </CardTitle>
+              <p className="text-sm text-gray-600 mt-1">
+                Visual representation of sentiment zones from extreme panic to extreme euphoria
+              </p>
+            </div>
+            <RefreshButton onClick={handleRefresh} loading={refreshing} />
+          </div>
         </CardHeader>
         <CardContent className="pt-6">
           <div className="space-y-6">
@@ -553,16 +557,7 @@ export function PanicEuphoria() {
                 <span className="text-xs font-normal text-gray-500">(Updated: {lastUpdated.toLocaleTimeString()})</span>
               )}
             </CardTitle>
-            <Button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              variant="outline"
-              size="sm"
-              className="bg-purple-50 hover:bg-purple-100 border-purple-200"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
-              {refreshing ? "Refreshing..." : "Refresh"}
-            </Button>
+            <RefreshButton onClick={handleRefresh} loading={refreshing} />
           </div>
         </CardHeader>
         <CardContent className="pt-4">

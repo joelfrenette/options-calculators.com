@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { RefreshButton } from "@/components/ui/refresh-button"
 import { Button } from "@/components/ui/button"
 import { RefreshCw, Target, Shield, AlertTriangle, Activity, TrendingUp } from "lucide-react"
 import {
@@ -216,15 +217,11 @@ export function TrendAnalysis() {
                 Visual representation of trend direction from extreme bearish to extreme bullish
               </CardDescription>
             </div>
-            <Button
+            <RefreshButton
               onClick={fetchData}
-              variant="outline"
-              size="sm"
-              disabled={loading}
+              isLoading={loading}
               className="bg-green-50 hover:bg-green-100 border-green-200"
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            </Button>
+            />
           </div>
         </CardHeader>
         <CardContent className="pt-6">
@@ -323,16 +320,11 @@ export function TrendAnalysis() {
               <CardTitle className="text-lg font-bold text-gray-900">Index Trend Analysis & Forecast</CardTitle>
               <CardDescription>Real-time trends and options strategies for major index funds</CardDescription>
             </div>
-            <Button
+            <RefreshButton
               onClick={fetchData}
-              variant="outline"
-              size="sm"
-              disabled={loading}
+              isLoading={loading}
               className="bg-green-50 hover:bg-green-100 border-green-200"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
+            />
           </div>
         </CardHeader>
         <CardContent className="pt-4">

@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { RefreshButton } from "@/components/ui/refresh-button"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { RefreshCw, TrendingUp, TrendingDown, Minus, AlertTriangle, Calendar, Target } from "lucide-react"
+import { TrendingUp, TrendingDown, Minus, AlertTriangle, Calendar, Target } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 
 interface NextMeeting {
@@ -526,10 +526,12 @@ export function FomcPredictions() {
                 {lastUpdated && <span className="ml-2 text-xs">(Updated: {lastUpdated.toLocaleTimeString()})</span>}
               </CardDescription>
             </div>
-            <Button onClick={fetchFomcData} disabled={loading} size="sm" className="bg-primary hover:bg-primary/90">
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-              {loading ? "Refreshing..." : "Refresh"}
-            </Button>
+            <RefreshButton
+              onClick={fetchFomcData}
+              isLoading={loading}
+              variant="default"
+              className="bg-primary hover:bg-primary/90"
+            />
           </div>
         </CardHeader>
       </Card>
