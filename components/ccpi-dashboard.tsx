@@ -6,9 +6,10 @@ import { Info } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { TrendingDown, AlertTriangle, RefreshCw, Activity, DollarSign, BarChart3, Users } from "lucide-react"
+import { TrendingDown, AlertTriangle, Activity, DollarSign, BarChart3, Users } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Download } from "lucide-react"
+import { RefreshButton } from "@/components/ui/refresh-button"
 
 interface CCPIData {
   ccpi: number
@@ -287,7 +288,7 @@ export default function CcpiDashboard() {
     return (
       <div className="flex items-center justify-center p-12">
         <div className="text-center">
-          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2 text-primary" />
+          <Activity className="h-8 w-8 animate-spin mx-auto mb-2 text-primary" />
           <p className="text-sm text-gray-600">Loading CCPI data...</p>
         </div>
       </div>
@@ -377,7 +378,7 @@ export default function CcpiDashboard() {
       {isRefreshing && refreshStatus && (
         <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-black/80 text-white px-6 py-3 rounded-full shadow-lg backdrop-blur-sm">
           <div className="flex items-center gap-3">
-            <RefreshCw className="h-5 w-5 animate-spin" />
+            <Activity className="h-5 w-5 animate-spin" />
             <span className="font-medium">{refreshStatus}</span>
           </div>
         </div>
@@ -411,10 +412,7 @@ export default function CcpiDashboard() {
                 />
               </button>
             </div>
-            <Button variant="outline" size="sm" onClick={fetchData} disabled={isRefreshing}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
-              {isRefreshing ? "Refreshing..." : "Refresh Data"}
-            </Button>
+            <RefreshButton onClick={fetchData} isLoading={isRefreshing} loadingText="Refreshing..." />
           </div>
         </div>
 
@@ -542,7 +540,7 @@ export default function CcpiDashboard() {
                   <Activity className="h-5 w-5 text-blue-600" />
                   Weekly Output - Executive Summary
                 </h4>
-                {summaryLoading && <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />}
+                {summaryLoading && <Activity className="h-4 w-4 animate-spin text-blue-600" />}
               </div>
 
               {/* AI-Generated Executive Summary */}
