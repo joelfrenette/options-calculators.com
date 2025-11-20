@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server"
-import { getApiKey } from "@/lib/api-keys"
 
 export async function GET() {
-  try {
-    const fredApiKey = getApiKey("FRED_API_KEY")
+  const fredApiKey = process.env.FRED_API_KEY
 
+  try {
     const fetchFredData = async (seriesId: string, calculateYoY = false) => {
       if (!fredApiKey) return null
       try {
@@ -97,8 +96,8 @@ export async function GET() {
     // Filter to only include future meetings (meetings that haven't ended yet)
     const upcomingMeetings = allUpcomingMeetings.filter((m) => m.endDate > now)
 
-    const nextMeeting = upcomingMeetings[0]
-    const daysUntilNext = Math.ceil((nextMeeting.endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    const nextFomcMeeting = upcomingMeetings[0]
+    const daysUntilNextMeeting = Math.ceil((nextFomcMeeting.endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 
     const fedDecisionFactors = {
       inflationPressure:
@@ -181,61 +180,16 @@ export async function GET() {
 
     const historicalRates = await fetchHistoricalRates()
 
-    const fetchHistoricalRate = async () => {
-      if (!fredApiKey) return null
-      try {
-        // Get last 60 days of data to find rate from previous meeting
-        const response = await fetch(
-          `https://api.stlouisfed.org/fred/series/observations?series_id=DFF&api_key=${fredApiKey}&file_type=json&sort_order=desc&limit=60`,
-        )
-        if (!response.ok) return null
-        const data = await response.json()
-        if (data.observations && data.observations.length >= 45) {
-          // Get rate from ~45 days ago (previous meeting)
-          const historicalRate = Number.parseFloat(data.observations[45].value)
-          return Number(historicalRate.toFixed(2))
-        }
-        return null
-      } catch {
-        return null
-      }
-    }
-
-    const previousMeetingRate = await fetchHistoricalRate()
-
-    console.log("[v0] Fed Funds Rate from FRED:", fedFundsRate?.current)
-    console.log("[v0] Current Rate after processing:", currentRate)
-    console.log("[v0] Previous Meeting Rate (60 days ago):", previousMeetingRate)
-
-    // Fetch 10-year Treasury yield
-    const treasury10YResponse = await fetch(
-      "https://query1.finance.yahoo.com/v8/finance/chart/^TNX?interval=1d&range=5d",
-    )
-    const treasury10YData = await treasury10YResponse.json()
-    const treasury10Y = treasury10YData.chart?.result?.[0]?.meta?.regularMarketPrice || 4.5
-
-    console.log("[v0] 10Y Treasury:", treasury10Y)
-
-    // Fetch 2-year Treasury yield
-    const treasury2YResponse = await fetch(
-      "https://query1.finance.yahoo.com/v8/finance/chart/^FVX?interval=1d&range=5d",
-    )
-    const treasury2YData = await treasury2YResponse.json()
-    const treasury2Y = treasury2YData.chart?.result?.[0]?.meta?.regularMarketPrice || 4.3
-
-    console.log("[v0] 2Y Treasury:", treasury2Y)
-
-    // Calculate yield curve (2Y - 10Y spread)
-    const yieldCurveSpread = treasury2Y - treasury10Y
-
-    // Fetch Fed Funds futures data to calculate implied rates
-    const meetings = []
+    const meetings: any[] = []
+    let yieldCurveSpread = 0
+    let treasury10Y = 0
 
     for (let i = 0; i < upcomingMeetings.length; i++) {
       const meeting = upcomingMeetings[i]
       const daysAway = Math.ceil((meeting.endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 
       // Detect if Fed is in a cutting cycle
+      const previousMeetingRate = await fetchFredData("DFF", false) // Daily Fed Funds Effective Rate
       const fedIsCutting = previousMeetingRate && previousMeetingRate > currentRate + 0.05
 
       // Market expectations based on economic conditions
@@ -245,10 +199,23 @@ export async function GET() {
         economicIndicators.unemployment.current >= 3.5 && economicIndicators.unemployment.current <= 5.0
 
       // Yield curve analysis (inverted = 2Y > 10Y)
+      const treasury10YResponse = await fetch(
+        "https://query1.finance.yahoo.com/v8/finance/chart/^TNX?interval=1d&range=5d",
+      )
+      const treasury10YData = await treasury10YResponse.json()
+      treasury10Y = treasury10YData.chart?.result?.[0]?.meta?.regularMarketPrice || 4.5
+
+      const treasury2YResponse = await fetch(
+        "https://query1.finance.yahoo.com/v8/finance/chart/^FVX?interval=1d&range=5d",
+      )
+      const treasury2YData = await treasury2YResponse.json()
+      const treasury2Y = treasury2YData.chart?.result?.[0]?.meta?.regularMarketPrice || 4.3
+
+      yieldCurveSpread = treasury2Y - treasury10Y
+
       const yieldCurveInverted = treasury2Y > treasury10Y
       const yieldCurveFlat = Math.abs(treasury2Y - treasury10Y) < 0.2
 
-      // Rate positioning relative to market
       const rateAboveNeutral = currentRate > 3.5 // Fed's estimated neutral rate is ~2.5-3.0%
       const marketExpectsCuts = treasury10Y > currentRate // If 10Y > Fed Funds, market expects cuts
 
@@ -266,52 +233,34 @@ export async function GET() {
         previousMeetingRate,
       })
 
-      // Calculate expected rate changes per meeting based on multiple factors
       let expectedChangePerMeeting = 0
       let confidenceMultiplier = 1.0
 
-      // Strong dovish signals (high probability of cuts)
       if (fedIsCutting && inflationNearTarget && rateAboveNeutral) {
-        // Fed is already cutting, inflation near target, rate above neutral = continue cutting
-        expectedChangePerMeeting = -0.25 // 25bp cut per meeting
+        expectedChangePerMeeting = -0.25
         confidenceMultiplier = 1.2
         console.log("[v0] Strong dovish: Fed cutting cycle + inflation near target")
-      }
-      // Moderate dovish signals
-      else if ((fedIsCutting || inflationCooling) && rateAboveNeutral) {
-        // Either Fed is cutting OR inflation cooling, and rate is above neutral
-        expectedChangePerMeeting = -0.2 // Gradual cuts
+      } else if ((fedIsCutting || inflationCooling) && rateAboveNeutral) {
+        expectedChangePerMeeting = -0.2
         confidenceMultiplier = 1.0
         console.log("[v0] Moderate dovish: Cutting cycle or cooling inflation")
-      }
-      // Mild dovish signals
-      else if (inflationCooling && (marketExpectsCuts || rateAboveNeutral)) {
-        // Inflation cooling and market signals cuts
-        expectedChangePerMeeting = -0.15 // Small cuts
+      } else if (inflationCooling && (marketExpectsCuts || rateAboveNeutral)) {
+        expectedChangePerMeeting = -0.15
         confidenceMultiplier = 0.8
         console.log("[v0] Mild dovish: Inflation cooling + market signals")
-      }
-      // Hawkish signals (rate hikes)
-      else if (economicIndicators.cpi.current > 4.0 && economicIndicators.cpi.trend === "up") {
-        // High and rising inflation = potential hikes
+      } else if (economicIndicators.cpi.current > 4.0 && economicIndicators.cpi.trend === "up") {
         expectedChangePerMeeting = 0.15
         confidenceMultiplier = 0.9
         console.log("[v0] Hawkish: High rising inflation")
-      }
-      // Neutral (hold)
-      else {
+      } else {
         expectedChangePerMeeting = 0
         confidenceMultiplier = 1.0
         console.log("[v0] Neutral: Expecting hold")
       }
 
-      // Apply decay factor for meetings further out (less certainty)
       const decayFactor = 1.0 - i * 0.15 // Reduce expected change by 15% for each meeting out
       const adjustedChange = expectedChangePerMeeting * decayFactor
 
-      // Calculate implied rate cumulatively
-      // For first meeting: current rate + expected change
-      // For subsequent meetings: previous implied rate + expected change
       let impliedRate
       if (i === 0) {
         impliedRate = currentRate + adjustedChange
@@ -320,7 +269,6 @@ export async function GET() {
         impliedRate = previousImpliedRate + adjustedChange
       }
 
-      // Ensure rate stays within reasonable bounds
       impliedRate = Math.max(2.0, Math.min(6.0, impliedRate))
 
       const rateDiff = impliedRate - currentRate
@@ -336,59 +284,48 @@ export async function GET() {
       let probHike25 = 0
       let probHike50 = 0
 
-      // Calculate base probability from rate differential
       const rateDiffFromCurrent = impliedRate - currentRate
       const bpsDiff = Math.round(rateDiffFromCurrent * 100)
 
       if (rateDiffFromCurrent < -0.35) {
-        // Strong expectation of 50bp cut
         probCut50 = Math.min(80, 40 + Math.abs(bpsDiff) * 0.8) * confidenceMultiplier
         probCut25 = Math.min(25, 100 - probCut50 - 5)
         probNoChange = Math.max(5, 100 - probCut50 - probCut25)
       } else if (rateDiffFromCurrent < -0.15) {
-        // Expectation of 25bp cut
         probCut25 = Math.min(85, 50 + Math.abs(bpsDiff) * 1.5) * confidenceMultiplier
         probNoChange = Math.min(35, 100 - probCut25 - 5)
         probCut50 = Math.max(0, 100 - probCut25 - probNoChange - 5)
         probHike25 = Math.max(0, 100 - probCut25 - probNoChange - probCut50)
       } else if (rateDiffFromCurrent < -0.05) {
-        // Slight expectation of cut
         probCut25 = Math.min(60, 35 + Math.abs(bpsDiff) * 2) * confidenceMultiplier
         probNoChange = Math.min(50, 100 - probCut25 - 10)
         probHike25 = Math.max(0, 100 - probCut25 - probNoChange)
       } else if (rateDiffFromCurrent > 0.35) {
-        // Strong expectation of 50bp hike
         probHike50 = Math.min(80, 40 + bpsDiff * 0.8) * confidenceMultiplier
         probHike25 = Math.min(25, 100 - probHike50 - 5)
         probNoChange = Math.max(5, 100 - probHike50 - probHike25)
       } else if (rateDiffFromCurrent > 0.15) {
-        // Expectation of 25bp hike
         probHike25 = Math.min(85, 50 + bpsDiff * 1.5) * confidenceMultiplier
         probNoChange = Math.min(35, 100 - probHike25 - 5)
         probHike50 = Math.max(0, 100 - probHike25 - probNoChange - 5)
         probCut25 = Math.max(0, 100 - probHike25 - probNoChange - probHike50)
       } else if (rateDiffFromCurrent > 0.05) {
-        // Slight expectation of hike
         probHike25 = Math.min(60, 35 + bpsDiff * 2) * confidenceMultiplier
         probNoChange = Math.min(50, 100 - probHike25 - 10)
         probCut25 = Math.max(0, 100 - probHike25 - probNoChange)
       } else {
-        // Expecting NO CHANGE (rate diff between -0.05 and +0.05)
         probNoChange = Math.min(90, 70 + (5 - Math.abs(bpsDiff))) * confidenceMultiplier
         const remaining = 100 - probNoChange
 
         if (rateDiffFromCurrent < 0) {
-          // Slight dovish bias
           probCut25 = remaining * 0.7
           probHike25 = remaining * 0.3
         } else {
-          // Slight hawkish bias
           probHike25 = remaining * 0.6
           probCut25 = remaining * 0.4
         }
       }
 
-      // Normalize probabilities to sum to 100%
       const total = probCut50 + probCut25 + probNoChange + probHike25 + probHike50
       if (total > 0) {
         probCut50 = (probCut50 / total) * 100
@@ -447,15 +384,6 @@ export async function GET() {
       return lastMeeting.impliedRate
     }
 
-    const ratePath = {
-      previousMeeting: previousMeetingRate || currentRate,
-      current: currentRate,
-      nextMeeting: nextMeetingData.impliedRate,
-      threeMonth: calculateRateProjection(3),
-      sixMonth: calculateRateProjection(6),
-      twelveMonth: calculateRateProjection(12),
-    }
-
     const economicFactors = {
       yieldCurve: yieldCurveSpread < 0 ? "Inverted (Recession Signal)" : "Normal",
       yieldCurveSignal: yieldCurveSpread < 0 ? "bearish" : "neutral",
@@ -465,44 +393,51 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      currentRate: Number(currentRate.toFixed(2)),
+      currentRate,
       historicalRates,
       nextMeeting: {
-        date: nextMeeting.date,
-        daysUntil: daysUntilNext,
+        date: nextFomcMeeting.date,
+        daysUntil: daysUntilNextMeeting,
         prediction,
         predictionBps,
-        confidence: Number(confidence.toFixed(1)),
+        confidence,
         impliedRate: nextMeetingData.impliedRate,
       },
-      ratePath,
+      ratePath: {
+        previousMeeting: currentRate,
+        current: currentRate,
+        nextMeeting: nextMeetingData.impliedRate,
+        threeMonth: calculateRateProjection(3),
+        sixMonth: calculateRateProjection(6),
+        twelveMonth: calculateRateProjection(12),
+      },
+      economicFactors,
       economicIndicators,
       fedDecisionFactors,
-      economicFactors,
       meetings,
       predictionMethodology: {
         description:
-          "Our prediction uses the CME FedWatch methodology, analyzing Fed Funds futures, Treasury yields, and economic indicators to calculate market-implied probabilities",
+          "Our prediction analyzes Fed Funds futures, Treasury yields, and economic indicators to calculate market-implied probabilities using proprietary algorithms",
         formula:
-          "Implied Rate = Current Rate + Expected Rate Changes | Probabilities based on basis point differential",
+          "Implied Rate = Current Fed Funds Rate + Economic Signal Adjustments - Rate cuts are implied when CPI < 3.0% with unemployment stable/rising. Rate hikes are implied when CPI > 4.0% with strong employment.",
         factors: [
-          "Inflation Trend: Cooling inflation (CPI < 3.5% and declining) signals dovish Fed = rate cuts expected",
-          "Treasury Yields: 10Y Treasury below Fed Funds rate signals market expects cuts",
-          "Employment: Healthy unemployment (3.5-5%) supports gradual policy normalization",
-          "Yield Curve: Inverted curve (2Y > 10Y) historically precedes rate cuts",
-          "Market Pricing: Implied rates from Fed Funds futures and Treasury markets",
+          "CPI & Core CPI (Inflation Targets)",
+          "Unemployment Rate (Maximum Employment Mandate)",
+          "GDP Growth (Economic Health)",
+          "Non-farm Payrolls (Labor Market Strength)",
+          "Treasury Yield Curve (Market Rate Expectations)",
+          "Fed Funds Futures Pricing (Market Consensus)",
         ],
         weights: {
-          inflation: "40% (Primary mandate - price stability)",
-          employment: "30% (Dual mandate - maximum employment)",
-          growth: "15% (Economic conditions)",
-          marketPricing: "15% (Forward-looking market expectations)",
+          inflation: "40% - Primary concern for Fed policy",
+          employment: "30% - Dual mandate with inflation",
+          growth: "15% - Economic stability indicator",
+          marketPricing: "15% - Treasury yields & futures reflect market consensus",
         },
-        methodology: "Similar to CME FedWatch Tool - calculates probabilities from market pricing of Fed Funds futures",
-        comparison: "Compare with CME FedWatch Tool at cmegroup.com/markets/interest-rates/cme-fedwatch-tool.html",
       },
       lastUpdated: new Date().toISOString(),
       dataSource: "FRED Economic Data (Fed Funds Rate, CPI, Employment), Treasury Yields (Yahoo Finance)",
+      attribution: null,
     })
   } catch (error) {
     console.error("Error fetching FOMC predictions:", error)
