@@ -2867,7 +2867,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
           </AccordionItem>
 
           {/* Pillar 4 - Macro Economic */}
-          <AccordionItem value="pillar4" className="border border-b rounded-lg px-4">
+          <AccordionItem value="pillar4" className="border rounded-lg px-4">
             <AccordionTrigger className="hover:no-underline py-10">
               <div className="flex items-center justify-between w-full pr-4">
                 <div className="flex items-center gap-2">
@@ -3290,9 +3290,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
               <span className="font-bold text-blue-900">20%</span>
             </div>
           </div>
-          <p className="text-xs text-blue-700 mt-3">
-            Final CCPI = Σ(Pillar Score × Weight)
-          </p>
+          <p className="text-xs text-blue-700 mt-3">Final CCPI = Σ(Pillar Score × Weight)</p>
         </div>
 
         <Accordion type="multiple" className="space-y-4 mt-8">
