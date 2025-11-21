@@ -521,9 +521,9 @@ export function FomcPredictions() {
                 <Target className="h-5 w-5 text-primary" />
                 Fed Rate Decision Predictor
               </CardTitle>
-              {/* CHANGE> Removed CME FedWatch attribution - using internal model */}
               <CardDescription className="mt-1">
-                AI-powered predictions using economic indicators and market data
+                AI-powered predictions using Fed Funds futures and economic data
+                {lastUpdated && <span className="ml-2 text-xs">(Updated: {lastUpdated.toLocaleTimeString()})</span>}
               </CardDescription>
             </div>
             <RefreshButton
@@ -678,25 +678,6 @@ export function FomcPredictions() {
             <CardDescription>Next FOMC Meeting - Calculated using CME FedWatch methodology</CardDescription>
           </CardHeader>
           <CardContent className="pt-4">
-            {/* CHANGE> Added CME FedWatch attribution badge when using their data */}
-            {meetings.length > 0 && meetings[0].date && (
-              <div className="mb-4 p-3 bg-blue-50 border-l-4 border-blue-500 rounded">
-                <p className="text-sm font-semibold text-blue-900 flex items-center gap-2">
-                  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                    <path
-                      fillRule="evenodd"
-                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  CME FedWatch Tool
-                </p>
-                <p className="text-xs text-blue-700 mt-1">
-                  Official market consensus from CME Group Fed Funds futures pricing
-                </p>
-              </div>
-            )}
-
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -743,11 +724,6 @@ export function FomcPredictions() {
               <p className="text-xs text-blue-800">
                 <span className="font-semibold">Note:</span> Showing next 3 meetings for actionable near-term
                 predictions. Market expectations become less reliable for meetings further out.
-                {meetings.length > 0 && meetings[0].date && (
-                  <span className="block mt-1">
-                    <span className="font-semibold">Data Source:</span> CME FedWatch Tool
-                  </span>
-                )}
               </p>
             </div>
           </CardContent>
