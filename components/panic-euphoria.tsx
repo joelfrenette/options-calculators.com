@@ -427,38 +427,55 @@ export function PanicEuphoria() {
                   Commodities: data.commodityPrices,
                   "Gas Prices": data.gasPrices,
                 }).map(([name, value], idx) => {
-                  // Calculate normalized score for each component (-1 to +1)
                   const scores = [
-                    (value - 3) / 2, // Short Interest: normalize around 3%
-                    (value - 500) / 500, // Margin Debt: normalize around $500B
-                    (value - 2.5) / 1.5, // Volume Ratio: normalize around 2.5x
-                    (value - 50) / 50, // II Survey: normalize around 50%
-                    (value - 40) / 40, // AAII: normalize around 40%
-                    (value - 5) / 3, // Money Markets: normalize around $5T
-                    (0.8 - value) / 0.4, // Put/Call: inverse, normalize around 0.8
-                    (value - 250) / 150, // Commodities: normalize around 250
-                    (3.5 - value) / 1.5, // Gas: inverse, normalize around $3.50
+                    (3 - value) / 2, // Short Interest: inverse, high short = panic (bullish signal)
+                    (value - 500) / 500, // Margin Debt: high = euphoria
+                    (value - 1) / 1, // Volume Ratio: high = euphoria
+                    (value - 50) / 50, // II Survey: high bulls = euphoria
+                    (value - 40) / 40, // AAII: high = euphoria
+                    (5 - value) / 3, // Money Markets: inverse, high cash = panic (bullish signal)
+                    (0.8 - value) / 0.4, // Put/Call: inverse, high = panic (bullish signal)
+                    (value - 250) / 150, // Commodities: high = euphoria
+                    (3.5 - value) / 1.5, // Gas: inverse, high = panic (bearish signal)
                   ]
                   const score = Math.max(-1, Math.min(1, scores[idx]))
 
+                  const tooltips = [
+                    "Short interest as % of float. High = bearish positioning (contrarian bullish signal)",
+                    "Margin debt levels. High = leveraged speculation (euphoria risk)",
+                    "Nasdaq vs NYSE volume ratio. High = speculative tech trading (euphoria)",
+                    "Newsletter writer bulls vs bears. High bulls = euphoria (contrarian sell)",
+                    "Individual investor survey. High = retail euphoria (contrarian sell)",
+                    "Money market fund assets. High = cash on sidelines (bullish potential)",
+                    "Put/Call ratio. High = hedging/fear (contrarian bullish signal)",
+                    "Commodity price levels. High = inflation/speculation (euphoria)",
+                    "Gas prices. High = economic stress (bearish signal)",
+                  ]
+
                   return (
                     <div key={name} className="flex items-center gap-3">
-                      <div className="w-36 text-xs font-semibold text-gray-700">{name}</div>
+                      <div className="w-36 text-xs font-semibold text-gray-700 flex items-center gap-1">
+                        {name}
+                        <div className="relative group/tooltip">
+                          <Info className="h-3 w-3 text-gray-400 cursor-help" />
+                          <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-20 whitespace-normal">
+                            {tooltips[idx]}
+                          </div>
+                        </div>
+                      </div>
                       <div className="flex-1 relative h-7 bg-gray-200 rounded-full overflow-hidden">
                         {/* Center line */}
                         <div className="absolute left-1/2 top-0 bottom-0 w-px bg-gray-400 z-10" />
 
-                        {/* Score bar with gradient background */}
                         <div
                           className="absolute top-0 bottom-0 transition-all duration-500"
                           style={{
-                            // Invert the direction: positive scores go left (green), negative go right (red)
-                            left: score > 0 ? `${((1 - score) / 2) * 100}%` : "50%",
-                            right: score <= 0 ? `${(1 - (score + 1) / 2) * 100}%` : "50%",
+                            left: score > 0 ? `${50 - score * 50}%` : "50%",
+                            right: score <= 0 ? `${50 - Math.abs(score) * 50}%` : "50%",
                             background:
                               score > 0
-                                ? `linear-gradient(to left, #22c55e ${Math.abs(score) * 100}%, transparent ${Math.abs(score) * 100}%)`
-                                : `linear-gradient(to right, #ef4444 ${Math.abs(score) * 100}%, transparent ${Math.abs(score) * 100}%)`,
+                                ? "linear-gradient(to left, #22c55e, #86efac)"
+                                : "linear-gradient(to right, #ef4444, #fca5a5)",
                           }}
                         />
                       </div>
