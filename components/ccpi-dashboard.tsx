@@ -251,7 +251,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
   const fetchExecutiveSummary = async (ccpiData: CCPIData) => {
     try {
       setSummaryLoading(true)
-      const response = await fetch("/api/admin/ai-summary", {
+      const response = await fetch("/api/ccpi/executive-summary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
