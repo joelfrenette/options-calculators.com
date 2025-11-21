@@ -224,10 +224,20 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
   const fetchExecutiveSummary = useCallback(async (ccpiData: CCPIData) => {
     try {
       setSummaryLoading(true)
+
+      const summaryPayload = {
+        ccpi: Math.round(ccpiData.ccpi),
+        certainty: ccpiData.confidence || 0,
+        activeCanaries: ccpiData.canaries ? ccpiData.canaries.filter((c) => c.active).length : 0,
+        totalIndicators: ccpiData.canaries ? ccpiData.canaries.length : 0,
+        regime: ccpiData.regime || { name: "Unknown", description: "Unknown" },
+        pillars: ccpiData.pillars || { momentum: 0, riskAppetite: 0, valuation: 0, macro: 0 },
+      }
+
       const response = await fetch("/api/ccpi/executive-summary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(ccpiData),
+        body: JSON.stringify(summaryPayload),
       })
 
       if (!response.ok) {
@@ -235,10 +245,17 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
       }
 
       const result = await response.json()
-      setExecutiveSummary(result.summary)
+
+      if (result.summary) {
+        setExecutiveSummary(result.summary)
+      } else {
+        setExecutiveSummary(null)
+      }
     } catch (error) {
       console.error("[v0] Failed to fetch executive summary:", error)
-      setExecutiveSummary(null)
+      setExecutiveSummary(
+        "Executive summary is temporarily unavailable. Market analysis data has been successfully loaded.",
+      )
     } finally {
       setSummaryLoading(false)
     }
