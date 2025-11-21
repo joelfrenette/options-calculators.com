@@ -187,7 +187,7 @@ export async function GET() {
       },
       canaries,
       activeCanaries: canaries.filter((c) => c.severity === "high" || c.severity === "medium").length,
-      totalIndicators: 38,
+      totalIndicators: 34,
       apiStatus: data.apiStatus,
       timestamp: new Date().toISOString(),
       cachedAt: new Date().toISOString(), // Added cache timestamp

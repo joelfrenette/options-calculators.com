@@ -119,32 +119,32 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
   }
 
   useEffect(() => {
-    loadFromLocalStorage()
-    fetchHistory()
-  }, [])
-
-  const loadFromLocalStorage = () => {
-    try {
+    const loadInitialData = async () => {
       const cached = localStorage.getItem("ccpi-data")
       if (cached) {
-        const parsedData = JSON.parse(cached)
-        console.log("[v0] CCPI: Loaded from localStorage", parsedData.cachedAt)
-        setData(parsedData)
-        // Don't fetch executive summary on initial load to speed things up
-      } else {
-        console.log("[v0] CCPI: No cached data in localStorage")
-        setError("No cached data available. Click refresh to load fresh data.")
+        try {
+          const parsedCache = JSON.parse(cached)
+          console.log("[v0] CCPI: Loaded from localStorage", parsedCache.timestamp)
+          console.log("[v0] CCPI: Cached crash amplifiers:", parsedCache.crashAmplifiers)
+          console.log("[v0] CCPI: Cached totalBonus:", parsedCache.totalBonus)
+          console.log("[v0] CCPI: Cached baseCCPI:", parsedCache.baseCCPI)
+          setData(parsedCache)
+        } catch (e) {
+          console.error("[v0] Failed to parse cached CCPI data:", e)
+        }
       }
-    } catch (error) {
-      console.error("[v0] CCPI localStorage load error:", error)
-      setError("No cached data available. Click refresh to load fresh data.")
-    }
-  }
 
-  const fetchData = async () => {
+      console.log("[v0] CCPI: Fetching fresh data from API...")
+      await fetchCCPIData()
+    }
+
+    loadInitialData()
+  }, [])
+
+  const fetchCCPIData = async () => {
     try {
       setIsRefreshing(true)
-      setLoading(true) // Also set loading to true
+      setLoading(true)
       setRefreshProgress(5)
       setRefreshStatus("Initializing CCPI calculation...")
       setError(null)
@@ -155,7 +155,6 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
           if (prev >= 90) return prev
           return prev + Math.random() * 8
         })
-        // Update status messages during fetch
         setRefreshStatus((prev) => {
           const messages = [
             "Fetching market data...",
@@ -187,29 +186,34 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
         regime: result.regime.name,
         pillars: result.pillars,
         activeCanaries: result.canaries.filter((c: any) => c.severity === "high" || c.severity === "medium").length,
-        totalIndicators: 38,
+        totalIndicators: result.totalIndicators || 34,
+        crashAmplifiers: result.crashAmplifiers?.length || 0,
+        totalBonus: result.totalBonus || 0,
       })
+      console.log("[v0] CCPI: crashAmplifiers from API:", result.crashAmplifiers)
+      console.log("[v0] CCPI: totalBonus from API:", result.totalBonus)
+      console.log("[v0] CCPI: baseCCPI from API:", result.baseCCPI)
       console.log("[v0] Pillar Breakdown (weighted contribution to CCPI):")
-      console.log("  Momentum:", result.pillars.momentum, "× 40% =", (result.pillars.momentum * 0.4).toFixed(1))
+      console.log("  Momentum:", result.pillars.momentum, "× 35% =", (result.pillars.momentum * 0.35).toFixed(1))
       console.log(
         "  Risk Appetite:",
         result.pillars.riskAppetite,
         "× 30% =",
         (result.pillars.riskAppetite * 0.3).toFixed(1),
       )
-      console.log("  Valuation:", result.pillars.valuation, "× 20% =", (result.pillars.valuation * 0.2).toFixed(1))
-      console.log("  Macro:", result.pillars.macro, "× 10% =", (result.pillars.macro * 0.1).toFixed(1))
+      console.log("  Valuation:", result.pillars.valuation, "× 15% =", (result.pillars.valuation * 0.15).toFixed(1))
+      console.log("  Macro:", result.pillars.macro, "× 20% =", (result.pillars.macro * 0.2).toFixed(1))
 
       const calculatedCCPI =
-        result.pillars.momentum * 0.4 +
+        result.pillars.momentum * 0.35 +
         result.pillars.riskAppetite * 0.3 +
-        result.pillars.valuation * 0.2 +
-        result.pillars.macro * 0.1
+        result.pillars.valuation * 0.15 +
+        result.pillars.macro * 0.2
       console.log("  Calculated CCPI:", calculatedCCPI.toFixed(1), "| API CCPI:", result.ccpi)
 
       const cachedData = {
         ...result,
-        cachedAt: new Date().toISOString(),
+        timestamp: new Date().toISOString(),
       }
 
       setData(cachedData)
@@ -230,7 +234,6 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
         console.log("[v0] CCPI data cached to API")
       } catch (cacheError) {
         console.error("[v0] Failed to cache CCPI data:", cacheError)
-        // Don't fail the whole operation if caching fails
       }
 
       await fetchExecutiveSummary(cachedData)
@@ -239,7 +242,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
       setError(error instanceof Error ? error.message : "Failed to load CCPI data")
     } finally {
       setIsRefreshing(false)
-      setLoading(false) // Clear loading state
+      setLoading(false)
       setRefreshProgress(0)
       setRefreshStatus("")
     }
@@ -248,14 +251,14 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
   const fetchExecutiveSummary = async (ccpiData: CCPIData) => {
     try {
       setSummaryLoading(true)
-      const response = await fetch("/api/ccpi/executive-summary", {
+      const response = await fetch("/api/admin/ai-summary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ccpi: ccpiData.ccpi,
           certainty: ccpiData.certainty,
           activeCanaries: ccpiData.canaries.filter((c) => c.severity === "high" || c.severity === "medium").length,
-          totalIndicators: 38, // Removed problematic comment
+          totalIndicators: ccpiData.totalIndicators || 34,
           regime: ccpiData.regime,
           pillars: ccpiData.pillars,
         }),
@@ -268,7 +271,6 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
       }
     } catch (error) {
       console.error("[v0] Failed to fetch executive summary:", error)
-      // Silently fail - we'll show the default summary
     } finally {
       setSummaryLoading(false)
     }
@@ -319,7 +321,9 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
         <div className="text-center">
           <AlertTriangle className="h-8 w-8 text-red-600 mx-auto mb-2" />
           <p className="text-sm text-red-600">{error}</p>
-          <Button variant="outline" onClick={fetchData} className="mt-4 bg-transparent">
+          <Button variant="outline" onClick={fetchCCPIData} className="mt-4 bg-transparent">
+            {" "}
+            {/* Changed to fetchCCPIData */}
             Retry
           </Button>
         </div>
@@ -360,15 +364,15 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
   }
 
   const pillarData = [
-    { name: "Pillar 1 - Momentum & Technical", value: data.pillars.momentum, weight: "40%", icon: Activity },
+    { name: "Pillar 1 - Momentum & Technical", value: data.pillars.momentum, weight: "35%", icon: Activity },
     {
       name: "Pillar 2 - Risk Appetite & Volatility",
       value: data.pillars.riskAppetite,
       weight: "30%",
       icon: TrendingDown,
     },
-    { name: "Pillar 3 - Valuation", value: data.pillars.valuation, weight: "20%", icon: DollarSign },
-    { name: "Pillar 4 - Macro", value: data.pillars.macro, weight: "10%", icon: Users },
+    { name: "Pillar 3 - Valuation", value: data.pillars.valuation, weight: "15%", icon: DollarSign },
+    { name: "Pillar 4 - Macro", value: data.pillars.macro, weight: "20%", icon: Users },
   ]
 
   const pillarChartData = pillarData.map((pillar, index) => ({
@@ -430,7 +434,8 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 />
               </button>
             </div>
-            <RefreshButton onClick={fetchData} isLoading={isRefreshing} loadingText="Refreshing..." />
+            <RefreshButton onClick={fetchCCPIData} isLoading={isRefreshing} loadingText="Refreshing..." />{" "}
+            {/* Changed to fetchCCPIData */}
           </div>
         </div>
 
@@ -590,15 +595,18 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
           </CardContent>
         </Card>
 
-        {data.totalBonus && data.totalBonus > 0 && (
-          <Card className="border-2 border-red-600 bg-gradient-to-r from-red-50 to-orange-50 shadow-xl">
+        {/* Crash Amplifiers Card - Only show if bonus > 0 */}
+        {data.crashAmplifiers && data.crashAmplifiers.length > 0 && (
+          <Card className="border-4 border-red-600 bg-gradient-to-r from-red-50 to-orange-50 shadow-2xl animate-pulse">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-red-900">
+              <CardTitle className="flex items-center gap-2 text-xl text-red-700">
                 <AlertTriangle className="h-6 w-6 text-red-600 animate-pulse" />🚨 CRASH AMPLIFIERS ACTIVE +
-                {data.totalBonus} BONUS POINTS
+                {data.totalBonus || 0} BONUS POINTS
               </CardTitle>
               <CardDescription className="text-red-700 font-medium">
-                Multiple extreme crash signals detected - CCPI boosted from {data.baseCCPI} to {data.ccpi}
+                {data.baseCCPI && data.totalBonus
+                  ? `Multiple extreme crash signals detected - CCPI boosted from ${data.baseCCPI} to ${data.ccpi}`
+                  : "Multiple extreme crash signals detected"}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -623,44 +631,35 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
           </Card>
         )}
 
+        {/* Canary Cards */}
         <Card className="border-2 border-orange-300 bg-gradient-to-r from-orange-50 to-red-50">
           <CardHeader>
-            {/* Added tooltip to Canaries section header */}
-            <CardTitle className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-red-600" />
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <AlertTriangle className="h-6 w-6 text-orange-600" />
                 Canaries in the Coal Mine - Active Warning Signals
-                {tooltipsEnabled && (
+                <TooltipProvider>
                   <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                    <TooltipTrigger>
+                      <Info className="h-4 w-4 text-muted-foreground" />
                     </TooltipTrigger>
-                    <TooltipContent className="max-w-md bg-yellow-50 border-yellow-200">
-                      <p className="font-semibold mb-1">Early Warning System</p>
+                    <TooltipContent className="max-w-sm">
                       <p className="text-sm">
-                        Like canaries in coal mines detected toxic gases, these indicators flag dangerous market
-                        conditions before a crash. Each warning represents a specific threshold breach across our 38
-                        indicators.
+                        These are the individual signals across all pillars that are currently in warning territory,
+                        automatically updating with each page load. Each canary card shows which specific indicator is
+                        flashing red and contributing to crash risk.
                       </p>
-                      <ul className="text-sm mt-2 space-y-1">
-                        <li>
-                          <strong>High Risk (Red):</strong> Critical threshold breached - immediate attention required
-                        </li>
-                        <li>
-                          <strong>Medium Risk (Yellow):</strong> Warning threshold breached - caution advised
-                        </li>
-                      </ul>
                     </TooltipContent>
                   </Tooltip>
-                )}
+                </TooltipProvider>
+              </CardTitle>
+              <div className="text-3xl font-bold text-orange-600">
+                {data.canaries.filter((c) => c.severity === "high" || c.severity === "medium").length}/
+                {data.totalIndicators || 34}
               </div>
-              <span className="text-2xl font-bold text-red-600">
-                {data.canaries.filter((canary) => canary.severity === "high" || canary.severity === "medium").length}/
-                {data.totalIndicators || 38}
-              </span>
-            </CardTitle>
-            <CardDescription>
-              Executive summary of medium and high severity red flags across all indicators
+            </div>
+            <CardDescription className="text-base mt-2">
+              Last Updated: {data.lastUpdated ? new Date(data.lastUpdated).toLocaleString() : "Loading..."}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -750,7 +749,11 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
         </Card>
 
         {/* Four Pillars - Collapsible Breakdown */}
-        <Accordion type="multiple" defaultValue={[]} className="space-y-4 pb-6 border-b border-gray-200">
+        <Accordion
+          type="multiple"
+          defaultValue={["pillar1", "pillar2", "pillar3", "pillar4"]}
+          className="space-y-4 pb-6 border-b border-gray-200"
+        >
           {/* Pillar 1 - Momentum & Technical */}
           <AccordionItem value="pillar1" className="border rounded-lg px-4">
             <AccordionTrigger className="hover:no-underline py-10">
@@ -758,7 +761,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 <div className="flex items-center gap-2">
                   <Activity className="h-5 w-5 text-cyan-600" />
                   <span className="text-lg font-semibold">Pillar 1 - Momentum & Technical</span>
-                  <span className="text-sm text-gray-600">Weight: 35% | 16 indicators</span>
+                  <span className="text-sm text-gray-600">Weight: 35% | 12 indicators</span>
                 </div>
                 <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.momentum)}/100</span>
               </div>
@@ -925,7 +928,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Down: {"<"}-1%</span>
-                      <span className="text-yellow-600">Flat: -1% to +1%</span>
+                      <span>Flat: -1% to +1%</span>
                       <span>Up: {">"} +1%</span>
                     </div>
                   </div>
@@ -1351,7 +1354,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Calm: {"<"}15</span>
-                      <span className="text-yellow-600">Elevated: 15-25</span>
+                      <span>Elevated: 15-25</span>
                       <span>Fear: {">"}25</span>
                     </div>
                   </div>
@@ -1404,7 +1407,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Calm: {"<"}15</span>
-                      <span className="text-yellow-600">Elevated: 15-25</span>
+                      <span>Elevated: 15-25</span>
                       <span>Panic: {">"}35</span>
                     </div>
                   </div>
@@ -1458,7 +1461,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Low: {"<"}18</span>
-                      <span className="text-yellow-600">Normal: 18-25</span>
+                      <span>Normal: 18-25</span>
                       <span>High: {">"}30</span>
                     </div>
                   </div>
@@ -1511,7 +1514,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Contango: {">"}1.5 (Safe)</span>
-                      <span className="text-yellow-600">Normal: 1.0-1.2</span>
+                      <span>Normal: 1.0-1.2</span>
                       <span className="text-red-600">Backwardation: {"<"}1.0 (FEAR)</span>
                     </div>
                   </div>
@@ -1564,7 +1567,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Low Vol: {"<"}25</span>
-                      <span className="text-yellow-600">Normal: 25-40</span>
+                      <span>Normal: 25-40</span>
                       <span>High Vol: {">"}50</span>
                     </div>
                   </div>
@@ -1618,7 +1621,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Stable: {"<"}10%</span>
-                      <span className="text-yellow-600">Normal: 10-15%</span>
+                      <span>Normal: 10-15%</span>
                       <span>Elevated: {">"}20%</span>
                     </div>
                   </div>
@@ -1669,7 +1672,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Oversold: {"<"}30%</span>
-                      <span className="text-yellow-600">Normal: 30-50%</span>
+                      <span>Normal: 30-50%</span>
                       <span>Overbought: {">"}70%</span>
                     </div>
                   </div>
@@ -1742,8 +1745,8 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Safe: {">"}1.1 (Hedging)</span>
-                      <span className="text-yellow-600">Caution: 0.9-1.1</span>
-                      <span className="text-red-600">Danger: {"<"}0.7 (Complacency)</span>
+                      <span>Caution: 0.9-1.1</span>
+                      <span>Danger: {"<"}0.7 (Complacency)</span>
                     </div>
                   </div>
                 )}
@@ -1794,7 +1797,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Fear: {"<"}30</span>
-                      <span className="text-yellow-600">Neutral: 30-60</span>
+                      <span>Neutral: 30-60</span>
                       <span>Greed: {">"}70</span>
                     </div>
                   </div>
@@ -1852,8 +1855,8 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Safe: {"<"}30%</span>
-                      <span className="text-yellow-600">Warning: 30-40%</span>
-                      <span className="text-red-600">Danger: {">"}50%</span>
+                      <span>Warning: 30-40%</span>
+                      <span>Danger: {">"}50%</span>
                     </div>
                   </div>
                 )}
@@ -1958,7 +1961,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Outflows: {"<"}-$2B</span>
-                      <span className="text-yellow-600">Neutral: -$2B to +$2B</span>
+                      <span>Neutral: -$2B to +$2B</span>
                       <span>Inflows: {">"} +$2B</span>
                     </div>
                   </div>
@@ -1982,7 +1985,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Low Vol: {"<"}25</span>
-                      <span className="text-yellow-600">Normal: 25-40</span>
+                      <span>Normal: 25-40</span>
                       <span>High Vol: {">"}50</span>
                     </div>
                   </div>
@@ -2006,7 +2009,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Stable: {"<"}10%</span>
-                      <span className="text-yellow-600">Normal: 10-15%</span>
+                      <span>Normal: 10-15%</span>
                       <span>Elevated: {">"}20%</span>
                     </div>
                   </div>
@@ -2030,7 +2033,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Oversold: {"<"}30%</span>
-                      <span className="text-yellow-600">Normal: 30-50%</span>
+                      <span>Normal: 30-50%</span>
                       <span>Overbought: {">"}70%</span>
                     </div>
                   </div>
@@ -2049,7 +2052,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs bg-green-50 border-green-200">
-                              <p className="font-semibold mb-1">Yield Curve (10Y-2Y Spread)</p>
+                              <p className="font-semibold mb-1">Yield Curve (10Y-2Y) Spread</p>
                               <p className="text-sm">Difference between 10-year and 2-year Treasury yields.</p>
                               <ul className="text-sm mt-1 space-y-1">
                                 <li>
@@ -2084,7 +2087,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Normal: {">"}0.5%</span>
-                      <span className="text-yellow-600">Flat: 0-0.5%</span>
+                      <span>Flat: 0-0.5%</span>
                       <span>Inverted: {"<"}0%</span>
                     </div>
                   </div>
@@ -2489,15 +2492,17 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
           </AccordionItem>
 
           {/* Pillar 4 - Macro Economic */}
-          <AccordionItem value="pillar4" className="border border-b rounded-lg px-4">
-            <AccordionTrigger className="hover:no-underline py-10">
+          <AccordionItem value="pillar4" className="border rounded-lg px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
               <div className="flex items-center justify-between w-full pr-4">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <BarChart3 className="h-5 w-5 text-purple-600" />
-                  <span className="text-lg font-semibold">Pillar 4 - Macro</span>
-                  <span className="text-sm text-gray-600">Weight: 20% | 7 indicators</span>
+                  <div className="text-left">
+                    <div className="font-semibold text-base">Pillar 4 - Macro</div>
+                    <div className="text-xs text-muted-foreground">Weight: 20% | 7 indicators</div>
+                  </div>
                 </div>
-                <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.macro)}/100</span>
+                <div className="text-2xl font-bold text-purple-600">{data.pillars.macro}/100</div>
               </div>
             </AccordionTrigger>
             <AccordionContent>
@@ -2713,7 +2718,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Accommodative: {"<"}2%</span>
-                      <span className="text-yellow-600">Neutral: 2-4%</span>
+                      <span>Neutral: 2-4%</span>
                       <span>Restrictive: {">"}4.5%</span>
                     </div>
                   </div>
@@ -2821,7 +2826,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Tight: {"<"}3%</span>
-                      <span className="text-yellow-600">Normal: 3-5%</span>
+                      <span>Normal: 3-5%</span>
                       <span>Wide: {">"}6%</span>
                     </div>
                   </div>
@@ -2874,8 +2879,8 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Healthy: {"<"}90%</span>
-                      <span className="text-yellow-600">Elevated: 100-120%</span>
-                      <span className="text-red-600">Danger: {">"}130%</span>
+                      <span>Elevated: 100-120%</span>
+                      <span>Danger: {">"}130%</span>
                     </div>
                   </div>
                 )}
@@ -2889,15 +2894,15 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
           <h4 className="font-semibold text-sm mb-3 text-blue-900">CCPI Formula Weights</h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
             <div className="flex items-center justify-between">
-              <span className="text-blue-700">Technical & Price:</span>
+              <span className="text-blue-700">Momentum & Technical:</span>
               <span className="font-bold text-blue-900">35%</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-blue-700">Risk Appetite:</span>
+              <span className="text-blue-700">Risk Appetite & Volatility:</span>
               <span className="font-bold text-blue-900">30%</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-blue-700">Valuation:</span>
+              <span className="text-blue-700">Valuation & Market Structure:</span>
               <span className="font-bold text-blue-900">15%</span>
             </div>
             <div className="flex items-center justify-between">
