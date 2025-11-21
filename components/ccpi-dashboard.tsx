@@ -4,11 +4,11 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Info } from "lucide-react"
+import { Info, TrendingDown, Activity, AlertTriangle, DollarSign, BarChart3 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { TrendingUp, AlertTriangle, Activity, DollarSign, BarChart3 } from "lucide-react"
+import { TrendingUp } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Download } from "lucide-react"
 import { RefreshButton } from "@/components/ui/refresh-button"
@@ -308,7 +308,7 @@ const getIndicatorExplanation = (signal: string): { what: string; impact: string
     }
   }
 
-  // Default fallback for any unmatched signals
+  // Default											 fallback for any unmatched signals
   return {
     what: "This indicator measures a specific market condition that has historically been associated with increased crash risk based on backtesting against past market cycles.",
     impact:
@@ -744,8 +744,6 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
             <RefreshButton onClick={fetchData} isLoading={isRefreshing} loadingText="Refreshing..." />
           </div>
         </div>
-
-        {/* Original progress card removed as it's replaced by the fixed bar and status message */}
 
         {/* Main CCPI Score Card */}
         <Card className="border-2 shadow-lg">
@@ -1222,72 +1220,56 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 {/* SOX Semiconductor Index */}
                 {data.indicators?.soxIndex !== undefined && (
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium flex items-center gap-1">
-                        SOX Semiconductor Index (Chip Sector Health)
-                        {/* CHANGE: Enhanced SOX Index tooltip */}
-                        {tooltipsEnabled && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-2">SOX Semiconductor Index - Chip Sector Health Check</p>
-                              <p className="text-sm mb-2">
-                                The SOX (PHLX Semiconductor Index) tracks 30 of the largest semiconductor companies.
-                                Think of semiconductors as the building blocks of all modern technology - they're in
-                                everything from smartphones to cars to data centers.
-                              </p>
-                              <p className="text-sm mb-2">
-                                <strong>What It Measures:</strong> The combined stock price performance of major chip
-                                makers including NVIDIA, AMD, Intel, Taiwan Semiconductor, and others. This index is
-                                often called a "leading indicator" because chip demand tends to slow before broader
-                                economic slowdowns.
-                              </p>
-                              <p className="text-sm mb-2">
-                                <strong>How to Read It:</strong>
-                              </p>
-                              <ul className="text-sm space-y-1 mb-2">
-                                <li>
-                                  • <strong>Above 5500:</strong> Chip sector is strong - healthy tech ecosystem, low
-                                  crash risk
-                                </li>
-                                <li>
-                                  • <strong>Around 5000 (baseline):</strong> Normal levels - tech sector is stable
-                                </li>
-                                <li>
-                                  • <strong>Below 4500:</strong> Chip sector weakness - may signal broader tech and
-                                  economic problems ahead
-                                </li>
-                              </ul>
-                              <p className="text-sm mb-2">
-                                <strong>Data Source:</strong> Philadelphia Stock Exchange (PHLX), updated daily based on
-                                trading prices of semiconductor stocks.
-                              </p>
-                              <p className="text-xs text-gray-600">
-                                Historical note: The SOX Index often peaks 6-12 months before major market corrections,
-                                making it an important early warning indicator.
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </span>
-                      <span className="font-bold">{data.indicators.soxIndex.toFixed(0)}</span>
-                    </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                      <div
-                        className="absolute inset-0 bg-gray-200"
-                        style={{
-                          marginLeft: `${100 - Math.min(100, Math.max(0, ((data.indicators.soxIndex - 4000) / 2000) * 100))}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Strong: {">"}5500</span>
-                      <span>Baseline: 5000</span>
-                      <span>Weak: {"<"}4500</span>
-                    </div>
+                    <span className="font-medium flex items-center gap-1">
+                      SOX Semiconductor Index (Chip Sector Health)
+                      {/* CHANGE: Enhanced SOX Index tooltip */}
+                      {tooltipsEnabled && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                            <p className="font-semibold mb-2">SOX Semiconductor Index - Chip Sector Health Check</p>
+                            <p className="text-sm mb-2">
+                              The SOX (PHLX Semiconductor Index) tracks 30 of the largest semiconductor companies. Think
+                              of semiconductors as the building blocks of all modern technology - they're in everything
+                              from smartphones to cars to data centers.
+                            </p>
+                            <p className="text-sm mb-2">
+                              <strong>What It Measures:</strong> The combined stock price performance of major chip
+                              makers including NVIDIA, AMD, Intel, Taiwan Semiconductor, and others. This index is often
+                              called a "leading indicator" because chip demand tends to slow before broader economic
+                              slowdowns.
+                            </p>
+                            <p className="text-sm mb-2">
+                              <strong>How to Read It:</strong>
+                            </p>
+                            <ul className="text-sm space-y-1 mb-2">
+                              <li>
+                                • <strong>Above 5500:</strong> Chip sector is strong - healthy tech ecosystem, low crash
+                                risk
+                              </li>
+                              <li>
+                                • <strong>Around 5000 (baseline):</strong> Normal levels - tech sector is stable
+                              </li>
+                              <li>
+                                • <strong>Below 4500:</strong> Chip sector weakness - may signal broader tech and
+                                economic problems ahead
+                              </li>
+                            </ul>
+                            <p className="text-sm mb-2">
+                              <strong>Data Source:</strong> Philadelphia Stock Exchange (PHLX), updated daily based on
+                              trading prices of semiconductor stocks.
+                            </p>
+                            <p className="text-xs text-gray-600">
+                              Historical note: The SOX Index often peaks 6-12 months before major market corrections,
+                              making it an important early warning indicator.
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </span>
+                    <span className="font-bold">{data.indicators.soxIndex.toFixed(0)}</span>
                   </div>
                 )}
 
@@ -2148,6 +2130,342 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     </div>
                   </div>
                 )}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="pillar2" className="border rounded-lg px-4">
+            <AccordionTrigger className="hover:no-underline py-10">
+              <div className="flex items-center justify-between w-full pr-4">
+                <div className="flex items-center gap-2">
+                  <TrendingDown className="h-5 w-5 text-orange-600" />
+                  <span className="text-lg font-semibold">Pillar 2 - Risk Appetite & Volatility</span>
+                  <span className="text-sm text-gray-600">Weight: 30% | 8 indicators</span>
+                </div>
+                <span className="text-2xl font-bold text-orange-600">{Math.round(data.pillars.riskAppetite)}/100</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="space-y-8 pt-6">
+                {/* Put/Call Ratio */}
+                {data.indicators?.putCallRatio !== undefined && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium flex items-center gap-1">
+                        Put/Call Ratio
+                        {tooltipsEnabled && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">Put/Call Ratio - Options Market Fear Gauge</p>
+                              <p className="text-sm mb-2">
+                                The Put/Call Ratio measures how many put options (bets that stocks will fall) are being
+                                traded compared to call options (bets that stocks will rise). It's one of the most
+                                direct measures of investor fear versus greed in the options market.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> The total volume of put options divided by call
+                                options traded each day across all U.S. stocks and indices. Calculated by CBOE (Chicago
+                                Board Options Exchange) using actual trading volume.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
+                                <li>
+                                  • <strong>Below 0.7:</strong> Extreme bullishness - investors buying mostly calls,
+                                  betting on market gains. Can signal complacency and market tops.
+                                </li>
+                                <li>
+                                  • <strong>0.7-1.0:</strong> Neutral to slightly cautious - balanced options trading,
+                                  normal market conditions
+                                </li>
+                                <li>
+                                  • <strong>Above 1.2:</strong> High fear - more puts than calls being bought, investors
+                                  hedging against declines. Often precedes or accompanies market crashes.
+                                </li>
+                                <li>
+                                  • <strong>Above 1.5:</strong> Extreme fear/panic - mass hedging activity, capitulation
+                                  may be near
+                                </li>
+                              </ul>
+                              <p className="text-sm mb-2">
+                                <strong>Why Higher Values = More Risk:</strong> While high put/call ratios show
+                                investors are buying protection, they also reveal widespread pessimism that can become
+                                self-fulfilling. When everyone expects a crash, positioning becomes crowded and markets
+                                can decline sharply.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Historical note: During the March 2020 COVID crash, the put/call ratio spiked above 1.6
+                                as panic reached extreme levels. During the 2008 crisis, it exceeded 1.3 for extended
+                                periods.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
+                      <span className="font-bold">{data.indicators.putCallRatio.toFixed(2)}</span>
+                    </div>
+                    <div className="relative w-full h-3 rounded-full overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                      <div
+                        className="absolute inset-0 bg-gray-200"
+                        style={{
+                          marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.putCallRatio - 0.5) / 1.5) * 100))}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-600">
+                      <span>Extreme Fear: {"<"}0.5-1.3</span>
+                      <span>Neutral: 0.7-1.0</span>
+                      <span>Complacent High: {">"}1.2 (Risk)</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Fear & Greed Index */}
+                {data.indicators?.fearAndGreed !== undefined && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium flex items-center gap-1">
+                        Fear & Greed Index
+                        {tooltipsEnabled && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">Fear & Greed Index - Market Sentiment Composite</p>
+                              <p className="text-sm mb-2">
+                                The CNN Fear & Greed Index combines seven different market indicators into one
+                                easy-to-read score that measures overall investor emotion. Think of it as the market's
+                                "mood meter" - showing whether investors are fearful (selling) or greedy (buying
+                                aggressively).
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> A composite of: stock price momentum, stock price
+                                strength, stock price breadth, put/call ratios, junk bond demand, market volatility, and
+                                safe haven demand. Each component is scored 0-100 and averaged.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It (Contrarian Indicator):</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
+                                <li>
+                                  • <strong>0-25 (Extreme Fear):</strong> Markets are panicking - historically good
+                                  buying opportunities as fear often marks bottoms
+                                </li>
+                                <li>
+                                  • <strong>25-45 (Fear):</strong> Investors are worried - caution prevails, downside
+                                  risk elevated
+                                </li>
+                                <li>
+                                  • <strong>45-55 (Neutral):</strong> Balanced sentiment - neither euphoric nor fearful
+                                </li>
+                                <li>
+                                  • <strong>55-75 (Greed):</strong> Investors are optimistic and buying - markets may be
+                                  getting overheated
+                                </li>
+                                <li>
+                                  • <strong>75-100 (Extreme Greed):</strong> Euphoria and complacency - historically
+                                  signals market tops and increased crash risk
+                                </li>
+                              </ul>
+                              <p className="text-sm mb-2">
+                                <strong>Why Extreme Greed = Danger:</strong> When everyone is greedy and fully invested,
+                                there are fewer buyers left to push prices higher. Any negative news can trigger sharp
+                                selloffs as profit-taking accelerates.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Historical note: The index hit "Extreme Greed" (90+) in January 2020 before the COVID
+                                crash, and hit "Extreme Fear" (12) during the March 2020 bottom - marking the perfect
+                                time to buy.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
+                      <span className="font-bold">{data.indicators.fearAndGreed}</span>
+                    </div>
+                    <div className="relative w-full h-3 rounded-full overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                      <div
+                        className="absolute inset-0 bg-gray-200"
+                        style={{
+                          marginLeft: `${data.indicators.fearAndGreed}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-600">
+                      <span>Extreme Fear: {"<"}25 (Buy)</span>
+                      <span>Neutral: 45-55</span>
+                      <span>Extreme Greed: {">"}75 (Risk)</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* AAII Bullish Sentiment */}
+                {data.indicators?.aaiiBullish !== undefined && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium flex items-center gap-1">
+                        AAII Bullish Sentiment
+                        {tooltipsEnabled && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">AAII Sentiment - Individual Investor Mood Survey</p>
+                              <p className="text-sm mb-2">
+                                AAII (American Association of Individual Investors) surveys thousands of individual
+                                investors every week asking a simple question: "Do you expect the stock market to go up,
+                                down, or sideways over the next six months?" The percentage who answer "up" is the
+                                bullish sentiment reading.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> The percentage of individual (retail) investors who
+                                are bullish about the market's direction. This is raw investor psychology - not
+                                professional traders, but everyday people managing their own portfolios.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It (Contrarian Indicator):</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
+                                <li>
+                                  • <strong>Below 25%:</strong> Extreme pessimism - retail investors have given up,
+                                  often marks market bottoms (buy signal)
+                                </li>
+                                <li>
+                                  • <strong>25-35%:</strong> Fearful - investors are worried, downside risk elevated
+                                </li>
+                                <li>
+                                  • <strong>35-45% (Historical Average):</strong> Normal balanced sentiment
+                                </li>
+                                <li>
+                                  • <strong>45-55%:</strong> Optimistic - investors feeling confident, markets steady
+                                </li>
+                                <li>
+                                  • <strong>Above 55%:</strong> Extreme optimism - euphoria and complacency, crash risk
+                                  increases (sell signal)
+                                </li>
+                                <li>
+                                  • <strong>Above 60%:</strong> Dangerous complacency - historically precedes sharp
+                                  corrections
+                                </li>
+                              </ul>
+                              <p className="text-sm mb-2">
+                                <strong>Why It's Contrarian:</strong> Retail investors tend to be "wrong at extremes" -
+                                most bullish near tops (when they should be cautious) and most bearish near bottoms
+                                (when they should be buying). Professional traders often do the opposite of what the
+                                AAII survey shows at extremes.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Data source: Weekly survey of AAII members, published every Thursday. Survey has tracked
+                                investor sentiment since 1987, providing over 35 years of data showing retail psychology
+                                patterns.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
+                      <span className="font-bold">{data.indicators.aaiiBullish.toFixed(1)}%</span>
+                    </div>
+                    <div className="relative w-full h-3 rounded-full overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                      <div
+                        className="absolute inset-0 bg-gray-200"
+                        style={{
+                          marginLeft: `${data.indicators.aaiiBullish}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-600">
+                      <span>Extreme Pessimism: {"<"}25% (Buy)</span>
+                      <span>Normal: 35-45%</span>
+                      <span>Extreme Optimism: {">"}55% (Risk)</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Short Interest */}
+                {data.indicators?.shortInterest !== undefined && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium flex items-center gap-1">
+                        Short Interest Ratio (Market Defense)
+                        {tooltipsEnabled && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">Short Interest - Bearish Bet Counter</p>
+                              <p className="text-sm mb-2">
+                                Short interest measures how many investors are actively betting against the market by
+                                "shorting" stocks - borrowing shares to sell them, hoping to buy them back cheaper
+                                later. Think of it as counting how many people have fire insurance on their house.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> The percentage of total available shares that have
+                                been sold short across the entire market. Calculated by dividing total short positions
+                                by total shares outstanding, updated twice monthly.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
+                                <li>
+                                  • <strong>Above 4%:</strong> High short interest - many investors positioned for
+                                  decline, provides "cushion" (short squeeze potential if market rallies)
+                                </li>
+                                <li>
+                                  • <strong>2-4%:</strong> Normal - balanced bearish positioning, healthy skepticism
+                                </li>
+                                <li>
+                                  • <strong>Below 2%:</strong> Low short interest - very few bearish bets, dangerous
+                                  complacency. Markets vulnerable to sharp declines.
+                                </li>
+                                <li>
+                                  • <strong>Below 1.5%:</strong> Extreme complacency - almost nobody positioned for
+                                  downside, high crash risk
+                                </li>
+                              </ul>
+                              <p className="text-sm mb-2">
+                                <strong>Why Low Short Interest = Danger:</strong> When short interest is low, it means
+                                almost nobody is hedged or positioned for a decline. If bad news hits, there's no
+                                "cushion" of short-covering (shorts buying back shares) to slow the fall. Markets can
+                                gap down violently.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Historical note: Short interest fell below 2% before both the 2000 dot-com crash and the
+                                2008 financial crisis. In both cases, low short interest signaled dangerous complacency
+                                and lack of downside protection.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
+                      <span className="font-bold">{data.indicators.shortInterest.toFixed(1)}%</span>
+                    </div>
+                    <div className="relative w-full h-3 rounded-full overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                      <div
+                        className="absolute inset-0 bg-gray-200"
+                        style={{
+                          marginLeft: `${Math.min(100, Math.max(0, (data.indicators.shortInterest / 6) * 100))}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-600">
+                      <span>Low Defense: {"<"}2% (Risk)</span>
+                      <span>Normal: 2-4%</span>
+                      <span>High Defense: {">"}4%</span>
+                    </div>
+                  </div>
+                )}
 
                 {/* ATR - Average True Range */}
                 {data.indicators.atr !== undefined && (
@@ -2155,61 +2473,53 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         ATR - Average True Range
-                        {/* CHANGE: Enhanced ATR tooltip */}
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-2">ATR - Average True Range (Daily Price Swings)</p>
+                              <p className="font-semibold mb-2">ATR - Average True Range (Daily Volatility Measure)</p>
                               <p className="text-sm mb-2">
-                                ATR measures how much the market typically moves up and down each day. It's like
-                                measuring the waves in the ocean - bigger waves (higher ATR) mean rougher seas (more
-                                volatility).
+                                ATR measures how much the market is swinging up and down each day on average. Think of
+                                it like measuring how bumpy a road is - higher ATR means bigger daily price swings
+                                (bumpier), lower ATR means calmer, steadier trading.
                               </p>
                               <p className="text-sm mb-2">
-                                <strong>What It Measures:</strong> The average of daily price ranges over the past 14
-                                trading days. It calculates the difference between each day's high and low price, then
-                                averages those differences. Expressed as a dollar amount or points.
-                              </p>
-                              <p className="text-sm mb-2">
-                                <strong>Why Daily Swings Matter:</strong> When markets start swinging wildly (high ATR),
-                                it indicates uncertainty and fear. Professional traders use ATR to set stop-losses and
-                                position sizes - they trade smaller when ATR is high because risk is elevated.
+                                <strong>What It Measures:</strong> The average dollar range between the daily high and
+                                low prices over the past 14 trading days for the S&P 500. It captures true volatility by
+                                including gaps (overnight price jumps).
                               </p>
                               <p className="text-sm mb-2">
                                 <strong>How to Read It:</strong>
                               </p>
                               <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  • <strong>Below 25:</strong> Low volatility - calm, stable market with small daily
-                                  swings
+                                  • <strong>Below 25:</strong> Low volatility - the market is calm, investors feel safe,
+                                  daily swings are small. This can signal complacency before crashes.
                                 </li>
                                 <li>
-                                  • <strong>25-40:</strong> Normal volatility - typical market fluctuations
+                                  • <strong>25-40:</strong> Normal volatility - typical daily fluctuations, healthy
+                                  market movement
                                 </li>
                                 <li>
-                                  • <strong>Above 50:</strong> High volatility - large daily swings indicate stress and
-                                  uncertainty
+                                  • <strong>40-60:</strong> Elevated volatility - increased uncertainty, larger daily
+                                  swings, risk building
                                 </li>
                                 <li>
-                                  • <strong>Above 70:</strong> Extreme volatility - panic-level price swings, crash
-                                  conditions
+                                  • <strong>Above 60:</strong> High volatility - large daily price swings indicate fear,
+                                  uncertainty, or panic. Often accompanies market crashes.
                                 </li>
                               </ul>
                               <p className="text-sm mb-2">
-                                <strong>Calculation Example:</strong> If SPY ranged from $500 low to $510 high (10-point
-                                range) for 14 days straight, ATR would be 10. But if it then has a day with a $500-$530
-                                range (30 points), ATR would start increasing, signaling rising volatility.
-                              </p>
-                              <p className="text-sm mb-2">
-                                <strong>Data Source:</strong> Calculated from daily high, low, and close prices from
-                                stock exchanges.
+                                <strong>Calculation:</strong> ATR averages the "true range" over 14 days, where true
+                                range is the largest of: (1) today's high minus low, (2) today's high minus yesterday's
+                                close, or (3) yesterday's close minus today's low.
                               </p>
                               <p className="text-xs text-gray-600">
-                                Professional use: Traders multiply ATR by 2-3 to set stop-loss levels. If ATR is $10,
-                                they might risk $20-30 per share, knowing that's typical volatility.
+                                Historical note: During the 2008 financial crisis, ATR spiked above 100. During the 2020
+                                COVID crash, it exceeded 150 - signaling extreme panic and wild daily swings of 5-10%
+                                per day.
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -2222,635 +2532,256 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, (data.indicators.atr / 60) * 100)}%`,
+                          marginLeft: `${Math.min(100, Math.max(0, (data.indicators.atr / 80) * 100))}%`,
                         }}
                       />
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Low Vol: {"<"}25</span>
-                      <span className="text-yellow-600">Normal: 25-40</span>
-                      <span>High Vol: {">"}50</span>
+                      <span>Normal: 25-40</span>
+                      <span>High Vol: {">"}60</span>
                     </div>
                   </div>
                 )}
 
                 {/* LTV - Long-term Volatility */}
-                {data.indicators.ltv !== undefined && (
+                {data.indicators?.ltv !== undefined && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         LTV - Long-term Volatility
-                        {/* CHANGE: Enhanced LTV tooltip */}
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-2">
-                                LTV - Long-Term Volatility (90-Day Price Variability)
+                              <p className="font-semibold mb-2">LTV - Long-Term Volatility (90-Day Turbulence Gauge)</p>
+                              <p className="text-sm mb-2">
+                                LTV measures price fluctuations over the past 90 days (about 3 months), providing a
+                                broader view of market stability than daily volatility indicators like VIX or ATR. While
+                                those measure immediate jitters, LTV shows whether volatility is becoming a persistent
+                                condition.
                               </p>
                               <p className="text-sm mb-2">
-                                While ATR measures short-term (14-day) volatility, LTV looks at longer-term (90-day)
-                                volatility patterns. It's like zooming out from daily waves to see the overall sea
-                                conditions over three months.
-                              </p>
-                              <p className="text-sm mb-2">
-                                <strong>What It Measures:</strong> The standard deviation of daily returns over the past
-                                90 trading days, expressed as an annualized percentage. This statistical measure shows
-                                how much prices have been bouncing around over the last quarter.
-                              </p>
-                              <p className="text-sm mb-2">
-                                <strong>Understanding Standard Deviation:</strong> Imagine if the average daily return
-                                is 0%, standard deviation tells us how far from 0% prices typically swing. Higher
-                                standard deviation = more unpredictable, wider price swings.
+                                <strong>What It Measures:</strong> The standard deviation of daily returns over 90
+                                trading days, expressed as an annualized percentage. This statistical measure shows how
+                                much actual prices have bounced around their average over the quarter.
                               </p>
                               <p className="text-sm mb-2">
                                 <strong>How to Read It:</strong>
                               </p>
                               <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  • <strong>Below 10%:</strong> Very stable market - prices are predictable, low crash
-                                  risk
+                                  • <strong>Below 10%:</strong> Very stable - extended calm where daily moves are small
+                                  and predictable. Can breed dangerous complacency.
                                 </li>
                                 <li>
-                                  • <strong>10-15%:</strong> Normal volatility - healthy market fluctuations
-                                </li>
-                                <li>
-                                  • <strong>15-20%:</strong> Elevated volatility - market is getting choppy, increased
+                                  • <strong>10-15%:</strong> Normal volatility - typical market fluctuations, healthy
                                   uncertainty
                                 </li>
                                 <li>
-                                  • <strong>Above 20%:</strong> High long-term volatility - sustained market stress,
-                                  elevated crash risk
+                                  • <strong>15-25%:</strong> Elevated volatility - sustained turbulence, investors
+                                  nervous for weeks/months
                                 </li>
                                 <li>
-                                  • <strong>Above 30%:</strong> Extreme long-term volatility - prolonged crisis
-                                  conditions
+                                  • <strong>Above 25%:</strong> High sustained volatility - characteristic of bear
+                                  markets and financial crises where uncertainty persists for months
                                 </li>
                               </ul>
                               <p className="text-sm mb-2">
-                                <strong>Why 90 Days Matters:</strong> Short-term volatility spikes can be temporary
-                                reactions to news. But when volatility stays elevated for 90 days, it suggests
-                                fundamental market problems that won't go away quickly.
-                              </p>
-                              <p className="text-sm mb-2">
-                                <strong>Calculation:</strong> Take daily returns for 90 days, calculate standard
-                                deviation, annualize it by multiplying by √252 (trading days in a year).
-                              </p>
-                              <p className="text-sm mb-2">
-                                <strong>Data Source:</strong> Calculated from 90 days of closing prices from stock
-                                exchanges.
+                                <strong>Why It Matters:</strong> When LTV exceeds 15% for extended periods, it indicates
+                                the market has shifted from a calm regime to a turbulent one. This regime change often
+                                precedes major corrections because sustained volatility erodes investor confidence and
+                                triggers deleveraging.
                               </p>
                               <p className="text-xs text-gray-600">
-                                Historical context: LTV stayed above 25% for months during 2008-2009 financial crisis
-                                and March-June 2020 COVID crash, signaling prolonged market distress.
+                                Historical note: LTV remained above 30% for most of 2008-2009 during the financial
+                                crisis. During the 2020 COVID crash, it spiked to 50% as markets experienced sustained
+                                wild swings for months.
                               </p>
                             </TooltipContent>
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{(data.indicators.ltv * 100).toFixed(1)}%</span>
+                      <span className="font-bold">{data.indicators.ltv.toFixed(1)}%</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, (data.indicators.ltv / 0.3) * 100)}%`,
+                          marginLeft: `${Math.min(100, Math.max(0, (data.indicators.ltv / 35) * 100))}%`,
                         }}
                       />
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Stable: {"<"}10%</span>
-                      <span className="text-yellow-600">Normal: 10-15%</span>
-                      <span>Elevated: {">"}20%</span>
+                      <span>Normal: 10-15%</span>
+                      <span>Elevated: {">"}25%</span>
                     </div>
                   </div>
                 )}
 
                 {/* Bullish Percent Index */}
-                {data.indicators.bullishPercent !== undefined && (
+                {data.indicators?.bullishPercent !== undefined && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         Bullish Percent Index
-                        {/* CHANGE: Enhanced Bullish Percent Index tooltip */}
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-2">Bullish Percent Index - Market Breadth Indicator</p>
+                              <p className="font-semibold mb-2">Bullish Percent Index - Technical Pattern Breadth</p>
                               <p className="text-sm mb-2">
-                                This indicator measures what percentage of stocks in an index are showing bullish
-                                technical signals based on "Point & Figure" charting. It's like taking a vote among all
-                                stocks - how many are trending up vs. down?
+                                The Bullish Percent Index measures what percentage of stocks in the S&P 500 are showing
+                                bullish technical chart patterns. Instead of looking at prices or earnings, this
+                                indicator analyzes the actual shape of each stock's price chart to determine if it's in
+                                an uptrend or downtrend.
                               </p>
                               <p className="text-sm mb-2">
-                                <strong>What It Measures:</strong> The percentage of stocks in the S&P 500 that have
-                                "bullish" chart patterns according to Point & Figure methodology. Each stock gets a
-                                simple yes/no vote: is its chart pattern bullish or bearish?
-                              </p>
-                              <p className="text-sm mb-2">
-                                <strong>Understanding Point & Figure Charts:</strong> Instead of showing every price
-                                move, Point & Figure charts only mark significant reversals in trend. A stock is
-                                "bullish" when its chart shows a pattern of higher highs and higher lows (uptrend
-                                intact).
+                                <strong>What It Measures:</strong> The percentage of S&P 500 stocks with bullish
+                                point-and-figure chart patterns - patterns like "double tops" (breakouts above
+                                resistance) and "bullish support lines" (stocks holding key technical levels).
                               </p>
                               <p className="text-sm mb-2">
                                 <strong>How to Read It:</strong>
                               </p>
                               <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  • <strong>Below 30%:</strong> Extreme bearishness - most stocks are in downtrends, but
-                                  often marks bottoms (contrarian buy)
+                                  • <strong>Below 30%:</strong> Oversold - most stocks in bearish patterns, pessimism
+                                  extreme, often marks bottoms (contrarian buy signal)
                                 </li>
                                 <li>
-                                  • <strong>30-50%:</strong> Bearish market - more stocks declining than advancing
+                                  • <strong>30-50%:</strong> Normal - balanced mix of bullish and bearish charts,
+                                  healthy market
                                 </li>
                                 <li>
-                                  • <strong>50-70%:</strong> Bullish market - more stocks advancing than declining,
-                                  healthy
+                                  • <strong>50-70%:</strong> Bullish - most stocks in uptrends, positive momentum
+                                  building
                                 </li>
                                 <li>
-                                  • <strong>Above 70%:</strong> Extreme bullishness - most stocks overbought, dangerous
-                                  (contrarian sell)
+                                  • <strong>Above 70%:</strong> Overbought - too many stocks extended, few left to join
+                                  rally, correction risk rises
                                 </li>
                                 <li>
-                                  • <strong>Above 80%:</strong> Euphoria - market is extremely overbought, crash risk
-                                  very high
+                                  • <strong>Above 80%:</strong> Extremely overbought - historically precedes pullbacks
+                                  as uptrends become exhausted
                                 </li>
                               </ul>
                               <p className="text-sm mb-2">
-                                <strong>Market Breadth Concept:</strong> It's healthier when many stocks participate in
-                                a rally (high breadth) than when just a few big stocks drive indexes higher while most
-                                stocks fall (low breadth). Declining breadth often precedes crashes.
-                              </p>
-                              <p className="text-sm mb-2">
-                                <strong>Data Source:</strong> Compiled from Point & Figure charts of S&P 500 stocks,
-                                updated daily.
+                                <strong>Why High Readings = Risk:</strong> When 80% of stocks already show bullish
+                                patterns, there are very few stocks left to "turn bullish" and fuel further gains.
+                                Markets need new buyers and fresh uptrends to continue rising - extreme breadth exhausts
+                                that fuel.
                               </p>
                               <p className="text-xs text-gray-600">
-                                Historical pattern: Readings above 75% preceded major tops in 2000 (dot-com bubble),
-                                2007 (pre-financial crisis), and early 2020 (pre-COVID crash).
+                                Calculation: Daily analysis of each S&P 500 stock's point-and-figure chart (ignores
+                                small moves, focuses only on significant directional changes). Maintained by Dorsey
+                                Wright & Associates since 1955.
                               </p>
                             </TooltipContent>
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{data.indicators.bullishPercent}%</span>
+                      <span className="font-bold">{Math.round(data.indicators.bullishPercent)}%</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${data.indicators.bullishPercent}%`,
+                          marginLeft: `${Math.min(100, Math.max(0, data.indicators.bullishPercent))}%`,
                         }}
                       />
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Oversold: {"<"}30%</span>
-                      <span className="text-yellow-600">Normal: 30-50%</span>
+                      <span>Normal: 30-50%</span>
                       <span>Overbought: {">"}70%</span>
                     </div>
                   </div>
                 )}
 
                 {/* Yield Curve (10Y-2Y Spread) */}
-                {data.indicators.yieldCurve !== undefined && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <h4 className="font-medium">Yield Curve (10Y-2Y Spread)</h4>
-                      <InfoTooltip title="The Yield Curve spread measures the difference between 10-year and 2-year U.S. Treasury bond yields, expressed in basis points (hundredths of a percent). Normally, long-term bonds pay higher interest than short-term bonds (positive spread of +50 to +200 bps), reflecting the extra risk of holding bonds longer. When this inverts (negative spread), it means short-term rates are higher than long-term rates, signaling that bond markets expect economic trouble and future rate cuts. Inversions have preceded every U.S. recession since 1950, typically 6-18 months before the downturn. The calculation is simple: 10-Year Treasury Yield minus 2-Year Treasury Yield. A deeply inverted curve (below -50 bps) is a major recession warning and often precedes stock market crashes." />
-                    </div>
-                    <div className="relative pt-1">
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span className="text-gray-700">Inverted: &lt;0</span>
-                        <span className="text-gray-700">Flat: 0-50</span>
-                        <span className="text-gray-700">Steep: &gt;100</span>
-                      </div>
-                      <div className="w-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 rounded h-4"></div>
-                      <div
-                        className="absolute top-[28px] w-1 h-6 bg-black"
-                        style={{
-                          left: `${Math.min(Math.max(((data.indicators.yieldCurve + 100) / 300) * 100, 0), 100)}%`,
-                        }}
-                      ></div>
-                    </div>
-                    <div className="flex justify-between items-center mt-2">
-                      <span className="text-2xl font-bold">{data.indicators.yieldCurve.toFixed(0)} bps</span>
-                      <span
-                        className={`text-sm font-medium ${
-                          data.indicators.yieldCurve < 0
-                            ? "text-red-600"
-                            : data.indicators.yieldCurve > 100
-                              ? "text-green-600"
-                              : "text-yellow-600"
-                        }`}
-                      >
-                        {data.indicators.yieldCurve < 0
-                          ? "Inverted (Recession Risk)"
-                          : data.indicators.yieldCurve > 100
-                            ? "Steep (Healthy)"
-                            : "Flat"}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-
-          {/* Pillar 3 - Valuation & Market Structure */}
-          <AccordionItem value="pillar3" className="border rounded-lg px-4">
-            <AccordionTrigger className="hover:no-underline py-10">
-              <div className="flex items-center justify-between w-full pr-4">
-                <div className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5 text-green-600" />
-                  <span className="text-lg font-semibold">Pillar 3 - Valuation & Market Structure</span>
-                  <span className="text-sm text-gray-600">Weight: 15% | 7 indicators</span>
-                </div>
-                <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.valuation)}/100</span>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent>
-              <div className="space-y-6 pt-4">
-                {/* S&P 500 P/E */}
-                {data.indicators?.spxPE !== undefined && (
+                {data.indicators?.yieldCurve !== undefined && (
                   <div className="space-y-2">
-                    {/* Added tooltip to S&P 500 P/E indicator */}
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
-                        S&P 500 Forward P/E
+                        Yield Curve (10Y-2Y Spread)
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-green-50 border-green-200">
-                              <p className="font-semibold mb-1">S&P 500 Forward P/E Ratio</p>
-                              <p className="text-sm">Price-to-Earnings ratio based on estimated future earnings.</p>
-                              <ul className="text-sm mt-1 space-y-1">
+                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-2">Yield Curve - Recession Prediction Gauge</p>
+                              <p className="text-sm mb-2">
+                                The yield curve measures the difference (spread) between long-term interest rates
+                                (10-year Treasury bonds) and short-term rates (2-year Treasury bonds). It's one of the
+                                most reliable recession predictors in financial history - every recession since 1950 was
+                                preceded by an inverted yield curve.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>What It Measures:</strong> 10-year Treasury yield minus 2-year Treasury yield,
+                                expressed in basis points (bps). For example, if 10-year bonds pay 4.5% and 2-year bonds
+                                pay 5.0%, the spread is -50 bps (inverted).
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>How to Read It:</strong>
+                              </p>
+                              <ul className="text-sm space-y-1 mb-2">
                                 <li>
-                                  <strong>{"<"} 15:</strong> Undervalued, low crash risk
+                                  • <strong>Above +100 bps:</strong> Steep curve - healthy economy, banks profitable,
+                                  low recession risk
                                 </li>
                                 <li>
-                                  <strong>16-20:</strong> Fair value, moderate risk
+                                  • <strong>+50 to +100 bps:</strong> Normal - typical spread, economy functioning well
                                 </li>
                                 <li>
-                                  <strong>{">"} 20:</strong> Overvalued, high crash risk
+                                  • <strong>0 to +50 bps:</strong> Flattening - economy slowing, recession risk building
+                                </li>
+                                <li>
+                                  • <strong>Below 0 (Inverted):</strong> Inverted curve - bond market predicting
+                                  recession, high crash risk. Markets typically peak 12-18 months after inversion.
+                                </li>
+                                <li>
+                                  • <strong>Below -50 bps:</strong> Deeply inverted - severe recession expectations,
+                                  extreme crash risk
                                 </li>
                               </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> High P/E ratios indicate markets vulnerable to corrections
+                              <p className="text-sm mb-2">
+                                <strong>Why Inversion Matters:</strong> When short-term rates exceed long-term rates, it
+                                means investors think the Fed will need to cut rates in the future due to economic
+                                weakness. This reflects consensus that growth is slowing and recession is coming.
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                Historical accuracy: The yield curve inverted before the 2000 dot-com crash, the 2008
+                                financial crisis, and the 2020 recession. It has predicted 8 of the last 8 recessions
+                                with only 1-2 false signals in 50+ years.
                               </p>
                             </TooltipContent>
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{data.indicators.spxPE}</span>
+                      <span className="font-bold">{data.indicators.yieldCurve.toFixed(0)} bps</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, ((data.indicators.spxPE - 10) / 15) * 100)}%`,
+                          marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.yieldCurve + 100) / 250) * 100))}%`,
                         }}
                       />
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
-                      <span>Historical Median: 16</span>
-                      <span>Current: {data.indicators.spxPE}</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* P/S Ratio */}
-                {data.indicators.spxPS !== undefined && (
-                  <div className="space-y-2">
-                    {/* Added tooltip to S&P 500 P/S indicator */}
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium flex items-center gap-1">
-                        S&P 500 Price-to-Sales
-                        {tooltipsEnabled && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-green-50 border-green-200">
-                              <p className="font-semibold mb-1">S&P 500 Price-to-Sales Ratio</p>
-                              <p className="text-sm">Market capitalization relative to total company revenues.</p>
-                              <ul className="text-sm mt-1 space-y-1">
-                                <li>
-                                  <strong>{"<"} 2.5:</strong> Undervalued, low risk
-                                </li>
-                                <li>
-                                  <strong>2.5 - 3.0:</strong> Fair value, moderate risk
-                                </li>
-                                <li>
-                                  <strong>{">"} 3.0:</strong> Overvalued, high crash risk
-                                </li>
-                              </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> High P/S ratios indicate markets trading at a premium to sales,
-                                vulnerable to price drops
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </span>
-                      <span className="font-bold">{data.indicators.spxPS}</span>
-                    </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                      <div
-                        className="absolute inset-0 bg-gray-200"
-                        style={{
-                          marginLeft: `${Math.min(100, ((data.indicators.spxPS - 1) / 2) * 100)}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Normal: {"<"}2.5</span>
-                      <span>Elevated: {">"}3.0</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Buffett Indicator */}
-                {data.indicators.buffettIndicator !== undefined && (
-                  <div className="space-y-2">
-                    {/* Added tooltip to Buffett Indicator */}
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium flex items-center gap-1">
-                        Buffett Indicator (Market Cap / GDP)
-                        {tooltipsEnabled && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-red-50 border-red-200">
-                              <p className="font-semibold mb-1">Buffett Indicator</p>
-                              <p className="text-sm">Compares total stock market capitalization to GDP.</p>
-                              <ul className="text-sm mt-1 space-y-1">
-                                <li>
-                                  <strong>{"<"} 120%:</strong> Undervalued, low crash risk
-                                </li>
-                                <li>
-                                  <strong>120-150%:</strong> Fair value, moderate risk
-                                </li>
-                                <li>
-                                  <strong>150-180%:</strong> Elevated risk
-                                </li>
-                                <li>
-                                  <strong>{">"} 200%:</strong> Historically signifies market bubbles, extreme crash risk
-                                </li>
-                              </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> A high Buffett Indicator suggests the market is significantly
-                                overvalued relative to the economy's productive capacity
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </span>
-                      <span className="font-bold">{data.indicators.buffettIndicator.toFixed(0)}%</span>
-                    </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                      <div
-                        className="absolute inset-0 bg-gray-200"
-                        style={{
-                          marginLeft: `${Math.min(100, Math.max(0, (data.indicators.buffettIndicator - 80) / 1.6))}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Undervalued: {"<"}120%</span>
-                      <span>Fair: 120-150%</span>
-                      <span>Warning: 150-180%</span>
-                      <span className="text-red-600">Danger: {">"}200%</span>
-                    </div>
-                  </div>
-                )}
-
-                {data.indicators.qqqPE !== undefined && (
-                  <div className="space-y-2">
-                    {/* Added tooltip to QQQ P/E indicator */}
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium flex items-center gap-1">
-                        QQQ Forward P/E (AI-Specific Valuation)
-                        {tooltipsEnabled && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-1">QQQ Forward P/E Ratio</p>
-                              <p className="text-sm">
-                                Measures the valuation of the Nasdaq-100, often driven by tech and AI growth
-                                expectations.
-                              </p>
-                              <ul className="text-sm mt-1 space-y-1">
-                                <li>
-                                  <strong>{"<"} 25:</strong> Fairly valued or undervalued
-                                </li>
-                                <li>
-                                  <strong>25-35:</strong> Elevated valuation, moderate risk
-                                </li>
-                                <li>
-                                  <strong>{">"} 35:</strong> Bubble territory, very high crash risk
-                                </li>
-                              </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> High P/E in tech can lead to sharp corrections when growth
-                                expectations are not met
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </span>
-                      <span className="font-bold">{data.indicators.qqqPE.toFixed(1)}</span>
-                    </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                      <div
-                        className="absolute inset-0 bg-gray-200"
-                        style={{
-                          marginLeft: `${Math.min(100, ((data.indicators.qqqPE - 15) / 30) * 100)}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Fair: {"<"}25</span>
-                      <span>Elevated: 30-35</span>
-                      <span>Bubble: {">"}40</span>
-                    </div>
-                  </div>
-                )}
-
-                {data.indicators.mag7Concentration !== undefined && (
-                  <div className="space-y-2">
-                    {/* Added tooltip to Magnificent 7 Concentration */}
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium flex items-center gap-1">
-                        Magnificent 7 Concentration (Crash Contagion Risk)
-                        {tooltipsEnabled && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-red-50 border-red-200">
-                              <p className="font-semibold mb-1">Magnificent 7 Concentration</p>
-                              <p className="text-sm">
-                                Percentage of the S&P 500 market cap held by the 'Magnificent 7' stocks.
-                              </p>
-                              <ul className="text-sm mt-1 space-y-1">
-                                <li>
-                                  <strong>{"<"} 50%:</strong> Diversified market, lower contagion risk
-                                </li>
-                                <li>
-                                  <strong>55-60%:</strong> High concentration, increased contagion risk
-                                </li>
-                                <li>
-                                  <strong>{">"} 65%:</strong> Extreme concentration, very high crash risk
-                                </li>
-                              </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> High concentration means a downturn in these stocks can
-                                severely impact the entire market
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </span>
-                      <span className="font-bold">{data.indicators.mag7Concentration.toFixed(1)}%</span>
-                    </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                      <div
-                        className="absolute inset-0 bg-gray-200"
-                        style={{
-                          marginLeft: `${Math.min(100, ((data.indicators.mag7Concentration - 40) / 30) * 100)}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Diversified: {"<"}50%</span>
-                      <span>High: 55-60%</span>
-                      <span>Extreme: {">"}65%</span>
-                    </div>
-                  </div>
-                )}
-
-                {data.indicators.shillerCAPE !== undefined && (
-                  <div className="space-y-2">
-                    {/* Added tooltip to Shiller CAPE Ratio */}
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium flex items-center gap-1">
-                        Shiller CAPE Ratio (10-Year Cyclical Valuation)
-                        {tooltipsEnabled && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-red-50 border-red-200">
-                              <p className="font-semibold mb-1">Shiller CAPE Ratio</p>
-                              <p className="text-sm">Cyclically Adjusted Price-to-Earnings ratio over 10 years.</p>
-                              <ul className="text-sm mt-1 space-y-1">
-                                <li>
-                                  <strong>{"<"} 20:</strong> Undervalued, low risk
-                                </li>
-                                <li>
-                                  <strong>20-30:</strong> Fair value, moderate risk
-                                </li>
-                                <li>
-                                  <strong>30-35:</strong> Elevated valuation, high risk
-                                </li>
-                                <li>
-                                  <strong>{">"} 35:</strong> Historically signals market tops, extreme crash risk
-                                </li>
-                              </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> High CAPE values indicate markets trading significantly above
-                                historical averages, prone to reversion
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </span>
-                      <span className="font-bold">{data.indicators.shillerCAPE.toFixed(1)}</span>
-                    </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                      <div
-                        className="absolute inset-0 bg-gray-200"
-                        style={{
-                          marginLeft: `${Math.min(100, ((data.indicators.shillerCAPE - 15) / 25) * 100)}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Historical Avg: 16-17</span>
-                      <span>Elevated: 25-30</span>
-                      <span>Extreme: {">"}35</span>
-                    </div>
-                  </div>
-                )}
-
-                {data.indicators.equityRiskPremium !== undefined && (
-                  <div className="space-y-2">
-                    {/* Added tooltip to Equity Risk Premium */}
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium flex items-center gap-1">
-                        Equity Risk Premium (Earnings Yield - 10Y Treasury)
-                        {tooltipsEnabled && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-green-50 border-green-200">
-                              <p className="font-semibold mb-1">Equity Risk Premium</p>
-                              <p className="text-sm">
-                                The excess return investors expect for holding stocks over risk-free bonds.
-                              </p>
-                              <ul className="text-sm mt-1 space-y-1">
-                                <li>
-                                  <strong>{">"} 5%:</strong> Attractive returns, low risk
-                                </li>
-                                <li>
-                                  <strong>3-4%:</strong> Fair compensation, moderate risk
-                                </li>
-                                <li>
-                                  <strong>{"<"} 2%:</strong> Low compensation, high crash risk
-                                </li>
-                              </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Low ERP suggests stocks are overvalued relative to their risk
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </span>
-                      <span className="font-bold">{data.indicators.equityRiskPremium.toFixed(2)}%</span>
-                    </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                      <div
-                        className="absolute inset-0 bg-gray-200"
-                        style={{
-                          marginLeft: `${Math.min(100, Math.max(0, ((6 - data.indicators.equityRiskPremium) / 6) * 100))}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Attractive: {">"}5%</span>
-                      <span>Fair: 3-4%</span>
-                      <span>Overvalued: {"<"}2%</span>
+                      <span>Inverted: {"<"}0 (Recession Risk)</span>
+                      <span>Flat: 0-50</span>
+                      <span>Steep: {">"}100 (Healthy)</span>
                     </div>
                   </div>
                 )}
@@ -3613,7 +3544,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                           <div className="mb-3">
                             <div className="flex items-center justify-between mb-2">
                               <div>
-                                <span className="font-mono text-sm font-bold text-gray-900">CCPI: {item.range}</span>
+                                <span className="font-mono text-sm font-bold text-gray-900">CCPI {item.range}</span>
                                 <span
                                   className={`ml-3 font-bold text-sm ${
                                     index === 0
