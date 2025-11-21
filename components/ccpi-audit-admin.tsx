@@ -109,10 +109,10 @@ export function CcpiAuditAdmin() {
         ],
       },
       canaries: {
-        total: 38,
+        total: 34,
         active: ccpi.activeCanaries,
         formula: "Count of indicators breaching medium or high risk thresholds",
-        executiveSummary: `Canary signals are binary warnings triggered when individual indicators cross predefined thresholds. ${ccpi.activeCanaries} of 38 indicators are currently flashing warning signals.`,
+        executiveSummary: `Canary signals are binary warnings triggered when individual indicators cross predefined thresholds. ${ccpi.activeCanaries} of 34 indicators are currently flashing warning signals.`,
         severityLevels: {
           high: "Critical breach requiring immediate attention",
           medium: "Elevated risk requiring monitoring",

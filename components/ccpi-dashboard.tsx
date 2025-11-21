@@ -212,7 +212,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
         regime: result.regime.name,
         pillars: result.pillars,
         activeCanaries: result.canaries.filter((c: any) => c.severity === "high" || c.severity === "medium").length,
-        totalIndicators: 38,
+        totalIndicators: 34,
       })
       console.log("[v0] Pillar Breakdown (weighted contribution to CCPI):")
       console.log("  Momentum:", result.pillars.momentum, "× 40% =", (result.pillars.momentum * 0.4).toFixed(1))
@@ -280,7 +280,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
           ccpi: ccpiData.ccpi,
           certainty: ccpiData.certainty,
           activeCanaries: ccpiData.canaries.filter((c) => c.severity === "high" || c.severity === "medium").length,
-          totalIndicators: 38, // Removed problematic comment
+          totalIndicators: 34,
           regime: ccpiData.regime,
           pillars: ccpiData.pillars,
         }),
@@ -717,7 +717,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
               </div>
               <span className="text-2xl font-bold text-red-600">
                 {data.canaries.filter((canary) => canary.severity === "high" || canary.severity === "medium").length}/
-                {data.totalIndicators || 38}
+                {data.totalIndicators || 34}
               </span>
             </CardTitle>
             <CardDescription>

@@ -187,7 +187,7 @@ export async function GET() {
       },
       canaries,
       activeCanaries: canaries.filter((c) => c.severity === "high" || c.severity === "medium").length,
-      totalIndicators: 38,
+      totalIndicators: 34,
       apiStatus: data.apiStatus,
       timestamp: new Date().toISOString(),
       cachedAt: new Date().toISOString(), // Added cache timestamp
@@ -1266,7 +1266,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // 1. QQQ Daily Return (Weight: 8/100 in Pillar 1)
   if (data.qqqDailyReturn <= -6) {
     canaries.push({
-      signal: `QQQ crashed ${Math.abs(data.qqqDailyReturn).toFixed(1)}% - Momentum loss`,
+      signal: `QQQ crashed ${Math.abs(data.qqqDailyReturn).toFixed(1)}% - Massive wealth destruction in tech sector threatens broader market contagion`,
       pillar: "Momentum & Technical",
       severity: "high",
       indicatorWeight: 8,
@@ -1275,7 +1275,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.qqqDailyReturn <= -3) {
     canaries.push({
-      signal: `QQQ dropped ${Math.abs(data.qqqDailyReturn).toFixed(1)}% - Sharp decline`,
+      signal: `QQQ dropped ${Math.abs(data.qqqDailyReturn).toFixed(1)}% - Significant portfolio losses accelerating selling pressure`,
       pillar: "Momentum & Technical",
       severity: "medium",
       indicatorWeight: 8,
@@ -1287,7 +1287,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // 2. QQQ Consecutive Down Days (Weight: 5/100 in Pillar 1)
   if (data.qqqConsecDown >= 5) {
     canaries.push({
-      signal: `${data.qqqConsecDown} consecutive down days - Trend break`,
+      signal: `${data.qqqConsecDown} consecutive down days - Persistent selling creates compounding losses and margin call risk`,
       pillar: "Momentum & Technical",
       severity: "high",
       indicatorWeight: 5,
@@ -1296,7 +1296,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.qqqConsecDown >= 3) {
     canaries.push({
-      signal: `${data.qqqConsecDown} consecutive down days`,
+      signal: `${data.qqqConsecDown} consecutive down days - Sustained decline eroding portfolio values`,
       pillar: "Momentum & Technical",
       severity: "medium",
       indicatorWeight: 5,
@@ -1308,7 +1308,8 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // 3. QQQ Below 20-Day SMA (Weight: 5/100 in Pillar 1)
   if (data.qqqBelowSMA20 && data.qqqSMA20Proximity >= 100) {
     canaries.push({
-      signal: "QQQ breached 20-day SMA - Short-term support lost",
+      signal:
+        "QQQ breached 20-day SMA - Algorithmic selling triggers accelerate downside momentum and portfolio losses",
       pillar: "Momentum & Technical",
       severity: "high",
       indicatorWeight: 5,
@@ -1317,7 +1318,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.qqqSMA20Proximity >= 50) {
     canaries.push({
-      signal: `QQQ approaching 20-day SMA (${data.qqqSMA20Proximity.toFixed(0)}% proximity)`,
+      signal: `QQQ approaching 20-day SMA (${data.qqqSMA20Proximity.toFixed(0)}% proximity) - Technical breakdown could trigger automated selling programs`,
       pillar: "Momentum & Technical",
       severity: "medium",
       indicatorWeight: 5,
@@ -1329,7 +1330,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // 4. QQQ Below 50-Day SMA (Weight: 7/100 in Pillar 1)
   if (data.qqqBelowSMA50 && data.qqqSMA50Proximity >= 100) {
     canaries.push({
-      signal: "QQQ breached 50-day SMA - Medium-term trend broken",
+      signal: "QQQ breached 50-day SMA - Institutional capital allocation shifts away from tech, reducing valuations",
       pillar: "Momentum & Technical",
       severity: "high",
       indicatorWeight: 7,
@@ -1338,7 +1339,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.qqqSMA50Proximity >= 50) {
     canaries.push({
-      signal: `QQQ approaching 50-day SMA (${data.qqqSMA50Proximity.toFixed(0)}% proximity)`,
+      signal: `QQQ approaching 50-day SMA (${data.qqqSMA50Proximity.toFixed(0)}% proximity) - Investors preparing to reduce tech exposure`,
       pillar: "Momentum & Technical",
       severity: "medium",
       indicatorWeight: 7,
@@ -1350,7 +1351,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // 5. QQQ Below 200-Day SMA (Weight: 10/100 in Pillar 1)
   if (data.qqqBelowSMA200 && data.qqqSMA200Proximity >= 100) {
     canaries.push({
-      signal: "QQQ breached 200-day SMA - Long-term bull market in question",
+      signal: "QQQ breached 200-day SMA - Bear market confirmed with average 30-40% declines historically ahead",
       pillar: "Momentum & Technical",
       severity: "high",
       indicatorWeight: 10,
@@ -1359,7 +1360,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.qqqSMA200Proximity >= 50) {
     canaries.push({
-      signal: `QQQ approaching 200-day SMA (${data.qqqSMA200Proximity.toFixed(0)}% proximity)`,
+      signal: `QQQ approaching 200-day SMA (${data.qqqSMA200Proximity.toFixed(0)}% proximity) - Long-term investors considering portfolio protection`,
       pillar: "Momentum & Technical",
       severity: "medium",
       indicatorWeight: 10,
@@ -1371,7 +1372,8 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // 6. QQQ Below Bollinger Band (Weight: 6/100 in Pillar 1)
   if (data.qqqBelowBollinger && data.qqqBollingerProximity >= 100) {
     canaries.push({
-      signal: "QQQ breached lower Bollinger Band - Oversold territory",
+      signal:
+        "QQQ breached lower Bollinger Band - Extreme statistical deviation signals panic selling and oversold conditions",
       pillar: "Momentum & Technical",
       severity: "high",
       indicatorWeight: 6,
@@ -1380,7 +1382,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.qqqBollingerProximity >= 50) {
     canaries.push({
-      signal: `QQQ approaching Bollinger Band (${data.qqqBollingerProximity.toFixed(0)}% proximity)`,
+      signal: `QQQ approaching Bollinger Band (${data.qqqBollingerProximity.toFixed(0)}% proximity) - Volatility expansion threatens further price declines`,
       pillar: "Momentum & Technical",
       severity: "medium",
       indicatorWeight: 6,
@@ -1392,7 +1394,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // 7. VIX (Weight: 9/100 in Pillar 1)
   if (data.vix > 35) {
     canaries.push({
-      signal: `VIX at ${data.vix.toFixed(1)} - Extreme fear`,
+      signal: `VIX at ${data.vix.toFixed(1)} - Market panic driving option premiums up 300-500%, crushing leveraged portfolios`,
       pillar: "Momentum & Technical",
       severity: "high",
       indicatorWeight: 9,
@@ -1401,7 +1403,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.vix > 25) {
     canaries.push({
-      signal: `VIX at ${data.vix.toFixed(1)} - Elevated fear`,
+      signal: `VIX at ${data.vix.toFixed(1)} - Rising hedging costs reduce net returns and signal investor anxiety`,
       pillar: "Momentum & Technical",
       severity: "medium",
       indicatorWeight: 9,
@@ -1413,7 +1415,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // 8. VXN (Weight: 7/100 in Pillar 1)
   if (data.vxn > 35) {
     canaries.push({
-      signal: `VXN at ${data.vxn.toFixed(1)} - Nasdaq panic`,
+      signal: `VXN at ${data.vxn.toFixed(1)} - Tech sector volatility explosion threatens trillion-dollar market cap destruction`,
       pillar: "Momentum & Technical",
       severity: "high",
       indicatorWeight: 7,
@@ -1422,7 +1424,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.vxn > 25) {
     canaries.push({
-      signal: `VXN at ${data.vxn.toFixed(1)} - Nasdaq volatility elevated`,
+      signal: `VXN at ${data.vxn.toFixed(1)} - Nasdaq instability increasing portfolio risk and option costs`,
       pillar: "Momentum & Technical",
       severity: "medium",
       indicatorWeight: 7,
@@ -1434,7 +1436,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // 9. RVX (Weight: 5/100 in Pillar 1)
   if (data.rvx > 35) {
     canaries.push({
-      signal: `RVX at ${data.rvx.toFixed(1)} - Small-cap stress`,
+      signal: `RVX at ${data.rvx.toFixed(1)} - Small-cap panic indicates liquidity crisis spreading beyond large stocks`,
       pillar: "Momentum & Technical",
       severity: "high",
       indicatorWeight: 5,
@@ -1443,7 +1445,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.rvx > 25) {
     canaries.push({
-      signal: `RVX at ${data.rvx.toFixed(1)} - Small-cap volatility rising`,
+      signal: `RVX at ${data.rvx.toFixed(1)} - Small-cap stress signals reduced risk appetite and capital flight to safety`,
       pillar: "Momentum & Technical",
       severity: "medium",
       indicatorWeight: 5,
@@ -1455,7 +1457,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // 10. VIX Term Structure (Weight: 6/100 in Pillar 1)
   if (data.vixTermInverted || data.vixTermStructure < 0.8) {
     canaries.push({
-      signal: `VIX term structure inverted (${data.vixTermStructure.toFixed(2)}) - Immediate fear`,
+      signal: `VIX term structure inverted (${data.vixTermStructure.toFixed(2)}) - Traders expecting immediate crisis, hedging costs skyrocket`,
       pillar: "Momentum & Technical",
       severity: "high",
       indicatorWeight: 6,
@@ -1464,7 +1466,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.vixTermStructure < 1.2) {
     canaries.push({
-      signal: `VIX term structure flattening (${data.vixTermStructure.toFixed(2)})`,
+      signal: `VIX term structure flattening (${data.vixTermStructure.toFixed(2)}) - Market pricing increased near-term risk`,
       pillar: "Momentum & Technical",
       severity: "medium",
       indicatorWeight: 6,
@@ -1476,7 +1478,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // 11. ATR (Weight: 5/100 in Pillar 2)
   if (data.atr > 50) {
     canaries.push({
-      signal: `ATR at ${data.atr.toFixed(1)} - Extreme volatility`,
+      signal: `ATR at ${data.atr.toFixed(1)} - Extreme daily price swings create unpredictable losses and stop-loss cascades`,
       pillar: "Risk Appetite & Volatility",
       severity: "high",
       indicatorWeight: 5,
@@ -1485,7 +1487,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.atr > 40) {
     canaries.push({
-      signal: `ATR at ${data.atr.toFixed(1)} - Elevated volatility`,
+      signal: `ATR at ${data.atr.toFixed(1)} - Elevated volatility increases portfolio drawdowns and trading costs`,
       pillar: "Risk Appetite & Volatility",
       severity: "medium",
       indicatorWeight: 5,
@@ -1497,7 +1499,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // 12. LTV (Weight: 5/100 in Pillar 2)
   if (data.ltv > 0.2) {
     canaries.push({
-      signal: `Long-term volatility at ${(data.ltv * 100).toFixed(1)}% - Sustained instability`,
+      signal: `Long-term volatility at ${(data.ltv * 100).toFixed(1)}% - Persistent instability destroys long-term wealth accumulation`,
       pillar: "Risk Appetite & Volatility",
       severity: "high",
       indicatorWeight: 5,
@@ -1506,7 +1508,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.ltv > 0.15) {
     canaries.push({
-      signal: `Long-term volatility at ${(data.ltv * 100).toFixed(1)}% - Rising`,
+      signal: `Long-term volatility at ${(data.ltv * 100).toFixed(1)}% - Sustained market choppiness reduces compounding returns`,
       pillar: "Risk Appetite & Volatility",
       severity: "medium",
       indicatorWeight: 5,
@@ -1518,7 +1520,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // 13. Bullish Percent (Weight: 5/100 in Pillar 2)
   if (data.bullishPercent > 70) {
     canaries.push({
-      signal: `Bullish Percent at ${data.bullishPercent}% - Overbought danger`,
+      signal: `Bullish Percent at ${data.bullishPercent}% - Extreme overbought conditions precede average 15-25% corrections`,
       pillar: "Risk Appetite & Volatility",
       severity: "high",
       indicatorWeight: 5,
@@ -1527,7 +1529,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.bullishPercent > 60) {
     canaries.push({
-      signal: `Bullish Percent at ${data.bullishPercent}% - Elevated optimism`,
+      signal: `Bullish Percent at ${data.bullishPercent}% - Limited upside with increased downside risk as optimism peaks`,
       pillar: "Risk Appetite & Volatility",
       severity: "medium",
       indicatorWeight: 5,
@@ -1539,7 +1541,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // 14. Put/Call Ratio (Weight: 18/100 in Pillar 2)
   if (data.putCallRatio < 0.6) {
     canaries.push({
-      signal: `Put/Call at ${data.putCallRatio.toFixed(2)} - Extreme complacency`,
+      signal: `Put/Call at ${data.putCallRatio.toFixed(2)} - Dangerously low hedging leaves portfolios exposed to sudden 20%+ drops`,
       pillar: "Risk Appetite & Volatility",
       severity: "high",
       indicatorWeight: 18,
@@ -1548,7 +1550,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.putCallRatio < 0.85) {
     canaries.push({
-      signal: `Put/Call at ${data.putCallRatio.toFixed(2)} - Low hedging activity`,
+      signal: `Put/Call at ${data.putCallRatio.toFixed(2)} - Insufficient downside protection increases portfolio vulnerability`,
       pillar: "Risk Appetite & Volatility",
       severity: "medium",
       indicatorWeight: 18,
@@ -1561,7 +1563,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   if (data.fearGreedIndex !== null) {
     if (data.fearGreedIndex > 80) {
       canaries.push({
-        signal: `Fear & Greed at ${data.fearGreedIndex} - Extreme greed`,
+        signal: `Fear & Greed at ${data.fearGreedIndex} - Euphoric sentiment historically followed by 15-30% drawdowns within months`,
         pillar: "Risk Appetite & Volatility",
         severity: "high",
         indicatorWeight: 15,
@@ -1570,7 +1572,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
       })
     } else if (data.fearGreedIndex > 70) {
       canaries.push({
-        signal: `Fear & Greed at ${data.fearGreedIndex} - Elevated greed`,
+        signal: `Fear & Greed at ${data.fearGreedIndex} - Elevated optimism reduces margin of safety in valuations`,
         pillar: "Risk Appetite & Volatility",
         severity: "medium",
         indicatorWeight: 15,
@@ -1584,7 +1586,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   const aaiiBullish = data.aaiiBullish || 35
   if (aaiiBullish > 55) {
     canaries.push({
-      signal: `AAII Bullish at ${aaiiBullish}% - Retail euphoria`,
+      signal: `AAII Bullish at ${aaiiBullish}% - Retail investor euphoria marks market tops before 20-40% crashes`,
       pillar: "Risk Appetite & Volatility",
       severity: "high",
       indicatorWeight: 16,
@@ -1593,7 +1595,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (aaiiBullish > 45) {
     canaries.push({
-      signal: `AAII Bullish at ${aaiiBullish}% - Elevated retail optimism`,
+      signal: `AAII Bullish at ${aaiiBullish}% - Excessive retail optimism indicates limited new buying power`,
       pillar: "Risk Appetite & Volatility",
       severity: "medium",
       indicatorWeight: 16,
@@ -1606,7 +1608,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   const shortInterest = data.shortInterest || 2.5
   if (shortInterest < 1.5) {
     canaries.push({
-      signal: `Short Interest at ${shortInterest.toFixed(1)}% - Extreme complacency`,
+      signal: `Short Interest at ${shortInterest.toFixed(1)}% - Minimal bearish positioning eliminates downside cushion from short covering`,
       pillar: "Risk Appetite & Volatility",
       severity: "high",
       indicatorWeight: 13,
@@ -1615,7 +1617,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (shortInterest < 2.5) {
     canaries.push({
-      signal: `Short Interest at ${shortInterest.toFixed(1)}% - Low positioning`,
+      signal: `Short Interest at ${shortInterest.toFixed(1)}% - Reduced skepticism removes safety net during selloffs`,
       pillar: "Risk Appetite & Volatility",
       severity: "medium",
       indicatorWeight: 13,
@@ -1628,7 +1630,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   if (data.etfFlows !== undefined) {
     if (data.etfFlows < -3.0) {
       canaries.push({
-        signal: `ETF outflows at $${Math.abs(data.etfFlows).toFixed(1)}B - Capital flight`,
+        signal: `ETF outflows at $${Math.abs(data.etfFlows).toFixed(1)}B - Massive institutional exit accelerates price declines`,
         pillar: "Risk Appetite & Volatility",
         severity: "high",
         indicatorWeight: 8,
@@ -1637,7 +1639,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
       })
     } else if (data.etfFlows < -1.5) {
       canaries.push({
-        signal: `ETF outflows at $${Math.abs(data.etfFlows).toFixed(1)}B - Selling pressure`,
+        signal: `ETF outflows at $${Math.abs(data.etfFlows).toFixed(1)}B - Capital withdrawal reduces market liquidity and support`,
         pillar: "Risk Appetite & Volatility",
         severity: "medium",
         indicatorWeight: 8,
@@ -1652,7 +1654,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // We'll use Pillar 1's weight here as it's primarily a momentum/macro indicator.
   if (data.yieldCurve < -1.0) {
     canaries.push({
-      signal: `Yield curve inverted ${Math.abs(data.yieldCurve).toFixed(2)}% - Deep inversion`,
+      signal: `Yield curve inverted ${Math.abs(data.yieldCurve).toFixed(2)}% - Deep inversion preceded every recession and major bear market since 1950`,
       pillar: "Momentum & Technical",
       severity: "high",
       indicatorWeight: 10,
@@ -1661,7 +1663,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.yieldCurve < -0.2) {
     canaries.push({
-      signal: `Yield curve inverted ${Math.abs(data.yieldCurve).toFixed(2)}%`,
+      signal: `Yield curve inverted ${Math.abs(data.yieldCurve).toFixed(2)}% - Banks' lending margins compressed, credit conditions tightening`,
       pillar: "Momentum & Technical",
       severity: "medium",
       indicatorWeight: 10,
@@ -1673,7 +1675,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // 20. S&P 500 P/E (Weight: 18/100 in Pillar 3)
   if (data.spxPE > 30) {
     canaries.push({
-      signal: `S&P 500 P/E at ${data.spxPE.toFixed(1)} - Extreme overvaluation`,
+      signal: `S&P 500 P/E at ${data.spxPE.toFixed(1)} - Extreme overvaluation requires 30-50% price drop or massive earnings growth to normalize`,
       pillar: "Valuation & Market Structure",
       severity: "high",
       indicatorWeight: 18,
@@ -1682,7 +1684,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.spxPE > 22) {
     canaries.push({
-      signal: `S&P 500 P/E at ${data.spxPE.toFixed(1)} - Above historical average`,
+      signal: `S&P 500 P/E at ${data.spxPE.toFixed(1)} - Above-average valuations offer limited upside and amplified downside risk`,
       pillar: "Valuation & Market Structure",
       severity: "medium",
       indicatorWeight: 18,
@@ -1694,7 +1696,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // 21. S&P 500 P/S (Weight: 12/100 in Pillar 3)
   if (data.spxPS > 3.5) {
     canaries.push({
-      signal: `S&P 500 P/S at ${data.spxPS.toFixed(1)} - Extremely expensive`,
+      signal: `S&P 500 P/S at ${data.spxPS.toFixed(1)} - Record valuation demands perfect execution; any disappointment triggers sharp selloffs`,
       pillar: "Valuation & Market Structure",
       severity: "high",
       indicatorWeight: 12,
@@ -1703,7 +1705,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.spxPS > 2.5) {
     canaries.push({
-      signal: `S&P 500 P/S at ${data.spxPS.toFixed(1)} - Elevated valuation`,
+      signal: `S&P 500 P/S at ${data.spxPS.toFixed(1)} - Elevated revenue multiples vulnerable to margin compression`,
       pillar: "Valuation & Market Structure",
       severity: "medium",
       indicatorWeight: 12,
@@ -1716,7 +1718,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   const buffett = data.buffettIndicator || 180
   if (buffett > 200) {
     canaries.push({
-      signal: `Buffett Indicator at ${buffett.toFixed(0)}% - Significantly overvalued`,
+      signal: `Buffett Indicator at ${buffett.toFixed(0)}% - Market cap vastly exceeds economic output; historically signals 40-60% crashes`,
       pillar: "Valuation & Market Structure",
       severity: "high",
       indicatorWeight: 16,
@@ -1725,7 +1727,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (buffett > 150) {
     canaries.push({
-      signal: `Buffett Indicator at ${buffett.toFixed(0)}% - Above fair value`,
+      signal: `Buffett Indicator at ${buffett.toFixed(0)}% - Stock valuations outpacing real economy growth creates correction risk`,
       pillar: "Valuation & Market Structure",
       severity: "medium",
       indicatorWeight: 16,
@@ -1737,7 +1739,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // 23. Fed Funds Rate (Weight: 17/100 in Pillar 4)
   if (data.fedFundsRate > 6.0) {
     canaries.push({
-      signal: `Fed Funds at ${data.fedFundsRate.toFixed(2)}% - Extremely restrictive`,
+      signal: `Fed Funds at ${data.fedFundsRate.toFixed(2)}% - Punitive borrowing costs crush corporate earnings and consumer spending`,
       pillar: "Macro",
       severity: "high",
       indicatorWeight: 17,
@@ -1746,7 +1748,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.fedFundsRate > 5.0) {
     canaries.push({
-      signal: `Fed Funds at ${data.fedFundsRate.toFixed(2)}% - Restrictive policy`,
+      signal: `Fed Funds at ${data.fedFundsRate.toFixed(2)}% - High interest rates reduce present value of future earnings, lowering stock prices`,
       pillar: "Macro",
       severity: "medium",
       indicatorWeight: 17,
@@ -1758,7 +1760,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // 24. Junk Spread (Weight: 12/100 in Pillar 4)
   if (data.junkSpread > 8) {
     canaries.push({
-      signal: `Junk Bond Spread at ${data.junkSpread.toFixed(2)}% - Severe credit stress`,
+      signal: `Junk Bond Spread at ${data.junkSpread.toFixed(2)}% - Credit markets seizing up; corporate defaults and bankruptcies surging`,
       pillar: "Macro",
       severity: "high",
       indicatorWeight: 12,
@@ -1767,7 +1769,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.junkSpread > 5) {
     canaries.push({
-      signal: `Junk Bond Spread at ${data.junkSpread.toFixed(2)}% - Credit tightening`,
+      signal: `Junk Bond Spread at ${data.junkSpread.toFixed(2)}% - Rising borrowing costs for weaker companies threaten earnings and stock prices`,
       pillar: "Macro",
       severity: "medium",
       indicatorWeight: 12,
@@ -1779,7 +1781,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // 25. Debt-to-GDP (Weight: 11/100 in Pillar 4)
   if (data.debtToGDP > 130) {
     canaries.push({
-      signal: `US Debt-to-GDP at ${data.debtToGDP.toFixed(0)}% - Fiscal crisis risk`,
+      signal: `US Debt-to-GDP at ${data.debtToGDP.toFixed(0)}% - Unsustainable fiscal trajectory threatens dollar collapse and bond crisis`,
       pillar: "Macro",
       severity: "high",
       indicatorWeight: 11,
@@ -1788,7 +1790,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.debtToGDP > 110) {
     canaries.push({
-      signal: `US Debt-to-GDP at ${data.debtToGDP.toFixed(0)}% - Elevated fiscal burden`,
+      signal: `US Debt-to-GDP at ${data.debtToGDP.toFixed(0)}% - Rising debt service costs compete with growth investments, slowing economy`,
       pillar: "Macro",
       severity: "medium",
       indicatorWeight: 11,
@@ -1800,7 +1802,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // NVIDIA Momentum (Weight: 6/100 in Pillar 1)
   if (data.nvidiaMomentum < 20) {
     canaries.push({
-      signal: `NVIDIA momentum at ${data.nvidiaMomentum} - AI sector weakness`,
+      signal: `NVIDIA momentum at ${data.nvidiaMomentum} - AI sector leader collapse signals $2+ trillion market cap destruction`,
       pillar: "Momentum & Technical",
       severity: "high",
       indicatorWeight: 6,
@@ -1809,7 +1811,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.nvidiaMomentum < 40) {
     canaries.push({
-      signal: `NVIDIA momentum at ${data.nvidiaMomentum} - Tech leadership fading`,
+      signal: `NVIDIA momentum at ${data.nvidiaMomentum} - Weakening AI narrative threatens tech sector leadership premium`,
       pillar: "Momentum & Technical",
       severity: "medium",
       indicatorWeight: 6,
@@ -1822,7 +1824,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   const soxDeviation = ((data.soxIndex - 5000) / 5000) * 100
   if (soxDeviation < -15) {
     canaries.push({
-      signal: `SOX down ${Math.abs(soxDeviation).toFixed(1)}% - Chip sector crash`,
+      signal: `SOX down ${Math.abs(soxDeviation).toFixed(1)}% - Semiconductor crash disrupts $500B+ supply chain and tech earnings`,
       pillar: "Momentum & Technical",
       severity: "high",
       indicatorWeight: 6,
@@ -1831,7 +1833,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (soxDeviation < -10) {
     canaries.push({
-      signal: `SOX down ${Math.abs(soxDeviation).toFixed(1)}% - Semiconductor weakness`,
+      signal: `SOX down ${Math.abs(soxDeviation).toFixed(1)}% - Chip weakness signals slowing tech spending and device demand`,
       pillar: "Momentum & Technical",
       severity: "medium",
       indicatorWeight: 6,
@@ -1843,7 +1845,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // TED Spread (Weight: 15/100 in Pillar 4)
   if (data.tedSpread > 1.0) {
     canaries.push({
-      signal: `TED Spread at ${data.tedSpread.toFixed(2)}% - Banking system stress`,
+      signal: `TED Spread at ${data.tedSpread.toFixed(2)}% - Banks hoarding cash refuse lending; credit freeze destroys asset values`,
       pillar: "Macro",
       severity: "high",
       indicatorWeight: 15,
@@ -1852,7 +1854,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.tedSpread > 0.5) {
     canaries.push({
-      signal: `TED Spread at ${data.tedSpread.toFixed(2)}% - Credit market tension`,
+      signal: `TED Spread at ${data.tedSpread.toFixed(2)}% - Interbank lending stress increases systemic risk and funding costs`,
       pillar: "Macro",
       severity: "medium",
       indicatorWeight: 15,
@@ -1864,7 +1866,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // DXY Dollar Index (Weight: 14/100 in Pillar 4)
   if (data.dxyIndex > 115) {
     canaries.push({
-      signal: `Dollar Index at ${data.dxyIndex.toFixed(1)} - Extreme dollar strength hurts tech`,
+      signal: `Dollar Index at ${data.dxyIndex.toFixed(1)} - Extreme dollar strength slashes multinational earnings and emerging market debt crisis looms`,
       pillar: "Macro",
       severity: "high",
       indicatorWeight: 14,
@@ -1873,7 +1875,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.dxyIndex > 105) {
     canaries.push({
-      signal: `Dollar Index at ${data.dxyIndex.toFixed(1)} - Strong dollar headwind`,
+      signal: `Dollar Index at ${data.dxyIndex.toFixed(1)} - Strong dollar reduces foreign revenue translation for S&P 500 companies`,
       pillar: "Macro",
       severity: "medium",
       indicatorWeight: 14,
@@ -1885,7 +1887,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // ISM PMI (Weight: 18/100 in Pillar 4)
   if (data.ismPMI < 46) {
     canaries.push({
-      signal: `ISM PMI at ${data.ismPMI.toFixed(1)} - Manufacturing contraction`,
+      signal: `ISM PMI at ${data.ismPMI.toFixed(1)} - Manufacturing recession destroys corporate earnings and triggers layoffs`,
       pillar: "Macro",
       severity: "high",
       indicatorWeight: 18,
@@ -1894,7 +1896,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.ismPMI < 50) {
     canaries.push({
-      signal: `ISM PMI at ${data.ismPMI.toFixed(1)} - Weak manufacturing`,
+      signal: `ISM PMI at ${data.ismPMI.toFixed(1)} - Manufacturing contraction reduces capital spending and economic growth`,
       pillar: "Macro",
       severity: "medium",
       indicatorWeight: 18,
@@ -1906,7 +1908,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // Fed Reverse Repo (Weight: 13/100 in Pillar 4)
   if (data.fedReverseRepo > 2000) {
     canaries.push({
-      signal: `Fed RRP at $${data.fedReverseRepo.toFixed(0)}B - Severe liquidity drain`,
+      signal: `Fed RRP at $${data.fedReverseRepo.toFixed(0)}B - Massive liquidity drain forces asset sales and crashes prices`,
       pillar: "Macro",
       severity: "high",
       indicatorWeight: 13,
@@ -1915,7 +1917,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.fedReverseRepo > 1000) {
     canaries.push({
-      signal: `Fed RRP at $${data.fedReverseRepo.toFixed(0)}B - Tight liquidity conditions`,
+      signal: `Fed RRP at $${data.fedReverseRepo.toFixed(0)}B - Capital parked at Fed reduces market liquidity and upward price pressure`,
       pillar: "Macro",
       severity: "medium",
       indicatorWeight: 13,
@@ -1927,7 +1929,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // QQQ P/E (Weight: 16/100 in Pillar 3)
   if (data.qqqPE > 40) {
     canaries.push({
-      signal: `QQQ P/E at ${data.qqqPE.toFixed(1)} - AI bubble territory`,
+      signal: `QQQ P/E at ${data.qqqPE.toFixed(1)} - Bubble territory valuations require 40-60% crash or decade of earnings growth`,
       pillar: "Valuation & Market Structure",
       severity: "high",
       indicatorWeight: 16,
@@ -1936,7 +1938,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.qqqPE > 30) {
     canaries.push({
-      signal: `QQQ P/E at ${data.qqqPE.toFixed(1)} - Tech overvaluation`,
+      signal: `QQQ P/E at ${data.qqqPE.toFixed(1)} - Tech overvaluation vulnerable to AI disappointment or rate increases`,
       pillar: "Valuation & Market Structure",
       severity: "medium",
       indicatorWeight: 16,
@@ -1948,7 +1950,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
   // Mag7 Concentration (Weight: 15/100 in Pillar 3)
   if (data.mag7Concentration > 65) {
     canaries.push({
-      signal: `Mag7 at ${data.mag7Concentration.toFixed(1)}% of QQQ - Extreme concentration risk`,
+      signal: `Mag7 at ${data.mag7Concentration.toFixed(1)}% of S&P - Extreme concentration means 7 stocks control entire market direction`,
       pillar: "Valuation & Market Structure",
       severity: "high",
       indicatorWeight: 15,
@@ -1957,7 +1959,7 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   } else if (data.mag7Concentration > 55) {
     canaries.push({
-      signal: `Mag7 at ${data.mag7Concentration.toFixed(1)}% of QQQ - High concentration`,
+      signal: `Mag7 at ${data.mag7Concentration.toFixed(1)}% of S&P - High concentration creates fragility; diversification no longer works`,
       pillar: "Valuation & Market Structure",
       severity: "medium",
       indicatorWeight: 15,
@@ -1966,54 +1968,26 @@ async function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarket
     })
   }
 
-  // Shiller CAPE (Weight: 13/100 in Pillar 3)
-  if (data.shillerCAPE > 35) {
+  // CAPE Ratio (Weight: 23/100 in Pillar 3)
+  if (data.capeRatio > 35) {
     canaries.push({
-      signal: `Shiller CAPE at ${data.shillerCAPE.toFixed(1)} - Historic overvaluation`,
+      signal: `CAPE at ${data.capeRatio.toFixed(1)} - Only exceeded twice (1929, 2000); both followed by 50%+ crashes`,
       pillar: "Valuation & Market Structure",
       severity: "high",
-      indicatorWeight: 13,
+      indicatorWeight: 23,
       pillarWeight: 15,
-      impactScore: 13 * 0.15,
+      impactScore: 23 * 0.15,
     })
-  } else if (data.shillerCAPE > 28) {
+  } else if (data.capeRatio > 30) {
     canaries.push({
-      signal: `Shiller CAPE at ${data.shillerCAPE.toFixed(1)} - Elevated cyclical valuation`,
+      signal: `CAPE at ${data.capeRatio.toFixed(1)} - Decade-long earnings power shows stocks priced for perfection`,
       pillar: "Valuation & Market Structure",
       severity: "medium",
-      indicatorWeight: 13,
+      indicatorWeight: 23,
       pillarWeight: 15,
-      impactScore: 13 * 0.15,
+      impactScore: 23 * 0.15,
     })
   }
 
-  // Equity Risk Premium (Weight: 10/100 in Pillar 3)
-  if (data.equityRiskPremium < 1.5) {
-    canaries.push({
-      signal: `Equity Risk Premium at ${data.equityRiskPremium.toFixed(2)}% - Stocks vs bonds severely overpriced`,
-      pillar: "Valuation & Market Structure",
-      severity: "high",
-      indicatorWeight: 10,
-      pillarWeight: 15,
-      impactScore: 10 * 0.15,
-    })
-  } else if (data.equityRiskPremium < 3.0) {
-    canaries.push({
-      signal: `Equity Risk Premium at ${data.equityRiskPremium.toFixed(2)}% - Low compensation for equity risk`,
-      pillar: "Valuation & Market Structure",
-      severity: "medium",
-      indicatorWeight: 10,
-      pillarWeight: 15,
-      impactScore: 10 * 0.15,
-    })
-  }
-
-  return canaries.sort((a, b) => {
-    // First sort by severity: high before medium
-    if (a.severity === "high" && b.severity !== "high") return -1
-    if (a.severity !== "high" && b.severity === "high") return 1
-
-    // Within same severity, sort by impact score descending
-    return b.impactScore - a.impactScore
-  })
+  return canaries
 }
