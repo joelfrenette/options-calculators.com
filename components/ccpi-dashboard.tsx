@@ -1071,10 +1071,10 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                   </div>
                 )}
 
-                {/* Consecutive Down Days */}
+                {/* QQQ Consecutive Down Days */}
                 {data.indicators?.qqqConsecDown !== undefined && (
                   <div className="space-y-2">
-                    {/* Added tooltip to Consecutive Down Days indicator */}
+                    {/* Added tooltip to QQQ Consecutive Down Days indicator */}
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         QQQ Consecutive Down Days
@@ -1547,52 +1547,35 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         VIX (Fear Gauge)
-                        {/* CHANGE: Enhanced VIX tooltip */}
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-2">VIX - The "Fear Gauge" of the Stock Market</p>
+                              <p className="font-semibold mb-2">VIX - Market Volatility Expectation</p>
                               <p className="text-sm mb-2">
-                                The VIX (Volatility Index) is often called the market's "fear gauge." It doesn't measure
-                                whether stocks are going up or down - it measures how much investors expect stocks to
-                                swing around in the next 30 days.
+                                The VIX measures how much investors expect the S&P 500 to fluctuate over the next 30
+                                days. Think of it as the market's anxiety level—when investors fear significant price
+                                swings, they pay more for portfolio insurance, driving the VIX higher.
                               </p>
                               <p className="text-sm mb-2">
-                                <strong>What It Measures:</strong> The VIX is calculated from S&P 500 options prices.
-                                When investors are nervous and buy lots of insurance (put options) against market drops,
-                                the VIX goes up. When investors are calm and confident, the VIX stays low.
+                                <strong>Financial Impact of Higher Values:</strong> When the VIX spikes above 40,
+                                historical data shows the S&P 500 typically experiences 20-40% declines. Portfolio
+                                values can evaporate rapidly as panic selling accelerates. Options become prohibitively
+                                expensive, making hedging unaffordable for average investors. During the 2008 crisis,
+                                VIX hit 80 while portfolios lost 50%+ of their value.
                               </p>
                               <p className="text-sm mb-2">
-                                <strong>How to Read It:</strong>
+                                <strong>Financial Impact of Lower Values:</strong> VIX below 15 signals complacency,
+                                where investors underestimate risk. This creates dangerous conditions where sudden
+                                shocks trigger massive sell-offs because nobody prepared. The calm before the storm
+                                often sees VIX near 10-12 before violent reversals that catch portfolios unprotected.
                               </p>
-                              <ul className="text-sm space-y-1 mb-2">
-                                <li>
-                                  • <strong>Below 15:</strong> Market is calm - investors are complacent, low volatility
-                                  (but can signal danger if TOO calm)
-                                </li>
-                                <li>
-                                  • <strong>15-25:</strong> Normal volatility - healthy market fluctuations
-                                </li>
-                                <li>
-                                  • <strong>Above 25:</strong> Fear is rising - investors are worried about potential
-                                  losses
-                                </li>
-                                <li>
-                                  • <strong>Above 40:</strong> Panic mode - extreme fear, crashes often occur at these
-                                  levels
-                                </li>
-                              </ul>
                               <p className="text-sm mb-2">
-                                <strong>Data Source:</strong> Calculated by the Chicago Board Options Exchange (CBOE)
-                                using real-time options prices on the S&P 500 index, updated every 15 seconds during
-                                market hours.
-                              </p>
-                              <p className="text-xs text-gray-600">
-                                Historical spikes: 2008 Financial Crisis (VIX hit 80), 2020 COVID Crash (VIX hit 82),
-                                2022 Ukraine War (VIX hit 36).
+                                <strong>Key Thresholds:</strong> VIX below 15 = market complacency, rising crash risk |
+                                VIX 15-25 = normal volatility | VIX 25-40 = fear emerging, expect 10-15% corrections |
+                                VIX above 40 = panic mode, 20%+ crashes underway
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -1851,61 +1834,37 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         ATR - Average True Range
-                        {/* CHANGE: Enhanced ATR tooltip */}
+                        {/* CHANGE: Enhanced ATR tooltip to focus on financial impact */}
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-2">ATR - Average True Range (Daily Price Swings)</p>
+                              <p className="font-semibold mb-2">ATR - Daily Price Swing Magnitude</p>
                               <p className="text-sm mb-2">
-                                ATR measures how much the market typically moves up and down each day. It's like
-                                measuring the waves in the ocean - bigger waves (higher ATR) mean rougher seas (more
-                                volatility).
+                                ATR measures the average daily price range over the past 14 trading days. It quantifies
+                                how violently prices are moving—a $50 ATR means the market swings roughly $50 per day on
+                                average.
                               </p>
                               <p className="text-sm mb-2">
-                                <strong>What It Measures:</strong> The average of daily price ranges over the past 14
-                                trading days. It calculates the difference between each day's high and low price, then
-                                averages those differences. Expressed as a dollar amount or points.
+                                <strong>Financial Impact of Higher Values:</strong> When ATR exceeds 50 points, your
+                                portfolio can lose or gain $5,000+ daily on a $100,000 position. High ATR forces traders
+                                to reduce position sizes dramatically—risking normal amounts becomes financially
+                                dangerous. Stop-losses get triggered more frequently, locking in losses. During 2020's
+                                crash, SPY's ATR hit 70+, meaning daily $7,000 swings per $100K invested.
                               </p>
                               <p className="text-sm mb-2">
-                                <strong>Why Daily Swings Matter:</strong> When markets start swinging wildly (high ATR),
-                                it indicates uncertainty and fear. Professional traders use ATR to set stop-losses and
-                                position sizes - they trade smaller when ATR is high because risk is elevated.
+                                <strong>Financial Impact of Lower Values:</strong> ATR below 25 suggests stable
+                                conditions where portfolio volatility is minimal. However, extremely low ATR (under 15)
+                                often precedes volatility explosions—when complacency breaks, ATR can triple overnight,
+                                catching investors in positions sized for calm markets that suddenly face violent
+                                swings.
                               </p>
                               <p className="text-sm mb-2">
-                                <strong>How to Read It:</strong>
-                              </p>
-                              <ul className="text-sm space-y-1 mb-2">
-                                <li>
-                                  • <strong>Below 25:</strong> Low volatility - calm, stable market with small daily
-                                  swings
-                                </li>
-                                <li>
-                                  • <strong>25-40:</strong> Normal volatility - typical market fluctuations
-                                </li>
-                                <li>
-                                  • <strong>Above 50:</strong> High volatility - large daily swings indicate stress and
-                                  uncertainty
-                                </li>
-                                <li>
-                                  • <strong>Above 70:</strong> Extreme volatility - panic-level price swings, crash
-                                  conditions
-                                </li>
-                              </ul>
-                              <p className="text-sm mb-2">
-                                <strong>Calculation Example:</strong> If SPY ranged from $500 low to $510 high (10-point
-                                range) for 14 days straight, ATR would be 10. But if it then has a day with a $500-$530
-                                range (30 points), ATR would start increasing, signaling rising volatility.
-                              </p>
-                              <p className="text-sm mb-2">
-                                <strong>Data Source:</strong> Calculated from daily high, low, and close prices from
-                                stock exchanges.
-                              </p>
-                              <p className="text-xs text-gray-600">
-                                Professional use: Traders multiply ATR by 2-3 to set stop-loss levels. If ATR is $10,
-                                they might risk $20-30 per share, knowing that's typical volatility.
+                                <strong>Key Thresholds:</strong> ATR below 25 = low volatility, stable portfolios | ATR
+                                25-40 = normal fluctuations | ATR 50-70 = high volatility, significant daily losses
+                                possible | ATR above 70 = extreme chaos, portfolios whipsawing violently
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -1936,71 +1895,37 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         LTV - Long-term Volatility
-                        {/* CHANGE: Enhanced LTV tooltip */}
+                        {/* CHANGE: Revised LTV tooltip to focus on financial impact */}
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-2">
-                                LTV - Long-Term Volatility (90-Day Price Variability)
+                              <p className="font-semibold mb-2">LTV - 90-Day Volatility Pattern</p>
+                              <p className="text-sm mb-2">
+                                LTV measures price variability over 90 days, showing whether market turbulence is
+                                temporary or sustained. It's expressed as an annualized percentage representing expected
+                                annual fluctuation.
                               </p>
                               <p className="text-sm mb-2">
-                                While ATR measures short-term (14-day) volatility, LTV looks at longer-term (90-day)
-                                volatility patterns. It's like zooming out from daily waves to see the overall sea
-                                conditions over three months.
+                                <strong>Financial Impact of Higher Values:</strong> LTV above 20% means your portfolio
+                                could realistically swing 20%+ annually based on recent patterns—a $500,000 portfolio
+                                faces potential $100,000+ fluctuations. When LTV sustained above 30% during 2008-2009,
+                                portfolios experienced -50% crashes. High LTV signals prolonged market stress where
+                                recovery takes quarters or years, not days.
                               </p>
                               <p className="text-sm mb-2">
-                                <strong>What It Measures:</strong> The standard deviation of daily returns over the past
-                                90 trading days, expressed as an annualized percentage. This statistical measure shows
-                                how much prices have been bouncing around over the last quarter.
+                                <strong>Financial Impact of Lower Values:</strong> LTV below 10% indicates remarkably
+                                stable conditions with minimal portfolio fluctuation expected. However, extended periods
+                                under 10% often breed complacency—investors increase leverage and take outsized risks,
+                                amplifying damage when LTV inevitably surges.
                               </p>
                               <p className="text-sm mb-2">
-                                <strong>Understanding Standard Deviation:</strong> Imagine if the average daily return
-                                is 0%, standard deviation tells us how far from 0% prices typically swing. Higher
-                                standard deviation = more unpredictable, wider price swings.
-                              </p>
-                              <p className="text-sm mb-2">
-                                <strong>How to Read It:</strong>
-                              </p>
-                              <ul className="text-sm space-y-1 mb-2">
-                                <li>
-                                  • <strong>Below 10%:</strong> Very stable market - prices are predictable, low crash
-                                  risk
-                                </li>
-                                <li>
-                                  • <strong>10-15%:</strong> Normal volatility - healthy market fluctuations
-                                </li>
-                                <li>
-                                  • <strong>15-20%:</strong> Elevated volatility - market is getting choppy, increased
-                                  uncertainty
-                                </li>
-                                <li>
-                                  • <strong>Above 20%:</strong> High long-term volatility - sustained market stress,
-                                  elevated crash risk
-                                </li>
-                                <li>
-                                  • <strong>Above 30%:</strong> Extreme long-term volatility - prolonged crisis
-                                  conditions
-                                </li>
-                              </ul>
-                              <p className="text-sm mb-2">
-                                <strong>Why 90 Days Matters:</strong> Short-term volatility spikes can be temporary
-                                reactions to news. But when volatility stays elevated for 90 days, it suggests
-                                fundamental market problems that won't go away quickly.
-                              </p>
-                              <p className="text-sm mb-2">
-                                <strong>Calculation:</strong> Take daily returns for 90 days, calculate standard
-                                deviation, annualize it by multiplying by √252 (trading days in a year).
-                              </p>
-                              <p className="text-sm mb-2">
-                                <strong>Data Source:</strong> Calculated from 90 days of closing prices from stock
-                                exchanges.
-                              </p>
-                              <p className="text-xs text-gray-600">
-                                Historical context: LTV stayed above 25% for months during 2008-2009 financial crisis
-                                and March-June 2020 COVID crash, signaling prolonged market distress.
+                                <strong>Key Thresholds:</strong> LTV below 10% = very stable, possible complacency | LTV
+                                10-15% = normal healthy volatility | LTV 15-20% = elevated uncertainty, increased risk |
+                                LTV above 20% = sustained market stress, major losses likely | LTV above 30% = extreme
+                                prolonged chaos
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -2031,79 +1956,50 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
                         Bullish Percent Index
-                        {/* CHANGE: Enhanced Bullish Percent Index tooltip */}
+                        {/* CHANGE: Revised Bullish Percent tooltip to focus on financial impact */}
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-2">Bullish Percent Index - Market Breadth Indicator</p>
+                              <p className="font-semibold mb-2">Bullish Percent Index - Market Breadth Strength</p>
                               <p className="text-sm mb-2">
-                                This indicator measures what percentage of stocks in an index are giving bullish
-                                technical signals based on "Point & Figure" charting. It's like taking a vote among all
-                                stocks - how many are trending up vs. down?
+                                This measures the percentage of stocks in the S&P 500 showing bullish technical patterns
+                                on point-and-figure charts, ranging from 0-100%.
                               </p>
                               <p className="text-sm mb-2">
-                                <strong>What It Measures:</strong> The percentage of stocks in the S&P 500 that have
-                                "bullish" chart patterns according to Point & Figure methodology. Each stock gets a
-                                simple yes/no vote: is its chart pattern bullish or bearish?
+                                <strong>FINANCIAL IMPACT OF HIGH VALUES (Above 70%):</strong> Overbought conditions
+                                where too many stocks are extended and vulnerable. Above 80% historically precedes
+                                10-15% corrections as fewer stocks can continue rallying—market runs out of fuel. Like a
+                                party where everyone's already dancing, no new buyers remain to push prices higher,
+                                leading to reversals as early bulls take profits.
                               </p>
                               <p className="text-sm mb-2">
-                                <strong>Understanding Point & Figure Charts:</strong> Instead of showing every price
-                                move, Point & Figure charts only mark significant reversals in trend. A stock is
-                                "bullish" when its chart shows a pattern of higher highs and higher lows (uptrend
-                                intact).
+                                <strong>FINANCIAL IMPACT OF LOW VALUES (Below 30%):</strong> Oversold conditions
+                                signaling capitulation where panic selling has exhausted itself. Below 20% often marks
+                                major bottoms where patient investors find exceptional entry points—stocks are hated and
+                                cheap. However, during severe crashes, readings can stay depressed for months as bear
+                                markets grind lower.
                               </p>
                               <p className="text-sm mb-2">
-                                <strong>How to Read It:</strong>
-                              </p>
-                              <ul className="text-sm space-y-1 mb-2">
-                                <li>
-                                  • <strong>Below 30%:</strong> Extreme bearishness - most stocks are in downtrends, but
-                                  often marks bottoms (contrarian buy)
-                                </li>
-                                <li>
-                                  • <strong>30-50%:</strong> Bearish market - more stocks declining than advancing
-                                </li>
-                                <li>
-                                  • <strong>50-70%:</strong> Bullish market - more stocks advancing than declining,
-                                  healthy
-                                </li>
-                                <li>
-                                  • <strong>Above 70%:</strong> Extreme bullishness - most stocks overbought, dangerous
-                                  (contrarian sell)
-                                </li>
-                                <li>
-                                  • <strong>Above 80%:</strong> Euphoria - market is extremely overbought, crash risk
-                                  very high
-                                </li>
-                              </ul>
-                              <p className="text-sm mb-2">
-                                <strong>Market Breadth Concept:</strong> It's healthier when many stocks participate in
-                                a rally (high breadth) than when just a few big stocks drive indexes higher while most
-                                stocks fall (low breadth). Declining breadth often precedes crashes.
-                              </p>
-                              <p className="text-sm mb-2">
-                                <strong>Data Source:</strong> Compiled from Point & Figure charts of S&P 500 stocks,
-                                updated daily.
-                              </p>
-                              <p className="text-xs text-gray-600">
-                                Historical pattern: Readings above 75% preceded major tops in 2000 (dot-com bubble),
-                                2007 (pre-financial crisis), and early 2020 (pre-COVID crash).
+                                <strong>KEY THRESHOLDS:</strong> Below 30% = oversold, possible bottom forming | 30-50%
+                                = normal healthy breadth | 50-70% = strong uptrend, momentum positive | Above 70% =
+                                overbought, correction risk rising | Above 80% = extremely overbought, major reversal
+                                likely
                               </p>
                             </TooltipContent>
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{data.indicators.bullishPercent}%</span>
+                      <span className="font-bold">{data.indicators.bullishPercent.toFixed(0)}%</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${data.indicators.bullishPercent}%`,
+                          marginLeft: `${Math.min(100, Math.max(0, data.indicators.bullishPercent))}%`,
                         }}
                       />
                     </div>
@@ -2115,98 +2011,79 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                   </div>
                 )}
 
-                {/* Yield Curve - moved to Risk Appetite */}
+                {/* Yield Curve (10Y-2Y Spread) */}
                 {data.indicators.yieldCurve !== undefined && (
-                  <div className="space-y-2">
-                    {/* Added tooltip to Yield Curve indicator */}
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium flex items-center gap-1">
-                        Yield Curve (10Y-2Y)
-                        {/* CHANGE: Enhanced Yield Curve tooltip */}
-                        {tooltipsEnabled && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-2">Yield Curve (10Y-2Y) - Recession Predictor</p>
-                              <p className="text-sm mb-2">
-                                The yield curve compares interest rates on 2-year Treasury bonds versus 10-year Treasury
-                                bonds. It's one of the most reliable recession predictors in economics, with a nearly
-                                perfect track record.
-                              </p>
-                              <p className="text-sm mb-2">
-                                <strong>What It Measures:</strong> The difference (spread) between 10-year and 2-year
-                                Treasury yields, measured in basis points (1 basis point = 0.01%). The number tells us
-                                what bond investors think about future economic growth.
-                              </p>
-                              <p className="text-sm mb-2">
-                                <strong>Understanding Bond Yields:</strong> Normally, longer-term bonds (10-year) pay
-                                higher yields than shorter-term bonds (2-year) because you're lending money for longer
-                                and taking more risk.
-                              </p>
-                              <p className="text-sm mb-2">
-                                <strong>How to Read It:</strong>
-                              </p>
-                              <ul className="text-sm space-y-1 mb-2">
-                                <li>
-                                  • <strong>Above +100 bps:</strong> Steep curve - healthy economy, growth expected, low
-                                  recession risk
-                                </li>
-                                <li>
-                                  • <strong>+50 to +100 bps:</strong> Normal curve - steady economic growth expected
-                                </li>
-                                <li>
-                                  • <strong>0 to +50 bps:</strong> Flattening curve - growth slowing, recession risk
-                                  building
-                                </li>
-                                <li>
-                                  • <strong>Below 0 (Inverted):</strong> Inverted curve - RECESSION WARNING! Investors
-                                  expect Fed to cut rates due to economic crisis
-                                </li>
-                              </ul>
-                              <p className="text-sm mb-2">
-                                <strong>Why Inversion Predicts Recessions:</strong> When short-term rates are higher
-                                than long-term rates, it means:
-                              </p>
-                              <ul className="text-sm space-y-1 mb-2">
-                                <li>
-                                  1. The Fed has raised rates aggressively to fight inflation (making 2-year yields
-                                  high)
-                                </li>
-                                <li>
-                                  2. Bond investors expect the Fed will have to CUT rates soon due to recession (making
-                                  10-year yields lower)
-                                </li>
-                                <li>3. This "inversion" has preceded EVERY recession since 1950</li>
-                              </ul>
-                              <p className="text-sm mb-2">
-                                <strong>Data Source:</strong> U.S. Treasury Department daily yield data for 2-year and
-                                10-year government bonds.
-                              </p>
-                              <p className="text-xs text-gray-600">
-                                Historical track record: Yield curve inverted 6-24 months before recessions in 1990,
-                                2001, 2008, and 2020. It's the most reliable recession predictor known to economics.
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </span>
-                      <span className="font-bold">{data.indicators.yieldCurve.toFixed(2)}%</span>
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <h4 className="font-medium">Yield Curve (10Y-2Y Spread)</h4>
+                      {/* CHANGE: Revised Yield Curve tooltip to focus on financial impact */}
+                      {tooltipsEnabled && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                            <p className="font-semibold mb-2">Yield Curve - Recession Warning Signal</p>
+                            <p className="text-sm mb-2">
+                              This measures the difference between 10-year and 2-year Treasury bond interest rates. It
+                              reveals bond investors' economic expectations—when short-term rates exceed long-term rates
+                              (inversion), recession is imminent.
+                            </p>
+                            <p className="text-sm mb-2">
+                              <strong>Financial Impact of Inversion (Below 0%):</strong> Yield curve inversions have
+                              preceded every recession since 1950, occurring 6-24 months before major crashes. When it
+                              inverts, stock markets typically decline 20-40% during the subsequent recession. Bond
+                              investors are essentially betting the economy will contract so badly that the Federal
+                              Reserve must slash rates dramatically. Portfolios face systematic destruction as earnings
+                              collapse and unemployment surges.
+                            </p>
+                            <p className="text-sm mb-2">
+                              <strong>Financial Impact of Positive Values:</strong> Spreads above 100 basis points
+                              indicate healthy economic growth expectations where stocks can appreciate steadily.
+                              Moderate spreads (50-100 bps) suggest stable conditions. However, when spreads narrow
+                              toward zero, it signals growth is slowing and recession risk is building—time to reduce
+                              portfolio risk.
+                            </p>
+                            <p className="text-sm mb-2">
+                              <strong>Key Thresholds:</strong> Above +100 bps = strong growth, bullish for stocks | +50
+                              to +100 bps = normal economy | 0 to +50 bps = slowing growth, rising risk | Below 0%
+                              (inverted) = recession warning, expect 20-40% stock declines within 24 months
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                     </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                    <div className="relative pt-1">
+                      <div className="flex items-center justify-between text-sm mb-1">
+                        <span className="text-gray-700">Inverted: &lt;0</span>
+                        <span className="text-gray-700">Flat: 0-50</span>
+                        <span className="text-gray-700">Steep: &gt;100</span>
+                      </div>
+                      <div className="w-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 rounded h-4"></div>
                       <div
-                        className="absolute inset-0 bg-gray-200"
+                        className="absolute top-[28px] w-1 h-6 bg-black"
                         style={{
-                          marginLeft: `${Math.min(100, Math.max(0, 100 - ((data.indicators.yieldCurve + 1) / 2) * 100))}%`,
+                          left: `${Math.min(Math.max(((data.indicators.yieldCurve + 100) / 300) * 100, 0), 100)}%`,
                         }}
-                      />
+                      ></div>
                     </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Normal: {">"}0.5%</span>
-                      <span className="text-yellow-600">Flat: 0-0.5%</span>
-                      <span>Inverted: {"<"}0%</span>
+                    <div className="flex justify-between items-center mt-2">
+                      <span className="text-2xl font-bold">{data.indicators.yieldCurve.toFixed(0)} bps</span>
+                      <span
+                        className={`text-sm font-medium ${
+                          data.indicators.yieldCurve < 0
+                            ? "text-red-600"
+                            : data.indicators.yieldCurve > 100
+                              ? "text-green-600"
+                              : "text-yellow-600"
+                        }`}
+                      >
+                        {data.indicators.yieldCurve < 0
+                          ? "Inverted (Recession Risk)"
+                          : data.indicators.yieldCurve > 100
+                            ? "Steep (Healthy)"
+                            : "Flat"}
+                      </span>
                     </div>
                   </div>
                 )}
@@ -2229,11 +2106,11 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
             <AccordionContent>
               <div className="space-y-6 pt-4">
                 {/* Put/Call Ratio */}
-                {data.indicators?.putCallRatio !== undefined && (
+                {data.indicators.putCallRatio !== undefined && (
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <h4 className="font-medium">Put/Call Ratio</h4>
-                      <InfoTooltip title="Put/Call Ratio measures investor sentiment by comparing the volume of bearish put options to bullish call options traded on the market. When more traders buy puts than calls, it indicates fear and defensive positioning. A ratio above 1.0 means more puts than calls (bearish), while below 0.7 suggests complacency (bullish sentiment that can precede crashes). This is calculated by dividing total put option volume by total call option volume across major exchanges like CBOE. Higher ratios during market strength can signal protective hedging before downturns, making it a leading indicator of investor anxiety." />
+                      <InfoTooltip title="Put/Call Ratio - Options Market Fear Gauge: This compares bearish put option volume to bullish call option volume. Higher ratios mean more investors are buying insurance against crashes. FINANCIAL IMPACT OF HIGH VALUES (Above 1.0): Extreme fear dominates—investors are aggressively hedging, signaling they expect major declines. When above 1.3, markets often experience 10-20% corrections as defensive positioning becomes self-fulfilling. However, extreme readings can also mark capitulation bottoms where panic reaches maximum. FINANCIAL IMPACT OF LOW VALUES (Below 0.7): Dangerous complacency where investors buy calls (bets on gains) instead of protecting portfolios with puts. This unhedged euphoria precedes crashes—when sentiment shifts suddenly, unprotected portfolios suffer full losses with no insurance. The 2021 meme stock bubble saw ratios near 0.5 before sharp reversals. KEY THRESHOLDS: Below 0.6 = extreme complacency, crash setup | 0.7-1.0 = balanced sentiment | Above 1.0 = rising fear | Above 1.3 = panic, possible capitulation bottom" />
                     </div>
                     <div className="relative pt-1">
                       <div className="flex items-center justify-between text-sm mb-1">
@@ -2355,7 +2232,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <h4 className="font-medium">Short Interest (% of Float)</h4>
-                      <InfoTooltip title="Short Interest measures the percentage of a stock's available shares (float) that have been sold short by investors betting on price declines. For major indices like SPY (S&P 500 ETF), typical short interest is 1-3%. When short interest spikes above 5%, it indicates widespread pessimism and bearish positioning by sophisticated traders who expect market drops. However, high short interest can also fuel 'short squeeze' rallies where shorts are forced to buy back shares, temporarily pushing prices higher. The data comes from twice-monthly exchange reports and is calculated as (shares sold short / total shares available for trading) × 100. Rising short interest confirms bearish sentiment among professional investors." />
+                      <InfoTooltip title="Short Interest - Professional Bearish Bets: Measures the percentage of shares sold short, indicating how many investors are betting on price declines. FINANCIAL IMPACT OF HIGH VALUES (Above 5%): Sophisticated traders are massively positioned for crashes, expecting 15-30% declines. High short interest validates bearish scenarios but also creates 'short squeeze' risk where shorts are forced to buy back shares at losses, temporarily spiking prices before resumption of downtrend. During 2008, financial stocks had 20%+ short interest before collapsing 80%. FINANCIAL IMPACT OF LOW VALUES (Below 2%): Minimal bearish positioning suggests either genuine optimism or dangerous complacency. Low shorts remove a natural buyer (short covering) that cushions declines, allowing for faster crashes when selling begins. It also signals few sophisticated investors see crash risk. KEY THRESHOLDS: Below 2% = low professional concern, possibly complacent | 2-4% = normal skepticism | Above 5% = widespread bearish conviction | Above 10% = extreme pessimism, massive downside expected" />
                     </div>
                     <div className="relative pt-1">
                       <div className="flex items-center justify-between text-sm mb-1">
@@ -2473,7 +2350,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <h4 className="font-medium">Bullish Percent Index</h4>
-                      <InfoTooltip title="The Bullish Percent Index (BPI) measures the percentage of stocks in a major index (like the S&P 500) that are currently showing bullish point-and-figure chart patterns. The index ranges from 0-100%, with readings above 70% indicating overbought conditions where too many stocks are extended (crash risk), and readings below 30% showing oversold conditions (potential bottoms). The BPI is calculated by analyzing point-and-figure charts for each stock and determining if its pattern is bullish (buy signal) or bearish, then computing the percentage that are bullish. Readings above 70% historically precede market tops as fewer stocks can join the rally, while readings below 30% often mark capitulation bottoms. It's a breadth indicator showing market-wide trend strength." />
+                      <InfoTooltip title="The Bullish Percent Index (BPI) measures the percentage of stocks in a major index (like the S&P 500) that are showing bullish technical patterns on point-and-figure charts, ranging from 0-100%. FINANCIAL IMPACT OF HIGH VALUES (Above 70%): Overbought conditions where too many stocks are extended and vulnerable. Above 80% historically precedes 10-15% corrections as fewer stocks can continue rallying—market runs out of fuel. Like a party where everyone's already dancing, no new buyers remain to push prices higher, leading to reversals as early bulls take profits. FINANCIAL IMPACT OF LOW VALUES (Below 30%): Oversold conditions signaling capitulation where panic selling has exhausted itself. Below 20% often marks major bottoms where patient investors find exceptional entry points—stocks are hated and cheap. However, during severe crashes, readings can stay depressed for months as bear markets grind lower. KEY THRESHOLDS: Below 30% = oversold, possible bottom forming | 30-50% = normal healthy breadth | 50-70% = strong uptrend, momentum positive | Above 70% = overbought, correction risk rising | Above 80% = extremely overbought, major reversal likely" />
                     </div>
                     <div className="relative pt-1">
                       <div className="flex items-center justify-between text-sm mb-1">
@@ -2513,7 +2390,42 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <h4 className="font-medium">Yield Curve (10Y-2Y Spread)</h4>
-                      <InfoTooltip title="The Yield Curve spread measures the difference between 10-year and 2-year U.S. Treasury bond yields, expressed in basis points (hundredths of a percent). Normally, long-term bonds pay higher interest than short-term bonds (positive spread of +50 to +200 bps), reflecting the extra risk of holding bonds longer. When this inverts (negative spread), it means short-term rates exceed long-term rates, signaling that bond markets expect economic trouble and future rate cuts. Inversions have preceded every U.S. recession since 1950, typically 6-18 months before the downturn. The calculation is simple: 10-Year Treasury Yield minus 2-Year Treasury Yield. A deeply inverted curve (below -50 bps) is a major recession warning and often precedes stock market crashes." />
+                      {/* CHANGE: Revised Yield Curve tooltip to focus on financial impact */}
+                      {tooltipsEnabled && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-md bg-blue-50 border-blue-200">
+                            <p className="font-semibold mb-2">Yield Curve - Recession Warning Signal</p>
+                            <p className="text-sm mb-2">
+                              This measures the difference between 10-year and 2-year Treasury bond interest rates. It
+                              reveals bond investors' economic expectations—when short-term rates exceed long-term rates
+                              (inversion), recession is imminent.
+                            </p>
+                            <p className="text-sm mb-2">
+                              <strong>Financial Impact of Inversion (Below 0%):</strong> Yield curve inversions have
+                              preceded every recession since 1950, occurring 6-24 months before major crashes. When it
+                              inverts, stock markets typically decline 20-40% during the subsequent recession. Bond
+                              investors are essentially betting the economy will contract so badly that the Federal
+                              Reserve must slash rates dramatically. Portfolios face systematic destruction as earnings
+                              collapse and unemployment surges.
+                            </p>
+                            <p className="text-sm mb-2">
+                              <strong>Financial Impact of Positive Values:</strong> Spreads above 100 basis points
+                              indicate healthy economic growth expectations where stocks can appreciate steadily.
+                              Moderate spreads (50-100 bps) suggest stable conditions. However, when spreads narrow
+                              toward zero, it signals growth is slowing and recession risk is building—time to reduce
+                              portfolio risk.
+                            </p>
+                            <p className="text-sm mb-2">
+                              <strong>Key Thresholds:</strong> Above +100 bps = strong growth, bullish for stocks | +50
+                              to +100 bps = normal economy | 0 to +50 bps = slowing growth, rising risk | Below 0%
+                              (inverted) = recession warning, expect 20-40% stock declines within 24 months
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                     </div>
                     <div className="relative pt-1">
                       <div className="flex items-center justify-between text-sm mb-1">
@@ -2683,25 +2595,29 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs bg-red-50 border-red-200">
-                              <p className="font-semibold mb-1">Buffett Indicator</p>
-                              <p className="text-sm">Compares total stock market capitalization to GDP.</p>
-                              <ul className="text-sm mt-1 space-y-1">
-                                <li>
-                                  <strong>{"<"} 120%:</strong> Undervalued, low crash risk
-                                </li>
-                                <li>
-                                  <strong>120-150%:</strong> Fair value, moderate risk
-                                </li>
-                                <li>
-                                  <strong>150-180%:</strong> Elevated risk
-                                </li>
-                                <li>
-                                  <strong>{">"} 200%:</strong> Historically signifies market bubbles, extreme crash risk
-                                </li>
-                              </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> A high Buffett Indicator suggests the market is significantly
-                                overvalued relative to the economy's productive capacity
+                              <p className="font-semibold mb-1">Buffett Indicator - Market Size vs Economy</p>
+                              <p className="text-sm mb-2">
+                                This divides total stock market value by Gross Domestic Product, showing whether stock
+                                prices are proportional to the economy's actual production capacity. Warren Buffett
+                                calls it "probably the best single measure" of valuation.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>FINANCIAL IMPACT OF HIGH VALUES (Above 150%):</strong> Markets are severely
+                                disconnected from economic reality. At 200%+, stocks are priced as if companies will
+                                generate profits impossible given actual GDP. The 2000 tech bubble peaked at 140% before
+                                a -50% crash. Above 180% signals 30-50% corrections as prices realign with economic
+                                fundamentals.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>FINANCIAL IMPACT OF LOW VALUES (Below 120%):</strong> Stocks are reasonably
+                                valued relative to economic output, offering attractive risk/reward. Historical average
+                                is 75-100%—buying below 120% typically provides strong long-term returns with lower
+                                crash risk.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>KEY THRESHOLDS:</strong> Below 120% = undervalued to fair | 120-150% =
+                                moderately overvalued | 150-180% = significantly overvalued, high risk | Above 200% =
+                                extreme bubble, major crash likely
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -2848,25 +2764,28 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs bg-red-50 border-red-200">
-                              <p className="font-semibold mb-1">Shiller CAPE Ratio</p>
-                              <p className="text-sm">Cyclically Adjusted Price-to-Earnings ratio over 10 years.</p>
-                              <ul className="text-sm mt-1 space-y-1">
-                                <li>
-                                  <strong>{"<"} 20:</strong> Undervalued, low risk
-                                </li>
-                                <li>
-                                  <strong>20-30:</strong> Fair value, moderate risk
-                                </li>
-                                <li>
-                                  <strong>30-35:</strong> Elevated valuation, high risk
-                                </li>
-                                <li>
-                                  <strong>{">"} 35:</strong> Historically signals market tops, extreme crash risk
-                                </li>
-                              </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> High CAPE values indicate markets trading significantly above
-                                historical averages, prone to reversion
+                              <p className="font-semibold mb-1">Shiller CAPE - Long-Term Valuation Gauge</p>
+                              <p className="text-sm mb-2">
+                                This compares current stock prices to average inflation-adjusted earnings over the past
+                                10 years, revealing whether markets are expensive or cheap relative to fundamental
+                                profits.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>FINANCIAL IMPACT OF HIGH VALUES (Above 30):</strong> Markets are overvalued by
+                                50-100%+ compared to historical norms. The higher CAPE goes, the worse subsequent
+                                returns become. CAPE above 35 preceded the 1929 crash (-89%), 2000 tech bubble (-50%),
+                                and signals 20-50% corrections are likely over the next 3-5 years as valuations revert
+                                to the mean.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>FINANCIAL IMPACT OF LOW VALUES (Below 20):</strong> Stocks are reasonably priced
+                                or undervalued, offering attractive entry points with lower crash risk. Historical
+                                average is 16-17—buying below 20 typically generates strong 10-year returns.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>KEY THRESHOLDS:</strong> Below 20 = undervalued | 20-30 = fair value | 30-35 =
+                                significantly overvalued, elevated crash risk | Above 35 = extreme bubble territory,
+                                major corrections likely
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -3299,22 +3218,29 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs bg-red-50 border-red-200">
-                              <p className="font-semibold mb-1">US Debt-to-GDP Ratio</p>
-                              <p className="text-sm">Total public debt as a percentage of Gross Domestic Product.</p>
-                              <ul className="text-sm mt-1 space-y-1">
-                                <li>
-                                  <strong>{"<"} 90%:</strong> Healthy level
-                                </li>
-                                <li>
-                                  <strong>90-120%:</strong> Elevated risk
-                                </li>
-                                <li>
-                                  <strong>{">"} 130%:</strong> Very high risk, potential for fiscal crisis
-                                </li>
-                              </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> High debt levels can lead to inflation, higher interest rates,
-                                and reduced fiscal flexibility
+                              <p className="font-semibold mb-1">US Debt-to-GDP - Government Leverage</p>
+                              <p className="text-sm mb-2">
+                                This measures total federal government debt as a percentage of GDP, indicating how much
+                                the nation has borrowed relative to its economic output and ability to repay.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>FINANCIAL IMPACT OF HIGH VALUES (Above 120%):</strong> Excessive debt burdens
+                                constrain economic growth and force governments to choose between raising taxes (killing
+                                growth) or inflating away debt (destroying savings). Above 130% historically triggers
+                                fiscal crises—bond yields spike, currency weakens, and stock markets decline 20-40% as
+                                confidence erodes. Greece, Japan, and other high-debt nations experienced prolonged
+                                economic stagnation and market crashes.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>FINANCIAL IMPACT OF LOW VALUES (Below 90%):</strong> Sustainable debt levels
+                                where government spending doesn't crowd out private investment. Below 60% is considered
+                                ideal, providing fiscal flexibility to respond to crises without triggering inflation or
+                                default concerns.
+                              </p>
+                              <p className="text-sm mb-2">
+                                <strong>KEY THRESHOLDS:</strong> Below 90% = healthy and sustainable | 90-120% =
+                                elevated but manageable | Above 120% = very high risk, fiscal crisis possible | Above
+                                130% = dangerous territory, potential for currency and market crisis
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -3365,8 +3291,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
             </div>
           </div>
           <p className="text-xs text-blue-700 mt-3">
-            Final CCPI = Σ(Pillar Score × Weight). Pillar 3 now includes 7 valuation & market structure indicators: S&P
-            P/E, S&P P/S, Buffett Indicator, QQQ P/E, Mag7 Concentration, Shiller CAPE, and Equity Risk Premium.
+            Final CCPI = Σ(Pillar Score × Weight)
           </p>
         </div>
 
