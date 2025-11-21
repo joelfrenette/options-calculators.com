@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 
 export async function GET() {
-  // Simulated data source status for all remaining tools
   const remainingSiteStatus = {
     timestamp: new Date().toISOString(),
     tools: {
@@ -45,6 +44,38 @@ export async function GET() {
           fallback4: "Grok xAI",
           status: "live",
           currentSource: "Twelve Data API",
+        },
+      ],
+      "VIX Volatility Index": [
+        {
+          indicator: "Current VIX Level",
+          primary: "Alpha Vantage API",
+          fallback1: "OpenAI GPT-4o",
+          fallback2: "Anthropic Claude",
+          fallback3: "Groq Llama",
+          fallback4: "Grok xAI",
+          status: "live",
+          currentSource: "Alpha Vantage API",
+        },
+        {
+          indicator: "VIX Historical Average",
+          primary: "Alpha Vantage API",
+          fallback1: "OpenAI GPT-4o",
+          fallback2: "Anthropic Claude",
+          fallback3: "Groq Llama",
+          fallback4: "Historical Baseline",
+          status: "live",
+          currentSource: "Alpha Vantage API",
+        },
+        {
+          indicator: "VIX Percentile (1-year)",
+          primary: "Alpha Vantage API",
+          fallback1: "OpenAI GPT-4o",
+          fallback2: "Anthropic Claude",
+          fallback3: "Groq Llama",
+          fallback4: "Historical Baseline",
+          status: "live",
+          currentSource: "Alpha Vantage API",
         },
       ],
       "Fear & Greed Index": [
@@ -209,38 +240,6 @@ export async function GET() {
           fallback4: "Grok xAI",
           status: "ai",
           currentSource: "Anthropic Claude",
-        },
-      ],
-      "VIX Volatility Index": [
-        {
-          indicator: "Current VIX Level",
-          primary: "Alpha Vantage API",
-          fallback1: "OpenAI GPT-4o",
-          fallback2: "Anthropic Claude",
-          fallback3: "Groq Llama",
-          fallback4: "Grok xAI",
-          status: "live",
-          currentSource: "Alpha Vantage API",
-        },
-        {
-          indicator: "VIX Historical Average",
-          primary: "Alpha Vantage API",
-          fallback1: "OpenAI GPT-4o",
-          fallback2: "Anthropic Claude",
-          fallback3: "Groq Llama",
-          fallback4: "Historical Baseline",
-          status: "live",
-          currentSource: "Alpha Vantage API",
-        },
-        {
-          indicator: "VIX Percentile (1-year)",
-          primary: "Alpha Vantage API",
-          fallback1: "OpenAI GPT-4o",
-          fallback2: "Anthropic Claude",
-          fallback3: "Groq Llama",
-          fallback4: "Historical Baseline",
-          status: "live",
-          currentSource: "Alpha Vantage API",
         },
       ],
       "Fed Rate Analysis & Forecast": [

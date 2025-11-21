@@ -95,6 +95,16 @@ export function RemainingSiteAudit() {
       validation: "Trend signals align with price action and volume confirmation",
     },
     {
+      id: "vix-risk",
+      name: "VIX Volatility Index",
+      icon: <Target className="h-5 w-5" />,
+      description: "Risk management calculator based on VIX levels",
+      formula: "Recommended Cash % = min(90, max(10, VIX × 2))",
+      explanation: "Dynamic cash allocation: VIX 10-15 = 20-30% cash, VIX 20-30 = 40-60% cash, VIX >40 = 80-90% cash",
+      dataPoints: ["Current VIX", "VIX Historical Average", "VIX Percentile"],
+      validation: "Higher VIX = Higher cash allocation to preserve capital during volatility",
+    },
+    {
       id: "fear-greed",
       name: "Fear & Greed Index",
       icon: <Gauge className="h-5 w-5" />,
@@ -133,16 +143,6 @@ export function RemainingSiteAudit() {
         "Market Breadth",
       ],
       validation: "Z-score >2 = Euphoria, <-2 = Panic, triggers contrarian signals",
-    },
-    {
-      id: "vix-risk",
-      name: "VIX Volatility Index",
-      icon: <Target className="h-5 w-5" />,
-      description: "Risk management calculator based on VIX levels",
-      formula: "Recommended Cash % = min(90, max(10, VIX × 2))",
-      explanation: "Dynamic cash allocation: VIX 10-15 = 20-30% cash, VIX 20-30 = 40-60% cash, VIX >40 = 80-90% cash",
-      dataPoints: ["Current VIX", "VIX Historical Average", "VIX Percentile"],
-      validation: "Higher VIX = Higher cash allocation to preserve capital during volatility",
     },
     {
       id: "fomc",

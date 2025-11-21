@@ -136,11 +136,11 @@ async function calculateFearGreedIndex() {
 
     // Determine sentiment
     let sentiment = "Neutral"
-    if (overallScore < 25) sentiment = "Extreme Fear"
-    else if (overallScore < 45) sentiment = "Fear"
-    else if (overallScore < 55) sentiment = "Neutral"
-    else if (overallScore < 75) sentiment = "Greed"
-    else sentiment = "Extreme Greed"
+    if (overallScore <= 24) sentiment = "Extreme Greed"
+    else if (overallScore <= 44) sentiment = "Greed"
+    else if (overallScore <= 55) sentiment = "Neutral"
+    else if (overallScore <= 74) sentiment = "Fear"
+    else sentiment = "Extreme Fear"
 
     return {
       overallScore,

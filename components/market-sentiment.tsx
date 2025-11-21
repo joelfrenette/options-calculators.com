@@ -569,7 +569,7 @@ export function MarketSentiment() {
               {marketData && (
                 <div
                   className="absolute top-0 bottom-0 w-2 bg-black shadow-lg transition-all duration-500"
-                  style={{ left: `calc(${100 - marketData.overallScore}% - 4px)` }}
+                  style={{ left: `calc(${marketData.overallScore}% - 4px)` }}
                 >
                   <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap">
                     <div className="bg-black text-white px-4 py-2 rounded-lg shadow-xl">

@@ -13,15 +13,15 @@ import { RotatingAdBanner } from "@/components/rotating-ad-banner"
 import { WheelScanner } from "@/components/wheel-scanner"
 import { CpiInflationAnalysis } from "@/components/cpi-inflation-analysis"
 import { CcpiDashboard } from "@/components/ccpi-dashboard"
-import { Menu, X } from 'lucide-react'
+import { Menu, X } from "lucide-react"
 import Image from "next/image"
 
 const TABS = [
-  { id: "ccpi", label: "CCPI: Crash Prediction Index" }, // Moved CCPI to first position
   { id: "trend-analysis", label: "Index Trend Analysis & Forecast" },
+  { id: "risk-management", label: "VIX Volatility Index" },
   { id: "market-sentiment", label: "Fear & Greed Index" },
   { id: "panic-euphoria", label: "Panic/Euphoria Index" },
-  { id: "risk-management", label: "VIX Volatility Index" },
+  { id: "ccpi", label: "CCPI: Crash Prediction Index" },
   { id: "fomc-predictions", label: "Fed Rate Analysis & Forecast" },
   { id: "cpi-inflation", label: "CPI Inflation Analysis & Forecast" },
   { id: "earnings-iv-crusher", label: "Earnings EM Calculator" },
@@ -31,7 +31,7 @@ const TABS = [
 ]
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState("ccpi") // Set CCPI as default active tab
+  const [activeTab, setActiveTab] = useState("trend-analysis")
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const handleTabChange = (tabId: string) => {
@@ -53,8 +53,8 @@ export default function Home() {
                   height={32}
                   className="h-8 w-8"
                 />
-                <a 
-                  href="https://OPTIONS-CALCULATORS.COM" 
+                <a
+                  href="https://OPTIONS-CALCULATORS.COM"
                   className="text-xl md:text-2xl font-bold text-gray-900 hover:text-primary transition-colors"
                 >
                   OPTIONS-CALCULATORS.COM
@@ -125,17 +125,6 @@ export default function Home() {
 
       <main className="container mx-auto px-4 py-4">
         <div className="max-w-5xl mx-auto">
-          {activeTab === "ccpi" && (
-            <div>
-              <div className="mb-4">
-                <p className="text-lg text-gray-600 text-balance">
-                  Early-warning oracle for AI-led market corrections with regime-based options playbooks for professional traders
-                </p>
-              </div>
-              <CcpiDashboard />
-            </div>
-          )}
-
           {activeTab === "trend-analysis" && (
             <div>
               <div className="mb-4">
@@ -144,6 +133,17 @@ export default function Home() {
                 </p>
               </div>
               <TrendAnalysis />
+            </div>
+          )}
+
+          {activeTab === "risk-management" && (
+            <div>
+              <div className="mb-4">
+                <p className="text-lg text-gray-600 text-balance">
+                  Calculate your recommended cash allocation based on current VIX volatility levels
+                </p>
+              </div>
+              <RiskCalculator />
             </div>
           )}
 
@@ -170,14 +170,15 @@ export default function Home() {
             </div>
           )}
 
-          {activeTab === "risk-management" && (
+          {activeTab === "ccpi" && (
             <div>
               <div className="mb-4">
                 <p className="text-lg text-gray-600 text-balance">
-                  Calculate your recommended cash allocation based on current VIX volatility levels
+                  Early-warning oracle for AI-led market corrections with regime-based options playbooks for
+                  professional traders
                 </p>
               </div>
-              <RiskCalculator />
+              <CcpiDashboard />
             </div>
           )}
 
@@ -256,15 +257,22 @@ export default function Home() {
               © 2025 OPTIONS-CALCULATORS.COM - Professional Tools for Options Traders
             </p>
             <p className="text-center text-xs text-gray-500 leading-relaxed max-w-4xl mx-auto">
-              This <a href="https://www.options-calculators.com/login" className="text-gray-500 hover:text-primary transition-colors">website</a> and its free AI-powered tools (including calculators, predictions, and analyses) are for
-              educational and entertainment purposes only and do not constitute financial, investment, legal, or
-              professional advice of any kind. We are not financial advisors, brokers, or certified professionals; all
-              content is based on algorithms, formulas, and third-party data that may contain errors, inaccuracies, or
-              biases—use at your own risk, with no guarantees of performance, profitability, or suitability. Always
-              consult qualified experts and conduct your own due diligence before making decisions; we disclaim all
-              liability for any losses or damages arising from reliance on this site. Additionally, we may earn
-              commissions or other compensation from affiliate links or referrals to recommended software, services, or
-              products on this site, at no extra cost to you.
+              This{" "}
+              <a
+                href="https://www.options-calculators.com/login"
+                className="text-gray-500 hover:text-primary transition-colors"
+              >
+                website
+              </a>{" "}
+              and its free AI-powered tools (including calculators, predictions, and analyses) are for educational and
+              entertainment purposes only and do not constitute financial, investment, legal, or professional advice of
+              any kind. We are not financial advisors, brokers, or certified professionals; all content is based on
+              algorithms, formulas, and third-party data that may contain errors, inaccuracies, or biases—use at your
+              own risk, with no guarantees of performance, profitability, or suitability. Always consult qualified
+              experts and conduct your own due diligence before making decisions; we disclaim all liability for any
+              losses or damages arising from reliance on this site. Additionally, we may earn commissions or other
+              compensation from affiliate links or referrals to recommended software, services, or products on this
+              site, at no extra cost to you.
             </p>
           </div>
         </div>
