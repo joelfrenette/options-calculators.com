@@ -356,7 +356,7 @@ export function RiskCalculator() {
                 <div
                   className="absolute top-0 bottom-0 w-2 bg-black shadow-lg transition-all duration-500"
                   style={{
-                    left: `calc(${Math.min(100, (vixValue / 50) * 100)}% - 4px)`,
+                    left: `calc(${Math.min(100, (vixValue / 30) * 100)}% - 4px)`,
                   }}
                 >
                   <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap">

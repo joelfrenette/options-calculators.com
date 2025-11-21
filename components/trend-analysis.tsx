@@ -214,7 +214,7 @@ export function TrendAnalysis() {
                 Index Trend Historical Scale
               </CardTitle>
               <CardDescription>
-                Visual representation of trend direction from extreme bearish to extreme bullish
+                Visual representation of trend direction from extreme bullish to extreme bearish
               </CardDescription>
             </div>
             <RefreshButton
@@ -228,19 +228,19 @@ export function TrendAnalysis() {
           <div className="relative">
             {/* Horizontal gradient bar with labeled zones */}
             <div className="relative h-20 rounded-lg overflow-hidden shadow-sm border border-gray-300">
-              <div className="absolute inset-0 h-24 bg-gradient-to-r from-red-600 via-red-400 via-20% via-yellow-400 via-50% via-green-400 via-80% to-green-600 rounded-lg shadow-inner" />
+              <div className="absolute inset-0 h-24 bg-gradient-to-r from-green-600 via-green-400 via-20% via-yellow-400 via-50% via-red-400 via-80% to-red-600 rounded-lg shadow-inner" />
 
               {/* Zone labels */}
               <div className="absolute inset-0 flex items-center justify-between px-2 text-xs font-bold">
-                {/* Extreme Bearish */}
+                {/* Extreme Bullish */}
                 <div className="text-center text-white drop-shadow-lg">
                   <div className="text-base">EXTREME</div>
-                  <div>BEARISH</div>
+                  <div>BULLISH</div>
                   <div className="text-[10px] mt-1">0-20</div>
                 </div>
-                {/* Bearish */}
+                {/* Bullish */}
                 <div className="text-center text-white drop-shadow-lg">
-                  <div>BEARISH</div>
+                  <div>BULLISH</div>
                   <div className="text-[10px] mt-1">21-40</div>
                 </div>
                 {/* Neutral */}
@@ -248,15 +248,15 @@ export function TrendAnalysis() {
                   <div>NEUTRAL</div>
                   <div className="text-[10px] mt-1">41-60</div>
                 </div>
-                {/* Bullish */}
+                {/* Bearish */}
                 <div className="text-center text-white drop-shadow-lg">
-                  <div>BULLISH</div>
+                  <div>BEARISH</div>
                   <div className="text-[10px] mt-1">61-80</div>
                 </div>
-                {/* Extreme Bullish */}
+                {/* Extreme Bearish */}
                 <div className="text-center text-white drop-shadow-lg">
                   <div className="text-base">EXTREME</div>
-                  <div>BULLISH</div>
+                  <div>BEARISH</div>
                   <div className="text-[10px] mt-1">81-100</div>
                 </div>
               </div>
@@ -274,14 +274,14 @@ export function TrendAnalysis() {
                   <div className="text-2xl font-bold">{Math.round(selectedItem.momentumStrength ?? 50)}</div>
                   <div className="text-xs text-center">
                     {selectedItem.momentumStrength >= 80
-                      ? "Extreme Bullish"
+                      ? "Extreme Bearish"
                       : selectedItem.momentumStrength >= 60
-                        ? "Bullish"
+                        ? "Bearish"
                         : selectedItem.momentumStrength >= 40
                           ? "Neutral"
                           : selectedItem.momentumStrength >= 20
-                            ? "Bearish"
-                            : "Extreme Bearish"}
+                            ? "Bullish"
+                            : "Extreme Bullish"}
                   </div>
                 </div>
                 <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-black mx-auto" />

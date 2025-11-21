@@ -527,7 +527,7 @@ export function MarketSentiment() {
                 Fear & Greed Historical Scale
               </CardTitle>
               <p className="text-sm text-gray-600 mt-1">
-                Visual representation of sentiment zones from extreme fear to extreme greed
+                Visual representation of sentiment zones from extreme greed to extreme fear
               </p>
             </div>
             <RefreshButton onClick={handleRefresh} loading={refreshing} />
@@ -537,18 +537,17 @@ export function MarketSentiment() {
           {/* Scale Visualization - Matching Panic/Euphoria style */}
           <div className="space-y-6">
             <div className="relative">
-              {/* Gradient Bar */}
+              {/* Gradient Bar - Colors remain the same (green->red) */}
               <div className="h-24 bg-gradient-to-r from-green-600 via-green-500 via-20% via-green-400 via-40% via-yellow-400 via-60% via-orange-500 via-80% to-red-600 rounded-lg shadow-inner" />
 
-              {/* Zone labels */}
               <div className="absolute inset-0 flex items-center justify-between px-2 text-xs font-bold">
                 <div className="text-center text-white drop-shadow-lg">
                   <div className="text-base">EXTREME</div>
-                  <div>FEAR</div>
+                  <div>GREED</div>
                   <div className="text-[10px] mt-1">0-24</div>
                 </div>
                 <div className="text-center text-white drop-shadow-lg">
-                  <div>FEAR</div>
+                  <div>GREED</div>
                   <div className="text-[10px] mt-1">25-44</div>
                 </div>
                 <div className="text-center text-gray-800 drop-shadow">
@@ -556,12 +555,12 @@ export function MarketSentiment() {
                   <div className="text-[10px] mt-1">45-55</div>
                 </div>
                 <div className="text-center text-white drop-shadow-lg">
-                  <div>GREED</div>
+                  <div>FEAR</div>
                   <div className="text-[10px] mt-1">56-74</div>
                 </div>
                 <div className="text-center text-white drop-shadow-lg">
                   <div className="text-base">EXTREME</div>
-                  <div>GREED</div>
+                  <div>FEAR</div>
                   <div className="text-[10px] mt-1">75-100</div>
                 </div>
               </div>
@@ -570,7 +569,7 @@ export function MarketSentiment() {
               {marketData && (
                 <div
                   className="absolute top-0 bottom-0 w-2 bg-black shadow-lg transition-all duration-500"
-                  style={{ left: `calc(${marketData.overallScore}% - 4px)` }}
+                  style={{ left: `calc(${100 - marketData.overallScore}% - 4px)` }}
                 >
                   <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap">
                     <div className="bg-black text-white px-4 py-2 rounded-lg shadow-xl">
@@ -578,14 +577,14 @@ export function MarketSentiment() {
                       <div className="text-2xl font-bold">{marketData.overallScore.toFixed(0)}</div>
                       <div className="text-xs text-center">
                         {marketData.overallScore <= 24
-                          ? "Extreme Fear"
+                          ? "Extreme Greed"
                           : marketData.overallScore <= 44
-                            ? "Fear"
+                            ? "Greed"
                             : marketData.overallScore <= 55
                               ? "Neutral"
                               : marketData.overallScore <= 74
-                                ? "Greed"
-                                : "Extreme Greed"}
+                                ? "Fear"
+                                : "Extreme Fear"}
                       </div>
                     </div>
                     <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-green-500 mx-auto" />
@@ -639,14 +638,6 @@ export function MarketSentiment() {
                 },
               ].map((component, idx) => {
                 const normalizedValue = Math.max(0, Math.min(100, component.value))
-                const getColor = (val: number) => {
-                  if (val <= 24) return "bg-green-500"
-                  if (val <= 44) return "bg-green-400"
-                  if (val <= 55) return "bg-yellow-400"
-                  if (val <= 74) return "bg-orange-500"
-                  return "bg-red-500"
-                }
-
                 return (
                   <div key={idx}>
                     <div className="flex items-center justify-between mb-1">
@@ -661,11 +652,8 @@ export function MarketSentiment() {
                       </div>
                       <span className="text-xs font-bold text-gray-900">{normalizedValue.toFixed(0)}</span>
                     </div>
-                    <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full ${getColor(normalizedValue)} transition-all duration-500`}
-                        style={{ width: `${normalizedValue}%` }}
-                      ></div>
+                    <div className="relative h-3 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded-full overflow-hidden">
+                      <div className="absolute inset-0 bg-gray-200" style={{ left: `${normalizedValue}%` }}></div>
                     </div>
                   </div>
                 )
@@ -673,7 +661,7 @@ export function MarketSentiment() {
             </div>
 
             {/* Historical Reference Points */}
-            <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+            <div className="mt-16 p-4 bg-gray-50 border border-gray-200 rounded-lg">
               <h4 className="text-xs font-bold text-gray-900 mb-3 flex items-center gap-2">
                 <InfoIcon />
                 Historical Reference Points
@@ -1024,13 +1012,21 @@ export function MarketSentiment() {
 
                     {/* Sentiment Bar */}
                     <div className="relative h-8 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 flex">
-                        <div className="bg-red-500 transition-all" style={{ width: `${item.bearishScore}%` }} />
-                        <div className="bg-green-500 transition-all" style={{ width: `${item.bullishScore}%` }} />
-                      </div>
-                      <div className="absolute inset-0 flex items-center justify-between px-3 text-xs font-semibold text-white">
-                        <span>Bearish {item.bearishScore}%</span>
-                        <span>Bullish {item.bullishScore}%</span>
+                      {/* Smooth gradient background */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+
+                      {/* Visual marker showing the net sentiment position */}
+                      <div
+                        className="absolute top-0 bottom-0 w-1 bg-black/50"
+                        style={{
+                          left: `${item.bullishScore}%`,
+                          transition: "left 0.3s ease",
+                        }}
+                      />
+
+                      <div className="absolute inset-0 flex items-center justify-between px-3 text-xs font-semibold">
+                        <span className="text-white drop-shadow-md">Bullish {item.bullishScore}%</span>
+                        <span className="text-white drop-shadow-md">Bearish {item.bearishScore}%</span>
                       </div>
                     </div>
                   </div>

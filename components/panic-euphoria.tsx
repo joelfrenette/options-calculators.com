@@ -354,35 +354,35 @@ export function PanicEuphoria() {
           <div className="space-y-6">
             {/* Main sentiment scale */}
             <div className="relative">
-              <div className="h-24 bg-gradient-to-r from-red-600 via-red-400 via-30% via-green-300 via-50% via-yellow-300 via-70% to-purple-600 rounded-lg shadow-inner" />
+              <div className="h-24 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded-lg shadow-inner" />
 
               {/* Zone labels */}
               <div className="absolute inset-0 flex items-center justify-between px-2 text-xs font-bold">
                 <div className="text-center text-white drop-shadow-lg">
                   <div className="text-base">EXTREME</div>
-                  <div>PANIC</div>
-                  <div className="text-[10px] mt-1">-1.0</div>
+                  <div>EUPHORIA</div>
+                  <div className="text-[10px] mt-1">+1.0</div>
                 </div>
                 <div className="text-center text-gray-800 drop-shadow">
-                  <div>PANIC</div>
-                  <div className="text-[10px] mt-1">-0.45</div>
-                </div>
-                <div className="text-center text-gray-800 drop-shadow">
-                  <div>MODERATE</div>
-                  <div className="text-[10px] mt-1">-0.10</div>
+                  <div>POSITIVE</div>
+                  <div className="text-[10px] mt-1">+0.41</div>
                 </div>
                 <div className="text-center text-gray-800 drop-shadow">
                   <div>NEUTRAL</div>
                   <div className="text-[10px] mt-1">0.0</div>
                 </div>
                 <div className="text-center text-gray-800 drop-shadow">
-                  <div>POSITIVE</div>
-                  <div className="text-[10px] mt-1">+0.41</div>
+                  <div>MODERATE</div>
+                  <div className="text-[10px] mt-1">-0.10</div>
+                </div>
+                <div className="text-center text-gray-800 drop-shadow">
+                  <div>PANIC</div>
+                  <div className="text-[10px] mt-1">-0.45</div>
                 </div>
                 <div className="text-center text-white drop-shadow-lg">
                   <div className="text-base">EXTREME</div>
-                  <div>EUPHORIA</div>
-                  <div className="text-[10px] mt-1">+1.0</div>
+                  <div>PANIC</div>
+                  <div className="text-[10px] mt-1">-1.0</div>
                 </div>
               </div>
 
@@ -390,7 +390,9 @@ export function PanicEuphoria() {
               {data && (
                 <div
                   className="absolute top-0 bottom-0 w-2 bg-black shadow-lg transition-all duration-500"
-                  style={{ left: `calc(${((data.overallScore + 1) / 2) * 100}% - 4px)` }}
+                  style={{
+                    left: `calc(${((1 - data.overallScore) / 2) * 100}% - 4px)`,
+                  }}
                 >
                   <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap">
                     <div className="bg-black text-white px-4 py-2 rounded-lg shadow-xl">
@@ -446,24 +448,17 @@ export function PanicEuphoria() {
                         {/* Center line */}
                         <div className="absolute left-1/2 top-0 bottom-0 w-px bg-gray-400 z-10" />
 
-                        {/* Score bar */}
+                        {/* Score bar with gradient background */}
                         <div
-                          className={`absolute top-0 bottom-0 transition-all duration-500 ${
-                            score < -0.5
-                              ? "bg-red-600"
-                              : score < -0.15
-                                ? "bg-red-400"
-                                : score < 0
-                                  ? "bg-orange-400"
-                                  : score < 0.15
-                                    ? "bg-green-400"
-                                    : score < 0.5
-                                      ? "bg-yellow-400"
-                                      : "bg-purple-600"
-                          }`}
+                          className="absolute top-0 bottom-0 transition-all duration-500"
                           style={{
-                            left: score < 0 ? `${((score + 1) / 2) * 100}%` : "50%",
-                            right: score >= 0 ? `${(1 - (score + 1) / 2) * 100}%` : "50%",
+                            // Invert the direction: positive scores go left (green), negative go right (red)
+                            left: score > 0 ? `${((1 - score) / 2) * 100}%` : "50%",
+                            right: score <= 0 ? `${(1 - (score + 1) / 2) * 100}%` : "50%",
+                            background:
+                              score > 0
+                                ? `linear-gradient(to left, #22c55e ${Math.abs(score) * 100}%, transparent ${Math.abs(score) * 100}%)`
+                                : `linear-gradient(to right, #ef4444 ${Math.abs(score) * 100}%, transparent ${Math.abs(score) * 100}%)`,
                           }}
                         />
                       </div>
