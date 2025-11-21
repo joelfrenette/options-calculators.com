@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Info } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,137 +12,239 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Download } from "lucide-react"
 import { RefreshButton } from "@/components/ui/refresh-button"
 
-interface CCPIData {
-  ccpi: number
-  baseCCPI?: number
-  crashAmplifiers?: Array<{ reason: string; points: number }>
-  totalBonus?: number
-  certainty: number
-  pillars: {
-    momentum: number // NEW: Pillar 1 - Momentum & Technical (40%)
-    riskAppetite: number // NEW: Pillar 2 - Risk Appetite (30%)
-    valuation: number // NEW: Pillar 3 - Valuation (20%)
-    macro: number // Pillar 4 - Macro (10%)
-  }
-  regime: {
-    level: number
-    name: string
-    color: string
+import type { CCPIData, HistoricalData } from "@/lib/ccpi/types"
+import { getReadableColor, getRegimeZone, sortCanaries, countActiveWarnings } from "@/lib/ccpi/calculations"
+import { saveCCPIToCache, loadCCPIFromCache, saveHistoryToCache } from "@/lib/ccpi/cache"
+import { REFRESH_STATUS_MESSAGES } from "@/lib/ccpi/constants"
+
+interface CCPIIndicatorTooltipProps {
+  title: string
+  description: string
+  thresholds: Array<{
+    label: string
     description: string
-  }
-  playbook: {
-    bias: string
-    strategies: string[]
-    allocation: Record<string, string>
-  }
-  summary: {
-    headline: string
-    bullets: string[]
-  }
-  canaries: Array<{
-    signal: string
-    pillar: string
-    severity: "high" | "medium" | "low"
-    indicatorWeight?: number
-    pillarWeight?: number
-    impactScore?: number
   }>
-  indicators?: Record<string, any>
-  apiStatus?: Record<string, { live: boolean; source: string }> // Updated for clarity
-  timestamp: string
-  totalIndicators?: number // Added for the canary count display
-  cachedAt?: string // Added cache timestamp
-  lastUpdated?: string // Added for last updated timestamp
+  impact?: string
 }
 
-interface HistoricalData {
-  history: Array<{
-    date: string
-    ccpi: number
-    certainty: number
-  }>
+function CCPIIndicatorTooltip({ title, description, thresholds, impact }: CCPIIndicatorTooltipProps) {
+  return (
+    <div>
+      <p className="font-semibold mb-1">{title}</p>
+      <p className="text-sm">{description}</p>
+      {thresholds.length > 0 && (
+        <ul className="text-sm mt-1 space-y-1">
+          {thresholds.map((threshold, index) => (
+            <li key={index}>
+              <strong>{threshold.label}:</strong> {threshold.description}
+            </li>
+          ))}
+        </ul>
+      )}
+      {impact && (
+        <p className="text-xs mt-2">
+          <strong>Impact:</strong> {impact}
+        </p>
+      )}
+    </div>
+  )
 }
 
-export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
+interface CCPIGradientBarProps {
+  value: number
+  min?: number
+  max?: number
+  reverse?: boolean
+}
+
+const CCPIGradientBar = React.memo(({ value, min = 0, max = 100, reverse = false }: CCPIGradientBarProps) => {
+  const percentage = Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100))
+  const marginLeft = reverse ? `${100 - percentage}%` : `${percentage}%`
+
+  return (
+    <div className="relative w-full h-3 rounded-full overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+      <div className="absolute inset-0 bg-gray-200" style={{ marginLeft }} />
+    </div>
+  )
+})
+CCPIGradientBar.displayName = "CCPIGradientBar"
+
+interface CCPIIndicatorThresholds {
+  low: { value: number; label: string }
+  mid?: { value: number; label: string }
+  high: { value: number; label: string }
+}
+
+interface CCPIIndicatorProps {
+  label: string
+  value: number | string
+  thresholds: CCPIIndicatorThresholds
+  tooltipContent?: React.ReactNode
+  formatValue?: (v: number | string) => string
+  valueColor?: string
+  barMin?: number
+  barMax?: number
+  barReverse?: boolean
+  tooltipsEnabled?: boolean
+}
+
+const CCPIIndicator = React.memo(
+  ({
+    label,
+    value,
+    thresholds,
+    tooltipContent,
+    formatValue,
+    valueColor,
+    barMin,
+    barMax,
+    barReverse,
+    tooltipsEnabled = true,
+  }: CCPIIndicatorProps) => {
+    const displayValue = formatValue ? formatValue(value) : value
+    const numericValue = typeof value === "string" ? Number.parseFloat(value) : value
+
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <span className="font-medium flex items-center gap-1">
+            {label}
+            {tooltipsEnabled && tooltipContent && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">{tooltipContent}</TooltipContent>
+              </Tooltip>
+            )}
+          </span>
+          <span className={`font-bold ${valueColor || ""}`}>{displayValue}</span>
+        </div>
+
+        <CCPIGradientBar value={numericValue} min={barMin} max={barMax} reverse={barReverse} />
+
+        <div className="flex justify-between text-xs text-gray-600">
+          <span>{thresholds.low.label}</span>
+          {thresholds.mid && <span>{thresholds.mid.label}</span>}
+          <span>{thresholds.high.label}</span>
+        </div>
+      </div>
+    )
+  },
+)
+CCPIIndicator.displayName = "CCPIIndicator"
+
+interface CCPIBooleanIndicatorProps {
+  label: string
+  value: boolean
+  proximity?: number
+  additionalInfo?: string
+  thresholds: CCPIIndicatorThresholds
+  tooltipContent?: React.ReactNode
+  tooltipsEnabled?: boolean
+}
+
+const CCPIBooleanIndicator = React.memo(
+  ({
+    label,
+    value,
+    proximity = 0,
+    additionalInfo,
+    thresholds,
+    tooltipContent,
+    tooltipsEnabled = true,
+  }: CCPIBooleanIndicatorProps) => {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <span className="font-medium flex items-center gap-1">
+            {label}
+            {tooltipsEnabled && tooltipContent && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">{tooltipContent}</TooltipContent>
+              </Tooltip>
+            )}
+          </span>
+          <span className="font-bold">
+            <span className={value ? "text-red-600" : "text-green-600"}>{value ? "YES" : "NO"}</span>
+            {additionalInfo && <span className="text-gray-600 ml-2 text-xs">({additionalInfo})</span>}
+          </span>
+        </div>
+
+        <CCPIGradientBar value={proximity} min={0} max={100} reverse={false} />
+
+        <div className="flex justify-between text-xs text-gray-600">
+          <span>{thresholds.low.label}</span>
+          {thresholds.mid && <span>{thresholds.mid.label}</span>}
+          <span>{thresholds.high.label}</span>
+        </div>
+      </div>
+    )
+  },
+)
+CCPIBooleanIndicator.displayName = "CCPIBooleanIndicator"
+
+export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
   const [data, setData] = useState<CCPIData | null>(null)
   const [history, setHistory] = useState<HistoricalData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [executiveSummary, setExecutiveSummary] = useState<string | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
-
   const [refreshProgress, setRefreshProgress] = useState(0)
   const [refreshStatus, setRefreshStatus] = useState("")
   const [isRefreshing, setIsRefreshing] = useState(false)
-
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
 
-  const getReadableColor = (colorName: string): string => {
-    const colorMap: Record<string, string> = {
-      green: "#16a34a", // Green for low risk
-      lime: "#65a30d", // Lime for normal
-      yellow: "#f97316", // Orange instead of yellow for better readability
-      orange: "#f97316", // Orange for caution
-      red: "#dc2626", // Red for high alert/crash watch
-    }
-    return colorMap[colorName] || "#6b7280" // Default to gray if color not found
-  }
+  const pillarData = useMemo(() => {
+    if (!data) return []
+    return [
+      { name: "Pillar 1 - Momentum & Technical", value: data.pillars.momentum, weight: "35%", icon: Activity },
+      {
+        name: "Pillar 2 - Risk Appetite & Volatility",
+        value: data.pillars.riskAppetite,
+        weight: "30%",
+        icon: TrendingDown,
+      },
+      { name: "Pillar 3 - Valuation", value: data.pillars.valuation, weight: "15%", icon: DollarSign },
+      { name: "Pillar 4 - Macro", value: data.pillars.macro, weight: "20%", icon: Users },
+    ]
+  }, [data])
 
-  const getBarColor = (percentage: number): string => {
-    if (percentage <= 33) return "#22c55e" // green-500
-    if (percentage <= 66) return "#eab308" // yellow-500
-    return "#ef4444" // red-500
-  }
+  const ccpiScore = useMemo(() => (data ? Math.round(data.ccpi) : 0), [data])
+  const zone = useMemo(() => getRegimeZone(ccpiScore), [ccpiScore])
+  const regimeColor = useMemo(() => getReadableColor(zone.color), [zone.color])
+  const sortedCanaries = useMemo(() => (data ? sortCanaries(data.canaries) : []), [data])
+  const activeCanariesCount = useMemo(() => (data ? countActiveWarnings(data.canaries) : 0), [data])
 
-  const getStatusBadge = (live: boolean, source: string) => {
-    if (live) {
-      return (
-        <Badge className="ml-2 bg-green-500 text-white text-xs flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-white"></span>
-          Live
-        </Badge>
-      )
-    } else if (source.includes("baseline") || source.includes("fallback") || source.includes("historical")) {
-      return (
-        <Badge className="ml-2 bg-amber-500 text-white text-xs flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-white"></span>
-          Baseline
-        </Badge>
-      )
-    } else {
-      return (
-        <Badge className="ml-2 bg-red-500 text-white text-xs flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-white"></span>
-          Failed
-        </Badge>
-      )
-    }
-  }
+  const fetchExecutiveSummary = useCallback(async (ccpiData: CCPIData) => {
+    try {
+      setSummaryLoading(true)
+      const response = await fetch("/api/ccpi/executive-summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(ccpiData),
+      })
 
-  useEffect(() => {
-    const loadInitialData = async () => {
-      const cached = localStorage.getItem("ccpi-data")
-      if (cached) {
-        try {
-          const parsedCache = JSON.parse(cached)
-          console.log("[v0] CCPI: Loaded from localStorage", parsedCache.timestamp)
-          console.log("[v0] CCPI: Cached crash amplifiers:", parsedCache.crashAmplifiers)
-          console.log("[v0] CCPI: Cached totalBonus:", parsedCache.totalBonus)
-          console.log("[v0] CCPI: Cached baseCCPI:", parsedCache.baseCCPI)
-          setData(parsedCache)
-        } catch (e) {
-          console.error("[v0] Failed to parse cached CCPI data:", e)
-        }
+      if (!response.ok) {
+        throw new Error(`Failed to fetch executive summary: ${response.status}`)
       }
 
-      console.log("[v0] CCPI: Fetching fresh data from API...")
-      await fetchCCPIData()
+      const result = await response.json()
+      setExecutiveSummary(result.summary)
+    } catch (error) {
+      console.error("[v0] Failed to fetch executive summary:", error)
+      setExecutiveSummary(null)
+    } finally {
+      setSummaryLoading(false)
     }
-
-    loadInitialData()
   }, [])
 
-  const fetchCCPIData = async () => {
+  const fetchCCPIData = useCallback(async () => {
     try {
       setIsRefreshing(true)
       setLoading(true)
@@ -149,22 +252,13 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
       setRefreshStatus("Initializing CCPI calculation...")
       setError(null)
 
-      // Simulate progress updates (in reality, the API would stream these)
       const progressInterval = setInterval(() => {
         setRefreshProgress((prev) => {
           if (prev >= 90) return prev
           return prev + Math.random() * 8
         })
-        setRefreshStatus((prev) => {
-          const messages = [
-            "Fetching market data...",
-            "Analyzing technical indicators...",
-            "Computing sentiment metrics...",
-            "Evaluating valuation signals...",
-            "Processing macro indicators...",
-            "Calculating CCPI score...",
-          ]
-          return messages[Math.floor(Math.random() * messages.length)]
+        setRefreshStatus(() => {
+          return REFRESH_STATUS_MESSAGES[Math.floor(Math.random() * REFRESH_STATUS_MESSAGES.length)]
         })
       }, 800)
 
@@ -180,50 +274,13 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
 
       const result = await response.json()
 
-      console.log("[v0] CCPI Data Loaded:", {
-        ccpi: result.ccpi,
-        certainty: result.certainty,
-        regime: result.regime.name,
-        pillars: result.pillars,
-        activeCanaries: result.canaries.filter((c: any) => c.severity === "high" || c.severity === "medium").length,
-        totalIndicators: result.totalIndicators || 34,
-        crashAmplifiers: result.crashAmplifiers?.length || 0,
-        totalBonus: result.totalBonus || 0,
-      })
-      console.log("[v0] CCPI: crashAmplifiers from API:", result.crashAmplifiers)
-      console.log("[v0] CCPI: totalBonus from API:", result.totalBonus)
-      console.log("[v0] CCPI: baseCCPI from API:", result.baseCCPI)
-      console.log("[v0] Pillar Breakdown (weighted contribution to CCPI):")
-      console.log("  Momentum:", result.pillars.momentum, "× 35% =", (result.pillars.momentum * 0.35).toFixed(1))
-      console.log(
-        "  Risk Appetite:",
-        result.pillars.riskAppetite,
-        "× 30% =",
-        (result.pillars.riskAppetite * 0.3).toFixed(1),
-      )
-      console.log("  Valuation:", result.pillars.valuation, "× 15% =", (result.pillars.valuation * 0.15).toFixed(1))
-      console.log("  Macro:", result.pillars.macro, "× 20% =", (result.pillars.macro * 0.2).toFixed(1))
-
-      const calculatedCCPI =
-        result.pillars.momentum * 0.35 +
-        result.pillars.riskAppetite * 0.3 +
-        result.pillars.valuation * 0.15 +
-        result.pillars.macro * 0.2
-      console.log("  Calculated CCPI:", calculatedCCPI.toFixed(1), "| API CCPI:", result.ccpi)
-
       const cachedData = {
         ...result,
         timestamp: new Date().toISOString(),
       }
 
       setData(cachedData)
-
-      try {
-        localStorage.setItem("ccpi-data", JSON.stringify(cachedData))
-        console.log("[v0] CCPI data saved to localStorage")
-      } catch (storageError) {
-        console.error("[v0] Failed to save to localStorage:", storageError)
-      }
+      saveCCPIToCache(cachedData)
 
       try {
         await fetch("/api/ccpi/cache", {
@@ -231,7 +288,6 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(cachedData),
         })
-        console.log("[v0] CCPI data cached to API")
       } catch (cacheError) {
         console.error("[v0] Failed to cache CCPI data:", cacheError)
       }
@@ -246,63 +302,33 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
       setRefreshProgress(0)
       setRefreshStatus("")
     }
-  }
+  }, [fetchExecutiveSummary])
 
-  const fetchExecutiveSummary = async (ccpiData: CCPIData) => {
-    try {
-      setSummaryLoading(true)
-      const response = await fetch("/api/ccpi/executive-summary", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ccpi: ccpiData.ccpi,
-          certainty: ccpiData.certainty,
-          activeCanaries: ccpiData.canaries.filter((c) => c.severity === "high" || c.severity === "medium").length,
-          totalIndicators: ccpiData.totalIndicators || 34,
-          regime: ccpiData.regime,
-          pillars: ccpiData.pillars,
-        }),
-      })
-
-      if (response.ok) {
-        const result = await response.json()
-        setExecutiveSummary(result.summary)
-        console.log("[v0] Grok executive summary generated:", result.summary)
-      }
-    } catch (error) {
-      console.error("[v0] Failed to fetch executive summary:", error)
-    } finally {
-      setSummaryLoading(false)
-    }
-  }
-
-  const fetchHistory = async () => {
+  const fetchHistory = useCallback(async () => {
     try {
       const response = await fetch("/api/ccpi/history")
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        throw new Error(`Failed to fetch history: ${response.status}`)
       }
       const result = await response.json()
       setHistory(result)
+      saveHistoryToCache(result)
     } catch (error) {
       console.error("[v0] Failed to fetch CCPI history:", error)
     }
-  }
+  }, [])
 
-  const sortCanaries = (canaries: CCPIData["canaries"]) => {
-    return [...canaries].sort((a, b) => {
-      // First sort by severity: high before medium before low
-      if (a.severity === "high" && b.severity !== "high") return -1
-      if (a.severity !== "high" && b.severity === "high") return 1
-      if (a.severity === "medium" && b.severity === "low") return -1
-      if (a.severity === "low" && b.severity === "medium") return 1
+  useEffect(() => {
+    const loadInitialData = async () => {
+      const cached = loadCCPIFromCache()
+      if (cached) {
+        setData(cached)
+      }
+      await fetchCCPIData()
+    }
 
-      // Within same severity, sort by impact score descending
-      const impactA = a.impactScore ?? 0
-      const impactB = b.impactScore ?? 0
-      return impactB - impactA
-    })
-  }
+    loadInitialData()
+  }, [fetchCCPIData])
 
   if (loading) {
     return (
@@ -322,8 +348,6 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
           <AlertTriangle className="h-8 w-8 text-red-600 mx-auto mb-2" />
           <p className="text-sm text-red-600">{error}</p>
           <Button variant="outline" onClick={fetchCCPIData} className="mt-4 bg-transparent">
-            {" "}
-            {/* Changed to fetchCCPIData */}
             Retry
           </Button>
         </div>
@@ -332,59 +356,8 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
   }
 
   if (!data) {
-    return null // Should not happen if loading/error handled
+    return null
   }
-
-  const getRegimeColor = (level: number) => {
-    if (level >= 80) return "bg-red-600"
-    if (level >= 60) return "bg-orange-500"
-    if (level >= 40) return "bg-yellow-500"
-    if (level >= 20) return "bg-lime-500"
-    return "bg-green-600"
-  }
-
-  const getRegimeZone = (ccpi: number) => {
-    if (ccpi >= 80) return { color: "red", label: "CRASH WATCH" }
-    if (ccpi >= 60) return { color: "orange", label: "HIGH ALERT" }
-    if (ccpi >= 40) return { color: "yellow", label: "CAUTION" }
-    if (ccpi >= 20) return { color: "lightgreen", label: "NORMAL" }
-    return { color: "green", label: "LOW RISK" }
-  }
-
-  const getIndicatorStatus = (value: number, thresholds: { low: number; high: number; ideal?: number }) => {
-    if (thresholds.ideal !== undefined) {
-      const deviation = Math.abs(value - thresholds.ideal)
-      if (deviation < 5) return { color: "bg-green-500", status: "Normal" }
-      if (deviation < 15) return { color: "bg-yellow-500", status: "Elevated" }
-      return { color: "bg-red-500", status: "Warning" }
-    }
-    if (value <= thresholds.low) return { color: "bg-green-500", status: "Low Risk" }
-    if (value <= thresholds.high) return { color: "bg-yellow-500", status: "Moderate" }
-    return { color: "bg-red-500", status: "High Risk" }
-  }
-
-  const pillarData = [
-    { name: "Pillar 1 - Momentum & Technical", value: data.pillars.momentum, weight: "35%", icon: Activity },
-    {
-      name: "Pillar 2 - Risk Appetite & Volatility",
-      value: data.pillars.riskAppetite,
-      weight: "30%",
-      icon: TrendingDown,
-    },
-    { name: "Pillar 3 - Valuation", value: data.pillars.valuation, weight: "15%", icon: DollarSign },
-    { name: "Pillar 4 - Macro", value: data.pillars.macro, weight: "20%", icon: Users },
-  ]
-
-  const pillarChartData = pillarData.map((pillar, index) => ({
-    name: `Pillar ${index + 1}`,
-    fullName: pillar.name,
-    value: pillar.value,
-    weight: pillar.weight,
-    icon: pillar.icon,
-  }))
-
-  const zone = getRegimeZone(data.ccpi)
-  const ccpiScore = data.ccpi
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -434,12 +407,9 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 />
               </button>
             </div>
-            <RefreshButton onClick={fetchCCPIData} isLoading={isRefreshing} loadingText="Refreshing..." />{" "}
-            {/* Changed to fetchCCPIData */}
+            <RefreshButton onClick={fetchCCPIData} isLoading={isRefreshing} loadingText="Refreshing..." />
           </div>
         </div>
-
-        {/* Original progress card removed as it's replaced by the fixed bar and status message */}
 
         {/* Main CCPI Score Card */}
         <Card className="border-2 shadow-lg">
@@ -458,10 +428,8 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
             <div className="mb-6">
               <div className="pt-0">
                 <div className="relative">
-                  {/* Gradient bar */}
                   <div className="h-16 bg-gradient-to-r from-green-600 via-[20%] via-lime-500 via-[40%] via-yellow-500 via-[60%] via-orange-500 via-[80%] via-red-500 to-[100%] to-red-700 rounded-lg shadow-inner" />
 
-                  {/* Zone labels */}
                   <div className="absolute inset-0 flex items-center justify-between px-4 text-white text-xs font-bold">
                     <div className="text-center">
                       <div>LOW</div>
@@ -488,7 +456,6 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     </div>
                   </div>
 
-                  {/* Pointer indicator */}
                   <div
                     className="absolute top-0 bottom-0 w-2 bg-black shadow-lg transition-all duration-500"
                     style={{ left: `calc(${ccpiScore}% - 4px)` }}
@@ -508,7 +475,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="text-center p-6 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-600 mb-2">CCPI Score</p>
-                <p className="text-5xl font-bold mb-2" style={{ color: getReadableColor(data.regime.color) }}>
+                <p className="text-5xl font-bold mb-2" style={{ color: regimeColor }}>
                   {data.ccpi}
                 </p>
                 <p className="text-xs text-gray-500">0 = No risk, 100 = Imminent crash</p>
@@ -518,39 +485,13 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 <p className="text-sm text-gray-600 mb-2">Certainty Score</p>
                 <div className="flex items-center justify-center gap-2">
                   <p className="text-5xl font-bold text-blue-600">{data.certainty}%</p>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button className="text-gray-400 hover:text-gray-600"></button>
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs p-3">
-                        <p className="font-semibold mb-2">Certainty Calculation</p>
-                        <p className="text-xs leading-relaxed">
-                          Based on pillar alignment variance (
-                          {Math.round(
-                            ((100 -
-                              (Math.max(...Object.values(data.pillars)) - Math.min(...Object.values(data.pillars)))) /
-                              100) *
-                              70,
-                          )}
-                          % weight) and canary agreement (
-                          {Math.round(
-                            (data.canaries.filter((c) => c.severity === "high" || c.severity === "medium").length /
-                              15) *
-                              30,
-                          )}
-                          % weight), adjusted for historical accuracy (82% backtest).
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
                 </div>
                 <p className="text-xs text-gray-500">Signal consistency & alignment</p>
               </div>
 
               <div className="text-center p-6 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-600 mb-2">Current Regime</p>
-                <p className="text-2xl font-bold mb-1" style={{ color: getReadableColor(data.regime.color) }}>
+                <p className="text-2xl font-bold mb-1" style={{ color: regimeColor }}>
                   {data.regime.name}
                 </p>
                 <p className="text-xs text-gray-600 px-2">{data.regime.description}</p>
@@ -561,12 +502,11 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
               <div className="flex items-center justify-between mb-3">
                 <h4 className="font-bold text-base text-blue-900 flex items-center gap-2">
                   <Activity className="h-5 w-5 text-blue-600" />
-                  Weekly Output - Executive Summary
+                  Executive Summary
                 </h4>
                 {summaryLoading && <Activity className="h-4 w-4 animate-spin text-blue-600" />}
               </div>
 
-              {/* AI-Generated Executive Summary */}
               {executiveSummary ? (
                 <div className="mb-4 p-4 bg-white rounded-lg border border-blue-200 shadow-sm">
                   <div className="flex items-start gap-3">
@@ -575,7 +515,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     </div>
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-gray-900 leading-relaxed">{executiveSummary}</p>
-                      <p className="text-xs text-gray-500 mt-2 italic">Generated by Grok xAI - grok-2-latest</p>
+                      <p className="text-xs text-gray-500 mt-2 italic">Generated by Grok xAI</p>
                     </div>
                   </div>
                 </div>
@@ -586,22 +526,17 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                   </div>
                 )
               )}
-
-              {/* Original Summary */}
-              <div className="space-y-2">
-                <ul className="space-y-1">{data.summary.bullets.map((bullet, i) => null)}</ul>
-              </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Crash Amplifiers Card - Only show if bonus > 0 */}
+        {/* Crash Amplifiers Card */}
         {data.crashAmplifiers && data.crashAmplifiers.length > 0 && (
-          <Card className="border-4 border-red-600 bg-gradient-to-r from-red-50 to-orange-50 shadow-2xl animate-pulse">
+          <Card className="border-4 border-red-600 bg-gradient-to-r from-red-50 to-orange-50 shadow-2xl">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl text-red-700">
-                <AlertTriangle className="h-6 w-6 text-red-600 animate-pulse" />🚨 CRASH AMPLIFIERS ACTIVE +
-                {data.totalBonus || 0} BONUS POINTS
+                <AlertTriangle className="h-6 w-6 text-red-600" />
+                CRASH AMPLIFIERS ACTIVE +{data.totalBonus || 0} BONUS POINTS
               </CardTitle>
               <CardDescription className="text-red-700 font-medium">
                 {data.baseCCPI && data.totalBonus
@@ -621,41 +556,20 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                   </div>
                 ))}
               </div>
-              <div className="mt-4 p-3 bg-red-100 border-2 border-red-400 rounded-lg">
-                <p className="text-sm text-red-900 font-bold">
-                  ⚠️ CRASH AMPLIFIERS = Short-term (1-14 day) indicators that trigger 10%+ corrections. Maximum bonus
-                  capped at +100 points to prevent over-signaling.
-                </p>
-              </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Canary Cards */}
+        {/* Canaries Card */}
         <Card className="border-2 border-orange-300 bg-gradient-to-r from-orange-50 to-red-50">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-xl">
                 <AlertTriangle className="h-6 w-6 text-orange-600" />
-                Canaries in the Coal Mine - Active Warning Signals
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <Info className="h-4 w-4 text-muted-foreground" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-sm">
-                      <p className="text-sm">
-                        These are the individual signals across all pillars that are currently in warning territory,
-                        automatically updating with each page load. Each canary card shows which specific indicator is
-                        flashing red and contributing to crash risk.
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                Active Warning Signals
               </CardTitle>
               <div className="text-3xl font-bold text-orange-600">
-                {data.canaries.filter((c) => c.severity === "high" || c.severity === "medium").length}/
-                {data.totalIndicators || 34}
+                {activeCanariesCount}/{data.totalIndicators || 34}
               </div>
             </div>
             <CardDescription className="text-base mt-2">
@@ -664,7 +578,7 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-4">
-              {sortCanaries(data.canaries)
+              {sortedCanaries
                 .filter((canary) => canary.severity === "high" || canary.severity === "medium")
                 .map((canary, i) => {
                   const severityConfig = {
@@ -693,54 +607,18 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                         <Badge variant="outline" className="text-xs font-semibold">
                           {canary.pillar}
                         </Badge>
-                        <div className="flex items-center gap-2">
-                          {canary.impactScore !== undefined && (
-                            <span className="text-xs font-mono text-muted-foreground">
-                              Impact: {canary.impactScore.toFixed(2)}
-                            </span>
-                          )}
-                          <span
-                            className={`text-xs font-bold px-3 py-1 rounded-md ${severityConfig.badgeColor} shadow-sm whitespace-nowrap`}
-                          >
-                            {severityConfig.label}
-                          </span>
-                        </div>
+                        <span
+                          className={`text-xs font-bold px-3 py-1 rounded-md ${severityConfig.badgeColor} shadow-sm whitespace-nowrap`}
+                        >
+                          {severityConfig.label}
+                        </span>
                       </div>
-                      {/* Added tooltip to each canary card */}
-                      <div className="flex items-start gap-2">
-                        <p className={`text-sm font-semibold ${severityConfig.textColor} flex-1`}>{canary.signal}</p>
-                        {tooltipsEnabled && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-4 w-4 text-muted-foreground cursor-help flex-shrink-0 mt-0.5" />
-                            </TooltipTrigger>
-                            <TooltipContent
-                              className={`max-w-xs ${canary.severity === "high" ? "bg-red-50 border-red-200" : "bg-yellow-50 border-yellow-200"}`}
-                            >
-                              <p className="font-semibold mb-1">{canary.signal}</p>
-                              <p className="text-sm">
-                                {canary.severity === "high"
-                                  ? "This indicator has breached a critical threshold, signaling elevated crash risk. Historical data shows increased volatility when this condition persists."
-                                  : "This indicator is showing warning signs. While not critical yet, it suggests increasing caution and risk monitoring."}
-                              </p>
-                              {canary.indicatorWeight !== undefined && canary.pillarWeight !== undefined && (
-                                <p className="text-xs font-medium mt-2">
-                                  Indicator Weight: {canary.indicatorWeight}/100 in pillar
-                                  <br />
-                                  Pillar Weight: {canary.pillarWeight}% of CCPI
-                                  <br />
-                                  Combined Impact: {canary.impactScore?.toFixed(2)}
-                                </p>
-                              )}
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </div>
+                      <p className={`text-sm font-semibold ${severityConfig.textColor}`}>{canary.signal}</p>
                     </div>
                   )
                 })}
             </div>
-            {data.canaries.filter((c) => c.severity === "high" || c.severity === "medium").length === 0 && (
+            {sortedCanaries.filter((c) => c.severity === "high" || c.severity === "medium").length === 0 && (
               <div className="text-center py-4">
                 <p className="text-sm text-green-700 font-medium">No medium or high severity warnings detected</p>
               </div>
@@ -769,419 +647,215 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
             <AccordionContent>
               <div className="space-y-6 pt-4">
                 {/* NVIDIA Momentum Score */}
-                {data.indicators?.nvidiaPrice !== undefined && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium flex items-center gap-1">
-                        NVIDIA Momentum Score (AI Bellwether)
-                        {tooltipsEnabled && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-1">NVIDIA Momentum Score</p>
-                              <p className="text-sm">
-                                Tracks NVIDIA's price momentum as a bellwether for AI sector health and tech leadership.
-                              </p>
-                              <ul className="text-sm mt-1 space-y-1">
-                                <li>
-                                  <strong>{">"}80:</strong> Strong AI sector momentum, low crash risk
-                                </li>
-                                <li>
-                                  <strong>40-60:</strong> Neutral momentum, moderate risk
-                                </li>
-                                <li>
-                                  <strong>{"<"}20:</strong> Falling momentum, tech crash risk
-                                </li>
-                              </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> NVIDIA weakness often precedes broader tech selloffs
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </span>
-                      <span className="font-bold">
-                        ${data.indicators.nvidiaPrice.toFixed(0)} | {data.indicators.nvidiaMomentum}/100
-                      </span>
-                    </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                      <div
-                        className="absolute inset-0 bg-gray-200"
-                        style={{
-                          marginLeft: `${data.indicators.nvidiaMomentum}%`,
-                        }}
+                {data.indicators?.nvidiaPrice !== undefined && data.indicators?.nvidiaMomentum !== undefined && (
+                  <CCPIIndicator
+                    label="NVIDIA Price Momentum (Tech Bellwether)"
+                    value={`$${data.indicators.nvidiaPrice.toFixed(0)} | ${data.indicators.nvidiaMomentum}/100`}
+                    thresholds={{
+                      low: { value: 0, label: "Falling: <20 (Tech crash risk)" },
+                      mid: { value: 50, label: "Neutral: 40-60" },
+                      high: { value: 100, label: "Strong: >80" },
+                    }}
+                    barMin={0}
+                    barMax={100}
+                    tooltipContent={
+                      <CCPIIndicatorTooltip
+                        title="NVIDIA Price Momentum"
+                        description="NVIDIA's stock performance is a key indicator of AI/tech sector health and overall market sentiment."
+                        thresholds={[
+                          { label: ">$140 + momentum >80", description: "Strong AI rally, bullish tech sector" },
+                          { label: "$120-140 + momentum 40-60", description: "Neutral, consolidation phase" },
+                          { label: "<$120 + momentum <40", description: "Tech sector weakness, crash warning" },
+                        ]}
+                        impact="NVIDIA weakness often precedes broader tech selloffs"
                       />
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Strong: {">"}80</span>
-                      <span>Neutral: 40-60</span>
-                      <span>Falling: {"<"}20 (Tech crash risk)</span>
-                    </div>
-                  </div>
+                    }
+                    tooltipsEnabled={tooltipsEnabled}
+                  />
                 )}
 
                 {/* SOX Semiconductor Index */}
                 {data.indicators?.soxIndex !== undefined && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium flex items-center gap-1">
-                        SOX Semiconductor Index (Chip Sector Health)
-                        {tooltipsEnabled && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-1">SOX Semiconductor Index</p>
-                              <p className="text-sm">
-                                Measures the health of the semiconductor industry, a critical leading indicator for tech
-                                sector performance.
-                              </p>
-                              <ul className="text-sm mt-1 space-y-1">
-                                <li>
-                                  <strong>{">"}5500:</strong> Strong chip sector, bullish for tech
-                                </li>
-                                <li>
-                                  <strong>~5000:</strong> Baseline level, neutral risk
-                                </li>
-                                <li>
-                                  <strong>{"<"}4500:</strong> Weak chip demand, tech crash risk
-                                </li>
-                              </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Chip weakness signals broader tech sector vulnerability
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </span>
-                      <span className="font-bold">{data.indicators.soxIndex.toFixed(0)}</span>
-                    </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                      <div
-                        className="absolute inset-0 bg-gray-200"
-                        style={{
-                          marginLeft: `${100 - Math.min(100, Math.max(0, ((data.indicators.soxIndex - 4000) / 2000) * 100))}%`,
-                        }}
+                  <CCPIIndicator
+                    label="SOX Semiconductor Index (Chip Sector Health)"
+                    value={data.indicators.soxIndex.toFixed(0)}
+                    thresholds={{
+                      low: { value: 4000, label: "Weak: <4500" },
+                      mid: { value: 5000, label: "Baseline: 5000" },
+                      high: { value: 6000, label: "Strong: >5500" },
+                    }}
+                    barMin={4000}
+                    barMax={6000}
+                    barReverse={true}
+                    tooltipContent={
+                      <CCPIIndicatorTooltip
+                        title="SOX Semiconductor Index"
+                        description="Measures the health of the semiconductor industry, a critical leading indicator for tech sector performance."
+                        thresholds={[
+                          { label: ">5500", description: "Strong chip sector, bullish for tech" },
+                          { label: "~5000", description: "Baseline level, neutral risk" },
+                          { label: "<4500", description: "Weak chip demand, tech crash risk" },
+                        ]}
+                        impact="Chip weakness signals broader tech sector vulnerability"
                       />
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Strong: {">"}5500</span>
-                      <span>Baseline: 5000</span>
-                      <span>Weak: {"<"}4500</span>
-                    </div>
-                  </div>
+                    }
+                    tooltipsEnabled={tooltipsEnabled}
+                  />
                 )}
 
                 {/* QQQ Daily Return */}
                 {data.indicators?.qqqDailyReturn !== undefined && (
-                  <div className="space-y-2">
-                    {/* Added tooltip to QQQ Daily Return indicator */}
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium flex items-center gap-1">
-                        QQQ Daily Return (5× downside amplifier)
-                        {tooltipsEnabled && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-1">QQQ Daily Return</p>
-                              <p className="text-sm">Tracks the daily percentage change in the Nasdaq-100 ETF (QQQ).</p>
-                              <ul className="text-sm mt-1 space-y-1">
-                                <li>
-                                  <strong>{">"} +1%:</strong> Strong bullish momentum, low crash risk
-                                </li>
-                                <li>
-                                  <strong>-1% to +1%:</strong> Neutral momentum, moderate risk
-                                </li>
-                                <li>
-                                  <strong>{"<"} -1%:</strong> Bearish momentum, increased crash risk
-                                </li>
-                              </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Large negative moves indicate selling pressure and risk-off
-                                sentiment
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </span>
-                      <span
-                        className={`font-bold ${Number.parseFloat(data.indicators.qqqDailyReturn) > 0 ? "text-green-600" : "text-red-600"}`}
-                      >
-                        {data.indicators.qqqDailyReturn}
-                      </span>
-                    </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                      <div
-                        className="absolute inset-0 bg-gray-200"
-                        style={{
-                          marginLeft: `${Math.min(100, Math.max(0, ((Number.parseFloat(data.indicators.qqqDailyReturn) + 2) / 4) * 100))}%`,
-                        }}
+                  <CCPIIndicator
+                    label="QQQ Daily Return (5× downside amplifier)"
+                    value={data.indicators.qqqDailyReturn}
+                    valueColor={
+                      Number.parseFloat(data.indicators.qqqDailyReturn) > 0 ? "text-green-600" : "text-red-600"
+                    }
+                    thresholds={{
+                      low: { value: -2, label: "Down: <-1%" },
+                      mid: { value: 0, label: "Flat: -1% to +1%" },
+                      high: { value: 2, label: "Up: > +1%" },
+                    }}
+                    barMin={-2}
+                    barMax={2}
+                    tooltipContent={
+                      <CCPIIndicatorTooltip
+                        title="QQQ Daily Return"
+                        description="Tracks the daily percentage change in the Nasdaq-100 ETF (QQQ)."
+                        thresholds={[
+                          { label: "> +1%", description: "Strong bullish momentum, low crash risk" },
+                          { label: "-1% to +1%", description: "Neutral momentum, moderate risk" },
+                          { label: "< -1%", description: "Bearish momentum, increased crash risk" },
+                        ]}
+                        impact="Large negative moves indicate selling pressure and risk-off sentiment"
                       />
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Down: {"<"}-1%</span>
-                      <span>Flat: -1% to +1%</span>
-                      <span>Up: {">"} +1%</span>
-                    </div>
-                  </div>
+                    }
+                    tooltipsEnabled={tooltipsEnabled}
+                  />
                 )}
 
                 {/* Consecutive Down Days */}
                 {data.indicators?.qqqConsecDown !== undefined && (
-                  <div className="space-y-2">
-                    {/* Added tooltip to Consecutive Down Days indicator */}
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium flex items-center gap-1">
-                        QQQ Consecutive Down Days
-                        {tooltipsEnabled && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-1">Consecutive Down Days</p>
-                              <p className="text-sm">Counts how many trading days in a row QQQ has closed lower.</p>
-                              <ul className="text-sm mt-1 space-y-1">
-                                <li>
-                                  <strong>0-1 days:</strong> Healthy market, minimal crash risk
-                                </li>
-                                <li>
-                                  <strong>2-3 days:</strong> Warning sign, increasing risk
-                                </li>
-                                <li>
-                                  <strong>4+ days:</strong> Dangerous selling pressure, high crash risk
-                                </li>
-                              </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Extended selling streaks often precede larger corrections or
-                                crashes
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </span>
-                      <span className="font-bold">{data.indicators.qqqConsecDown} days</span>
-                    </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                      <div
-                        className="absolute inset-0 bg-gray-200"
-                        style={{
-                          marginLeft: `${Math.min(100, (data.indicators.qqqConsecDown / 5) * 100)}%`,
-                        }}
+                  <CCPIIndicator
+                    label="QQQ Consecutive Down Days"
+                    value={`${data.indicators.qqqConsecDown} days`}
+                    thresholds={{
+                      low: { value: 0, label: "Healthy: 0-1 days" },
+                      mid: { value: 2.5, label: "Warning: 2-3 days" },
+                      high: { value: 5, label: "Danger: 4+ days" },
+                    }}
+                    barMin={0}
+                    barMax={5}
+                    tooltipContent={
+                      <CCPIIndicatorTooltip
+                        title="Consecutive Down Days"
+                        description="Counts how many trading days in a row QQQ has closed lower."
+                        thresholds={[
+                          { label: "0-1 days", description: "Healthy market, minimal crash risk" },
+                          { label: "2-3 days", description: "Warning sign, increasing risk" },
+                          { label: "4+ days", description: "Dangerous selling pressure, high crash risk" },
+                        ]}
+                        impact="Extended selling streaks often precede larger corrections or crashes"
                       />
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Healthy: 0-1 days</span>
-                      <span>Warning: 2-3 days</span>
-                      <span>Danger: 4+ days</span>
-                    </div>
-                  </div>
+                    }
+                    tooltipsEnabled={tooltipsEnabled}
+                  />
                 )}
 
                 {/* Below SMA20 */}
                 {data.indicators?.qqqBelowSMA20 !== undefined && (
-                  <div className="space-y-2">
-                    {/* Added tooltip to QQQ Below 20-Day SMA indicator */}
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium flex items-center gap-1">
-                        QQQ Below 20-Day SMA
-                        {tooltipsEnabled && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-1">20-Day Simple Moving Average</p>
-                              <p className="text-sm">
-                                Short-term trend indicator. Breach signals near-term momentum shift.
-                              </p>
-                              <ul className="text-sm mt-1 space-y-1">
-                                <li>
-                                  <strong>Above SMA20:</strong> Bullish short-term trend, low risk
-                                </li>
-                                <li>
-                                  <strong>Near SMA20 (50%):</strong> Testing support, moderate risk
-                                </li>
-                                <li>
-                                  <strong>Below SMA20:</strong> Bearish short-term trend, elevated risk
-                                </li>
-                              </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Breaking below 20-day SMA often triggers technical selling
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        {data.indicators?.qqqSMA20Proximity !== undefined && (
-                          <span className="text-xs font-semibold text-orange-600">
-                            {data.indicators.qqqSMA20Proximity.toFixed(0)}% proximity
-                          </span>
-                        )}
-                        <span
-                          className={`font-bold ${data.indicators.qqqBelowSMA20 ? "text-red-600" : "text-green-600"}`}
-                        >
-                          {data.indicators.qqqBelowSMA20 ? "YES" : "NO"}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                      <div
-                        className="absolute inset-0 bg-gray-200"
-                        style={{
-                          marginLeft: `${data.indicators?.qqqSMA20Proximity || 0}%`,
-                        }}
+                  <CCPIBooleanIndicator
+                    label="QQQ Below 20-Day SMA"
+                    value={data.indicators.qqqBelowSMA20}
+                    proximity={data.indicators?.qqqSMA20Proximity || 0}
+                    additionalInfo={
+                      data.indicators?.qqqSMA20Proximity !== undefined
+                        ? `${data.indicators.qqqSMA20Proximity.toFixed(0)}% proximity`
+                        : undefined
+                    }
+                    thresholds={{
+                      low: { value: 0, label: "Safe: 0% (far above)" },
+                      mid: { value: 50, label: "Warning: 50%" },
+                      high: { value: 100, label: "Danger: 100% (breached)" },
+                    }}
+                    tooltipContent={
+                      <CCPIIndicatorTooltip
+                        title="20-Day Simple Moving Average"
+                        description="Short-term trend indicator. Breach signals near-term momentum shift."
+                        thresholds={[
+                          { label: "Above SMA20", description: "Bullish short-term trend, low risk" },
+                          { label: "Near SMA20 (50%)", description: "Testing support, moderate risk" },
+                          { label: "Below SMA20", description: "Bearish short-term trend, elevated risk" },
+                        ]}
+                        impact="Breaking below 20-day SMA often triggers technical selling"
                       />
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Safe: 0% (far above)</span>
-                      <span>Warning: 50%</span>
-                      <span>Danger: 100% (breached)</span>
-                    </div>
-                  </div>
+                    }
+                    tooltipsEnabled={tooltipsEnabled}
+                  />
                 )}
 
                 {/* Below SMA50 */}
                 {data.indicators?.qqqBelowSMA50 !== undefined && (
-                  <div className="space-y-2">
-                    {/* Added tooltip to QQQ Below 50-Day SMA indicator */}
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium flex items-center gap-1">
-                        QQQ Below 50-Day SMA
-                        {tooltipsEnabled && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-1">50-Day Simple Moving Average</p>
-                              <p className="text-sm">
-                                Medium-term trend indicator. Key support level watched by institutions.
-                              </p>
-                              <ul className="text-sm mt-1 space-y-1">
-                                <li>
-                                  <strong>Above SMA50:</strong> Healthy medium-term trend, low risk
-                                </li>
-                                <li>
-                                  <strong>Near SMA50 (50%):</strong> Critical support test, moderate risk
-                                </li>
-                                <li>
-                                  <strong>Below SMA50:</strong> Broken support, high crash risk
-                                </li>
-                              </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Breaking below 50-day SMA signals weakening trend and triggers
-                                institutional selling
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        {data.indicators?.qqqSMA50Proximity !== undefined && (
-                          <span className="text-xs font-semibold text-orange-600">
-                            {data.indicators.qqqSMA50Proximity.toFixed(0)}% proximity
-                          </span>
-                        )}
-                        <span
-                          className={`font-bold ${data.indicators.qqqBelowSMA50 ? "text-red-600" : "text-green-600"}`}
-                        >
-                          {data.indicators.qqqBelowSMA50 ? "YES" : "NO"}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                      <div
-                        className="absolute inset-0 bg-gray-200"
-                        style={{
-                          marginLeft: `${data.indicators?.qqqSMA50Proximity || 0}%`,
-                        }}
+                  <CCPIBooleanIndicator
+                    label="QQQ Below 50-Day SMA"
+                    value={data.indicators.qqqBelowSMA50}
+                    proximity={data.indicators?.qqqSMA50Proximity || 0}
+                    additionalInfo={
+                      data.indicators?.qqqSMA50Proximity !== undefined
+                        ? `${data.indicators.qqqSMA50Proximity.toFixed(0)}% proximity`
+                        : undefined
+                    }
+                    thresholds={{
+                      low: { value: 0, label: "Safe: 0% (far above)" },
+                      mid: { value: 50, label: "Warning: 50%" },
+                      high: { value: 100, label: "Danger: 100% (breached)" },
+                    }}
+                    tooltipContent={
+                      <CCPIIndicatorTooltip
+                        title="50-Day Simple Moving Average"
+                        description="Medium-term trend indicator. Key support level watched by institutions."
+                        thresholds={[
+                          { label: "Above SMA50", description: "Healthy medium-term trend, low risk" },
+                          { label: "Near SMA50 (50%)", description: "Critical support test, moderate risk" },
+                          { label: "Below SMA50", description: "Broken support, high crash risk" },
+                        ]}
+                        impact="Breaking below 50-day SMA signals weakening trend and triggers institutional selling"
                       />
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Safe: 0% (far above)</span>
-                      <span>Warning: 50%</span>
-                      <span>Danger: 100% (breached)</span>
-                    </div>
-                  </div>
+                    }
+                    tooltipsEnabled={tooltipsEnabled}
+                  />
                 )}
 
                 {/* Below SMA200 */}
                 {data.indicators?.qqqBelowSMA200 !== undefined && (
-                  <div className="space-y-2">
-                    {/* Added tooltip to QQQ Below 200-Day SMA indicator */}
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium flex items-center gap-1">
-                        QQQ Below 200-Day SMA
-                        {tooltipsEnabled && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-1">200-Day Simple Moving Average</p>
-                              <p className="text-sm">
-                                Long-term trend indicator and major support/resistance. Most critical technical level.
-                              </p>
-                              <ul className="text-sm mt-1 space-y-1">
-                                <li>
-                                  <strong>Above SMA200:</strong> Bull market confirmed, low crash risk
-                                </li>
-                                <li>
-                                  <strong>Near SMA200 (50%):</strong> Major support test, elevated risk
-                                </li>
-                                <li>
-                                  <strong>Below SMA200:</strong> Bear market territory, very high crash risk
-                                </li>
-                              </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Breaking below 200-day SMA historically precedes major market
-                                crashes
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        {data.indicators?.qqqSMA200Proximity !== undefined && (
-                          <span className="text-xs font-semibold text-orange-600">
-                            {data.indicators.qqqSMA200Proximity.toFixed(0)}% proximity
-                          </span>
-                        )}
-                        <span
-                          className={`font-bold ${data.indicators.qqqBelowSMA200 ? "text-red-600" : "text-green-600"}`}
-                        >
-                          {data.indicators.qqqBelowSMA200 ? "YES" : "NO"}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                      <div
-                        className="absolute inset-0 bg-gray-200"
-                        style={{
-                          marginLeft: `${data.indicators?.qqqSMA200Proximity || 0}%`,
-                        }}
+                  <CCPIBooleanIndicator
+                    label="QQQ Below 200-Day SMA"
+                    value={data.indicators.qqqBelowSMA200}
+                    proximity={data.indicators?.qqqSMA200Proximity || 0}
+                    additionalInfo={
+                      data.indicators?.qqqSMA200Proximity !== undefined
+                        ? `${data.indicators.qqqSMA200Proximity.toFixed(0)}% proximity`
+                        : undefined
+                    }
+                    thresholds={{
+                      low: { value: 0, label: "Safe: 0% (far above)" },
+                      mid: { value: 50, label: "Warning: 50%" },
+                      high: { value: 100, label: "Danger: 100% (breached)" },
+                    }}
+                    tooltipContent={
+                      <CCPIIndicatorTooltip
+                        title="200-Day Simple Moving Average"
+                        description="Long-term trend indicator and major support/resistance. Most critical technical level."
+                        thresholds={[
+                          { label: "Above SMA200", description: "Bull market confirmed, low crash risk" },
+                          { label: "Near SMA200 (50%)", description: "Major support test, elevated risk" },
+                          { label: "Below SMA200", description: "Bear market territory, very high crash risk" },
+                        ]}
+                        impact="Breaking below 200-day SMA historically precedes major market crashes"
                       />
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Safe: 0% (far above)</span>
-                      <span>Warning: 50%</span>
-                      <span>Danger: 100% (breached)</span>
-                    </div>
-                  </div>
+                    }
+                    tooltipsEnabled={tooltipsEnabled}
+                  />
                 )}
 
                 {/* Below Bollinger Band (Lower) */}
@@ -3031,8 +2705,8 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                       },
                     ].map((item, index) => {
                       const isCurrent =
-                        data.ccpi >= Number.parseInt(item.range.split("-")[0]) &&
-                        data.ccpi <= Number.parseInt(item.range.split("-")[1])
+                        ccpiScore >= Number.parseInt(item.range.split("-")[0]) &&
+                        ccpiScore <= Number.parseInt(item.range.split("-")[1])
 
                       return (
                         <div
@@ -3233,8 +2907,8 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                       },
                     ].map((item, index) => {
                       const isCurrent =
-                        data.ccpi >= Number.parseInt(item.range.split("-")[0]) &&
-                        data.ccpi <= Number.parseInt(item.range.split("-")[1])
+                        ccpiScore >= Number.parseInt(item.range.split("-")[0]) &&
+                        ccpiScore <= Number.parseInt(item.range.split("-")[1])
 
                       return (
                         <div
@@ -3361,5 +3035,3 @@ export default function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
     </TooltipProvider>
   )
 }
-
-export { CcpiDashboard }
