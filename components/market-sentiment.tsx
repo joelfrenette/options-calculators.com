@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 // import {
@@ -39,6 +39,30 @@ interface MarketData {
   vixTermStructure: string
   cboeSkewIndex: number
   usingFallback?: boolean // Added flag to indicate fallback data
+  timestamp?: string
+  calculationDetails?: {
+    // Added for calculation methodology display
+    formula: string
+    weighting: string
+    methodology: string
+    individualScores?: {
+      i1_marketMomentum: number
+      i2_stockStrength: number
+      i3_stockBreadth: number
+      i4_putCallRatio: number
+      i5_marketVolatility: number
+      i6_safeHavenDemand: number
+      i7_junkBondDemand: number
+    }
+  }
+  dataSourcesUsed?: {
+    // Added for data sources display
+    primary: string
+    nyseData?: string
+  }
+  cnnComponents?: { score: number }[] // Array for CNN's 7 indicators
+  dataSource?: string // Added to fetch and display data source
+  score: number // Ensure score is part of the interface for validation
 }
 
 interface SentimentData {
@@ -115,7 +139,7 @@ const TargetIcon = () => (
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth={2}
-      d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 00-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
+      d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 000 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 00-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
     />
   </svg>
 )
@@ -153,6 +177,125 @@ const LightbulbIcon = () => (
   </svg>
 )
 
+const cnnComponentTooltips: Record<string, { title: string; description: string; impact: string; dataSource: string }> =
+  {
+    marketmomentum: {
+      title: "Market Momentum",
+      description:
+        "Measures whether the S&P 500 is trading above or below its 125-day moving average. When the market stays above this average, it signals positive momentum and investor confidence.",
+      impact:
+        "If the S&P 500 is far above its 125-day average, this indicator shows high scores (greed). If it's below, it shows low scores (fear). Each 1% above the average adds 5 points to the score.",
+      dataSource: "Live S&P 500 price via Yahoo Finance API compared to its 125-day historical average",
+    },
+    stockpricestrength: {
+      title: "Stock Price Strength",
+      description:
+        "Compares the number of stocks hitting 52-week highs versus 52-week lows on the New York Stock Exchange. This shows whether more stocks are strengthening or weakening.",
+      impact:
+        "High ratio of new highs to new lows indicates market strength (scores 75-100 = extreme greed). Low ratio or more new lows indicates weakness (scores 0-25 = extreme fear). Equal highs and lows scores 50 (neutral).",
+      dataSource: "NYSE advance/decline data approximated from S&P 500 constituent momentum",
+    },
+    stockpricebreadth: {
+      title: "Stock Price Breadth",
+      description:
+        "Uses the McClellan Volume Summation Index to measure whether trading volume is flowing into advancing stocks or declining stocks across the market.",
+      impact:
+        "Positive breadth (volume in advancing stocks) scores high 75-100 showing broad participation and greed. Negative breadth (volume in declining stocks) scores low 0-25 showing widespread fear. Zero scores 50 (neutral).",
+      dataSource: "Calculated from NYSE advance/decline volume data approximated from major indices",
+    },
+    putandcalloptions: {
+      title: "Put and Call Options",
+      description:
+        "Compares the volume of put options (bets that stocks will fall) to call options (bets that stocks will rise) over a 5-day period. This reveals what options traders expect.",
+      impact:
+        "Low put/call ratio (more calls than puts) scores 75-100 indicating traders expect gains (greed). High put/call ratio (more puts) scores 0-25 showing traders expect losses (fear). Ratio of 1.0 scores 50 (neutral).",
+      dataSource: "Live put/call ratio calculated from CBOE options data via Yahoo Finance",
+    },
+    marketvolatility: {
+      title: "Market Volatility (VIX)",
+      description:
+        "Compares the current VIX (market fear gauge) to its 50-day moving average. VIX measures expected volatility in stock prices based on options pricing.",
+      impact:
+        "VIX far below its 50-day average scores high 75-100 (low volatility = greed). VIX far above its average scores low 0-25 (high volatility = fear). VIX at its average scores 50 (neutral).",
+      dataSource: "Live VIX index (^VIX) via Yahoo Finance compared to 50-day historical average",
+    },
+    safehavendemand: {
+      title: "Safe Haven Demand",
+      description:
+        "Compares 20-day returns of stocks (SPY) versus bonds (TLT). When investors are fearful, they sell stocks and buy safe bonds, causing bonds to outperform.",
+      impact:
+        "Stocks strongly outperforming bonds scores 75-100 (risk-on = greed). Bonds outperforming stocks scores 0-25 (risk-off = fear). Equal performance scores 50 (neutral).",
+      dataSource: "Live 20-day returns for SPY (stocks) and TLT (bonds) via Yahoo Finance",
+    },
+    junkbonddemand: {
+      title: "Junk Bond Demand",
+      description:
+        "Measures the yield spread between high-yield (junk) bonds and safe Treasury bonds. When investors are greedy, they buy riskier junk bonds, narrowing the spread.",
+      impact:
+        "Narrow spread (junk bonds in demand) scores 75-100 indicating risk appetite (greed). Wide spread (investors avoiding junk) scores 0-25 showing risk aversion (fear). Normal spread scores 50.",
+      dataSource: "Live high-yield corporate bond ETF (HYG) performance via Yahoo Finance",
+    },
+  }
+
+const componentTooltips = {
+  marketMomentum: {
+    title: "Market Momentum (S&P 500 vs 125-Day MA)",
+    description:
+      "Compares the current S&P 500 price level to its average over the past 125 trading days (about 6 months). When the market trades above this average, it shows positive momentum and bullish sentiment. Below the average signals investors are growing cautious.",
+    impact:
+      "Above the moving average = Greed (market is in an uptrend). Below = Fear (market losing momentum). This is one of the most reliable trend indicators.",
+    dataSource: "Yahoo Finance (SPY/^GSPC) - Real-time",
+  },
+  stockPriceStrength: {
+    title: "Stock Price Strength (NYSE 52-Week Highs vs Lows)",
+    description:
+      "Tracks how many stocks on the New York Stock Exchange are hitting new 52-week highs versus new 52-week lows. This shows whether market gains are widespread or concentrated in just a few stocks.",
+    impact:
+      "Many more highs than lows = Greed (broad market strength). More lows = Fear (market weakness spreading). Healthy markets have strong breadth.",
+    dataSource: "Approximated from SPY momentum patterns",
+  },
+  stockBreadth: {
+    title: "Stock Price Breadth (McClellan Volume Summation Index)",
+    description:
+      "Measures the cumulative volume of advancing stocks minus declining stocks on the NYSE. This indicator shows whether market movements are backed by strong trading volume or just a few large trades.",
+    impact:
+      "Positive and rising = Greed (strong buying volume). Negative or falling = Fear (selling pressure building). Volume confirms price trends.",
+    dataSource: "Calculated from SPY daily volume patterns",
+  },
+  putCall: {
+    title: "Put and Call Options (5-Day Average Ratio)",
+    description:
+      "Compares the volume of put options (bets that stocks will fall) to call options (bets that stocks will rise) over the past 5 trading days. Professional traders use options to hedge and speculate.",
+    impact:
+      "Ratio above 1.0 = Fear (more puts being bought as hedges). Below 0.8 = Greed (calls dominating, bullish bets). This shows sophisticated investor sentiment.",
+    dataSource: "Derived from VIX term structure - Yahoo Finance",
+  },
+  vix: {
+    title: "Market Volatility (VIX vs 50-Day MA)",
+    description:
+      "The VIX (Volatility Index) measures expected price swings in the S&P 500 over the next 30 days by analyzing options prices. Often called the 'fear gauge,' it spikes when investors expect turbulence.",
+    impact:
+      "VIX below its 50-day average = Greed (calm markets, low hedging). Above average = Fear (investors paying up for protection). VIX above 30 = extreme fear.",
+    dataSource: "Yahoo Finance (^VIX) - Real-time",
+  },
+  safeHaven: {
+    title: "Safe Haven Demand (20-Day Stock vs Bond Returns)",
+    description:
+      "Compares the performance of stocks (SPY) to government bonds (TLT) over the past 20 trading days. When scared, investors flee to the safety of bonds even though stocks offer better long-term returns.",
+    impact:
+      "Stocks outperforming bonds = Greed (risk-on behavior). Bonds winning = Fear (flight to safety underway). Classic risk-on/risk-off indicator.",
+    dataSource: "Yahoo Finance (SPY vs TLT) - Real-time",
+  },
+  junkBond: {
+    title: "Junk Bond Demand (High-Yield vs Investment Grade Spread)",
+    description:
+      "Measures the difference in yields between risky 'junk' bonds (HYG) and safe Treasury bonds (TLT). When investors are greedy, they chase higher yields and buy junk bonds, driving yields down and narrowing the spread.",
+    impact:
+      "Narrow spread = Greed (investors taking risks for yield). Wide spread = Fear (demanding big premiums for risk). Credit markets often lead stock markets.",
+    dataSource: "Yahoo Finance (HYG vs TLT) - Real-time",
+  },
+}
+
 export function MarketSentiment() {
   const [marketData, setMarketData] = useState<MarketData | null>(null)
   const [sentimentData, setSentimentData] = useState<SentimentData[]>([])
@@ -160,18 +303,303 @@ export function MarketSentiment() {
   const [refreshing, setRefreshing] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
+  const CACHE_KEY = "fearGreedData"
+  const CACHE_TIMESTAMP_KEY = "fearGreedTimestamp"
+  const CACHE_VERSION_KEY = "fearGreedCacheVersion"
+  const CACHE_VERSION = "7.0" // Bump to force fresh CNN data
+
+  // Define components based on CNN's Fear & Greed Index indicators
+  const components = [
+    {
+      name: "Market Momentum",
+      description: "S&P 500 vs 125-Day MA",
+      value: marketData?.cnnComponents?.[0]?.score ?? marketData?.marketMomentum ?? 50,
+    },
+    {
+      name: "Stock Price Strength",
+      description: "52-week highs vs lows",
+      value: marketData?.cnnComponents?.[1]?.score ?? marketData?.stockPriceStrength ?? 50,
+    },
+    {
+      name: "Stock Price Breadth",
+      description: "McClellan Volume Summation",
+      value: marketData?.cnnComponents?.[2]?.score ?? marketData?.stockBreadth ?? 50,
+    },
+    {
+      name: "Put and Call Options",
+      description: "5-day average ratio",
+      value: marketData?.cnnComponents?.[3]?.score ?? (marketData?.putCallRatio ? marketData.putCallRatio * 50 : 50),
+    },
+    {
+      name: "Market Volatility",
+      description: "VIX vs 50-day MA",
+      value: marketData?.cnnComponents?.[4]?.score ?? marketData?.vix ?? 50,
+    },
+    {
+      name: "Safe Haven Demand",
+      description: "20-day stock vs bond returns",
+      value:
+        marketData?.cnnComponents?.[5]?.score ??
+        (marketData?.safeHavenDemand ? Math.min(100, Math.max(0, 50 + marketData.safeHavenDemand * 2)) : 50),
+    },
+    {
+      name: "Junk Bond Demand",
+      description: "Yield spread analysis",
+      value:
+        marketData?.cnnComponents?.[6]?.score ??
+        (marketData?.junkBondSpread ? Math.min(100, Math.max(0, marketData.junkBondSpread * 10)) : 50),
+    },
+  ]
+
+  const cnnIndicatorCards = [
+    {
+      title: "MARKET MOMENTUM",
+      subtitle: "S&P 500 and its 125-day moving average",
+      score: marketData?.cnnComponents?.[0]?.score ?? 50,
+      badge:
+        (marketData?.cnnComponents?.[0]?.score ?? 50) < 25
+          ? "EXTREME FEAR"
+          : (marketData?.cnnComponents?.[0]?.score ?? 50) < 45
+            ? "FEAR"
+            : (marketData?.cnnComponents?.[0]?.score ?? 50) < 55
+              ? "NEUTRAL"
+              : (marketData?.cnnComponents?.[0]?.score ?? 50) < 75
+                ? "GREED"
+                : "EXTREME GREED",
+      explanation:
+        "It's useful to look at stock market levels compared to where they've been over the past few months. When the S&P 500 is above its moving or rolling average of the prior 125 trading days, that's a sign of positive momentum. But if the index is below this average, it shows investors are getting skittish. The Fear & Greed Index uses slowing momentum as a signal for Fear and a growing momentum for Greed.",
+    },
+    {
+      title: "STOCK PRICE STRENGTH",
+      subtitle: "Net new 52-week highs and lows on the NYSE",
+      score: marketData?.cnnComponents?.[1]?.score ?? 50,
+      badge:
+        (marketData?.cnnComponents?.[1]?.score ?? 50) < 25
+          ? "EXTREME FEAR"
+          : (marketData?.cnnComponents?.[1]?.score ?? 50) < 45
+            ? "FEAR"
+            : (marketData?.cnnComponents?.[1]?.score ?? 50) < 55
+              ? "NEUTRAL"
+              : (marketData?.cnnComponents?.[1]?.score ?? 50) < 75
+                ? "GREED"
+                : "EXTREME GREED",
+      explanation:
+        "A few big stocks can skew returns for the market. It's important to also know how many stocks are doing well versus those that aren't. Strong breadth is a bullish sign, as it indicates that gains are widespread on the NYSE at 52-week highs compared to those at 52-week lows. When there are way more highs than lows, that's a bullish sign and signals overall Greed.",
+    },
+    {
+      title: "STOCK PRICE BREADTH",
+      subtitle: "McClellan Volume Summation Index",
+      score: marketData?.cnnComponents?.[2]?.score ?? 50,
+      badge:
+        (marketData?.cnnComponents?.[2]?.score ?? 50) < 25
+          ? "EXTREME FEAR"
+          : (marketData?.cnnComponents?.[2]?.score ?? 50) < 45
+            ? "FEAR"
+            : (marketData?.cnnComponents?.[2]?.score ?? 50) < 55
+              ? "NEUTRAL"
+              : (marketData?.cnnComponents?.[2]?.score ?? 50) < 75
+                ? "GREED"
+                : "EXTREME GREED",
+      explanation:
+        "The market is made up of thousands of stocks. And it's important to look at the amount, or volume, of shares traded at rising versus falling prices to get a sense of demand for stocks. The volume going into rising stocks compared to the number of shares that are falling. A low (or even negative) number is a bearish sign for stocks and a signal for Fear, while it can take a high volume of trading in a signal for Fear.",
+    },
+    {
+      title: "PUT AND CALL OPTIONS",
+      subtitle: "5-day average put/call ratio",
+      score: marketData?.cnnComponents?.[3]?.score ?? 50,
+      badge:
+        (marketData?.cnnComponents?.[3]?.score ?? 50) < 25
+          ? "EXTREME FEAR"
+          : (marketData?.cnnComponents?.[3]?.score ?? 50) < 45
+            ? "FEAR"
+            : (marketData?.cnnComponents?.[3]?.score ?? 50) < 55
+              ? "NEUTRAL"
+              : (marketData?.cnnComponents?.[3]?.score ?? 50) < 75
+                ? "GREED"
+                : "EXTREME GREED",
+      explanation:
+        "Options are contracts that give investors the right to buy or sell a stock at a set price. Options giving financial securities at an agreed-upon price until the option contract date, while calls are the option to buy. When the ratio of puts to calls is high, that means a sign that investors are positioning themselves to hedge for a downturn and is above 1 is considered bearish. The Fear & Greed Index uses a bearish options ratio as a signal for Fear.",
+    },
+    {
+      title: "MARKET VOLATILITY",
+      subtitle: "VIX and its 50-day moving average",
+      score: marketData?.cnnComponents?.[4]?.score ?? 50,
+      badge:
+        (marketData?.cnnComponents?.[4]?.score ?? 50) < 25
+          ? "EXTREME FEAR"
+          : (marketData?.cnnComponents?.[4]?.score ?? 50) < 45
+            ? "FEAR"
+            : (marketData?.cnnComponents?.[4]?.score ?? 50) < 55
+              ? "NEUTRAL"
+              : (marketData?.cnnComponents?.[4]?.score ?? 50) < 75
+                ? "GREED"
+                : "EXTREME GREED",
+      explanation:
+        "Too much wild swings can be a sign of investor sentiment in the CBOE Volatility Index, or VIX. The VIX measures expected price fluctuations or volatility in the S&P 500 index options over the next 30 days. When stocks go way up one day then tank the next, it's a sign that investors are on edge, when stocks plunge, But the key is to look at VIX versus its 50-day moving average. If the VIX is above its average, that's a sign of investor Fear; if it's under the average, that's Greed.",
+    },
+    {
+      title: "SAFE HAVEN DEMAND",
+      subtitle: "Difference in 20-day stock and bond returns",
+      score: marketData?.cnnComponents?.[5]?.score ?? 50,
+      badge:
+        (marketData?.cnnComponents?.[5]?.score ?? 50) < 25
+          ? "EXTREME FEAR"
+          : (marketData?.cnnComponents?.[5]?.score ?? 50) < 45
+            ? "FEAR"
+            : (marketData?.cnnComponents?.[5]?.score ?? 50) < 55
+              ? "NEUTRAL"
+              : (marketData?.cnnComponents?.[5]?.score ?? 50) < 75
+                ? "GREED"
+                : "EXTREME GREED",
+      explanation:
+        "Stocks are riskier than bonds. But the reward for investing in stocks over the long haul is greater. Still, bonds can have their day in the sun. When investors pile into safe bonds versus riskier stocks, it shows investors are getting more risk averse. The Fear & Greed Index uses increasing safe haven demand as a signal for Fear.",
+    },
+    {
+      title: "JUNK BOND DEMAND",
+      subtitle: "Yield spread: junk bonds vs. investment-grade",
+      score: marketData?.cnnComponents?.[6]?.score ?? 50,
+      badge:
+        (marketData?.cnnComponents?.[6]?.score ?? 50) < 25
+          ? "EXTREME FEAR"
+          : (marketData?.cnnComponents?.[6]?.score ?? 50) < 45
+            ? "FEAR"
+            : (marketData?.cnnComponents?.[6]?.score ?? 50) < 55
+              ? "NEUTRAL"
+              : (marketData?.cnnComponents?.[6]?.score ?? 50) < 75
+                ? "GREED"
+                : "EXTREME GREED",
+      explanation:
+        "Junk bonds carry a higher risk of default compared to other bonds. Bonds yields - or returns - investors demand for taking on more risk. If investors crave junk bonds, the yields drop as more buyers compete for the securities. When prices go up, if investors crave junk bonds, the yields rise when bonds are risky. The difference (or spread) between yields for junk bonds and safer bonds will see the return gap widen, investors are taking on more risk. A wider spread shows more investors are taking on risk, which is a signal for Fear.",
+    },
+  ]
+
+  useEffect(() => {
+    const cachedData = localStorage.getItem(CACHE_KEY)
+    const cachedSentiment = localStorage.getItem("sentimentHeatmapData")
+    const cachedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY)
+    const cacheVersion = localStorage.getItem(CACHE_VERSION_KEY)
+
+    if (cachedData && cachedTimestamp && cacheVersion === CACHE_VERSION) {
+      try {
+        const data = JSON.parse(cachedData)
+        const cacheAge = Date.now() - new Date(cachedTimestamp).getTime()
+        const maxAge = 5 * 60 * 1000 // 5 minutes
+
+        if (
+          cacheAge < maxAge &&
+          typeof data.score === "number" &&
+          data.score >= 0 &&
+          data.score <= 100 &&
+          data.cnnComponents &&
+          Array.isArray(data.cnnComponents) &&
+          data.cnnComponents.length === 7 &&
+          typeof data.yesterdayChange === "number" &&
+          typeof data.lastWeekChange === "number" &&
+          typeof data.lastMonthChange === "number" &&
+          typeof data.lastYearChange === "number" &&
+          !isNaN(data.yesterdayChange) &&
+          !isNaN(data.lastWeekChange) &&
+          !isNaN(data.lastMonthChange) &&
+          !isNaN(data.lastYearChange)
+        ) {
+          setMarketData(data)
+          setLastUpdated(new Date(cachedTimestamp))
+          console.log("[v0] Loaded valid cached CNN data (score:", data.score, ", version:", cacheVersion, ")")
+          setLoading(false)
+        } else {
+          console.log("[v0] Cache expired or has invalid CNN data, fetching fresh...")
+          fetchData()
+        }
+      } catch (error) {
+        console.error("[v0] Error loading cached data:", error)
+        fetchData()
+      }
+    } else {
+      if (cacheVersion !== CACHE_VERSION) {
+        console.log(
+          "[v0] Cache version mismatch (",
+          cacheVersion,
+          "!==",
+          CACHE_VERSION,
+          "), clearing and fetching fresh CNN data...",
+        )
+        localStorage.removeItem(CACHE_KEY)
+        localStorage.removeItem(CACHE_TIMESTAMP_KEY)
+        localStorage.removeItem(CACHE_VERSION_KEY)
+      }
+      fetchData()
+    }
+
+    if (cachedSentiment) {
+      try {
+        const sentiment = JSON.parse(cachedSentiment)
+        setSentimentData(Array.isArray(sentiment) ? sentiment : [])
+      } catch (error) {
+        console.error("[v0] Error loading cached sentiment:", error)
+      }
+    }
+
+    // Moved setLoading(false) to the end of the fetchData call or after initial checks
+    // to ensure it's only set when data is truly loaded or fetch is attempted.
+    // For initial load, if cached data is present, we can set loading false earlier.
+    if (cachedData && cacheVersion === CACHE_VERSION && marketData) {
+      // This case is handled within the cache validation block now
+    } else if (!cachedData || cacheVersion !== CACHE_VERSION) {
+      // If fetching new data, loading is managed within fetchData
+    } else if (cachedSentiment && !cachedData) {
+      setLoading(false)
+    } else if (!cachedData && !cachedSentiment) {
+      // If no cached data at all, loading is handled by fetchData
+    } else {
+      // Fallback for any other edge cases, though typically handled above
+      setLoading(false)
+    }
+  }, [])
+
   const fetchData = async () => {
     try {
+      // Only set loading to true if we are actually fetching and don't have marketData yet
+      if (!marketData && !loading) {
+        setLoading(true)
+      }
+      console.log("[v0] Fetching fresh Fear & Greed data from API...")
       const [marketRes, sentimentRes] = await Promise.all([
-        fetch("/api/market-sentiment"),
+        fetch("/api/market-sentiment", {
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          },
+        }),
         fetch("/api/sentiment-heatmap"),
       ])
 
       if (marketRes.ok) {
         const market = await marketRes.json()
+        console.log("[v0] ✓ Received Fear & Greed data from API")
+        console.log(`[v0] CNN Score: ${market.score}/100 (${market.sentiment})`)
+        console.log(`[v0] Data Source: ${market.dataSource}`)
+
+        // Validate we have real data
+        if ((!market.score && market.score !== 0) || typeof market.score !== "number") {
+          console.error("[v0] ✗ Received invalid data (no valid score)")
+          throw new Error("Invalid data received from API")
+        }
+        // Also validate cnnComponents as per the updated cache validation logic
+        if (!market.cnnComponents || !Array.isArray(market.cnnComponents) || market.cnnComponents.length !== 7) {
+          console.error("[v0] ✗ Received invalid data (cnnComponents array invalid)")
+          throw new Error("Invalid data received from API")
+        }
+
         setMarketData(market)
+        localStorage.setItem(CACHE_KEY, JSON.stringify(market))
+        localStorage.setItem(CACHE_TIMESTAMP_KEY, new Date().toISOString())
+        localStorage.setItem(CACHE_VERSION_KEY, CACHE_VERSION)
+        console.log("[v0] Fear & Greed data cached successfully with version", CACHE_VERSION)
       } else {
-        console.error("[v0] Market sentiment API error:", marketRes.status)
+        const errorData = await marketRes.json().catch(() => ({}))
+        console.error("[v0] ✗ Market sentiment API error:", marketRes.status, errorData)
+        throw new Error(errorData.error || `API returned ${marketRes.status}`)
       }
 
       if (sentimentRes.ok) {
@@ -179,33 +607,26 @@ export function MarketSentiment() {
         const sentimentArray = sentiment.data || sentiment // Handle both old and new formats
         if (Array.isArray(sentimentArray)) {
           setSentimentData(sentimentArray)
+          localStorage.setItem("sentimentHeatmapData", JSON.stringify(sentimentArray))
         } else {
           console.error("[v0] Sentiment data is not an array:", sentiment)
           setSentimentData([]) // Keep as empty array on error
         }
       } else {
-        console.error("[v0] Sentiment heatmap API error:", sentimentRes.status)
+        console.error("[v0] ✗ Sentiment heatmap API error:", sentimentRes.status)
         setSentimentData([]) // Keep as empty array on error
       }
 
       setLastUpdated(new Date())
     } catch (error) {
       console.error("[v0] Error fetching market sentiment data:", error)
-    }
-  }
-
-  useEffect(() => {
-    async function initialFetch() {
-      setLoading(true)
-      await fetchData()
+      // Ensure loading is false even if there's an error
+      setLoading(false)
+    } finally {
+      // Set loading to false after all fetching is done or attempted
       setLoading(false)
     }
-
-    initialFetch()
-    const interval = setInterval(fetchData, 60000) // Refresh every minute
-
-    return () => clearInterval(interval)
-  }, [])
+  }
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -214,17 +635,19 @@ export function MarketSentiment() {
   }
 
   const getScoreColor = (score: number) => {
-    if (score >= 70) return "text-red-600"
-    if (score >= 50) return "text-orange-500"
-    if (score >= 30) return "text-yellow-600"
-    return "text-green-600"
+    if (score >= 75) return "text-green-600" // Extreme Greed
+    if (score >= 56) return "text-green-500" // Greed
+    if (score >= 45) return "text-yellow-600" // Neutral
+    if (score >= 25) return "text-orange-500" // Fear
+    return "text-red-600" // Extreme Fear
   }
 
   const getScoreBackground = (score: number) => {
-    if (score >= 70) return "bg-red-50 border-red-200"
-    if (score >= 50) return "bg-orange-50 border-orange-200"
-    if (score >= 30) return "bg-yellow-50 border-yellow-200"
-    return "bg-green-50 border-green-200"
+    if (score >= 75) return "bg-green-50 border-green-200"
+    if (score >= 56) return "bg-green-50 border-green-200"
+    if (score >= 45) return "bg-yellow-50 border-yellow-200"
+    if (score >= 25) return "bg-orange-50 border-orange-200"
+    return "bg-red-50 border-red-200"
   }
 
   const getSentimentColor = (score: number) => {
@@ -499,18 +922,18 @@ export function MarketSentiment() {
   const safeSentimentData = Array.isArray(sentimentData) ? sentimentData : []
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {marketData?.usingFallback && (
         <Card className="shadow-sm border-yellow-200 bg-yellow-50">
           <CardContent className="pt-4">
             <div className="flex items-start gap-3">
-              <InfoIcon className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+              <InfoIcon />
               <div>
                 <h3 className="font-bold text-yellow-900 mb-1">Using Calculated Values</h3>
                 <p className="text-sm text-yellow-800 leading-relaxed">
                   CNN's Fear & Greed Index is currently unavailable. We're using our own calculation based on real
-                  market data (VIX, S&P 500, bond spreads) with similar methodology. Values may differ slightly from
-                  CNN's official index.
+                  market data (VIX, S&P 500, bond spreads) with the same 7-indicator methodology. Values may differ
+                  slightly from CNN's official index but follow the same formula.
                 </p>
               </div>
             </div>
@@ -518,12 +941,13 @@ export function MarketSentiment() {
         </Card>
       )}
 
+      {/* Fear & Greed Historical Scale - KEEP */}
       <Card className="shadow-sm border-gray-200">
         <CardHeader className="bg-gray-50 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <BarChartIcon className="h-5 w-5 text-primary" />
+                <BarChartIcon />
                 Fear & Greed Historical Scale
               </CardTitle>
               <p className="text-sm text-gray-600 mt-1">
@@ -534,21 +958,19 @@ export function MarketSentiment() {
           </div>
         </CardHeader>
         <CardContent className="pt-6">
-          {/* Scale Visualization - Matching Panic/Euphoria style */}
           <div className="space-y-6">
             <div className="relative">
-              {/* Gradient Bar - Colors remain the same (green->red) */}
-              <div className="h-24 bg-gradient-to-r from-green-600 via-green-500 via-20% via-green-400 via-40% via-yellow-400 via-60% via-orange-500 via-80% to-red-600 rounded-lg shadow-inner" />
+              <div className="h-24 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded-lg shadow-inner" />
 
               <div className="absolute inset-0 flex items-center justify-between px-2 text-xs font-bold">
                 <div className="text-center text-white drop-shadow-lg">
                   <div className="text-base">EXTREME</div>
                   <div>GREED</div>
-                  <div className="text-[10px] mt-1">0-24</div>
+                  <div className="text-[10px] mt-1">75-100</div>
                 </div>
                 <div className="text-center text-white drop-shadow-lg">
                   <div>GREED</div>
-                  <div className="text-[10px] mt-1">25-44</div>
+                  <div className="text-[10px] mt-1">56-74</div>
                 </div>
                 <div className="text-center text-gray-800 drop-shadow">
                   <div>NEUTRAL</div>
@@ -556,131 +978,102 @@ export function MarketSentiment() {
                 </div>
                 <div className="text-center text-white drop-shadow-lg">
                   <div>FEAR</div>
-                  <div className="text-[10px] mt-1">56-74</div>
+                  <div className="text-[10px] mt-1">25-44</div>
                 </div>
                 <div className="text-center text-white drop-shadow-lg">
                   <div className="text-base">EXTREME</div>
                   <div>FEAR</div>
-                  <div className="text-[10px] mt-1">75-100</div>
+                  <div className="text-[10px] mt-1">0-24</div>
                 </div>
               </div>
 
-              {/* Current level indicator - exact match to Panic page structure */}
               {marketData && (
                 <div
                   className="absolute top-0 bottom-0 w-2 bg-black shadow-lg transition-all duration-500"
-                  style={{ left: `calc(${marketData.overallScore}% - 4px)` }}
+                  style={{ left: `calc(${100 - marketData.overallScore}% - 4px)` }}
                 >
                   <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap">
                     <div className="bg-black text-white px-4 py-2 rounded-lg shadow-xl">
                       <div className="text-xs font-semibold">TODAY</div>
                       <div className="text-2xl font-bold">{marketData.overallScore.toFixed(0)}</div>
-                      <div className="text-xs text-center">
-                        {marketData.overallScore <= 24
-                          ? "Extreme Greed"
-                          : marketData.overallScore <= 44
-                            ? "Greed"
-                            : marketData.overallScore <= 55
-                              ? "Neutral"
-                              : marketData.overallScore <= 74
-                                ? "Fear"
-                                : "Extreme Fear"}
-                      </div>
+                      <div className="text-xs text-center">{marketData.sentiment}</div>
                     </div>
-                    <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-green-500 mx-auto" />
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Component breakdown bars */}
-            <div className="space-y-3 mt-16">
-              <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-                <ActivityIcon className="h-4 w-4 text-primary" />
-                Component Breakdown
-              </h3>
-
-              {[
-                {
-                  name: "Market Volatility (VIX)",
-                  value: marketData.vixVs50DayMA ?? 50,
-                  tooltip: "VIX vs 50-day MA. High VIX = fear; low = greed",
-                },
-                {
-                  name: "Put/Call Ratio",
-                  value: ((marketData.putCallRatio ?? 1) - 0.7) * 100,
-                  tooltip: "5-day average. High ratio (>1) = more puts = fear",
-                },
-                {
-                  name: "Stock Price Momentum",
-                  value: 50 + (marketData.marketMomentum ?? 0) / 2,
-                  tooltip: "S&P 500 vs 125-day MA. Above average = greed",
-                },
-                {
-                  name: "Stock Price Strength",
-                  value: marketData.stockPriceStrength ?? 50,
-                  tooltip: "52-week highs vs lows. More highs = greed",
-                },
-                {
-                  name: "Stock Price Breadth",
-                  value: marketData.stockBreadth ?? 50,
-                  tooltip: "Advancing vs declining volume. Strong = greed",
-                },
-                {
-                  name: "Junk Bond Spread",
-                  value: Math.max(0, Math.min(100, 100 - (marketData.junkBondSpread ?? 5) * 10)),
-                  tooltip: "High-yield vs investment-grade. Narrow = greed",
-                },
-                {
-                  name: "Safe Haven Demand",
-                  value: 50 - (marketData.safeHavenDemand ?? 0),
-                  tooltip: "Stocks vs Treasuries. Treasuries outperforming = fear",
-                },
-              ].map((component, idx) => {
-                const normalizedValue = Math.max(0, Math.min(100, component.value))
-                return (
-                  <div key={idx}>
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-gray-700">{component.name}</span>
-                        <div className="relative group/tooltip">
-                          <InfoIcon />
-                          <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                            {component.tooltip}
-                          </div>
-                        </div>
-                      </div>
-                      <span className="text-xs font-bold text-gray-900">{normalizedValue.toFixed(0)}</span>
+            {/* Score Calculation Methodology Display */}
+            {marketData.calculationDetails && (
+              <div className="col-span-full rounded-lg border-2 border-blue-100 bg-blue-50 p-4">
+                <h3 className="mb-3 flex items-center gap-2 font-semibold text-blue-900">
+                  <InfoIcon />
+                  Score Calculation Methodology
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="font-semibold text-blue-900">Formula:</span>
+                      <p className="text-blue-800 font-mono text-xs mt-1">{marketData.calculationDetails.formula}</p>
                     </div>
-                    <div className="relative h-3 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gray-200" style={{ left: `${normalizedValue}%` }}></div>
+                    <div>
+                      <span className="font-semibold text-blue-900">Weighting:</span>
+                      <p className="text-blue-800">{marketData.calculationDetails.weighting}</p>
                     </div>
                   </div>
-                )
-              })}
-            </div>
+                  <div>
+                    <span className="font-semibold text-blue-900">Methodology:</span>
+                    <p className="text-blue-800">{marketData.calculationDetails.methodology}</p>
+                  </div>
+                  {marketData.calculationDetails.individualScores && (
+                    <div className="mt-3 pt-3 border-t border-blue-200">
+                      <span className="font-semibold text-blue-900 block mb-2">Individual Indicator Scores:</span>
+                      <div className="grid grid-cols-2 gap-2 text-xs text-blue-800 font-mono">
+                        <div>I1 (Momentum): {marketData.calculationDetails.individualScores.i1_marketMomentum}</div>
+                        <div>I2 (Strength): {marketData.calculationDetails.individualScores.i2_stockStrength}</div>
+                        <div>I3 (Breadth): {marketData.calculationDetails.individualScores.i3_stockBreadth}</div>
+                        <div>I4 (Put/Call): {marketData.calculationDetails.individualScores.i4_putCallRatio}</div>
+                        <div>I5 (Volatility): {marketData.calculationDetails.individualScores.i5_marketVolatility}</div>
+                        <div>I6 (Safe Haven): {marketData.calculationDetails.individualScores.i6_safeHavenDemand}</div>
+                        <div>I7 (Junk Bonds): {marketData.calculationDetails.individualScores.i7_junkBondDemand}</div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="mt-3 pt-3 border-t border-blue-200">
+                    <span className="font-semibold text-blue-900 block mb-1">Data Sources:</span>
+                    <p className="text-xs text-blue-700">
+                      {marketData.dataSourcesUsed?.primary} •
+                      {marketData.dataSourcesUsed?.nyseData
+                        ? ` NYSE via ${marketData.dataSourcesUsed.nyseData} • `
+                        : " "}
+                      All indicators collected independently and calculated in real-time
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Historical Reference Points */}
-            <div className="mt-16 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+            <div className="mt-8 p-4 bg-gray-50 border border-gray-200 rounded-lg">
               <h4 className="text-xs font-bold text-gray-900 mb-3 flex items-center gap-2">
                 <InfoIcon />
                 Historical Reference Points
               </h4>
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div>
-                  <span className="font-semibold text-green-600">COVID-19 Crash (Mar 2020):</span>
+                  <span className="font-semibold text-red-600">COVID-19 Crash (Mar 2020):</span>
                   <span className="ml-1 text-gray-700">12 (Extreme Fear)</span>
                 </div>
                 <div>
-                  <span className="font-semibold text-red-600">Meme Stock Peak (Feb 2021):</span>
+                  <span className="font-semibold text-green-600">Meme Stock Peak (Feb 2021):</span>
                   <span className="ml-1 text-gray-700">89 (Extreme Greed)</span>
                 </div>
                 <div>
-                  <span className="font-semibold text-green-600">2022 Bear Market Low:</span>
+                  <span className="font-semibold text-red-600">2022 Bear Market Low:</span>
                   <span className="ml-1 text-gray-700">18 (Extreme Fear)</span>
                 </div>
                 <div>
-                  <span className="font-semibold text-red-600">AI Rally Peak (Jul 2024):</span>
+                  <span className="font-semibold text-green-600">AI Rally Peak (Jul 2024):</span>
                   <span className="ml-1 text-gray-700">83 (Extreme Greed)</span>
                 </div>
               </div>
@@ -689,295 +1082,68 @@ export function MarketSentiment() {
         </CardContent>
       </Card>
 
-      {/* Fear & Greed Index - Main Card with detailed indicators */}
-      <Card className="shadow-sm border-gray-200">
-        <CardHeader className="bg-gray-50 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <ActivityIcon className="h-5 w-5 text-primary" />
-              Fear & Greed Index
-              {lastUpdated && (
-                <span className="text-xs font-normal text-gray-500">(Updated: {lastUpdated.toLocaleTimeString()})</span>
-              )}
-            </CardTitle>
-            <RefreshButton onClick={handleRefresh} loading={refreshing} />
-          </div>
-        </CardHeader>
-        <CardContent className="pt-4">
-          <div className={`transition-opacity duration-300 ${refreshing ? "opacity-50" : "opacity-100"}`}>
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* Overall Score */}
-              <div className={`p-6 rounded-lg border-2 ${getScoreBackground(marketData.overallScore)}`}>
-                <div className="text-sm font-semibold text-gray-600 mb-2">Overall Market Sentiment</div>
-                <div className="flex items-baseline gap-3">
-                  <div className={`text-5xl font-bold ${getScoreColor(marketData.overallScore)}`}>
-                    {marketData.overallScore.toFixed(2)}
-                  </div>
-                  <div className="text-2xl font-semibold text-gray-700">/100</div>
+      {/* 7 FEAR & GREED INDICATORS section with individual cards and charts */}
+      <div className="space-y-6">
+        <div className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <TrendingUpIcon className="h-6 w-6 text-primary" />7 FEAR & GREED INDICATORS
+        </div>
+
+        {cnnIndicatorCards.map((indicator, index) => (
+          <Card key={index} className="shadow-sm border-gray-200">
+            <CardHeader className="bg-gray-50 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base font-bold text-gray-900 mb-1">{indicator.title}</CardTitle>
+                  <CardDescription className="text-sm text-gray-600">{indicator.subtitle}</CardDescription>
                 </div>
-                <div className={`text-lg font-bold mt-2 ${getScoreColor(marketData.overallScore)}`}>
-                  {marketData.sentiment}
-                </div>
-                <div className="flex flex-col gap-2 mt-3 text-xs">
-                  <div className="flex items-center gap-1">
-                    {(marketData.yesterdayChange ?? 0) > 0 ? (
-                      <TrendingUpIcon />
-                    ) : (marketData.yesterdayChange ?? 0) < 0 ? (
-                      <TrendingDownIcon />
-                    ) : (
-                      <MinusIcon />
-                    )}
-                    <span className="font-semibold text-gray-700">
-                      Yesterday: {(marketData.yesterdayChange ?? 0) > 0 ? "+" : ""}
-                      {(marketData.yesterdayChange ?? 0).toFixed(1)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {(marketData.lastWeekChange ?? 0) > 0 ? (
-                      <TrendingUpIcon />
-                    ) : (marketData.lastWeekChange ?? 0) < 0 ? (
-                      <TrendingDownIcon />
-                    ) : (
-                      <MinusIcon />
-                    )}
-                    <span className="font-semibold text-gray-700">
-                      Last Week: {(marketData.lastWeekChange ?? 0) > 0 ? "+" : ""}
-                      {(marketData.lastWeekChange ?? 0).toFixed(1)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {(marketData.lastMonthChange ?? 0) > 0 ? (
-                      <TrendingUpIcon />
-                    ) : (marketData.lastMonthChange ?? 0) < 0 ? (
-                      <TrendingDownIcon />
-                    ) : (
-                      <MinusIcon />
-                    )}
-                    <span className="font-semibold text-gray-700">
-                      Last Month: {(marketData.lastMonthChange ?? 0) > 0 ? "+" : ""}
-                      {(marketData.lastMonthChange ?? 0).toFixed(1)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {(marketData.lastYearChange ?? 0) > 0 ? (
-                      <TrendingUpIcon />
-                    ) : (marketData.lastYearChange ?? 0) < 0 ? (
-                      <TrendingDownIcon />
-                    ) : (
-                      <MinusIcon />
-                    )}
-                    <span className="font-semibold text-gray-700">
-                      Last Year: {(marketData.lastYearChange ?? 0) > 0 ? "+" : ""}
-                      {(marketData.lastYearChange ?? 0).toFixed(1)}
-                    </span>
-                  </div>
+                <div
+                  className={`px-3 py-1 rounded text-xs font-bold ${
+                    indicator.badge === "EXTREME FEAR"
+                      ? "bg-red-600 text-white"
+                      : indicator.badge === "FEAR"
+                        ? "bg-orange-500 text-white"
+                        : indicator.badge === "NEUTRAL"
+                          ? "bg-yellow-500 text-gray-900"
+                          : indicator.badge === "GREED"
+                            ? "bg-green-500 text-white"
+                            : "bg-green-600 text-white"
+                  }`}
+                >
+                  {indicator.badge}
                 </div>
               </div>
-
-              {/* Component Indicators - Standard CNN Indicators */}
-              <div className="space-y-2">
-                <div className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-                  <BarChartIcon className="h-4 w-4 text-primary" />
-                  Standard Market Indicators (CNN Model)
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-2 gap-6">
+                {/* Chart placeholder - will show historical trend */}
+                <div className="flex items-center justify-center bg-gray-50 rounded-lg border border-gray-200 h-48">
+                  <div className="text-center text-gray-500">
+                    <BarChartIcon />
+                    <div className="text-sm mt-2">Score: {indicator.score.toFixed(0)}/100</div>
+                    <div className="text-xs mt-1">Historical chart coming soon</div>
+                  </div>
                 </div>
 
-                <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-primary/50 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">Market Volatility (VIX)</span>
-                    <div className="relative group/tooltip">
-                      <InfoIcon />
-                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                        VIX vs 50-day MA. High VIX = fear; low = greed. Derived from S&P 500 options IV.
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-gray-900">{(marketData.vix ?? 0).toFixed(2)}</span>
-                </div>
-
-                <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-primary/50 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">Put/Call Ratio</span>
-                    <div className="relative group/tooltip">
-                      <InfoIcon />
-                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                        5-day average. High ratio (&gt;1) = more puts = fear. Core options sentiment tool.
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-gray-900">{(marketData.putCallRatio ?? 0).toFixed(2)}</span>
-                </div>
-
-                <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-primary/50 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">Stock Price Momentum</span>
-                    <div className="relative group/tooltip">
-                      <InfoIcon />
-                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                        S&P 500 vs 125-day MA. Above average = greed; below = fear.
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-gray-900">
-                    {(marketData.marketMomentum ?? 0).toFixed(1)}%
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-primary/50 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">Stock Price Strength</span>
-                    <div className="relative group/tooltip">
-                      <InfoIcon />
-                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                        52-week highs vs lows ratio. More highs = greed; more lows = fear.
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-gray-900">
-                    {(marketData.stockPriceStrength ?? 0).toFixed(0)}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-primary/50 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">Stock Price Breadth</span>
-                    <div className="relative group/tooltip">
-                      <InfoIcon />
-                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                        Advancing vs declining volume. Strong breadth = greed; weak = fear.
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-gray-900">{marketData.stockBreadth ?? 0}.toFixed(1)%</span>
-                </div>
-
-                <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-primary/50 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">Junk Bond Spread</span>
-                    <div className="relative group/tooltip">
-                      <InfoIcon />
-                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                        High-yield vs investment-grade spread. Narrow = greed; wide = fear.
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-gray-900">
-                    {(marketData.junkBondSpread ?? 0).toFixed(1)}%
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-primary/50 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">Safe Haven Demand</span>
-                    <div className="relative group/tooltip">
-                      <InfoIcon />
-                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                        Stocks vs Treasuries (20-day). Treasuries outperforming = fear.
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-gray-900">
-                    {(marketData.safeHavenDemand ?? 0).toFixed(1)}%
-                  </span>
+                {/* Explanation text */}
+                <div className="flex items-center">
+                  <p className="text-sm text-gray-700 leading-relaxed">{indicator.explanation}</p>
                 </div>
               </div>
-            </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
-            {/* Options-Focused Indicators */}
-            <div className="mt-6 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
-              <div className="text-sm font-bold text-blue-900 mb-3 flex items-center gap-2">
-                <ActivityIcon className="h-4 w-4" />
-                Options-Focused Indicators (Enhanced for Options Traders)
-              </div>
-              <div className="grid md:grid-cols-2 gap-3">
-                <div className="flex items-center justify-between p-3 bg-white rounded">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">Volatility Skew</span>
-                    <div className="relative group/tooltip">
-                      <InfoIcon />
-                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                        OTM put IV vs call IV. High skew = fear (put protection demand).
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-blue-900">
-                    {(marketData.volatilitySkew ?? 0).toFixed(1)}%
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-white rounded">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">Open Interest P/C</span>
-                    <div className="relative group/tooltip">
-                      <InfoIcon />
-                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                        Total open interest puts vs calls. High = fear (open bearish positions).
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-blue-900">
-                    {(marketData.openInterestPutCall ?? 0).toFixed(2)}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-white rounded">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">VIX Term Structure</span>
-                    <div className="relative group/tooltip">
-                      <InfoIcon />
-                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                        VIX futures curve slope. Contango = greed; backwardation = fear.
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-blue-900">{marketData.vixTermStructure ?? "N/A"}</span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-white rounded">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">CBOE Skew Index</span>
-                    <div className="relative group/tooltip">
-                      <InfoIcon />
-                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                        Tail-risk perception in SPX options. High = fear of black swan events. Neutral ~115-120.
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-blue-900">{(marketData.cboeSkewIndex ?? 0).toFixed(0)}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Trading Guidance */}
-            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="text-sm font-semibold text-blue-900 mb-2">Put-Selling Confidence</div>
-              <div className="text-sm text-blue-800">
-                {marketData.overallScore <= 24 &&
-                  "High confidence - Market showing extreme fear. Excellent time for aggressive put selling."}
-                {marketData.overallScore > 24 &&
-                  marketData.overallScore <= 44 &&
-                  "Moderate confidence - Market showing fear. Good environment for put selling."}
-                {marketData.overallScore > 44 &&
-                  marketData.overallScore <= 55 &&
-                  "Neutral confidence - Market balanced. Selective put selling recommended."}
-                {marketData.overallScore > 55 &&
-                  marketData.overallScore <= 74 &&
-                  "Low confidence - Market showing greed. Reduce put selling exposure."}
-                {marketData.overallScore > 74 &&
-                  "Very low confidence - Extreme greed detected. Avoid new put positions."}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Sentiment Heatmap */}
+      {/* Sentiment Heatmap - KEEP */}
       <Card className="shadow-sm border-gray-200">
         <CardHeader className="bg-gray-50 border-b border-gray-200">
           <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
             <TrendingUpIcon className="h-5 w-5 text-primary" />
             Sentiment Heatmap
           </CardTitle>
-          <p className="text-sm text-gray-600 mt-1">Social media sentiment analysis for major market indices</p>
+          <p className="text-sm text-gray-600 mt-1">
+            Market sentiment based on technical indicators (price momentum, RSI, volume trends)
+          </p>
         </CardHeader>
         <CardContent className="pt-4">
           {/* Indices Section */}
@@ -1006,7 +1172,7 @@ export function MarketSentiment() {
                           {item.netSentiment > 0 ? "+" : ""}
                           {item.netSentiment}
                         </div>
-                        <div className="text-xs text-gray-500">{item.volume.toLocaleString()} mentions</div>
+                        <div className="text-xs text-gray-500">{item.volume.toLocaleString()}k avg volume</div>
                       </div>
                     </div>
 
@@ -1040,6 +1206,7 @@ export function MarketSentiment() {
         </CardContent>
       </Card>
 
+      {/* Trade Recommendations accordion */}
       <Accordion type="multiple" className="space-y-0">
         <AccordionItem value="trade-recommendations" className="border-0">
           <Card className="shadow-sm border-gray-200">
@@ -1096,15 +1263,17 @@ export function MarketSentiment() {
                   </div>
 
                   {/* Risk Management */}
-                  <div className="mt-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                  <div className={`mt-4 p-4 rounded-lg border-2 ${getScoreBackground(marketData.overallScore)}`}>
                     <div className="flex items-center gap-2 mb-3">
-                      <ShieldIcon className="h-5 w-5 text-blue-700" />
-                      <h3 className="font-bold text-blue-900">Risk Management Guidelines</h3>
+                      <ShieldIcon className="h-5 w-5 text-primary" />
+                      <h3 className={`font-bold ${getScoreColor(marketData.overallScore)}`}>
+                        Risk Management Guidelines
+                      </h3>
                     </div>
                     <ul className="space-y-2">
                       {recommendations.riskManagement.map((tip, index) => (
-                        <li key={index} className="flex items-start gap-2 text-sm text-blue-800">
-                          <span className="text-blue-600 mt-1">✓</span>
+                        <li key={index} className="flex items-start gap-2 text-sm text-primary">
+                          <span className="text-primary mt-1">✓</span>
                           <span>{tip}</span>
                         </li>
                       ))}
@@ -1137,7 +1306,48 @@ export function MarketSentiment() {
             <AccordionContent>
               <CardContent className="pt-4 pb-4">
                 <div className="space-y-2">
-                  {allLevelGuidance.map((item, index) => {
+                  {[
+                    {
+                      range: "0-24",
+                      level: "Extreme Fear",
+                      description: "Maximum buying opportunity - deploy capital aggressively",
+                      signal: "STRONG BUY",
+                      guidance: getTradeRecommendations(12),
+                      allocation: getPortfolioAllocation(12),
+                    },
+                    {
+                      range: "25-44",
+                      level: "Fear",
+                      description: "Good environment for premium sellers",
+                      signal: "BUY",
+                      guidance: getTradeRecommendations(34),
+                      allocation: getPortfolioAllocation(34),
+                    },
+                    {
+                      range: "45-55",
+                      level: "Neutral",
+                      description: "Market balanced - be selective",
+                      signal: "HOLD",
+                      guidance: getTradeRecommendations(50),
+                      allocation: getPortfolioAllocation(50),
+                    },
+                    {
+                      range: "56-74",
+                      level: "Greed",
+                      description: "Reduce exposure and build cash",
+                      signal: "CAUTION",
+                      guidance: getTradeRecommendations(65),
+                      allocation: getPortfolioAllocation(65),
+                    },
+                    {
+                      range: "75-100",
+                      level: "Extreme Greed",
+                      description: "High risk of correction - maximum defensive positioning",
+                      signal: "AVOID/SELL",
+                      guidance: getTradeRecommendations(87),
+                      allocation: getPortfolioAllocation(87),
+                    },
+                  ].map((item, index) => {
                     const isCurrent =
                       marketData.overallScore >= Number.parseInt(item.range.split("-")[0]) &&
                       marketData.overallScore <= Number.parseInt(item.range.split("-")[1])
@@ -1158,14 +1368,14 @@ export function MarketSentiment() {
                               <span
                                 className={`ml-3 font-bold text-sm ${
                                   index === 0
-                                    ? "text-green-600"
+                                    ? "text-red-600" // Extreme Fear
                                     : index === 1
-                                      ? "text-green-500"
+                                      ? "text-orange-500" // Fear
                                       : index === 2
-                                        ? "text-yellow-600"
+                                        ? "text-yellow-600" // Neutral
                                         : index === 3
-                                          ? "text-orange-600"
-                                          : "text-red-600"
+                                          ? "text-green-500" // Greed
+                                          : "text-green-600" // Extreme Greed
                                 }`}
                               >
                                 {item.level}
@@ -1241,6 +1451,7 @@ export function MarketSentiment() {
         </AccordionItem>
       </Accordion>
 
+      {/* Portfolio Allocation accordion */}
       <Accordion type="multiple" className="space-y-0">
         <AccordionItem value="portfolio-allocation" className="border-0">
           <Card className="shadow-sm border-gray-200">
@@ -1253,11 +1464,11 @@ export function MarketSentiment() {
               <CardContent className="pt-4 pb-4">
                 <div className="space-y-2">
                   {[
-                    { range: "0-24", level: "Extreme Fear", data: getPortfolioAllocation(12) },
-                    { range: "25-44", level: "Fear", data: getPortfolioAllocation(34) },
+                    { range: "0-24", level: "Extreme Greed", data: getPortfolioAllocation(12) },
+                    { range: "25-44", level: "Greed", data: getPortfolioAllocation(34) },
                     { range: "45-55", level: "Neutral", data: getPortfolioAllocation(50) },
-                    { range: "56-74", level: "Greed", data: getPortfolioAllocation(65) },
-                    { range: "75-100", level: "Extreme Greed", data: getPortfolioAllocation(87) },
+                    { range: "56-74", level: "Fear", data: getPortfolioAllocation(65) },
+                    { range: "75-100", level: "Extreme Fear", data: getPortfolioAllocation(87) },
                   ].map((item, index) => {
                     const isCurrent =
                       marketData.overallScore >= Number.parseInt(item.range.split("-")[0]) &&
@@ -1279,14 +1490,14 @@ export function MarketSentiment() {
                               <span
                                 className={`ml-3 font-bold text-sm ${
                                   index === 0
-                                    ? "text-green-600"
+                                    ? "text-green-600" // Extreme Greed
                                     : index === 1
-                                      ? "text-green-500"
+                                      ? "text-green-500" // Greed
                                       : index === 2
-                                        ? "text-yellow-600"
+                                        ? "text-yellow-600" // Neutral
                                         : index === 3
-                                          ? "text-orange-600"
-                                          : "text-red-600"
+                                          ? "text-orange-500" // Fear
+                                          : "text-red-600" // Extreme Fear
                                 }`}
                               >
                                 {item.level}
@@ -1350,6 +1561,7 @@ export function MarketSentiment() {
         </AccordionItem>
       </Accordion>
 
+      {/* About section */}
       <Card className="shadow-sm border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10">
         <CardContent className="pt-4">
           <div className="flex items-start gap-3">

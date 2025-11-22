@@ -468,19 +468,32 @@ export function CcpiAuditAdmin() {
         {
           name: "Fear & Greed Index",
           formula:
-            "Composite Sentiment = 7 indicators (VIX, momentum, breadth, safe haven, junk bonds, market momentum, options)",
+            "CNN Composite: 7 indicators (Market Momentum [S&P vs 125-MA], Stock Strength [52-wk highs/lows], Breadth [McClellan Vol], Put/Call [5-day avg], VIX [vs 50-MA], Safe Haven [stock vs bond 20d], Junk Bond [HY spread])",
           executiveSummary:
-            "CNN's aggregate sentiment index. Scores above 75 indicate greed/euphoria; below 25 indicate fear/panic.",
+            "CNN's official 7-indicator sentiment composite. Scores 0-24 = Extreme Fear (buy opportunity), 75-100 = Extreme Greed (correction risk). Equal-weighted calculation updated continuously during market hours. Low scores (fear) appear on RIGHT of visual scale, high scores (greed) on LEFT per crash prediction logic.",
           currentValue: ccpi.indicators.fearGreedIndex !== null ? ccpi.indicators.fearGreedIndex : "N/A",
           ranges: {
-            safe: "40-60 (neutral)",
-            warning: "60-75 (greed) or 25-40 (fear)",
-            danger: "Above 75 (extreme greed) or Below 25 (extreme fear)",
+            safe: "45-55 (neutral - balanced market)",
+            warning: "25-44 (fear - cautious) or 56-74 (greed - elevated)",
+            danger: "0-24 (extreme fear - max opportunity) or 75-100 (extreme greed - correction risk)",
           },
-          dataSources: getDataSourceForIndicator("Fear & Greed Index", dataSources),
+          dataSources: {
+            primary: "CNN Fear & Greed API (https://production.dataviz.cnn.io/index/fearandgreed/graphdata)",
+            fallbackChain: [
+              "1. Yahoo Finance (^VIX, SPY, HYG, TLT) - Real-time prices",
+              "2. Calculated indicators (Put/Call from VIX term structure, Breadth from SPY volume patterns)",
+              "3. Approximated 52-week strength from SPY momentum analysis",
+            ],
+            currentSource:
+              dataSources?.sources?.find((s: any) => s.name === "Fear & Greed Index")?.currentSource || "CNN API",
+            status: dataSources?.sources?.find((s: any) => s.name === "Fear & Greed Index")?.status || "live",
+            updateFrequency: "Continuous during market hours (every component updates as data becomes available)",
+            methodology:
+              "Each of 7 indicators scores 0-100 independently, then averaged with equal weighting. Uses z-score normalization against historical ranges to determine how far current values deviate from typical levels.",
+          },
           canaryThresholds: {
-            medium: ">70 or <30",
-            high: ">80 (euphoria) or <20 (panic)",
+            medium: "Score >70 (greed building) or <30 (fear building)",
+            high: "Score >80 (extreme greed - contrarian sell signal) or <20 (extreme fear - contrarian buy signal)",
           },
         },
         {

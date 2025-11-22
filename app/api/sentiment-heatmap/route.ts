@@ -5,7 +5,7 @@ export async function GET() {
     const indices = [
       { ticker: "QQQ", sector: "Nasdaq-100 ETF", category: "index" },
       { ticker: "SPY", sector: "S&P 500 ETF", category: "index" },
-      { ticker: "^GSPC", sector: "S&P 500 Index", category: "index" },
+      { ticker: "^SPX", sector: "S&P 500 Index", category: "index" },
     ]
 
     const allTickers = indices
