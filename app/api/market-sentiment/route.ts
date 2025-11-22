@@ -588,11 +588,38 @@ async function scrapeCNNFearGreed(): Promise<{
   }
 }
 
+// Function to fetch historical data for charts
+async function fetchHistoricalDataForCharts() {
+  try {
+    // Fetch 3 months of data for chart visualization
+    const spyData = await fetchYahooData("SPY", "3mo")
+    const vixData = await fetchYahooData("^VIX", "3mo")
+
+    const timestamps = spyData.timestamp
+    const spyPrices = spyData.indicators.quote[0].close.filter((p: number) => p !== null)
+    const vixPrices = vixData.indicators.quote[0].close.filter((p: number) => p !== null)
+
+    // Convert timestamps to dates
+    const dates = timestamps.map((ts: number) => new Date(ts * 1000).toISOString().split("T")[0])
+
+    return {
+      dates: dates.slice(-60), // Last 60 days for chart
+      spy: spyPrices.slice(-60),
+      vix: vixPrices.slice(-60),
+    }
+  } catch (error) {
+    console.error("[v0] Error fetching historical chart data:", error)
+    return null
+  }
+}
+
 export async function GET() {
   try {
     console.log("[v0] ====== FETCHING REAL CNN DATA ======")
 
     const scrapedData = await scrapeCNNFearGreed()
+
+    const chartData = await fetchHistoricalDataForCharts()
 
     if (scrapedData) {
       console.log(`[v0] ✓ Successfully scraped CNN: Score ${scrapedData.score}/100 (${scrapedData.sentiment})`)
@@ -624,38 +651,27 @@ export async function GET() {
       )
 
       return NextResponse.json({
-        score: scrapedData.score,
+        overallScore: scrapedData.score,
         sentiment: scrapedData.sentiment,
-        lastUpdated: new Date().toISOString(),
-        yesterdayChange,
-        lastWeekChange,
-        lastMonthChange,
-        lastYearChange,
-
-        // CNN's 7 indicator scores
-        cnnComponents: scrapedData.indicators,
-
-        // Raw live data for display
-        vix: vixPrice,
+        trend: (yesterdayChange > 1 ? "up" : yesterdayChange < -1 ? "down" : "neutral") as "up" | "down" | "neutral",
+        yesterdayChange: Math.round(yesterdayChange * 10) / 10,
+        lastWeekChange: Math.round(lastWeekChange * 10) / 10,
+        lastMonthChange: Math.round(lastMonthChange * 10) / 10,
+        lastYearChange: Math.round(lastYearChange * 10) / 10,
+        cnnComponents: scrapedData.indicators.map((ind) => ({
+          name: ind.name,
+          score: ind.score,
+          description: ind.description,
+        })),
+        chartData: chartData || { dates: [], spy: [], vix: [] },
+        marketVolatility: vixPrice,
         putCallRatio: putCallRatio,
         stockPriceMomentum: spyMomentumPct,
-        stockPriceStrength:
-          scrapedData.indicators.find((i: any) => i.name.toLowerCase().includes("strength"))?.score || 50,
-        stockPriceBreadth:
-          scrapedData.indicators.find((i: any) => i.name.toLowerCase().includes("breadth"))?.score || 50,
-        junkBondSpread: scrapedData.indicators.find((i: any) => i.name.toLowerCase().includes("junk"))?.score || 50,
-        safeHavenDemand: scrapedData.indicators.find((i: any) => i.name.toLowerCase().includes("safe"))?.score || 50,
-
-        // Options indicators
-        volatilitySkew: spyMomentumPct,
-        openInterestPutCall: putCallRatio,
-        vixTermStructure:
-          scrapedData.indicators.find((i: any) => i.name.toLowerCase().includes("volatility"))?.score || 50,
-        cboeSkewIndex:
-          100 - scrapedData.indicators.find((i: any) => i.name.toLowerCase().includes("volatility"))?.score || 50,
-
-        dataSource: "CNN (Scraped via ScrapingBee) + Yahoo Finance (Live)",
-        methodology: "Using CNN's actual Fear & Greed scores with live raw data from Yahoo Finance APIs",
+        stockPriceStrength: 0,
+        stockPriceBreadth: 0,
+        junkBondSpread: 0,
+        safeHavenDemand: 0,
+        lastUpdate: new Date().toISOString(),
       })
     }
 
@@ -742,6 +758,8 @@ export async function GET() {
       lastYearChange,
 
       cnnComponents: finalIndicators,
+
+      chartData: chartData || { dates: [], spy: [], vix: [] }, // Added missing chartData
 
       vix: 0,
       putCallRatio: 0,

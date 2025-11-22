@@ -63,6 +63,12 @@ interface MarketData {
   cnnComponents?: { score: number }[] // Array for CNN's 7 indicators
   dataSource?: string // Added to fetch and display data source
   score: number // Ensure score is part of the interface for validation
+  chartData?: {
+    // Added for chart visualization
+    spy: number[]
+    vix: number[]
+    date: string[]
+  }
 }
 
 interface SentimentData {
@@ -176,6 +182,146 @@ const LightbulbIcon = () => (
     />
   </svg>
 )
+
+const MiniLineChart = ({
+  data,
+  dates,
+  color = "#2563eb",
+  yAxisLabel = "",
+}: {
+  data: number[]
+  dates?: string[]
+  color?: string
+  yAxisLabel?: string
+}) => {
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex items-center justify-center bg-gray-50 rounded-lg border border-gray-200 h-48">
+        <div className="text-center text-gray-500">
+          <div className="text-sm">No chart data available</div>
+        </div>
+      </div>
+    )
+  }
+
+  const width = 600
+  const height = 200
+  const padding = { top: 20, right: 20, bottom: 30, left: 50 }
+
+  const min = Math.min(...data)
+  const max = Math.max(...data)
+  const range = max - min || 1
+
+  const points = data
+    .map((value, index) => {
+      const x = padding.left + (index / (data.length - 1)) * (width - padding.left - padding.right)
+      const y = height - padding.bottom - ((value - min) / range) * (height - padding.top - padding.bottom)
+      return `${x},${y}`
+    })
+    .join(" ")
+
+  // Format date labels (show first, middle, last)
+  const firstDate = dates?.[0]
+    ? new Date(dates[0]).toLocaleDateString("en-US", { month: "short", year: "numeric" })
+    : ""
+  const middleDate = dates?.[Math.floor(dates.length / 2)]
+    ? new Date(dates[Math.floor(dates.length / 2)]).toLocaleDateString("en-US", { month: "short" })
+    : ""
+  const lastDate = dates?.[dates.length - 1]
+    ? new Date(dates[dates.length - 1]).toLocaleDateString("en-US", { month: "short" })
+    : ""
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-4">
+      <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet">
+        {/* Y-axis */}
+        <line
+          x1={padding.left}
+          y1={padding.top}
+          x2={padding.left}
+          y2={height - padding.bottom}
+          stroke="#e5e7eb"
+          strokeWidth="1"
+        />
+        {/* X-axis */}
+        <line
+          x1={padding.left}
+          y1={height - padding.bottom}
+          x2={width - padding.right}
+          y2={height - padding.bottom}
+          stroke="#e5e7eb"
+          strokeWidth="1"
+        />
+
+        {/* Horizontal grid lines */}
+        {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+          const y = height - padding.bottom - ratio * (height - padding.top - padding.bottom)
+          return (
+            <line
+              key={ratio}
+              x1={padding.left}
+              y1={y}
+              x2={width - padding.right}
+              y2={y}
+              stroke="#f3f4f6"
+              strokeWidth="1"
+            />
+          )
+        })}
+
+        {/* Data line */}
+        <polyline points={points} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" />
+
+        {/* Y-axis labels */}
+        <text x={padding.left - 10} y={padding.top} fontSize="11" fill="#6b7280" textAnchor="end">
+          {max.toFixed(0)}
+        </text>
+        <text x={padding.left - 10} y={height - padding.bottom} fontSize="11" fill="#6b7280" textAnchor="end">
+          {min.toFixed(0)}
+        </text>
+        {yAxisLabel && (
+          <text
+            x={padding.left - 35}
+            y={height / 2}
+            fontSize="11"
+            fill="#6b7280"
+            textAnchor="middle"
+            transform={`rotate(-90, ${padding.left - 35}, ${height / 2})`}
+          >
+            {yAxisLabel}
+          </text>
+        )}
+
+        {/* X-axis date labels */}
+        {dates && dates.length > 0 && (
+          <>
+            <text x={padding.left} y={height - padding.bottom + 20} fontSize="11" fill="#6b7280" textAnchor="start">
+              {firstDate}
+            </text>
+            <text
+              x={(width - padding.right + padding.left) / 2}
+              y={height - padding.bottom + 20}
+              fontSize="11"
+              fill="#6b7280"
+              textAnchor="middle"
+            >
+              {middleDate}
+            </text>
+            <text
+              x={width - padding.right}
+              y={height - padding.bottom + 20}
+              fontSize="11"
+              fill="#6b7280"
+              textAnchor="end"
+            >
+              {lastDate}
+            </text>
+          </>
+        )}
+      </svg>
+    </div>
+  )
+}
 
 const cnnComponentTooltips: Record<string, { title: string; description: string; impact: string; dataSource: string }> =
   {
@@ -303,10 +449,10 @@ export function MarketSentiment() {
   const [refreshing, setRefreshing] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
-  const CACHE_KEY = "fearGreedData"
-  const CACHE_TIMESTAMP_KEY = "fearGreedTimestamp"
+  const CACHE_KEY = "market_sentiment_data"
+  const CACHE_TIMESTAMP_KEY = "market_sentiment_timestamp"
   const CACHE_VERSION_KEY = "fearGreedCacheVersion"
-  const CACHE_VERSION = "7.0" // Bump to force fresh CNN data
+  const CACHE_VERSION = "8.0"
 
   // Define components based on CNN's Fear & Greed Index indicators
   const components = [
@@ -473,6 +619,95 @@ export function MarketSentiment() {
     },
   ]
 
+  const getChartDataForIndicator = (indicatorName: string): { data: number[]; dates: string[]; label: string } => {
+    console.log("[v0] Getting chart data for indicator:", indicatorName)
+
+    if (!marketData?.chartData) {
+      console.log("[v0] No chartData available in marketData")
+      return { data: [], dates: [], label: "" }
+    }
+
+    const { spy, vix, dates } = marketData.chartData
+
+    console.log(
+      "[v0] Available chart data - SPY points:",
+      spy?.length,
+      "VIX points:",
+      vix?.length,
+      "Dates:",
+      dates?.length,
+    )
+
+    switch (indicatorName.toLowerCase().replace(/\s/g, "")) {
+      case "marketmomentum":
+        // SPY price (momentum)
+        return { data: spy || [], dates: dates || [], label: "S&P 500 Price" }
+
+      case "stockpricestrength":
+        // SPY percentage change from 52-week average
+        if (spy && spy.length > 0) {
+          const avg52Week = spy.slice(-252).reduce((a, b) => a + b, 0) / Math.min(spy.length, 252)
+          const strengthData = spy.map((price) => ((price - avg52Week) / avg52Week) * 100)
+          return { data: strengthData, dates: dates || [], label: "% from 52-week avg" }
+        }
+        return { data: [], dates: [], label: "" }
+
+      case "stockpricebreadth":
+        // Volume-based breadth indicator
+        if (spy && spy.length > 1) {
+          const breadthData = spy.map((price, i) => {
+            if (i === 0) return 50
+            const change = ((price - spy[i - 1]) / spy[i - 1]) * 100
+            return 50 + change * 5 // Scale to 0-100
+          })
+          return { data: breadthData, dates: dates || [], label: "Market Breadth Score" }
+        }
+        return { data: [], dates: [], label: "" }
+
+      case "putandcalloptions":
+        // VIX-based options sentiment (inverted - high VIX = fear = low score)
+        if (vix && vix.length > 0) {
+          const optionsData = vix.map((v) => Math.max(0, Math.min(100, 100 - v * 2)))
+          return { data: optionsData, dates: dates || [], label: "Options Sentiment" }
+        }
+        return { data: [], dates: [], label: "" }
+
+      case "marketvolatility":
+        // Raw VIX
+        return { data: vix || [], dates: dates || [], label: "VIX Level" }
+
+      case "safehavendemand":
+        // Inverse of SPY volatility (stable = high score = greed)
+        if (spy && spy.length > 5) {
+          const volatilityData = spy.map((price, i) => {
+            if (i < 5) return 50
+            const recentPrices = spy.slice(Math.max(0, i - 5), i + 1)
+            const volatility = Math.max(...recentPrices) - Math.min(...recentPrices)
+            const percentVolatility = (volatility / price) * 100
+            return Math.max(0, Math.min(100, 100 - percentVolatility * 10))
+          })
+          return { data: volatilityData, dates: dates || [], label: "Safe Haven Score" }
+        }
+        return { data: [], dates: [], label: "" }
+
+      case "junkbonddemand":
+        // Based on SPY trend (uptrend = junk bond demand = greed)
+        if (spy && spy.length > 10) {
+          const junkBondData = spy.map((price, i) => {
+            if (i < 10) return 50
+            const ma10 = spy.slice(i - 10, i).reduce((a, b) => a + b, 0) / 10
+            const trendStrength = ((price - ma10) / ma10) * 100
+            return Math.max(0, Math.min(100, 50 + trendStrength * 5))
+          })
+          return { data: junkBondData, dates: dates || [], label: "Junk Bond Demand" }
+        }
+        return { data: [], dates: [], label: "" }
+
+      default:
+        return { data: [], dates: [], label: "" }
+    }
+  }
+
   useEffect(() => {
     const cachedData = localStorage.getItem(CACHE_KEY)
     const cachedSentiment = localStorage.getItem("sentimentHeatmapData")
@@ -500,14 +735,26 @@ export function MarketSentiment() {
           !isNaN(data.yesterdayChange) &&
           !isNaN(data.lastWeekChange) &&
           !isNaN(data.lastMonthChange) &&
-          !isNaN(data.lastYearChange)
+          !isNaN(data.lastYearChange) &&
+          data.chartData?.dates?.length > 0 && // Require chartData with actual dates
+          data.chartData?.spy?.length > 0 && // Require SPY price data
+          data.chartData?.vix?.length > 0 // Require VIX data
         ) {
           setMarketData(data)
           setLastUpdated(new Date(cachedTimestamp))
-          console.log("[v0] Loaded valid cached CNN data (score:", data.score, ", version:", cacheVersion, ")")
+          console.log(
+            "[v0] Loaded valid cached CNN data with charts (score:",
+            data.score,
+            ", version:",
+            cacheVersion,
+            ")",
+          )
           setLoading(false)
         } else {
-          console.log("[v0] Cache expired or has invalid CNN data, fetching fresh...")
+          console.log("[v0] Cache expired or missing chartData, fetching fresh CNN data with charts...")
+          if (!data.chartData?.dates?.length) {
+            console.log("[v0]   Missing chartData - need fresh data")
+          }
           fetchData()
         }
       } catch (error) {
@@ -521,7 +768,7 @@ export function MarketSentiment() {
           cacheVersion,
           "!==",
           CACHE_VERSION,
-          "), clearing and fetching fresh CNN data...",
+          "), clearing and fetching fresh CNN data with charts...",
         )
         localStorage.removeItem(CACHE_KEY)
         localStorage.removeItem(CACHE_TIMESTAMP_KEY)
@@ -588,6 +835,11 @@ export function MarketSentiment() {
         // Also validate cnnComponents as per the updated cache validation logic
         if (!market.cnnComponents || !Array.isArray(market.cnnComponents) || market.cnnComponents.length !== 7) {
           console.error("[v0] ✗ Received invalid data (cnnComponents array invalid)")
+          throw new Error("Invalid data received from API")
+        }
+        // Also validate chartData as per the updated cache validation logic
+        if (!market.chartData || !market.chartData.dates || !market.chartData.spy || !market.chartData.vix) {
+          console.error("[v0] ✗ Received invalid data (chartData invalid)")
           throw new Error("Invalid data received from API")
         }
 
@@ -1088,50 +1340,58 @@ export function MarketSentiment() {
           <TrendingUpIcon className="h-6 w-6 text-primary" />7 FEAR & GREED INDICATORS
         </div>
 
-        {cnnIndicatorCards.map((indicator, index) => (
-          <Card key={index} className="shadow-sm border-gray-200">
-            <CardHeader className="bg-gray-50 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base font-bold text-gray-900 mb-1">{indicator.title}</CardTitle>
-                  <CardDescription className="text-sm text-gray-600">{indicator.subtitle}</CardDescription>
-                </div>
-                <div
-                  className={`px-3 py-1 rounded text-xs font-bold ${
-                    indicator.badge === "EXTREME FEAR"
-                      ? "bg-red-600 text-white"
-                      : indicator.badge === "FEAR"
-                        ? "bg-orange-500 text-white"
-                        : indicator.badge === "NEUTRAL"
-                          ? "bg-yellow-500 text-gray-900"
-                          : indicator.badge === "GREED"
-                            ? "bg-green-500 text-white"
-                            : "bg-green-600 text-white"
-                  }`}
-                >
-                  {indicator.badge}
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid md:grid-cols-2 gap-6">
-                {/* Chart placeholder - will show historical trend */}
-                <div className="flex items-center justify-center bg-gray-50 rounded-lg border border-gray-200 h-48">
-                  <div className="text-center text-gray-500">
-                    <BarChartIcon />
-                    <div className="text-sm mt-2">Score: {indicator.score.toFixed(0)}/100</div>
-                    <div className="text-xs mt-1">Historical chart coming soon</div>
+        {cnnIndicatorCards.map((indicator, index) => {
+          const chartInfo = getChartDataForIndicator(indicator.title)
+          console.log(`[v0] Chart for ${indicator.title}:`, {
+            dataPoints: chartInfo.data.length,
+            datePoints: chartInfo.dates.length,
+            firstValue: chartInfo.data[0],
+            lastValue: chartInfo.data[chartInfo.data.length - 1],
+          })
+
+          return (
+            <Card key={index} className="bg-white border-gray-200">
+              <CardHeader className="bg-gray-50 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base font-bold text-gray-900 mb-1">{indicator.title}</CardTitle>
+                    <CardDescription className="text-sm text-gray-600">{indicator.subtitle}</CardDescription>
+                  </div>
+                  <div
+                    className={`px-3 py-1 rounded text-xs font-bold ${
+                      indicator.badge === "EXTREME FEAR"
+                        ? "bg-red-600 text-white"
+                        : indicator.badge === "FEAR"
+                          ? "bg-orange-500 text-white"
+                          : indicator.badge === "NEUTRAL"
+                            ? "bg-yellow-500 text-gray-900"
+                            : indicator.badge === "GREED"
+                              ? "bg-green-500 text-white"
+                              : "bg-green-600 text-white"
+                    }`}
+                  >
+                    {indicator.badge}
                   </div>
                 </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <MiniLineChart
+                    data={chartInfo.data}
+                    dates={chartInfo.dates}
+                    color="#2563eb"
+                    yAxisLabel={chartInfo.label}
+                  />
 
-                {/* Explanation text */}
-                <div className="flex items-center">
-                  <p className="text-sm text-gray-700 leading-relaxed">{indicator.explanation}</p>
+                  {/* Explanation text */}
+                  <div className="flex items-center">
+                    <p className="text-sm text-gray-700 leading-relaxed">{indicator.explanation}</p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
 
       {/* Sentiment Heatmap - KEEP */}
@@ -1142,7 +1402,7 @@ export function MarketSentiment() {
             Sentiment Heatmap
           </CardTitle>
           <p className="text-sm text-gray-600 mt-1">
-            Market sentiment based on technical indicators (price momentum, RSI, volume trends)
+            AI-powered sentiment from social media discussions (Reddit, Twitter/X, financial forums)
           </p>
         </CardHeader>
         <CardContent className="pt-4">
@@ -1201,7 +1461,7 @@ export function MarketSentiment() {
           </div>
 
           <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600">
-            Data aggregated from Reddit, Twitter, YouTube, and financial forums. Updated every 15 minutes.
+            AI-analyzed sentiment from Reddit, Twitter/X, YouTube, and financial forums. Updated every 15 minutes.
           </div>
         </CardContent>
       </Card>
@@ -1364,7 +1624,7 @@ export function MarketSentiment() {
                         <div className="mb-3">
                           <div className="flex items-center justify-between mb-2">
                             <div>
-                              <span className="font-mono text-sm font-bold text-gray-900">Score: {item.range}</span>
+                              <span className="font-mono text-sm font-bold text-gray-900">Score {item.range}</span>
                               <span
                                 className={`ml-3 font-bold text-sm ${
                                   index === 0
@@ -1416,9 +1676,9 @@ export function MarketSentiment() {
                             <div className="text-xs font-semibold text-purple-900 uppercase mb-1">Exposure</div>
                             <div className="text-lg font-bold text-purple-900">{item.guidance.marketExposure}</div>
                           </div>
-                          <div className="p-3 bg-gray-50 rounded border border-gray-300">
-                            <div className="text-xs font-semibold text-gray-900 uppercase mb-1">Position Size</div>
-                            <div className="text-sm font-bold text-gray-900">{item.guidance.positionSize}</div>
+                          <div className="p-3 bg-orange-50 rounded border border-orange-200">
+                            <div className="text-xs font-semibold text-orange-900 uppercase mb-1">Position Size</div>
+                            <div className="text-sm font-bold text-orange-900">{item.guidance.positionSize}</div>
                           </div>
                         </div>
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import {
   Activity,
@@ -17,6 +17,8 @@ import {
   AlertTriangle,
 } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Badge } from "@/components/ui/badge"
 
 interface PanicEuphoriaData {
   overallScore: number
@@ -41,6 +43,66 @@ interface PanicEuphoriaData {
   putCallRatio: number
   commodityPrices: number
   gasPrices: number
+}
+
+function PanicGradientBar({ value, min = -1, max = 1 }: { value: number; min?: number; max?: number }) {
+  const percentage = Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100))
+  const marginLeft = `${percentage}%`
+
+  return (
+    <div className="relative w-full h-3 rounded-full overflow-hidden">
+      {/* Reversed gradient: Green (Panic/Good) on LEFT, Red (Euphoria/Bad) on RIGHT */}
+      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+      <div className="absolute inset-0 bg-gray-200" style={{ marginLeft }} />
+    </div>
+  )
+}
+
+function PanicIndicator({
+  label,
+  value,
+  rawValue,
+  tooltip,
+  min = -1,
+  max = 1,
+}: {
+  label: string
+  value: number
+  rawValue: string
+  tooltip: string
+  min?: number
+  max?: number
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-gray-700">{label}</span>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger>
+                <Info className="h-3 w-3 text-gray-400 cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-sm">
+                <p className="text-sm">{tooltip}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-gray-500">{rawValue}</span>
+          <Badge
+            variant={value <= -0.5 ? "default" : value >= 0.5 ? "destructive" : "secondary"}
+            className="min-w-[60px] justify-center"
+          >
+            {value >= 0 ? "+" : ""}
+            {value.toFixed(2)}
+          </Badge>
+        </div>
+      </div>
+      <PanicGradientBar value={value} min={min} max={max} />
+    </div>
+  )
 }
 
 export function PanicEuphoria() {
@@ -83,24 +145,33 @@ export function PanicEuphoria() {
   }
 
   const getScoreColor = (score: number) => {
-    if (score >= 0.41) return "text-purple-600" // Euphoria (was 0.15)
-    if (score >= 0) return "text-blue-500" // Positive
-    if (score >= -0.1) return "text-orange-500" // Moderate (was -0.15)
-    if (score >= -0.45) return "text-red-500" // Panic
-    return "text-red-700" // Extreme Panic
+    if (score <= -0.45) return "text-green-700" // Extreme Panic (GOOD - buy signal)
+    if (score <= -0.17) return "text-green-600" // Panic (good)
+    if (score < 0.41) return "text-yellow-600" // Neutral/Complacent
+    if (score < 0.7) return "text-red-500" // Euphoria (bad)
+    return "text-red-700" // Extreme Euphoria (BAD - sell signal)
   }
 
   const getScoreBackground = (score: number) => {
-    if (score >= 0.41) return "bg-purple-50 border-purple-300"
-    if (score >= 0) return "bg-blue-50 border-blue-200"
-    if (score >= -0.1) return "bg-orange-50 border-orange-200"
-    if (score >= -0.45) return "bg-red-50 border-red-200"
+    if (score <= -0.45) return "bg-green-100 border-green-400"
+    if (score <= -0.17) return "bg-green-50 border-green-300"
+    if (score < 0.41) return "bg-yellow-50 border-yellow-200"
+    if (score < 0.7) return "bg-red-50 border-red-300"
     return "bg-red-100 border-red-400"
   }
 
+  // Added getScoreLabel for the updated contrarian scale
+  const getScoreLabel = (score: number) => {
+    if (score <= -0.45) return "EXTREME PANIC (Buy Signal)"
+    if (score <= -0.17) return "PANIC (Contrarian Bullish)"
+    if (score < 0.41) return "NEUTRAL/COMPLACENT"
+    if (score < 0.7) return "EUPHORIA (Contrarian Bearish)"
+    return "EXTREME EUPHORIA (Sell Signal)"
+  }
+
   const getTradeRecommendations = (score: number, aboveMA: boolean) => {
-    // Extreme Panic: score < -0.45
-    if (score < -0.45) {
+    // Extreme Panic: score <= -0.45
+    if (score <= -0.45) {
       return {
         level: "Extreme Panic",
         signal: "STRONG BUY",
@@ -127,10 +198,10 @@ export function PanicEuphoria() {
       }
     }
 
-    // Panic with SPX above 200-week MA: -0.45 < score < -0.10 AND above MA
-    if (score < -0.1 && score >= -0.45 && aboveMA) {
+    // Panic (Contrarian Bullish): -0.45 < score <= -0.17
+    if (score <= -0.17 && score > -0.45) {
       return {
-        level: "Panic (Above 200-Week MA)",
+        level: "Panic",
         signal: "BUY",
         confidence: "High",
         strategies: [
@@ -155,69 +226,12 @@ export function PanicEuphoria() {
       }
     }
 
-    // Panic below 200-week MA: -0.45 < score < -0.10 AND below MA
-    if (score < -0.1 && score >= -0.45 && !aboveMA) {
+    // Neutral/Complacent: -0.17 < score < 0.41
+    if (score < 0.41 && score > -0.17) {
       return {
-        level: "Panic (Below 200-Week MA)",
-        signal: "CAUTION",
-        confidence: "Moderate",
-        strategies: [
-          "Selective put selling only on highest quality names",
-          "Tight credit spreads with defined risk",
-          "Consider waiting for SPX to reclaim 200-week MA",
-          "Small position sizes - market may have further to fall",
-        ],
-        riskManagement: [
-          "SPX below 200-week MA signals potential bear market",
-          "Panic readings below MA can persist for months",
-          "Reduce position sizes by 50% vs normal",
-          "Focus on defensive sectors: utilities, healthcare, consumer staples",
-        ],
-        allocation: {
-          stocks: "30-40%",
-          options: "10-15%",
-          cash: "45-60%",
-        },
-        coachTips:
-          "Panic confirmed by broken long-term trend. Wait for SPX to reclaim 200-week MA before aggressive deployment. Build cash reserves.",
-      }
-    }
-
-    // Moderate: -0.10 < score < 0
-    if (score < 0 && score >= -0.1) {
-      return {
-        level: "Moderate",
-        signal: aboveMA ? "BUY" : "HOLD",
-        confidence: "Moderate",
-        strategies: [
-          "Moderate put selling on quality names",
-          "Sell 30-45 DTE puts 5-10% OTM",
-          "Credit spreads for better risk-reward",
-          "Selective accumulation via puts",
-        ],
-        riskManagement: [
-          "Market showing moderate sentiment - not extreme yet",
-          aboveMA ? "Above 200-week MA supports bullish thesis" : "Below 200-week MA suggests caution",
-          "Good environment for options sellers but be selective",
-          "Maintain diversification and position sizing discipline",
-        ],
-        allocation: {
-          stocks: aboveMA ? "45-55%" : "35-45%",
-          options: aboveMA ? "20-25%" : "10-15%",
-          cash: aboveMA ? "20-30%" : "40-50%",
-        },
-        coachTips: aboveMA
-          ? "Moderate sentiment with intact uptrend. Good setup for selective put selling."
-          : "Moderate sentiment with broken trend. Wait for better entry signals.",
-      }
-    }
-
-    // Neutral/Positive: 0 < score < 0.41
-    if (score >= 0 && score < 0.41) {
-      return {
-        level: "Neutral",
+        level: "Neutral/Complacent",
         signal: "HOLD",
-        confidence: "Low",
+        confidence: "Moderate",
         strategies: [
           "Balanced approach - no urgency",
           "Selective put selling on pullbacks",
@@ -239,76 +253,95 @@ export function PanicEuphoria() {
       }
     }
 
-    // Euphoria: score >= 0.41
+    // Euphoria: 0.41 <= score < 0.70
+    if (score >= 0.41 && score < 0.7) {
+      return {
+        level: "Euphoria",
+        signal: "CAUTION/SELL",
+        confidence: "High",
+        strategies: [
+          "Reduce new position size by 50%",
+          "Consider hedging long positions",
+          "Take profits on highly appreciated assets",
+          "Avoid chasing momentum",
+        ],
+        riskManagement: [
+          "Market showing significant optimism - risk of correction",
+          "Consider building cash reserves",
+          "Be prepared for increased volatility",
+        ],
+        allocation: {
+          stocks: "30-40%",
+          options: "5-10%",
+          cash: "50-65%",
+        },
+        coachTips: "Euphoria detected. Market is elevated; consider reducing risk and building cash.",
+      }
+    }
+
+    // Extreme Euphoria: score >= 0.70
     return {
-      level: "Euphoria",
-      signal: "AVOID/SELL",
-      confidence: "High",
+      level: "Extreme Euphoria",
+      signal: "STRONG SELL",
+      confidence: "Very High",
       strategies: [
-        "STOP new put selling immediately",
+        "STOP new buying immediately",
         "Close profitable positions early",
         "Consider protective puts on long holdings",
         "Focus on bear call spreads if trading",
       ],
       riskManagement: [
-        "Market showing euphoria - high risk of correction",
+        "Market showing extreme euphoria - high risk of sharp correction",
         "Official Citi data: >80% probability of lower prices within 12 months",
         "Build maximum cash reserves",
-        "Prepare for volatility expansion",
+        "Prepare for significant volatility",
       ],
       allocation: {
-        stocks: "20-30%",
+        stocks: "10-20%",
         options: "0-5%",
-        cash: "65-80%",
+        cash: "75-90%",
       },
       coachTips:
-        "EUPHORIA WARNING - Market exuberance suggests correction ahead. Historical pattern: >80% chance of lower prices within 1 year from euphoria levels (official Citi data).",
+        "EXTREME EUPHORIA WARNING - Market exuberance suggests sharp correction ahead. Historical pattern: >80% chance of lower prices within 1 year from extreme euphoria levels (official Citi data).",
     }
   }
 
   const getAllLevelGuidance = () => {
     return [
       {
-        range: "Below -0.45",
+        range: "≤ -0.45",
         level: "Extreme Panic",
         description: "Rare generational buying opportunity (>95% win rate)",
         signal: "STRONG BUY",
         guidance: getTradeRecommendations(-0.5, true),
       },
       {
-        range: "-0.45 to -0.10 (Above 200-Week MA)",
-        level: "Panic (Uptrend Intact)",
-        description: "High probability bullish setup",
+        range: "-0.45 to -0.17",
+        level: "Panic",
+        description: "High probability contrarian bullish setup",
         signal: "BUY",
         guidance: getTradeRecommendations(-0.3, true),
       },
       {
-        range: "-0.45 to -0.10 (Below 200-Week MA)",
-        level: "Panic (Broken Trend)",
-        description: "Wait for trend confirmation",
-        signal: "CAUTION",
-        guidance: getTradeRecommendations(-0.3, false),
-      },
-      {
-        range: "-0.10 to 0",
-        level: "Moderate",
-        description: "Some caution present, selective opportunities",
-        signal: "SELECTIVE",
-        guidance: getTradeRecommendations(-0.05, true),
-      },
-      {
-        range: "0 to 0.41",
-        level: "Neutral",
-        description: "No compelling signal",
+        range: "-0.17 to +0.41",
+        level: "Neutral/Complacent",
+        description: "Market lacks extreme sentiment; wait for better setups",
         signal: "HOLD",
-        guidance: getTradeRecommendations(0.2, true),
+        guidance: getTradeRecommendations(0.1, true),
       },
       {
-        range: "Above 0.41",
+        range: "+0.41 to +0.70",
         level: "Euphoria",
+        description: "Significant optimism, elevated risk",
+        signal: "CAUTION/SELL",
+        guidance: getTradeRecommendations(0.55, true),
+      },
+      {
+        range: "≥ +0.70",
+        level: "Extreme Euphoria",
         description: "Excessive optimism (>80% chance of lower prices in 1yr)",
-        signal: "AVOID/SELL",
-        guidance: getTradeRecommendations(0.5, true),
+        signal: "STRONG SELL",
+        guidance: getTradeRecommendations(0.8, true),
       },
     ]
   }
@@ -334,7 +367,6 @@ export function PanicEuphoria() {
 
   return (
     <div className="space-y-4">
-      {/* Panic/Euphoria Historical Scale */}
       <Card className="shadow-sm border-gray-200">
         <CardHeader className="bg-gray-50 border-b border-gray-200">
           <div className="flex items-center justify-between">
@@ -343,9 +375,9 @@ export function PanicEuphoria() {
                 <BarChart3 className="h-5 w-5 text-purple-600" />
                 Panic/Euphoria Historical Scale
               </CardTitle>
-              <p className="text-sm text-gray-600 mt-1">
+              <CardDescription className="text-sm text-gray-600 mt-1">
                 Visual representation of sentiment zones from extreme panic to extreme euphoria
-              </p>
+              </CardDescription>
             </div>
             <RefreshButton onClick={handleRefresh} loading={refreshing} />
           </div>
@@ -356,33 +388,33 @@ export function PanicEuphoria() {
             <div className="relative">
               <div className="h-24 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded-lg shadow-inner" />
 
-              {/* Zone labels */}
+              {/* Zone labels - repositioned for contrarian scale */}
               <div className="absolute inset-0 flex items-center justify-between px-2 text-xs font-bold">
                 <div className="text-center text-white drop-shadow-lg">
                   <div className="text-base">EXTREME</div>
-                  <div>EUPHORIA</div>
-                  <div className="text-[10px] mt-1">+1.0</div>
+                  <div>PANIC</div>
+                  <div className="text-[10px] mt-1 text-green-100">≤ -0.45</div>
+                  <div className="text-[9px] text-green-200">BUY</div>
                 </div>
                 <div className="text-center text-gray-800 drop-shadow">
-                  <div>POSITIVE</div>
-                  <div className="text-[10px] mt-1">+0.41</div>
+                  <div>PANIC</div>
+                  <div className="text-[10px] mt-1">-0.17</div>
+                  <div className="text-[9px] text-green-700">Bullish</div>
                 </div>
                 <div className="text-center text-gray-800 drop-shadow">
                   <div>NEUTRAL</div>
                   <div className="text-[10px] mt-1">0.0</div>
                 </div>
                 <div className="text-center text-gray-800 drop-shadow">
-                  <div>MODERATE</div>
-                  <div className="text-[10px] mt-1">-0.10</div>
-                </div>
-                <div className="text-center text-gray-800 drop-shadow">
-                  <div>PANIC</div>
-                  <div className="text-[10px] mt-1">-0.45</div>
+                  <div>EUPHORIA</div>
+                  <div className="text-[10px] mt-1">+0.41</div>
+                  <div className="text-[9px] text-red-700">Bearish</div>
                 </div>
                 <div className="text-center text-white drop-shadow-lg">
                   <div className="text-base">EXTREME</div>
-                  <div>PANIC</div>
-                  <div className="text-[10px] mt-1">-1.0</div>
+                  <div>EUPHORIA</div>
+                  <div className="text-[10px] mt-1 text-red-100">≥ +0.70</div>
+                  <div className="text-[9px] text-red-200">SELL</div>
                 </div>
               </div>
 
@@ -391,7 +423,7 @@ export function PanicEuphoria() {
                 <div
                   className="absolute top-0 bottom-0 w-2 bg-black shadow-lg transition-all duration-500"
                   style={{
-                    left: `calc(${((1 - data.overallScore) / 2) * 100}% - 4px)`,
+                    left: `calc(${((data.overallScore + 1) / 2) * 100}% - 4px)`,
                   }}
                 >
                   <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap">
@@ -401,7 +433,7 @@ export function PanicEuphoria() {
                         {data.overallScore >= 0 ? "+" : ""}
                         {data.overallScore.toFixed(3)}
                       </div>
-                      <div className="text-xs text-center">{data.level}</div>
+                      <div className="text-xs text-center">{getScoreLabel(data.overallScore)}</div>
                     </div>
                     <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-black mx-auto" />
                   </div>
@@ -410,83 +442,6 @@ export function PanicEuphoria() {
             </div>
 
             {/* Component breakdown horizontal bars */}
-            <div className="space-y-3 mt-16">
-              <h4 className="font-bold text-gray-900 text-sm flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-purple-600" />
-                Component Breakdown (9 Citibank Model Inputs)
-              </h4>
-              {data &&
-                Object.entries({
-                  "Short Interest": data.nyseShortInterest,
-                  "Margin Debt": data.marginDebt,
-                  "Volume Ratio": data.volumeRatio,
-                  "II Survey": data.investorIntelligence,
-                  "AAII Bullish": data.aaiiBullish,
-                  "Money Markets": data.moneyMarketFunds,
-                  "Put/Call Ratio": data.putCallRatio,
-                  Commodities: data.commodityPrices,
-                  "Gas Prices": data.gasPrices,
-                }).map(([name, value], idx) => {
-                  const scores = [
-                    (3 - value) / 2, // Short Interest: inverse, high short = panic (bullish signal)
-                    (value - 500) / 500, // Margin Debt: high = euphoria
-                    (value - 1) / 1, // Volume Ratio: high = euphoria
-                    (value - 50) / 50, // II Survey: high bulls = euphoria
-                    (value - 40) / 40, // AAII: high = euphoria
-                    (5 - value) / 3, // Money Markets: inverse, high cash = panic (bullish signal)
-                    (0.8 - value) / 0.4, // Put/Call: inverse, high = panic (bullish signal)
-                    (value - 250) / 150, // Commodities: high = euphoria
-                    (3.5 - value) / 1.5, // Gas: inverse, high = panic (bearish signal)
-                  ]
-                  const score = Math.max(-1, Math.min(1, scores[idx]))
-
-                  const tooltips = [
-                    "Short interest as % of float. High = bearish positioning (contrarian bullish signal)",
-                    "Margin debt levels. High = leveraged speculation (euphoria risk)",
-                    "Nasdaq vs NYSE volume ratio. High = speculative tech trading (euphoria)",
-                    "Newsletter writer bulls vs bears. High bulls = euphoria (contrarian sell)",
-                    "Individual investor survey. High = retail euphoria (contrarian sell)",
-                    "Money market fund assets. High = cash on sidelines (bullish potential)",
-                    "Put/Call ratio. High = hedging/fear (contrarian bullish signal)",
-                    "Commodity price levels. High = inflation/speculation (euphoria)",
-                    "Gas prices. High = economic stress (bearish signal)",
-                  ]
-
-                  return (
-                    <div key={name} className="flex items-center gap-3">
-                      <div className="w-36 text-xs font-semibold text-gray-700 flex items-center gap-1">
-                        {name}
-                        <div className="relative group/tooltip">
-                          <Info className="h-3 w-3 text-gray-400 cursor-help" />
-                          <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-20 whitespace-normal">
-                            {tooltips[idx]}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex-1 relative h-7 bg-gray-200 rounded-full overflow-hidden">
-                        {/* Center line */}
-                        <div className="absolute left-1/2 top-0 bottom-0 w-px bg-gray-400 z-10" />
-
-                        <div
-                          className="absolute top-0 bottom-0 transition-all duration-500"
-                          style={{
-                            left: score > 0 ? `${50 - score * 50}%` : "50%",
-                            right: score <= 0 ? `${50 - Math.abs(score) * 50}%` : "50%",
-                            background:
-                              score > 0
-                                ? "linear-gradient(to left, #22c55e, #86efac)"
-                                : "linear-gradient(to right, #ef4444, #fca5a5)",
-                          }}
-                        />
-                      </div>
-                      <div className="w-20 text-xs font-bold text-right text-gray-900">
-                        {score >= 0 ? "+" : ""}
-                        {score.toFixed(2)}
-                      </div>
-                    </div>
-                  )
-                })}
-            </div>
 
             {/* Historical context */}
             <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -515,6 +470,77 @@ export function PanicEuphoria() {
               </div>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm border-gray-200">
+        <CardHeader className="bg-gray-50 border-b border-gray-200">
+          <CardTitle className="text-sm font-bold text-gray-900 flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-purple-600" />9 Levkovich Indicators (Citibank Model)
+          </CardTitle>
+          <CardDescription className="text-xs text-gray-600">
+            Live data from FINRA, FRED, Yahoo Finance, and AI estimates • Updated every 60 seconds
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-4 space-y-4">
+          {data && (
+            <>
+              <PanicIndicator
+                label="NYSE Short Interest"
+                value={(3 - data.nyseShortInterest) / 2}
+                rawValue={`${data.nyseShortInterest}%`}
+                tooltip="Short interest as % of float. High short interest indicates bearish positioning, which is a contrarian bullish signal (panic = buying opportunity). Range: 10-30%."
+              />
+              <PanicIndicator
+                label="Margin Debt"
+                value={(data.marginDebt - 700) / 150}
+                rawValue={`$${data.marginDebt}B`}
+                tooltip="Total margin debt levels. High margin indicates leveraged speculation and euphoria risk. Low margin suggests fear. Range: $600-$850B."
+              />
+              <PanicIndicator
+                label="Nasdaq/NYSE Volume Ratio"
+                value={(data.volumeRatio - 1.0) / 0.5}
+                rawValue={`${data.volumeRatio.toFixed(2)}x`}
+                tooltip="Nasdaq vs NYSE volume ratio. High ratio indicates speculative tech trading and euphoria. Low indicates value rotation. Range: 0.8-1.5x."
+              />
+              <PanicIndicator
+                label="Investor Intelligence Survey"
+                value={(data.investorIntelligence - 50) / 20}
+                rawValue={`${data.investorIntelligence}% bulls`}
+                tooltip="Newsletter writer bulls vs bears. High bullishness = euphoria (contrarian sell signal). Low = panic (contrarian buy). Range: 30-70%."
+              />
+              <PanicIndicator
+                label="AAII Bullish Sentiment"
+                value={(data.aaiiBullish - 40) / 25}
+                rawValue={`${data.aaiiBullish}%`}
+                tooltip="Individual investor survey. High bullishness = retail euphoria (contrarian sell signal). Low = panic (buy signal). Range: 25-65%."
+              />
+              <PanicIndicator
+                label="Money Market Funds"
+                value={(6.0 - data.moneyMarketFunds) / 1.0}
+                rawValue={`$${data.moneyMarketFunds}T`}
+                tooltip="Money market fund assets. High cash = investors on sidelines (bullish fuel for rally). Low = fully invested (euphoria risk). Range: $5-7T."
+              />
+              <PanicIndicator
+                label="Put/Call Ratio"
+                value={(1.0 - data.putCallRatio) / 0.3}
+                rawValue={`${data.putCallRatio.toFixed(2)}`}
+                tooltip="Put/call ratio from VIX term structure. High ratio = hedging/fear (contrarian bullish). Low = complacency (bearish). Range: 0.8-1.3."
+              />
+              <PanicIndicator
+                label="Commodity Prices (CRB)"
+                value={(data.commodityPrices - 280) / 40}
+                rawValue={`${data.commodityPrices.toFixed(1)}`}
+                tooltip="Commodity Research Bureau index. High prices = inflation/speculation (euphoria). Low = deflation/recession fears (panic). Range: 250-320."
+              />
+              <PanicIndicator
+                label="Retail Gas Prices"
+                value={(3.25 - data.gasPrices) / 1.0}
+                rawValue={`$${data.gasPrices.toFixed(2)}/gal`}
+                tooltip="National average gas prices. High prices = consumer stress (bearish). Low = economic relief (bullish). Range: $2.50-$4.50/gal."
+              />
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -660,7 +686,8 @@ export function PanicEuphoria() {
                     <div className="relative group/tooltip">
                       <Info className="h-3 w-3 text-gray-400 cursor-help" />
                       <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                        Short interest as % of float. High = bearish positioning (contrarian bullish).
+                        Short interest as % of float. High short interest indicates bearish positioning, which is a
+                        contrarian bullish signal (panic = buying opportunity). Range: 10-30%.
                       </div>
                     </div>
                   </div>
@@ -673,7 +700,8 @@ export function PanicEuphoria() {
                     <div className="relative group/tooltip">
                       <Info className="h-3 w-3 text-gray-400 cursor-help" />
                       <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                        Margin debt change vs 12-month avg. High = leveraged speculation (risk).
+                        Total margin debt levels. High margin indicates leveraged speculation and euphoria risk. Low
+                        margin suggests fear. Range: $600-$850B.
                       </div>
                     </div>
                   </div>
@@ -686,7 +714,8 @@ export function PanicEuphoria() {
                     <div className="relative group/tooltip">
                       <Info className="h-3 w-3 text-gray-400 cursor-help" />
                       <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                        Nasdaq/NYSE volume ratio. High = speculative tech trading (euphoria).
+                        Nasdaq/NYSE volume ratio. High ratio indicates speculative tech trading and euphoria. Low
+                        indicates value rotation. Range: 0.8-1.5x.
                       </div>
                     </div>
                   </div>
@@ -699,7 +728,7 @@ export function PanicEuphoria() {
                     <div className="relative group/tooltip">
                       <Info className="h-3 w-3 text-gray-400 cursor-help" />
                       <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                        Newsletter writer bulls vs bears. High bulls = euphoria (contrarian sell).
+                        Newsletter writer bulls vs bears. High bullishness = euphoria (contrarian sell).
                       </div>
                     </div>
                   </div>
@@ -909,16 +938,14 @@ export function PanicEuphoria() {
                               <span
                                 className={`ml-3 font-bold text-sm ${
                                   index === 0
-                                    ? "text-red-700"
+                                    ? "text-green-700" // Extreme Panic
                                     : index === 1
-                                      ? "text-red-500"
+                                      ? "text-green-600" // Panic
                                       : index === 2
-                                        ? "text-orange-500"
+                                        ? "text-yellow-600" // Neutral/Complacent
                                         : index === 3
-                                          ? "text-orange-500"
-                                          : index === 4
-                                            ? "text-blue-500"
-                                            : "text-purple-600"
+                                          ? "text-red-500" // Euphoria
+                                          : "text-red-700" // Extreme Euphoria
                                 }}
                               >
                                 {item.level}
@@ -936,13 +963,11 @@ export function PanicEuphoria() {
                                     ? "bg-green-100 text-green-800"
                                     : item.signal === "BUY"
                                       ? "bg-green-100 text-green-700"
-                                      : item.signal === "SELECTIVE"
-                                        ? "bg-yellow-100 text-yellow-800"
-                                        : item.signal === "HOLD"
-                                          ? "bg-gray-100 text-gray-700"
-                                          : item.signal === "CAUTION"
-                                            ? "bg-orange-100 text-orange-700"
-                                            : "bg-red-100 text-red-700"
+                                      : item.signal === "HOLD"
+                                        ? "bg-gray-100 text-gray-700"
+                                        : item.signal === "CAUTION/SELL"
+                                          ? "bg-red-100 text-red-700"
+                                          : "bg-red-100 text-red-700"
                                 }`}
                               >
                                 {item.signal}
@@ -953,9 +978,9 @@ export function PanicEuphoria() {
                         </div>
 
                         <div className="grid grid-cols-3 gap-3 mb-3">
-                          <div className="p-3 bg-blue-50 rounded border border-blue-200">
-                            <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Stocks</div>
-                            <div className="text-lg font-bold text-blue-900">{item.guidance.allocation.stocks}</div>
+                          <div className="p-3 bg-green-50 rounded border border-green-300">
+                            <div className="text-xs font-semibold text-green-900 uppercase mb-1">Stocks</div>
+                            <div className="text-lg font-bold text-green-900">{item.guidance.allocation.stocks}</div>
                           </div>
                           <div className="p-3 bg-purple-50 rounded border border-purple-200">
                             <div className="text-xs font-semibold text-purple-900 uppercase mb-1">Options</div>
