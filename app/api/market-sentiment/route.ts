@@ -501,19 +501,43 @@ async function scrapeCNNFearGreed() {
     const html = await response.text()
     console.log(`[v0] Received HTML, length: ${html.length} characters`)
 
-    // Extract main score from the page
     let mainScore = 50
     let mainSentiment = "neutral"
 
-    // Try to find the main score in the HTML
-    const scoreMatch =
-      html.match(/fear[_-]and[_-]greed[^>]*>(\d+)</i) ||
-      html.match(/score[^>]*>(\d+)</i) ||
-      html.match(/"score"\s*:\s*(\d+)/i)
+    // Try multiple patterns to find the main Fear & Greed score
+    const scorePatterns = [
+      // Look for the number displayed prominently on the gauge (usually in a span or div with specific classes)
+      /market-fng-gauge__dial-number[^>]*>(\d+)/i,
+      /fng-score[^>]*>(\d+)/i,
+      /fear-greed-score[^>]*>(\d+)/i,
+      // Look for data attributes
+      /data-score="(\d+)"/i,
+      /data-value="(\d+)"/i,
+      // Look for JSON data with score
+      /"score"\s*:\s*(\d+\.?\d*)/i,
+      /"rating_score"\s*:\s*(\d+\.?\d*)/i,
+      // Generic patterns as fallback
+      /score[^>]{0,50}>(\d+)</i,
+      />(\d+)<.*?(fear|greed)/i,
+    ]
 
-    if (scoreMatch) {
-      mainScore = Number.parseInt(scoreMatch[1])
-      console.log(`[v0] Extracted main CNN score: ${mainScore}`)
+    for (const pattern of scorePatterns) {
+      const match = html.match(pattern)
+      if (match && match[1]) {
+        const parsedScore = Number.parseFloat(match[1])
+        // Validate the score is in expected range (0-100)
+        if (parsedScore >= 0 && parsedScore <= 100) {
+          mainScore = Math.round(parsedScore)
+          console.log(`[v0] ✓ Extracted main CNN score: ${mainScore} using pattern: ${pattern.source.substring(0, 50)}`)
+          break
+        }
+      }
+    }
+
+    if (mainScore === 50) {
+      console.log("[v0] ⚠️ Could not extract score from HTML, defaulting to 50")
+      // Save a portion of HTML for debugging
+      console.log("[v0] HTML sample (first 1000 chars):", html.substring(0, 1000))
     }
 
     // Determine main sentiment from score
