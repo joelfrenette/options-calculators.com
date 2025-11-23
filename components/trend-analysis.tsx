@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { Button } from "@/components/ui/button"
-import { RefreshCw, Target, Shield, AlertTriangle, Activity, TrendingUp } from "lucide-react"
+import { RefreshCw, Target, Shield, AlertTriangle, Activity, TrendingUp, Info } from "lucide-react"
 import {
   Line,
   XAxis,
@@ -42,6 +42,13 @@ interface TrendData {
   trend: string
   trendConfidence: number
   trendStrength: string
+  trendSignals?: { bullish: number; bearish: number; total: number }
+  indicatorContributions?: {
+    rsi: { value: number; contribution: number; weight: number }
+    macd: { value: number; contribution: number; weight: number }
+    priceChange: { value: number; contribution: number; weight: number }
+    volumeTrend: { value: number; contribution: number; weight: number }
+  }
   priceTarget1Week: number
   priceTarget1Month: number
   stopLoss: number
@@ -204,7 +211,7 @@ export function TrendAnalysis() {
 
   return (
     <div className="space-y-4">
-      {/* Index Trend Historical Scale visual matching Fear & Greed / Panic Euphoria design */}
+      {/* Index Trend Historical Scale visual - CORRECTED SCALE */}
       <Card className="shadow-sm border-gray-200">
         <CardHeader className="bg-gray-50 border-b border-gray-200">
           <div className="flex items-center justify-between">
@@ -214,7 +221,7 @@ export function TrendAnalysis() {
                 Index Trend Historical Scale
               </CardTitle>
               <CardDescription>
-                Visual representation of trend direction from extreme bullish to extreme bearish
+                Assess market and sector trends with technical indicators to make informed trading decisions
               </CardDescription>
             </div>
             <RefreshButton
@@ -226,22 +233,20 @@ export function TrendAnalysis() {
         </CardHeader>
         <CardContent className="pt-6">
           <div className="relative">
-            {/* Horizontal gradient bar with labeled zones */}
             <div className="relative h-20 rounded-lg overflow-hidden shadow-sm border border-gray-300">
-              <div className="absolute inset-0 h-24 bg-gradient-to-r from-green-600 via-green-400 via-20% via-yellow-400 via-50% via-red-400 via-80% to-red-600 rounded-lg shadow-inner" />
+              <div className="absolute inset-0 h-24 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded-lg shadow-inner" />
 
-              {/* Zone labels */}
               <div className="absolute inset-0 flex items-center justify-between px-2 text-xs font-bold">
-                {/* Extreme Bullish */}
+                {/* Extreme Bullish - LEFT/GREEN */}
                 <div className="text-center text-white drop-shadow-lg">
                   <div className="text-base">EXTREME</div>
                   <div>BULLISH</div>
-                  <div className="text-[10px] mt-1">0-20</div>
+                  <div className="text-[10px] mt-1">81-100</div>
                 </div>
                 {/* Bullish */}
                 <div className="text-center text-white drop-shadow-lg">
                   <div>BULLISH</div>
-                  <div className="text-[10px] mt-1">21-40</div>
+                  <div className="text-[10px] mt-1">61-80</div>
                 </div>
                 {/* Neutral */}
                 <div className="text-center text-gray-800 drop-shadow">
@@ -251,13 +256,13 @@ export function TrendAnalysis() {
                 {/* Bearish */}
                 <div className="text-center text-white drop-shadow-lg">
                   <div>BEARISH</div>
-                  <div className="text-[10px] mt-1">61-80</div>
+                  <div className="text-[10px] mt-1">21-40</div>
                 </div>
-                {/* Extreme Bearish */}
+                {/* Extreme Bearish - RIGHT/RED */}
                 <div className="text-center text-white drop-shadow-lg">
                   <div className="text-base">EXTREME</div>
                   <div>BEARISH</div>
-                  <div className="text-[10px] mt-1">81-100</div>
+                  <div className="text-[10px] mt-1">0-20</div>
                 </div>
               </div>
             </div>
@@ -265,7 +270,7 @@ export function TrendAnalysis() {
             <div
               className="absolute top-0 bottom-0 w-2 bg-black shadow-lg transition-all duration-500"
               style={{
-                left: `calc(${Math.max(0, Math.min(100, selectedItem.momentumStrength ?? 50))}% - 4px)`,
+                left: `calc(${Math.max(0, Math.min(100, 100 - (selectedItem.momentumStrength ?? 50)))}% - 4px)`,
               }}
             >
               <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap">
@@ -273,15 +278,15 @@ export function TrendAnalysis() {
                   <div className="text-xs font-semibold">TODAY</div>
                   <div className="text-2xl font-bold">{Math.round(selectedItem.momentumStrength ?? 50)}</div>
                   <div className="text-xs text-center">
-                    {selectedItem.momentumStrength >= 80
-                      ? "Extreme Bearish"
-                      : selectedItem.momentumStrength >= 60
-                        ? "Bearish"
-                        : selectedItem.momentumStrength >= 40
+                    {selectedItem.momentumStrength >= 81
+                      ? "Extreme Bullish"
+                      : selectedItem.momentumStrength >= 61
+                        ? "Bullish"
+                        : selectedItem.momentumStrength >= 41
                           ? "Neutral"
-                          : selectedItem.momentumStrength >= 20
-                            ? "Bullish"
-                            : "Extreme Bullish"}
+                          : selectedItem.momentumStrength >= 21
+                            ? "Bearish"
+                            : "Extreme Bearish"}
                   </div>
                 </div>
                 <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-black mx-auto" />
@@ -309,6 +314,202 @@ export function TrendAnalysis() {
               <p className="text-xs text-gray-600 mt-1">Directional power</p>
             </div>
           </div>
+
+          {selectedItem.indicatorContributions && (
+            <div className="mt-6 border-t pt-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Info className="h-4 w-4 text-blue-600" />
+                <h4 className="text-sm font-bold text-gray-900">Momentum Score Breakdown</h4>
+              </div>
+              <p className="text-xs text-gray-600 mb-4">
+                Starting from neutral baseline (50), each indicator adds or subtracts points based on bullish/bearish
+                signals
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* RSI Contribution */}
+                <div className="bg-white border border-gray-200 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-gray-700">RSI</span>
+                    <span className="text-xs text-gray-500">
+                      Weight: ±{selectedItem.indicatorContributions.rsi.weight} pts
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-mono">
+                      {selectedItem.indicatorContributions.rsi.value.toFixed(1)}
+                    </span>
+                    <span
+                      className={`text-sm font-bold ${selectedItem.indicatorContributions.rsi.contribution >= 0 ? "text-green-600" : "text-red-600"}`}
+                    >
+                      {selectedItem.indicatorContributions.rsi.contribution >= 0 ? "+" : ""}
+                      {selectedItem.indicatorContributions.rsi.contribution.toFixed(1)} pts
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {selectedItem.indicatorContributions.rsi.value > 55
+                      ? "Bullish momentum"
+                      : selectedItem.indicatorContributions.rsi.value < 45
+                        ? "Bearish momentum"
+                        : "Neutral"}
+                  </p>
+                </div>
+
+                {/* MACD Contribution */}
+                <div className="bg-white border border-gray-200 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-gray-700">MACD</span>
+                    <span className="text-xs text-gray-500">
+                      Weight: ±{selectedItem.indicatorContributions.macd.weight} pts
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-mono">
+                      {selectedItem.indicatorContributions.macd.value.toFixed(2)}
+                    </span>
+                    <span
+                      className={`text-sm font-bold ${selectedItem.indicatorContributions.macd.contribution >= 0 ? "text-green-600" : "text-red-600"}`}
+                    >
+                      {selectedItem.indicatorContributions.macd.contribution >= 0 ? "+" : ""}
+                      {selectedItem.indicatorContributions.macd.contribution.toFixed(1)} pts
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {selectedItem.indicatorContributions.macd.value > 0 ? "Bullish trend" : "Bearish trend"}
+                  </p>
+                </div>
+
+                {/* Price Change Contribution */}
+                <div className="bg-white border border-gray-200 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-gray-700">20-Day Price Change</span>
+                    <span className="text-xs text-gray-500">
+                      Weight: ±{selectedItem.indicatorContributions.priceChange.weight} pts
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-mono">
+                      {selectedItem.indicatorContributions.priceChange.value.toFixed(2)}%
+                    </span>
+                    <span
+                      className={`text-sm font-bold ${selectedItem.indicatorContributions.priceChange.contribution >= 0 ? "text-green-600" : "text-red-600"}`}
+                    >
+                      {selectedItem.indicatorContributions.priceChange.contribution >= 0 ? "+" : ""}
+                      {selectedItem.indicatorContributions.priceChange.contribution.toFixed(1)} pts
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {selectedItem.indicatorContributions.priceChange.value > 0
+                      ? "Positive momentum"
+                      : "Negative momentum"}
+                  </p>
+                </div>
+
+                {/* Volume Trend Contribution */}
+                <div className="bg-white border border-gray-200 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-gray-700">Volume Trend</span>
+                    <span className="text-xs text-gray-500">
+                      Weight: ±{selectedItem.indicatorContributions.volumeTrend.weight} pts
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-mono">
+                      {selectedItem.indicatorContributions.volumeTrend.value.toFixed(1)}%
+                    </span>
+                    <span
+                      className={`text-sm font-bold ${selectedItem.indicatorContributions.volumeTrend.contribution >= 0 ? "text-green-600" : "text-red-600"}`}
+                    >
+                      {selectedItem.indicatorContributions.volumeTrend.contribution >= 0 ? "+" : ""}
+                      {selectedItem.indicatorContributions.volumeTrend.contribution.toFixed(1)} pts
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {selectedItem.indicatorContributions.volumeTrend.value > 0 ? "Rising volume" : "Falling volume"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Visual Summary */}
+              <div className="mt-4 bg-gray-50 rounded-lg p-3 border border-gray-200">
+                <p className="text-xs font-semibold text-gray-700 mb-2">Calculation Summary</p>
+                <div className="flex items-center gap-2 text-xs font-mono">
+                  <span>Baseline: 50</span>
+                  <span
+                    className={
+                      selectedItem.indicatorContributions.rsi.contribution >= 0 ? "text-green-600" : "text-red-600"
+                    }
+                  >
+                    {selectedItem.indicatorContributions.rsi.contribution >= 0 ? "+" : ""}
+                    {selectedItem.indicatorContributions.rsi.contribution.toFixed(1)}
+                  </span>
+                  <span
+                    className={
+                      selectedItem.indicatorContributions.macd.contribution >= 0 ? "text-green-600" : "text-red-600"
+                    }
+                  >
+                    {selectedItem.indicatorContributions.macd.contribution >= 0 ? "+" : ""}
+                    {selectedItem.indicatorContributions.macd.contribution.toFixed(1)}
+                  </span>
+                  <span
+                    className={
+                      selectedItem.indicatorContributions.priceChange.contribution >= 0
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }
+                  >
+                    {selectedItem.indicatorContributions.priceChange.contribution >= 0 ? "+" : ""}
+                    {selectedItem.indicatorContributions.priceChange.contribution.toFixed(1)}
+                  </span>
+                  <span
+                    className={
+                      selectedItem.indicatorContributions.volumeTrend.contribution >= 0
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }
+                  >
+                    {selectedItem.indicatorContributions.volumeTrend.contribution >= 0 ? "+" : ""}
+                    {selectedItem.indicatorContributions.volumeTrend.contribution.toFixed(1)}
+                  </span>
+                  <span className="font-bold">= {selectedItem.momentumStrength.toFixed(1)}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {selectedItem.trendSignals && (
+            <div className="mt-6 border-t pt-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Activity className="h-4 w-4 text-purple-600" />
+                <h4 className="text-sm font-bold text-gray-900">Trend Confidence Signals</h4>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <p className="text-xs font-semibold text-green-700 mb-2">Bullish Signals</p>
+                  <p className="text-3xl font-bold text-green-600">
+                    {selectedItem.trendSignals.bullish}/{selectedItem.trendSignals.total}
+                  </p>
+                  <p className="text-xs text-green-600 mt-1">
+                    {((selectedItem.trendSignals.bullish / selectedItem.trendSignals.total) * 100).toFixed(0)}%
+                    confidence
+                  </p>
+                </div>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-xs font-semibold text-red-700 mb-2">Bearish Signals</p>
+                  <p className="text-3xl font-bold text-red-600">
+                    {selectedItem.trendSignals.bearish}/{selectedItem.trendSignals.total}
+                  </p>
+                  <p className="text-xs text-red-600 mt-1">
+                    {((selectedItem.trendSignals.bearish / selectedItem.trendSignals.total) * 100).toFixed(0)}%
+                    confidence
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-gray-600 mt-3">
+                Signals analyzed: MA alignment (3 pts), RSI (1 pt), MACD (2 pts), Momentum (2 pts), Volume (1 pt)
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

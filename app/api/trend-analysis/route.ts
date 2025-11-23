@@ -240,23 +240,28 @@ function calculateMomentumStrength(prices: number[], volumes: number[], rsi: num
   const olderVolume = volumes.slice(-30, -10).reduce((sum, v) => sum + v, 0) / 20
   const volumeTrend = ((recentVolume - olderVolume) / olderVolume) * 100
 
-  // Combine indicators into strength score (0-100)
+  // Combine indicators into strength score (0-100, where higher = more bullish)
   let strength = 50 // neutral baseline
 
   // RSI contribution (±20 points)
+  // RSI > 50 is bullish, adds to score; RSI < 50 is bearish, subtracts from score
   if (rsi > 50) strength += ((rsi - 50) / 50) * 20
   else if (rsi < 50) strength -= ((50 - rsi) / 50) * 20
 
   // MACD contribution (±15 points)
+  // Positive MACD is bullish; negative is bearish
   if (macd > 0) strength += Math.min(macd * 3, 15)
   else if (macd < 0) strength -= Math.min(Math.abs(macd) * 3, 15)
 
   // Price momentum contribution (±10 points)
+  // Positive price change is bullish; negative is bearish
   strength += Math.max(-10, Math.min(10, priceChange))
 
   // Volume trend contribution (±5 points)
+  // Rising volume is bullish; falling volume is bearish
   strength += Math.max(-5, Math.min(5, volumeTrend / 10))
 
+  // Return score between 0-100 (higher = more bullish)
   return Math.max(0, Math.min(100, strength))
 }
 
@@ -269,32 +274,37 @@ function determineTrend(
   macd: { macd: number; signal: number; histogram: number },
   momentumStrength: number,
   volumeRatio: number,
-): { trend: string; confidence: number; strength: string } {
+): {
+  trend: string
+  confidence: number
+  strength: string
+  signals: { bullish: number; bearish: number; total: number }
+} {
   let bullishSignals = 0
   let bearishSignals = 0
   let totalSignals = 0
 
-  // MA alignment
+  // MA alignment (3 points)
   if (currentPrice > ma20 && ma20 > ma50 && ma50 > ma200) bullishSignals += 3
   else if (currentPrice < ma20 && ma20 < ma50 && ma50 < ma200) bearishSignals += 3
   totalSignals += 3
 
-  // RSI
+  // RSI (1 point)
   if (rsi > 55) bullishSignals++
   else if (rsi < 45) bearishSignals++
   totalSignals++
 
-  // MACD
+  // MACD (2 points)
   if (macd.macd > macd.signal && macd.histogram > 0) bullishSignals += 2
   else if (macd.macd < macd.signal && macd.histogram < 0) bearishSignals += 2
   totalSignals += 2
 
-  // Momentum strength
+  // Momentum strength (2 points) - Fixed: now using corrected scale where higher = more bullish
   if (momentumStrength > 60) bullishSignals += 2
   else if (momentumStrength < 40) bearishSignals += 2
   totalSignals += 2
 
-  // Volume
+  // Volume (1 point)
   if (volumeRatio > 1.2) bullishSignals++
   else if (volumeRatio < 0.8) bearishSignals++
   totalSignals++
@@ -306,21 +316,27 @@ function determineTrend(
   let confidence = 50
   let strength = "Weak"
 
-  if (bullishConfidence > 60) {
+  if (bullishConfidence > 55) {
+    // Lowered from 60 for more accurate classification
     trend = "Bullish"
     confidence = bullishConfidence
-    strength = bullishConfidence > 80 ? "Strong" : bullishConfidence > 70 ? "Moderate" : "Weak"
-  } else if (bearishConfidence > 60) {
+    strength = bullishConfidence > 77 ? "Strong" : bullishConfidence > 66 ? "Moderate" : "Weak"
+  } else if (bearishConfidence > 55) {
     trend = "Bearish"
     confidence = bearishConfidence
-    strength = bearishConfidence > 80 ? "Strong" : bearishConfidence > 70 ? "Moderate" : "Weak"
+    strength = bearishConfidence > 77 ? "Strong" : bearishConfidence > 66 ? "Moderate" : "Weak"
   } else {
     trend = "Neutral"
     confidence = Math.max(bullishConfidence, bearishConfidence)
     strength = "Weak"
   }
 
-  return { trend, confidence, strength }
+  return {
+    trend,
+    confidence,
+    strength,
+    signals: { bullish: bullishSignals, bearish: bearishSignals, total: totalSignals },
+  }
 }
 
 function calculatePriceTargets(
@@ -442,6 +458,34 @@ export async function GET() {
         momentumStrength,
       )
 
+      const priceChange = ((prices[prices.length - 1] - prices[prices.length - 20]) / prices[prices.length - 20]) * 100
+      const recentVolume = volumes.slice(-10).reduce((sum, v) => sum + v, 0) / 10
+      const olderVolume = volumes.slice(-30, -10).reduce((sum, v) => sum + v, 0) / 20
+      const volumeTrend = ((recentVolume - olderVolume) / olderVolume) * 100
+
+      const indicatorContributions = {
+        rsi: {
+          value: rsi,
+          contribution: rsi > 50 ? ((rsi - 50) / 50) * 20 : -((50 - rsi) / 50) * 20,
+          weight: 20,
+        },
+        macd: {
+          value: macd.macd,
+          contribution: macd.macd > 0 ? Math.min(macd.macd * 3, 15) : -Math.min(Math.abs(macd.macd) * 3, 15),
+          weight: 15,
+        },
+        priceChange: {
+          value: priceChange,
+          contribution: Math.max(-10, Math.min(10, priceChange)),
+          weight: 10,
+        },
+        volumeTrend: {
+          value: volumeTrend,
+          contribution: Math.max(-5, Math.min(5, volumeTrend / 10)),
+          weight: 5,
+        },
+      }
+
       const historicalWithMA = historical.slice(-60).map((h: any, i: number) => {
         const pricesUpToIndex = prices.slice(0, historical.length - 60 + i + 1)
         const bollingerBands = calculateBollingerBands(pricesUpToIndex, 20, 2)
@@ -513,6 +557,8 @@ export async function GET() {
         trend: trendAnalysis.trend,
         trendConfidence: trendAnalysis.confidence,
         trendStrength: trendAnalysis.strength,
+        trendSignals: trendAnalysis.signals,
+        indicatorContributions,
         priceTarget1Week: priceTargets.target1Week,
         priceTarget1Month: priceTargets.target1Month,
         stopLoss: priceTargets.stopLoss,
