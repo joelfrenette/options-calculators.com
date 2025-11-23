@@ -35,7 +35,7 @@ Be realistic and data-driven. If there's limited discussion, reflect that with m
         Authorization: `Bearer ${xaiApiKey}`,
       },
       body: JSON.stringify({
-        model: "grok-beta",
+        model: "grok-3",
         messages: [
           {
             role: "system",
