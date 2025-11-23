@@ -384,62 +384,36 @@ const cnnComponentTooltips: Record<string, { title: string; description: string;
   }
 
 const componentTooltips = {
-  marketMomentum: {
-    title: "Market Momentum (S&P 500 vs 125-Day MA)",
-    description:
-      "Compares the current S&P 500 price level to its average over the past 125 trading days (about 6 months). When the market trades above this average, it shows positive momentum and bullish sentiment. Below the average signals investors are growing cautious.",
-    impact:
-      "Above the moving average = Greed (market is in an uptrend). Below = Fear (market losing momentum). This is one of the most reliable trend indicators.",
-    dataSource: "Yahoo Finance (SPY/^GSPC) - Real-time",
-  },
-  stockPriceStrength: {
-    title: "Stock Price Strength (NYSE 52-Week Highs vs Lows)",
-    description:
-      "Tracks how many stocks on the New York Stock Exchange are hitting new 52-week highs versus new 52-week lows. This shows whether market gains are widespread or concentrated in just a few stocks.",
-    impact:
-      "Many more highs than lows = Greed (broad market strength). More lows = Fear (market weakness spreading). Healthy markets have strong breadth.",
-    dataSource: "Approximated from SPY momentum patterns",
-  },
-  stockBreadth: {
-    title: "Stock Price Breadth (McClellan Volume Summation Index)",
-    description:
-      "Measures the cumulative volume of advancing stocks minus declining stocks on the NYSE. This indicator shows whether market movements are backed by strong trading volume or just a few large trades.",
-    impact:
-      "Positive and rising = Greed (strong buying volume). Negative or falling = Fear (selling pressure building). Volume confirms price trends.",
-    dataSource: "Calculated from SPY daily volume patterns",
-  },
-  putCall: {
-    title: "Put and Call Options (5-Day Average Ratio)",
-    description:
-      "Compares the volume of put options (bets that stocks will fall) to call options (bets that stocks will rise) over the past 5 trading days. Professional traders use options to hedge and speculate.",
-    impact:
-      "Ratio above 1.0 = Fear (more puts being bought as hedges). Below 0.8 = Greed (calls dominating, bullish bets). This shows sophisticated investor sentiment.",
-    dataSource: "Derived from VIX term structure - Yahoo Finance",
-  },
-  vix: {
-    title: "Market Volatility (VIX vs 50-Day MA)",
-    description:
-      "The VIX (Volatility Index) measures expected price swings in the S&P 500 over the next 30 days by analyzing options prices. Often called the 'fear gauge,' it spikes when investors expect turbulence.",
-    impact:
-      "VIX below its 50-day average = Greed (calm markets, low hedging). Above average = Fear (investors paying up for protection). VIX above 30 = extreme fear.",
-    dataSource: "Yahoo Finance (^VIX) - Real-time",
-  },
-  safeHaven: {
-    title: "Safe Haven Demand (20-Day Stock vs Bond Returns)",
-    description:
-      "Compares the performance of stocks (SPY) to government bonds (TLT) over the past 20 trading days. When scared, investors flee to the safety of bonds even though stocks offer better long-term returns.",
-    impact:
-      "Stocks outperforming bonds = Greed (risk-on behavior). Bonds winning = Fear (flight to safety underway). Classic risk-on/risk-off indicator.",
-    dataSource: "Yahoo Finance (SPY vs TLT) - Real-time",
-  },
-  junkBond: {
-    title: "Junk Bond Demand (High-Yield vs Investment Grade Spread)",
-    description:
-      "Measures the difference in yields between risky 'junk' bonds (HYG) and safe Treasury bonds (TLT). When investors are greedy, they chase higher yields and buy junk bonds, driving yields down and narrowing the spread.",
-    impact:
-      "Narrow spread = Greed (investors taking risks for yield). Wide spread = Fear (demanding big premiums for risk). Credit markets often lead stock markets.",
-    dataSource: "Yahoo Finance (HYG vs TLT) - Real-time",
-  },
+  momentum: cnnComponentTooltips.marketmomentum,
+  strength: cnnComponentTooltips.stockpricestrength,
+  stockBreadth: cnnComponentTooltips.stockpricebreadth,
+  putCall: cnnComponentTooltips.putandcalloptions,
+  vix: cnnComponentTooltips.marketvolatility,
+  safeHaven: cnnComponentTooltips.safehavendemand,
+  junkBond: cnnComponentTooltips.junkbonddemand,
+}
+
+const getIndicatorSentiment = (score: number): string => {
+  if (score < 25) return "EXTREME FEAR"
+  if (score < 45) return "FEAR"
+  if (score >= 55 && score < 75) return "GREED"
+  if (score >= 75) return "EXTREME GREED"
+  return "NEUTRAL"
+}
+
+const getSentimentColor = (sentiment: string): string => {
+  switch (sentiment) {
+    case "EXTREME FEAR":
+      return "bg-red-500 text-white"
+    case "FEAR":
+      return "bg-orange-500 text-white"
+    case "GREED":
+      return "bg-green-500 text-white"
+    case "EXTREME GREED":
+      return "bg-emerald-600 text-white"
+    default:
+      return "bg-yellow-500 text-gray-900"
+  }
 }
 
 export function MarketSentiment() {
@@ -449,10 +423,24 @@ export function MarketSentiment() {
   const [refreshing, setRefreshing] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
+  // Define cache keys and version
   const CACHE_KEY = "market_sentiment_data"
   const CACHE_TIMESTAMP_KEY = "market_sentiment_timestamp"
   const CACHE_VERSION_KEY = "fearGreedCacheVersion"
-  const CACHE_VERSION = "8.0"
+  const CACHE_VERSION = "11.0" // Updated cache version to force refresh
+
+  // Placeholder declarations for variables used in useEffect and fetchData
+  // const [marketData, setMarketData] = useState<MarketData | null>(null)
+  // const [sentimentData, setSentimentData] = useState<SentimentData[]>([])
+  // const [loading, setLoading] = useState<boolean>(true)
+  // const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  // const [refreshing, setRefreshing] = useState<boolean>(false)
+
+  // Define cache keys and version
+  // const CACHE_KEY = "marketSentimentData"
+  // const CACHE_TIMESTAMP_KEY = "marketSentimentTimestamp"
+  // const CACHE_VERSION_KEY = "marketSentimentCacheVersion"
+  // const CACHE_VERSION = "v1" // Increment this when the cache structure changes
 
   // Define components based on CNN's Fear & Greed Index indicators
   const components = [
@@ -499,123 +487,60 @@ export function MarketSentiment() {
 
   const cnnIndicatorCards = [
     {
-      title: "MARKET MOMENTUM",
-      subtitle: "S&P 500 and its 125-day moving average",
-      score: marketData?.cnnComponents?.[0]?.score ?? 50,
-      badge:
-        (marketData?.cnnComponents?.[0]?.score ?? 50) < 25
-          ? "EXTREME FEAR"
-          : (marketData?.cnnComponents?.[0]?.score ?? 50) < 45
-            ? "FEAR"
-            : (marketData?.cnnComponents?.[0]?.score ?? 50) < 55
-              ? "NEUTRAL"
-              : (marketData?.cnnComponents?.[0]?.score ?? 50) < 75
-                ? "GREED"
-                : "EXTREME GREED",
-      explanation:
-        "It's useful to look at stock market levels compared to where they've been over the past few months. When the S&P 500 is above its moving or rolling average of the prior 125 trading days, that's a sign of positive momentum. But if the index is below this average, it shows investors are getting skittish. The Fear & Greed Index uses slowing momentum as a signal for Fear and a growing momentum for Greed.",
+      name: "MARKET MOMENTUM",
+      description: "S&P 500 vs 125-day moving average",
+      score: components[0].value,
+      sentiment: getIndicatorSentiment(components[0].value),
+      icon: <ActivityIcon />,
+      tooltipKey: "momentum",
     },
     {
-      title: "STOCK PRICE STRENGTH",
-      subtitle: "Net new 52-week highs and lows on the NYSE",
-      score: marketData?.cnnComponents?.[1]?.score ?? 50,
-      badge:
-        (marketData?.cnnComponents?.[1]?.score ?? 50) < 25
-          ? "EXTREME FEAR"
-          : (marketData?.cnnComponents?.[1]?.score ?? 50) < 45
-            ? "FEAR"
-            : (marketData?.cnnComponents?.[1]?.score ?? 50) < 55
-              ? "NEUTRAL"
-              : (marketData?.cnnComponents?.[1]?.score ?? 50) < 75
-                ? "GREED"
-                : "EXTREME GREED",
-      explanation:
-        "A few big stocks can skew returns for the market. It's important to also know how many stocks are doing well versus those that aren't. Strong breadth is a bullish sign, as it indicates that gains are widespread on the NYSE at 52-week highs compared to those at 52-week lows. When there are way more highs than lows, that's a bullish sign and signals overall Greed.",
+      name: "STOCK PRICE STRENGTH",
+      description: "Next over 52-week highs and lows on the NYSE",
+      score: components[1].value,
+      sentiment: getIndicatorSentiment(components[1].value),
+      icon: <TrendingUpIcon />,
+      tooltipKey: "strength",
     },
     {
-      title: "STOCK PRICE BREADTH",
-      subtitle: "McClellan Volume Summation Index",
-      score: marketData?.cnnComponents?.[2]?.score ?? 50,
-      badge:
-        (marketData?.cnnComponents?.[2]?.score ?? 50) < 25
-          ? "EXTREME FEAR"
-          : (marketData?.cnnComponents?.[2]?.score ?? 50) < 45
-            ? "FEAR"
-            : (marketData?.cnnComponents?.[2]?.score ?? 50) < 55
-              ? "NEUTRAL"
-              : (marketData?.cnnComponents?.[2]?.score ?? 50) < 75
-                ? "GREED"
-                : "EXTREME GREED",
-      explanation:
-        "The market is made up of thousands of stocks. And it's important to look at the amount, or volume, of shares traded at rising versus falling prices to get a sense of demand for stocks. The volume going into rising stocks compared to the number of shares that are falling. A low (or even negative) number is a bearish sign for stocks and a signal for Fear, while it can take a high volume of trading in a signal for Fear.",
+      name: "STOCK PRICE BREADTH",
+      description: "McClellan Volume Summation Index",
+      score: components[2].value,
+      sentiment: getIndicatorSentiment(components[2].value),
+      icon: <BarChartIcon />,
+      tooltipKey: "stockBreadth",
     },
     {
-      title: "PUT AND CALL OPTIONS",
-      subtitle: "5-day average put/call ratio",
-      score: marketData?.cnnComponents?.[3]?.score ?? 50,
-      badge:
-        (marketData?.cnnComponents?.[3]?.score ?? 50) < 25
-          ? "EXTREME FEAR"
-          : (marketData?.cnnComponents?.[3]?.score ?? 50) < 45
-            ? "FEAR"
-            : (marketData?.cnnComponents?.[3]?.score ?? 50) < 55
-              ? "NEUTRAL"
-              : (marketData?.cnnComponents?.[3]?.score ?? 50) < 75
-                ? "GREED"
-                : "EXTREME GREED",
-      explanation:
-        "Options are contracts that give investors the right to buy or sell a stock at a set price. Options giving financial securities at an agreed-upon price until the option contract date, while calls are the option to buy. When the ratio of puts to calls is high, that means a sign that investors are positioning themselves to hedge for a downturn and is above 1 is considered bearish. The Fear & Greed Index uses a bearish options ratio as a signal for Fear.",
+      name: "PUT AND CALL OPTIONS",
+      description: "5-day average put/call ratio",
+      score: components[3].value,
+      sentiment: getIndicatorSentiment(components[3].value),
+      icon: <TargetIcon />,
+      tooltipKey: "putCall",
     },
     {
-      title: "MARKET VOLATILITY",
-      subtitle: "VIX and its 50-day moving average",
-      score: marketData?.cnnComponents?.[4]?.score ?? 50,
-      badge:
-        (marketData?.cnnComponents?.[4]?.score ?? 50) < 25
-          ? "EXTREME FEAR"
-          : (marketData?.cnnComponents?.[4]?.score ?? 50) < 45
-            ? "FEAR"
-            : (marketData?.cnnComponents?.[4]?.score ?? 50) < 55
-              ? "NEUTRAL"
-              : (marketData?.cnnComponents?.[4]?.score ?? 50) < 75
-                ? "GREED"
-                : "EXTREME GREED",
-      explanation:
-        "Too much wild swings can be a sign of investor sentiment in the CBOE Volatility Index, or VIX. The VIX measures expected price fluctuations or volatility in the S&P 500 index options over the next 30 days. When stocks go way up one day then tank the next, it's a sign that investors are on edge, when stocks plunge, But the key is to look at VIX versus its 50-day moving average. If the VIX is above its average, that's a sign of investor Fear; if it's under the average, that's Greed.",
+      name: "MARKET VOLATILITY",
+      description: "VIX vs 50-day moving average",
+      score: components[4].value,
+      sentiment: getIndicatorSentiment(components[4].value),
+      icon: <ActivityIcon />,
+      tooltipKey: "vix",
     },
     {
-      title: "SAFE HAVEN DEMAND",
-      subtitle: "Difference in 20-day stock and bond returns",
-      score: marketData?.cnnComponents?.[5]?.score ?? 50,
-      badge:
-        (marketData?.cnnComponents?.[5]?.score ?? 50) < 25
-          ? "EXTREME FEAR"
-          : (marketData?.cnnComponents?.[5]?.score ?? 50) < 45
-            ? "FEAR"
-            : (marketData?.cnnComponents?.[5]?.score ?? 50) < 55
-              ? "NEUTRAL"
-              : (marketData?.cnnComponents?.[5]?.score ?? 50) < 75
-                ? "GREED"
-                : "EXTREME GREED",
-      explanation:
-        "Stocks are riskier than bonds. But the reward for investing in stocks over the long haul is greater. Still, bonds can have their day in the sun. When investors pile into safe bonds versus riskier stocks, it shows investors are getting more risk averse. The Fear & Greed Index uses increasing safe haven demand as a signal for Fear.",
+      name: "SAFE HAVEN DEMAND",
+      description: "Difference in 20-day stock and bond returns",
+      score: components[5].value,
+      sentiment: getIndicatorSentiment(components[5].value),
+      icon: <ShieldIcon />,
+      tooltipKey: "safeHaven",
     },
     {
-      title: "JUNK BOND DEMAND",
-      subtitle: "Yield spread: junk bonds vs. investment-grade",
-      score: marketData?.cnnComponents?.[6]?.score ?? 50,
-      badge:
-        (marketData?.cnnComponents?.[6]?.score ?? 50) < 25
-          ? "EXTREME FEAR"
-          : (marketData?.cnnComponents?.[6]?.score ?? 50) < 45
-            ? "FEAR"
-            : (marketData?.cnnComponents?.[6]?.score ?? 50) < 55
-              ? "NEUTRAL"
-              : (marketData?.cnnComponents?.[6]?.score ?? 50) < 75
-                ? "GREED"
-                : "EXTREME GREED",
-      explanation:
-        "Junk bonds carry a higher risk of default compared to other bonds. Bonds yields - or returns - investors demand for taking on more risk. If investors crave junk bonds, the yields drop as more buyers compete for the securities. When prices go up, if investors crave junk bonds, the yields rise when bonds are risky. The difference (or spread) between yields for junk bonds and safer bonds will see the return gap widen, investors are taking on more risk. A wider spread shows more investors are taking on risk, which is a signal for Fear.",
+      name: "JUNK BOND DEMAND",
+      description: "Yield spread: Investment grade bonds vs junk bonds",
+      score: components[6].value,
+      sentiment: getIndicatorSentiment(components[6].value),
+      icon: <DollarSignIcon />,
+      tooltipKey: "junkBond",
     },
   ]
 
@@ -902,12 +827,12 @@ export function MarketSentiment() {
     return "bg-red-50 border-red-200"
   }
 
-  const getSentimentColor = (score: number) => {
-    if (score > 20) return "bg-green-500"
-    if (score > 0) return "bg-green-300"
-    if (score > -20) return "bg-red-300"
-    return "bg-red-500"
-  }
+  // const getSentimentColor = (score: number) => { // REMOVED AND REPLACED BY getSentimentColor FUNCTION ABOVE
+  //   if (score > 20) return "bg-green-500"
+  //   if (score > 0) return "bg-green-300"
+  //   if (score > -20) return "bg-red-300"
+  //   return "bg-red-500"
+  // }
 
   const getTradeRecommendations = (score: number) => {
     if (score <= 24) {
@@ -1347,8 +1272,8 @@ export function MarketSentiment() {
         </div>
 
         {cnnIndicatorCards.map((indicator, index) => {
-          const chartInfo = getChartDataForIndicator(indicator.title)
-          console.log(`[v0] Chart for ${indicator.title}:`, {
+          const chartInfo = getChartDataForIndicator(indicator.name) // Use indicator.name to match tooltip keys
+          console.log(`[v0] Chart for ${indicator.name}:`, {
             dataPoints: chartInfo.data.length,
             datePoints: chartInfo.dates.length,
             firstValue: chartInfo.data[0],
@@ -1360,23 +1285,11 @@ export function MarketSentiment() {
               <CardHeader className="bg-gray-50 border-b border-gray-200">
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-base font-bold text-gray-900 mb-1">{indicator.title}</CardTitle>
-                    <CardDescription className="text-sm text-gray-600">{indicator.subtitle}</CardDescription>
+                    <CardTitle className="text-base font-bold text-gray-900 mb-1">{indicator.name}</CardTitle>
+                    <CardDescription className="text-sm text-gray-600">{indicator.description}</CardDescription>
                   </div>
-                  <div
-                    className={`px-3 py-1 rounded text-xs font-bold ${
-                      indicator.badge === "EXTREME FEAR"
-                        ? "bg-red-600 text-white"
-                        : indicator.badge === "FEAR"
-                          ? "bg-orange-500 text-white"
-                          : indicator.badge === "NEUTRAL"
-                            ? "bg-yellow-500 text-gray-900"
-                            : indicator.badge === "GREED"
-                              ? "bg-green-500 text-white"
-                              : "bg-green-600 text-white"
-                    }`}
-                  >
-                    {indicator.badge}
+                  <div className={`px-3 py-1 rounded text-xs font-bold ${getSentimentColor(indicator.sentiment)}`}>
+                    {indicator.sentiment}
                   </div>
                 </div>
               </CardHeader>
@@ -1391,7 +1304,9 @@ export function MarketSentiment() {
 
                   {/* Explanation text */}
                   <div className="flex items-center">
-                    <p className="text-sm text-gray-700 leading-relaxed">{indicator.explanation}</p>
+                    <p className="text-sm text-gray-700 leading-relaxed">
+                      {componentTooltips[indicator.tooltipKey as keyof typeof componentTooltips].description}
+                    </p>
                   </div>
                 </div>
               </CardContent>

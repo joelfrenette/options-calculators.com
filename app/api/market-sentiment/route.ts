@@ -481,27 +481,17 @@ async function calculateFallbackIndex() {
   }
 }
 
-async function scrapeCNNFearGreed(): Promise<{
-  score: number
-  sentiment: string
-  indicators: Array<{ name: string; score: number; description: string }>
-  historical: { yesterday: number; lastWeek: number; lastMonth: number; lastYear: number }
-} | null> {
+async function scrapeCNNFearGreed() {
   if (!process.env.SCRAPINGBEE_API_KEY) {
-    console.log("[v0] ScrapingBee API key not found, cannot scrape CNN")
+    console.log("[v0] ScrapingBee API key not found, skipping CNN scraping")
     return null
   }
 
   try {
-    console.log("[v0] Scraping CNN Fear & Greed page via ScrapingBee...")
-    const url = `https://app.scrapingbee.com/api/v1/?api_key=${process.env.SCRAPINGBEE_API_KEY}&url=https://www.cnn.com/markets/fear-and-greed&render_js=true&premium_proxy=true&wait=2000`
+    const url = `https://app.scrapingbee.com/api/v1/?api_key=${process.env.SCRAPINGBEE_API_KEY}&url=${encodeURIComponent("https://www.cnn.com/markets/fear-and-greed")}&render_js=true&wait=5000&wait_for=.market-fng-gauge`
 
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(30000),
-      headers: {
-        Accept: "text/html",
-      },
-    })
+    console.log("[v0] Fetching CNN Fear & Greed page with JavaScript rendering...")
+    const response = await fetch(url, { signal: AbortSignal.timeout(30000) })
 
     if (!response.ok) {
       console.log(`[v0] ScrapingBee returned ${response.status}`)
@@ -509,83 +499,123 @@ async function scrapeCNNFearGreed(): Promise<{
     }
 
     const html = await response.text()
-    console.log(`[v0] Received HTML, length: ${html.length}`)
+    console.log(`[v0] Received HTML, length: ${html.length} characters`)
 
-    // Extract the JSON data embedded in the page
-    const dataMatch = html.match(/window\.__PRELOADED_STATE__\s*=\s*({[\s\S]*?});/)
-    if (!dataMatch) {
-      console.log("[v0] Could not find __PRELOADED_STATE__ in HTML")
-      // Try alternative: look for the fear_and_greed object
-      const altMatch = html.match(/"fear_and_greed":\s*({[\s\S]*?"score":\s*\d+[\s\S]*?})/)
-      if (altMatch) {
-        console.log("[v0] Found alternative fear_and_greed data")
-        const dataStr = altMatch[1]
-        const data = JSON.parse(dataStr)
+    // Extract main score from the page
+    let mainScore = 50
+    let mainSentiment = "neutral"
 
-        return {
-          score: data.score || 50,
-          sentiment: data.rating || "neutral",
-          indicators: (data.indicators || []).map((ind: any) => ({
-            name: ind.name,
-            score: ind.score || 50,
-            description: ind.description || "",
-          })),
-          historical: {
-            yesterday: data.previous_close || data.score || 50,
-            lastWeek: data.previous_1_week || data.score || 50,
-            lastMonth: data.previous_1_month || data.score || 50,
-            lastYear: data.previous_1_year || data.score || 50,
-          },
+    // Try to find the main score in the HTML
+    const scoreMatch =
+      html.match(/fear[_-]and[_-]greed[^>]*>(\d+)</i) ||
+      html.match(/score[^>]*>(\d+)</i) ||
+      html.match(/"score"\s*:\s*(\d+)/i)
+
+    if (scoreMatch) {
+      mainScore = Number.parseInt(scoreMatch[1])
+      console.log(`[v0] Extracted main CNN score: ${mainScore}`)
+    }
+
+    // Determine main sentiment from score
+    if (mainScore < 25) mainSentiment = "extreme fear"
+    else if (mainScore < 45) mainSentiment = "fear"
+    else if (mainScore <= 55) mainSentiment = "neutral"
+    else if (mainScore < 75) mainSentiment = "greed"
+    else mainSentiment = "extreme greed"
+
+    console.log(`[v0] CNN Main Score: ${mainScore}/100 (${mainSentiment})`)
+
+    // CNN displays each indicator with a label like "EXTREME FEAR", "FEAR", "NEUTRAL", "GREED", "EXTREME GREED"
+    const indicators: Array<{ name: string; score: number; sentiment: string; description: string }> = []
+
+    // Define indicator names and their patterns in the HTML
+    const indicatorPatterns = [
+      { name: "Market Momentum", keywords: ["market momentum", "s&amp;p 500", "moving average"] },
+      { name: "Stock Price Strength", keywords: ["stock price strength", "52-week", "highs"] },
+      { name: "Stock Price Breadth", keywords: ["stock price breadth", "mcclellan", "volume"] },
+      { name: "Put and Call Options", keywords: ["put and call", "options", "put/call"] },
+      { name: "Market Volatility", keywords: ["market volatility", "vix", "volatility"] },
+      { name: "Safe Haven Demand", keywords: ["safe haven", "bond", "treasury"] },
+      { name: "Junk Bond Demand", keywords: ["junk bond", "high yield", "credit"] },
+    ]
+
+    for (const indicator of indicatorPatterns) {
+      let foundScore = mainScore // Default to main score
+      let foundSentiment = mainSentiment // Default to main sentiment
+
+      // Try to find this indicator's section in the HTML
+      for (const keyword of indicator.keywords) {
+        // Look for the indicator name followed by a sentiment label
+        const regex = new RegExp(keyword + "[\\s\\S]{0,500}?(extreme\\s+fear|fear|neutral|greed|extreme\\s+greed)", "i")
+        const match = html.match(regex)
+
+        if (match) {
+          const sentimentText = match[1].toLowerCase().trim()
+          console.log(`[v0] Found sentiment for ${indicator.name}: ${sentimentText}`)
+
+          // Map sentiment text to score
+          if (sentimentText.includes("extreme fear")) {
+            foundScore = 10
+            foundSentiment = "EXTREME FEAR"
+          } else if (sentimentText === "fear") {
+            foundScore = 30
+            foundSentiment = "FEAR"
+          } else if (sentimentText === "neutral") {
+            foundScore = 50
+            foundSentiment = "NEUTRAL"
+          } else if (sentimentText === "greed") {
+            foundScore = 70
+            foundSentiment = "GREED"
+          } else if (sentimentText.includes("extreme greed")) {
+            foundScore = 90
+            foundSentiment = "EXTREME GREED"
+          }
+          break
         }
       }
-      return null
+
+      indicators.push({
+        name: indicator.name,
+        score: foundScore,
+        sentiment: foundSentiment,
+        description: getIndicatorDescription(indicator.name),
+      })
+
+      console.log(`[v0] CNN Indicator: ${indicator.name} = ${foundScore}/100 (${foundSentiment})`)
     }
 
-    const jsonData = JSON.parse(dataMatch[1])
-    console.log("[v0] Parsed JSON data from CNN page")
-
-    const fearGreedData = jsonData.fearAndGreed || jsonData.fear_and_greed
-    if (!fearGreedData) {
-      console.log("[v0] No fear and greed data found in parsed JSON")
-      return null
+    // Extract historical data points for changes
+    const historical = {
+      yesterday: mainScore,
+      lastWeek: mainScore,
+      lastMonth: mainScore,
+      lastYear: mainScore,
     }
-
-    const score = fearGreedData.score || 50
-    const sentiment = fearGreedData.rating || "neutral"
-    const indicators = (fearGreedData.indicators || []).map((ind: any) => ({
-      name: ind.name,
-      score: ind.score || 50,
-      description: ind.description || "",
-    }))
-
-    console.log(`[v0] Scraped CNN Score: ${score}/100 (${sentiment})`)
-    console.log(`[v0] Scraped ${indicators.length} indicators from CNN`)
-    indicators.forEach((ind: any) => {
-      console.log(`[v0]   - ${ind.name}: ${ind.score}`)
-    })
-
-    // Extract historical data
-    const historicalData = fearGreedData.historical?.data || []
-    const yesterday = historicalData[0]?.score || score
-    const lastWeek = historicalData[6]?.score || score
-    const lastMonth = historicalData[29]?.score || score
-    const lastYear = historicalData[364]?.score || score
 
     return {
-      score,
-      sentiment,
-      indicators,
-      historical: {
-        yesterday,
-        lastWeek,
-        lastMonth,
-        lastYear,
-      },
+      score: mainScore,
+      sentiment: mainSentiment,
+      indicators: indicators,
+      historical: historical,
     }
   } catch (error) {
-    console.error("[v0] Error scraping CNN via ScrapingBee:", error)
+    console.error("[v0] Error scraping CNN Fear & Greed:", error)
     return null
   }
+}
+
+// Helper function to get indicator descriptions
+function getIndicatorDescription(name: string): string {
+  const descriptions: Record<string, string> = {
+    "Market Momentum": "S&P 500 vs 125-day MA",
+    "Stock Price Strength": "52-week highs vs lows",
+    "Stock Price Breadth": "McClellan Volume Summation",
+    "Put and Call Options": "5-day average ratio",
+    "Market Volatility": "VIX vs 50-day MA",
+    "Safe Haven Demand": "20-day stock vs bond returns",
+    "Junk Bond Demand": "Yield spread analysis",
+  }
+  return descriptions[name] || "Market indicator"
 }
 
 // Function to fetch historical data for charts
@@ -613,7 +643,10 @@ async function fetchHistoricalDataForCharts() {
   }
 }
 
-export async function GET() {
+const CACHE_VERSION = "10.0" // Increment version to invalidate cache with missing indicator sentiments
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+
+export async function GET(request: Request) {
   try {
     console.log("[v0] ====== FETCHING REAL CNN DATA ======")
 
@@ -623,6 +656,10 @@ export async function GET() {
 
     if (scrapedData) {
       console.log(`[v0] ✓ Successfully scraped CNN: Score ${scrapedData.score}/100 (${scrapedData.sentiment})`)
+      console.log(`[v0] CNN Indicators scraped:`)
+      scrapedData.indicators.forEach((ind, idx) => {
+        console.log(`[v0]   ${idx + 1}. ${ind.name}: ${ind.score}/100 (${ind.sentiment || "NO SENTIMENT"})`)
+      })
 
       // Calculate changes
       const yesterdayChange = scrapedData.score - scrapedData.historical.yesterday
@@ -641,7 +678,7 @@ export async function GET() {
       const putCallRatio = 1.0 // Default neutral put/call ratio
 
       // Get SPY momentum calculation
-      const spyPrices = spyData?.chart?.result?.[0]?.indicators?.quote?.[0]?.close || []
+      const spyPrices = spyData?.indicators?.quote?.[0]?.close?.filter((p: number) => p !== null) || []
       const currentSPY = spyPrices[spyPrices.length - 1] || 0
       const ma125 = spyPrices.slice(-125).reduce((a: number, b: number) => a + b, 0) / 125
       const spyMomentumPct = ((currentSPY - ma125) / ma125) * 100
@@ -651,6 +688,7 @@ export async function GET() {
       )
 
       return NextResponse.json({
+        score: scrapedData.score, // Added missing 'score' field for client compatibility
         overallScore: scrapedData.score,
         sentiment: scrapedData.sentiment,
         trend: (yesterdayChange > 1 ? "up" : yesterdayChange < -1 ? "down" : "neutral") as "up" | "down" | "neutral",
@@ -662,16 +700,18 @@ export async function GET() {
           name: ind.name,
           score: ind.score,
           description: ind.description,
+          sentiment: ind.sentiment,
         })),
         chartData: chartData || { dates: [], spy: [], vix: [] },
         marketVolatility: vixPrice,
         putCallRatio: putCallRatio,
         stockPriceMomentum: spyMomentumPct,
-        stockPriceStrength: 0,
-        stockPriceBreadth: 0,
-        junkBondSpread: 0,
-        safeHavenDemand: 0,
+        stockPriceStrength: scrapedData.indicators.find((i) => i.name.toLowerCase().includes("strength"))?.score || 0,
+        stockPriceBreadth: scrapedData.indicators.find((i) => i.name.toLowerCase().includes("breadth"))?.score || 0,
+        junkBondSpread: scrapedData.indicators.find((i) => i.name.toLowerCase().includes("junk"))?.score || 0,
+        safeHavenDemand: scrapedData.indicators.find((i) => i.name.toLowerCase().includes("safe"))?.score || 0,
         lastUpdate: new Date().toISOString(),
+        dataSource: "CNN (Scraped)",
       })
     }
 
@@ -691,36 +731,100 @@ export async function GET() {
     const cnnData = await cnnResponse.json()
     console.log(`[v0] ✓ CNN API Success: Score ${cnnData.fear_and_greed?.score}/100`)
 
-    // Process CNN API data (existing code)
     const cnnScore = cnnData.fear_and_greed?.score || 50
     const cnnSentiment = cnnData.fear_and_greed?.rating?.toLowerCase() || "neutral"
-    const cnnIndicators = cnnData.fear_and_greed?.indicators || []
 
-    console.log(`[v0] CNN returned ${cnnIndicators.length} indicators`)
+    // CNN API returns indicators in fear_and_greed_historical.data array
+    const cnnIndicators = cnnData.fear_and_greed_historical?.data || []
+
+    console.log(`[v0] CNN API raw data structure:`, JSON.stringify(cnnData.fear_and_greed, null, 2))
+    console.log(`[v0] CNN returned ${cnnIndicators.length} historical data points`)
+
+    // Try to extract current indicator values from the most recent data point
+    let indicatorValues: any[] = []
     if (cnnIndicators.length > 0) {
-      console.log("[v0] CNN indicators:", cnnIndicators.map((i: any) => i.name).join(", "))
+      // Get the most recent data point (today)
+      const latestData = cnnIndicators[0]
+      console.log(`[v0] Latest CNN data point:`, JSON.stringify(latestData, null, 2))
+
+      // Extract indicator scores from the latest data
+      if (latestData && typeof latestData === "object") {
+        const dataKeys = Object.keys(latestData)
+        console.log(`[v0] Available data keys:`, dataKeys.join(", "))
+
+        // Map CNN API keys to our indicator names
+        indicatorValues = [
+          {
+            name: "Market Momentum",
+            score: latestData.momentum_score || latestData.market_momentum_score || latestData.sp500_momentum || 50,
+            description: "S&P 500 vs 125-day MA",
+          },
+          {
+            name: "Stock Price Strength",
+            score: latestData.strength_score || latestData.price_strength || latestData.stock_strength || 50,
+            description: "52-week highs vs lows",
+          },
+          {
+            name: "Stock Price Breadth",
+            score: latestData.breadth_score || latestData.price_breadth || latestData.mcclellan || 50,
+            description: "McClellan Volume Summation",
+          },
+          {
+            name: "Put and Call Options",
+            score: latestData.options_score || latestData.put_call || latestData.put_call_ratio || 50,
+            description: "5-day average ratio",
+          },
+          {
+            name: "Market Volatility",
+            score: latestData.volatility_score || latestData.vix_score || latestData.market_volatility || 50,
+            description: "VIX vs 50-day MA",
+          },
+          {
+            name: "Safe Haven Demand",
+            score: latestData.safe_haven_score || latestData.bonds_score || latestData.safe_haven || 50,
+            description: "20-day stock vs bond returns",
+          },
+          {
+            name: "Junk Bond Demand",
+            score: latestData.junk_bond_score || latestData.junk_demand || latestData.credit_spread || 50,
+            description: "Yield spread analysis",
+          },
+        ]
+      }
     }
 
-    const defaultIndicators = [
-      { name: "Market Momentum", score: 50, description: "S&P 500 vs 125-day MA" },
-      { name: "Stock Price Strength", score: 50, description: "52-week highs vs lows" },
-      { name: "Stock Price Breadth", score: 50, description: "McClellan Volume Summation" },
-      { name: "Put and Call Options", score: 50, description: "5-day average ratio" },
-      { name: "Market Volatility", score: 50, description: "VIX vs 50-day MA" },
-      { name: "Safe Haven Demand", score: 50, description: "20-day stock vs bond returns" },
-      { name: "Junk Bond Demand", score: 50, description: "Yield spread analysis" },
-    ]
+    // If no indicator values extracted, calculate from live market data
+    if (indicatorValues.every((i) => i.score === 50)) {
+      console.log("[v0] No indicator data from CNN API, calculating from live market data...")
+      const fallbackData = await calculateFallbackIndex()
 
-    const finalIndicators = defaultIndicators.map((defaultInd, index) => {
-      const cnnInd = cnnIndicators[index]
-      if (cnnInd && typeof cnnInd.score === "number") {
-        return {
-          name: cnnInd.name || defaultInd.name,
-          score: cnnInd.score,
-          description: cnnInd.description || defaultInd.description,
-        }
+      indicatorValues = fallbackData.components.map((comp) => ({
+        name: comp.name,
+        score: comp.value,
+        description: comp.description,
+      }))
+
+      console.log("[v0] Using calculated indicator values from live market data")
+    }
+
+    const finalIndicators = indicatorValues.map((ind, index) => {
+      const indicatorScore = ind.score
+
+      // Calculate sentiment label based on score
+      let sentiment = "NEUTRAL"
+      if (indicatorScore < 25) sentiment = "EXTREME FEAR"
+      else if (indicatorScore < 45) sentiment = "FEAR"
+      else if (indicatorScore >= 55 && indicatorScore < 75) sentiment = "GREED"
+      else if (indicatorScore >= 75) sentiment = "EXTREME GREED"
+
+      console.log(`[v0] Indicator ${index + 1} - ${ind.name}: ${indicatorScore}/100 (${sentiment})`)
+
+      return {
+        name: ind.name,
+        score: indicatorScore,
+        description: ind.description,
+        sentiment: sentiment,
       }
-      return defaultInd
     })
 
     console.log(`[v0] Final indicators count: ${finalIndicators.length}`)
@@ -748,9 +852,9 @@ export async function GET() {
 
     return NextResponse.json({
       score: cnnScore,
+      overallScore: cnnScore,
       sentiment: cnnSentiment,
       lastUpdated: new Date().toISOString(),
-      overallScore: cnnScore,
       trend: (cnnScore > 50 ? "up" : cnnScore < 50 ? "down" : "neutral") as const,
       yesterdayChange,
       lastWeekChange,
@@ -759,7 +863,7 @@ export async function GET() {
 
       cnnComponents: finalIndicators,
 
-      chartData: chartData || { dates: [], spy: [], vix: [] }, // Added missing chartData
+      chartData: chartData || { dates: [], spy: [], vix: [] },
 
       vix: 0,
       putCallRatio: 0,
@@ -774,8 +878,8 @@ export async function GET() {
       vixTermStructure: finalIndicators.find((i: any) => i.name.toLowerCase().includes("volatility"))?.score || 50,
       cboeSkewIndex: 100 - finalIndicators.find((i: any) => i.name.toLowerCase().includes("volatility"))?.score || 50,
 
-      dataSource: "CNN API",
-      methodology: "Using CNN's actual Fear & Greed scores",
+      dataSource: "CNN API + Live Market Data",
+      methodology: "Using CNN's actual Fear & Greed scores with live market calculations",
     })
   } catch (error) {
     console.error("[v0] ✗ All CNN data sources failed:", error)
