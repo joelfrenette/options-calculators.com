@@ -1153,16 +1153,22 @@ export function MarketSentiment() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-gray-600">Loading market sentiment data...</div>
+      <div className="flex flex-col items-center justify-center py-12 gap-4">
+        <div className="relative">
+          <div className="w-12 h-12 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin"></div>
+        </div>
+        <div className="text-gray-600 font-medium">Loading Fear & Greed Index data...</div>
       </div>
     )
   }
 
   if (!marketData) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-gray-600">Unable to load market data</div>
+      <div className="flex flex-col items-center justify-center py-12 gap-4">
+        <div className="relative">
+          <div className="w-12 h-12 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin"></div>
+        </div>
+        <div className="text-gray-600 font-medium">Loading market data...</div>
       </div>
     )
   }
