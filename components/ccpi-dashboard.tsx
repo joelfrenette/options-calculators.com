@@ -644,11 +644,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
         </Card>
 
         {/* Four Pillars - Collapsible Breakdown */}
-        <Accordion
-          type="multiple"
-          defaultValue={["pillar1", "pillar2", "pillar3", "pillar4"]}
-          className="space-y-4 pb-6 border-b border-gray-200"
-        >
+        <Accordion type="multiple" defaultValue={[]} className="space-y-4 pb-6 border-b border-gray-200">
           {/* Pillar 1 - Momentum & Technical */}
           <AccordionItem value="pillar1" className="border rounded-lg px-4">
             <AccordionTrigger className="hover:no-underline py-10">
@@ -1340,6 +1336,256 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
             </AccordionContent>
           </AccordionItem>
 
+          {/* Pillar 2 - Risk Appetite & Volatility */}
+          <AccordionItem value="pillar2" className="border rounded-lg px-4">
+            <AccordionTrigger className="hover:no-underline py-10">
+              <div className="flex items-center justify-between w-full pr-4">
+                <div className="flex items-center gap-2">
+                  <TrendingDown className="h-5 w-5 text-orange-600" />
+                  <span className="text-lg font-semibold">Pillar 2 - Risk Appetite & Volatility</span>
+                  <span className="text-sm text-gray-600">Weight: 30% | 8 indicators</span>
+                </div>
+                <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.riskAppetite)}/100</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="space-y-6 pt-4">
+                {/* Put/Call Ratio */}
+                {data.indicators.putCallRatio !== undefined && (
+                  <CCPIIndicator
+                    label="Put/Call Ratio"
+                    value={data.indicators.putCallRatio}
+                    formatValue={(v) => Number(v).toFixed(2)}
+                    thresholds={{
+                      low: { value: 0.6, label: "Complacent: <0.7" },
+                      mid: { value: 0.9, label: "Normal: 0.7-1.1" },
+                      high: { value: 1.3, label: "Fear: >1.1" },
+                    }}
+                    barMin={0.5}
+                    barMax={1.5}
+                    tooltipContent={
+                      <CCPIIndicatorTooltip
+                        title="Put/Call Ratio"
+                        description="Ratio of put options to call options traded. Low values signal complacency and potential bubble risk."
+                        thresholds={[
+                          { label: "< 0.7", description: "Extreme complacency - investors overconfident" },
+                          { label: "0.7-1.1", description: "Normal range - balanced sentiment" },
+                          { label: "> 1.1", description: "High fear - potential contrarian opportunity" },
+                        ]}
+                        impact="Low put/call ratios have preceded major market tops when combined with elevated valuations."
+                      />
+                    }
+                    tooltipsEnabled={tooltipsEnabled}
+                  />
+                )}
+
+                {/* Fear & Greed Index */}
+                {data.indicators.fearGreedIndex !== null && data.indicators.fearGreedIndex !== undefined && (
+                  <CCPIIndicator
+                    label="Fear & Greed Index"
+                    value={data.indicators.fearGreedIndex}
+                    formatValue={(v) => `${Number(v).toFixed(0)}`}
+                    thresholds={{
+                      low: { value: 20, label: "Fear: 0-30" },
+                      mid: { value: 50, label: "Neutral: 30-70" },
+                      high: { value: 80, label: "Greed: 70-100" },
+                    }}
+                    barMin={0}
+                    barMax={100}
+                    tooltipContent={
+                      <CCPIIndicatorTooltip
+                        title="CNN Fear & Greed Index"
+                        description="Composite measure of market sentiment based on 7 indicators including volatility, momentum, and breadth."
+                        thresholds={[
+                          { label: "0-30", description: "Extreme Fear - potential buying opportunity" },
+                          { label: "30-70", description: "Neutral - balanced market conditions" },
+                          { label: "70-100", description: "Extreme Greed - high crash risk" },
+                        ]}
+                        impact="Extreme greed readings above 80 often precede corrections as complacency peaks."
+                      />
+                    }
+                    tooltipsEnabled={tooltipsEnabled}
+                  />
+                )}
+
+                {/* AAII Bullish Sentiment */}
+                {data.indicators.aaiiBullish !== undefined && (
+                  <CCPIIndicator
+                    label="AAII Bullish Sentiment"
+                    value={data.indicators.aaiiBullish}
+                    formatValue={(v) => `${Number(v).toFixed(1)}%`}
+                    thresholds={{
+                      low: { value: 25, label: "Bearish: <30%" },
+                      mid: { value: 40, label: "Neutral: 30-50%" },
+                      high: { value: 55, label: "Bullish: >50%" },
+                    }}
+                    barMin={20}
+                    barMax={60}
+                    tooltipContent={
+                      <CCPIIndicatorTooltip
+                        title="AAII Bullish Sentiment"
+                        description="Percentage of individual investors expecting stocks to rise over the next 6 months."
+                        thresholds={[
+                          { label: "< 30%", description: "Extreme pessimism - contrarian buy signal" },
+                          { label: "30-50%", description: "Normal range - balanced sentiment" },
+                          { label: "> 50%", description: "Retail euphoria - elevated crash risk" },
+                        ]}
+                        impact="When retail investors become extremely bullish (>55%), it often signals market tops as the last buyers enter."
+                      />
+                    }
+                    tooltipsEnabled={tooltipsEnabled}
+                  />
+                )}
+
+                {/* Short Interest Ratio */}
+                {data.indicators.shortInterest !== undefined && (
+                  <CCPIIndicator
+                    label="SPY Short Interest Ratio"
+                    value={data.indicators.shortInterest}
+                    formatValue={(v) => `${Number(v).toFixed(1)} days`}
+                    thresholds={{
+                      low: { value: 1.5, label: "Low: <2 days" },
+                      mid: { value: 4, label: "Normal: 2-6 days" },
+                      high: { value: 8, label: "High: >6 days" },
+                    }}
+                    barMin={1}
+                    barMax={10}
+                    tooltipContent={
+                      <CCPIIndicatorTooltip
+                        title="Short Interest Ratio"
+                        description="Days to cover short positions based on average volume. Low values signal complacency."
+                        thresholds={[
+                          { label: "< 2 days", description: "Extreme complacency - few bears remain" },
+                          { label: "2-6 days", description: "Normal positioning" },
+                          { label: "> 6 days", description: "High short positioning - potential squeeze" },
+                        ]}
+                        impact="Extremely low short interest indicates lack of hedging and potential one-sided positioning risk."
+                      />
+                    }
+                    tooltipsEnabled={tooltipsEnabled}
+                  />
+                )}
+
+                {/* ATR - Average True Range */}
+                {data.indicators.atr !== undefined && (
+                  <CCPIIndicator
+                    label="ATR - Average True Range"
+                    value={data.indicators.atr}
+                    formatValue={(v) => Number(v).toFixed(1)}
+                    thresholds={{
+                      low: { value: 20, label: "Low Volatility" },
+                      mid: { value: 35, label: "Normal" },
+                      high: { value: 50, label: "High Volatility" },
+                    }}
+                    barMin={15}
+                    barMax={60}
+                    tooltipContent={
+                      <CCPIIndicatorTooltip
+                        title="Average True Range (ATR)"
+                        description="Measures market volatility by decomposing the entire range of an asset price for that period."
+                        thresholds={[
+                          { label: "< 30", description: "Low volatility - calm markets" },
+                          { label: "30-40", description: "Normal volatility range" },
+                          { label: "> 40", description: "Elevated volatility - increased risk" },
+                        ]}
+                        impact="Rising ATR signals increasing market stress and potential for sharp moves."
+                      />
+                    }
+                    tooltipsEnabled={tooltipsEnabled}
+                  />
+                )}
+
+                {/* LTV - Long-term Volatility */}
+                {data.indicators.ltv !== undefined && (
+                  <CCPIIndicator
+                    label="LTV - Long-term Volatility"
+                    value={data.indicators.ltv}
+                    formatValue={(v) => `${(Number(v) * 100).toFixed(1)}%`}
+                    thresholds={{
+                      low: { value: 0.1, label: "Calm: <12%" },
+                      mid: { value: 0.15, label: "Normal: 12-20%" },
+                      high: { value: 0.25, label: "Stressed: >20%" },
+                    }}
+                    barMin={0.08}
+                    barMax={0.3}
+                    tooltipContent={
+                      <CCPIIndicatorTooltip
+                        title="Long-term Volatility (LTV)"
+                        description="Measures sustained volatility over extended periods, indicating structural market stress."
+                        thresholds={[
+                          { label: "< 12%", description: "Low long-term volatility - stable environment" },
+                          { label: "12-20%", description: "Normal volatility range" },
+                          { label: "> 20%", description: "Elevated sustained stress - high risk period" },
+                        ]}
+                        impact="Persistently high LTV signals systemic market fragility and elevated crash risk."
+                      />
+                    }
+                    tooltipsEnabled={tooltipsEnabled}
+                  />
+                )}
+
+                {/* Bullish Percent Index */}
+                {data.indicators.bullishPercent !== undefined && (
+                  <CCPIIndicator
+                    label="Bullish Percent Index"
+                    value={data.indicators.bullishPercent}
+                    formatValue={(v) => `${Number(v).toFixed(0)}%`}
+                    thresholds={{
+                      low: { value: 30, label: "Oversold: <40%" },
+                      mid: { value: 50, label: "Normal: 40-70%" },
+                      high: { value: 70, label: "Overbought: >70%" },
+                    }}
+                    barMin={20}
+                    barMax={80}
+                    tooltipContent={
+                      <CCPIIndicatorTooltip
+                        title="Bullish Percent Index (BPI)"
+                        description="Percentage of stocks on point & figure buy signals. Extreme readings signal overbought/oversold conditions."
+                        thresholds={[
+                          { label: "< 40%", description: "Oversold - potential bounce opportunity" },
+                          { label: "40-70%", description: "Normal range - healthy market" },
+                          { label: "> 70%", description: "Overbought - high risk of pullback" },
+                        ]}
+                        impact="Readings above 70% indicate broad market overbought conditions and increased reversal risk."
+                      />
+                    }
+                    tooltipsEnabled={tooltipsEnabled}
+                  />
+                )}
+
+                {/* Yield Curve */}
+                {data.indicators.yieldCurve !== undefined && (
+                  <CCPIIndicator
+                    label="Yield Curve (10Y-2Y)"
+                    value={data.indicators.yieldCurve}
+                    formatValue={(v) => `${Number(v).toFixed(2)}%`}
+                    thresholds={{
+                      low: { value: -1, label: "Inverted: <0%" },
+                      mid: { value: 0.25, label: "Flat: 0-0.5%" },
+                      high: { value: 0.5, label: "Normal: >0.5%" },
+                    }}
+                    barMin={-1.5}
+                    barMax={1.0}
+                    barReverse={true}
+                    tooltipContent={
+                      <CCPIIndicatorTooltip
+                        title="Yield Curve (10Y-2Y) Spread"
+                        description="Difference between 10-year and 2-year Treasury yields. Inversion has historically preceded recessions."
+                        thresholds={[
+                          { label: "< 0% (Inverted)", description: "Recession signal - high crash risk" },
+                          { label: "0-0.5%", description: "Flat curve - slowing growth, moderate risk" },
+                          { label: "> 0.5%", description: "Steep curve - healthy economy, low risk" },
+                        ]}
+                        impact="Inverted yield curves have preceded every recession since 1955, typically 6-24 months in advance."
+                      />
+                    }
+                    tooltipsEnabled={tooltipsEnabled}
+                  />
+                )}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
           {/* Pillar 3 - Valuation & Market Structure */}
           <AccordionItem value="pillar3" className="border rounded-lg px-4">
             <AccordionTrigger className="hover:no-underline py-10">
@@ -1737,7 +1983,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
 
           {/* Pillar 4 - Macro Economic */}
           <AccordionItem value="pillar4" className="border rounded-lg px-4">
-            <AccordionTrigger className="hover:no-underline py-4">
+            <AccordionTrigger className="hover:no-underline py-10">
               <div className="flex items-center justify-between w-full pr-4">
                 <div className="flex items-center gap-3">
                   <BarChart3 className="h-5 w-5 text-purple-600" />
