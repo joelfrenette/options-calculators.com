@@ -154,13 +154,28 @@ export async function scrapePutCallRatio(): Promise<{
   ratio: number
   status: "live" | "baseline"
 }> {
+  console.log("[v0] Put/Call: Trying Grok AI first for reliability...")
+  try {
+    const grokValue = await fetchMarketDataWithGrok(
+      "CBOE equity put/call ratio",
+      "Current CBOE total equity put/call ratio (CPCE index). Return just the decimal number like 0.85 or 1.05",
+    )
+
+    if (grokValue && grokValue > 0.3 && grokValue < 3) {
+      console.log(`[v0] Put/Call: Grok fetched value: ${grokValue}`)
+      return { ratio: grokValue, status: "live" }
+    }
+  } catch (grokError) {
+    console.log("[v0] Grok Put/Call fetch failed, trying other sources:", grokError)
+  }
+
   try {
     const alphaVantageKey = process.env.ALPHA_VANTAGE_API_KEY
 
     if (alphaVantageKey) {
       const vixResponse = await fetch(
-        `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=^VIX&apikey=${alphaVantageKey}`,
-        { signal: AbortSignal.timeout(10000) },
+        `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=VIX&apikey=${alphaVantageKey}`,
+        { signal: AbortSignal.timeout(8000) },
       )
 
       if (vixResponse.ok) {
@@ -177,10 +192,15 @@ export async function scrapePutCallRatio(): Promise<{
         }
       }
     }
+  } catch (alphaError) {
+    console.log("[v0] Alpha Vantage VIX estimation failed:", alphaError)
+  }
 
+  try {
     const cboeResult = await scrapeUrl("https://www.cboe.com/us/options/market_statistics/daily/", {
       renderJs: true,
       premiumProxy: true,
+      customParams: { timeout: "15000" }, // Shorter timeout
     })
 
     const cboeHtml = typeof cboeResult.data === "string" ? cboeResult.data : ""
@@ -204,58 +224,14 @@ export async function scrapePutCallRatio(): Promise<{
         }
       }
     }
+  } catch (cboeError) {
+    console.log("[v0] CBOE scraping failed:", cboeError)
+  }
 
-    const result = await scrapeUrl("https://www.barchart.com/stocks/quotes/$CPCE/overview", {
-      renderJs: true,
-      premiumProxy: true,
-    })
-
-    const html = typeof result.data === "string" ? result.data : ""
-
-    const patterns = [
-      /<span[^>]*class="[^"]*last-change[^"]*"[^>]*>(\d+\.\d+)<\/span>/,
-      /Last:\s*<strong>(\d+\.\d+)<\/strong>/,
-      /CPCE.*?(\d+\.\d+)/,
-      /Put\/Call.*?(\d+\.\d+)/is,
-    ]
-
-    for (const pattern of patterns) {
-      const match = html.match(pattern)
-      if (match && match[1]) {
-        const ratio = Number.parseFloat(match[1])
-        if (ratio > 0.3 && ratio < 3) {
-          console.log("[v0] Put/Call ratio scraped from BarChart:", ratio)
-          return {
-            ratio,
-            status: "live",
-          }
-        }
-      }
-    }
-
-    throw new Error("Could not parse Put/Call ratio from scraping")
-  } catch (error) {
-    console.log("[v0] Put/Call scraping failed, trying Grok AI fallback...", error)
-
-    try {
-      const grokValue = await fetchMarketDataWithGrok(
-        "CBOE equity put/call ratio",
-        "Current CBOE total equity put/call ratio (CPCE index)",
-      )
-
-      if (grokValue && grokValue > 0.3 && grokValue < 3) {
-        console.log(`[v0] Put/Call: Grok fetched value: ${grokValue}`)
-        return { ratio: grokValue, status: "live" }
-      }
-    } catch (grokError) {
-      console.log("[v0] Grok Put/Call fetch failed:", grokError)
-    }
-
-    console.log("[v0] Put/Call: All sources including Grok failed, using baseline")
-    return {
-      ratio: 0.95,
-      status: "baseline",
-    }
+  console.log("[v0] Put/Call: All sources failed, using baseline")
+  return {
+    ratio: 0.95,
+    status: "baseline",
   }
 }
 
