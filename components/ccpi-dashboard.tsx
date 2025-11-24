@@ -189,6 +189,118 @@ const CCPIBooleanIndicator = React.memo(
 )
 CCPIBooleanIndicator.displayName = "CCPIBooleanIndicator"
 
+// Helper function for warning signal tooltips
+function getSignalTooltip(signal: string): string {
+  const signalLower = signal.toLowerCase()
+
+  // Dollar Index
+  if (signalLower.includes("dollar index") || signalLower.includes("dxy")) {
+    return "The Dollar Index measures the US dollar's strength against other major currencies. When it's extremely high (above 110), it makes US exports more expensive and hurts multinational companies' profits. For investors, a strong dollar often leads to lower stock prices, especially for tech companies that earn revenue overseas."
+  }
+
+  // QQQ / Nasdaq signals
+  if (signalLower.includes("qqq") && signalLower.includes("50-day")) {
+    return "QQQ tracks the Nasdaq-100 index (top 100 tech stocks). When it falls below its 50-day moving average, it signals that the medium-term trend has turned negative. This is often an early warning that tech stocks may continue falling. Investors often reduce tech exposure when this happens."
+  }
+  if (signalLower.includes("qqq") && signalLower.includes("20-day")) {
+    return "When QQQ drops below its 20-day moving average, short-term momentum has turned bearish. This is a faster-moving signal than the 50-day and often indicates near-term weakness. Traders may use this as a signal to tighten stop-losses or reduce positions."
+  }
+  if (signalLower.includes("qqq") && signalLower.includes("bollinger")) {
+    return "Bollinger Bands measure how far a stock has moved from its average price. When QQQ approaches the lower band, it's either oversold (potentially a buying opportunity) or showing extreme weakness. Context matters - in a crash, touching the lower band often leads to more downside."
+  }
+
+  // SOX / Semiconductors
+  if (signalLower.includes("sox") || signalLower.includes("chip") || signalLower.includes("semiconductor")) {
+    return "The SOX index tracks semiconductor stocks (chipmakers like NVIDIA, AMD, Intel). Semiconductors are considered a leading indicator because chips go into everything from phones to cars. A crashing chip sector often predicts broader market weakness 2-3 months ahead."
+  }
+
+  // Equity Risk Premium
+  if (signalLower.includes("equity risk premium") || signalLower.includes("erp")) {
+    return "The Equity Risk Premium compares stock earnings yields to bond yields. When it's very low (below 1%), stocks are expensive relative to bonds. This means investors aren't being compensated enough for the extra risk of owning stocks, making bonds more attractive."
+  }
+
+  // Put/Call Ratio
+  if (signalLower.includes("put/call") || signalLower.includes("put call")) {
+    return "The Put/Call ratio shows how many bearish bets (puts) versus bullish bets (calls) traders are making. A low ratio (below 0.7) means excessive optimism - everyone is betting on stocks going up. This is often a contrarian warning sign that a pullback is coming."
+  }
+
+  // AAII Sentiment
+  if (signalLower.includes("aaii") || signalLower.includes("retail optimism")) {
+    return "AAII tracks how individual investors feel about the market. When bullish sentiment exceeds 45-50%, it often signals excessive optimism. Historically, the market tends to underperform after periods of extreme retail bullishness because there are fewer new buyers left."
+  }
+
+  // ISM PMI
+  if (signalLower.includes("ism") || signalLower.includes("pmi") || signalLower.includes("manufacturing")) {
+    return "The ISM Manufacturing Index measures factory activity. Readings below 50 indicate contraction. Weak manufacturing often leads to job losses and reduced consumer spending, which eventually hurts corporate profits and stock prices."
+  }
+
+  // P/E Ratio
+  if (signalLower.includes("p/e") || signalLower.includes("pe ratio")) {
+    return "The Price-to-Earnings ratio shows how much investors pay for each dollar of company earnings. The S&P 500 historical average is around 16. When it's above 22, stocks are considered expensive. High P/E markets are more vulnerable to sharp corrections."
+  }
+
+  // Buffett Indicator
+  if (signalLower.includes("buffett indicator")) {
+    return "Warren Buffett's favorite valuation metric: total stock market value divided by GDP. Above 150% is considered significantly overvalued. When stocks are worth more than the entire economy produces, it suggests prices have gotten ahead of reality."
+  }
+
+  // Debt-to-GDP
+  if (signalLower.includes("debt-to-gdp") || signalLower.includes("debt to gdp") || signalLower.includes("fiscal")) {
+    return "This measures government debt relative to the economy's size. High debt levels (above 100% of GDP) can lead to higher interest rates, inflation concerns, and reduced government spending flexibility. This creates headwinds for economic growth and stock returns."
+  }
+
+  // Shiller CAPE
+  if (signalLower.includes("shiller") || signalLower.includes("cape")) {
+    return "The Shiller CAPE looks at stock prices versus 10 years of averaged earnings (adjusting for inflation). It smooths out short-term profit swings. Above 30 is historically expensive - periods of high CAPE have often preceded below-average returns over the next decade."
+  }
+
+  // P/S Ratio
+  if (signalLower.includes("p/s") || signalLower.includes("price-to-sales") || signalLower.includes("price to sales")) {
+    return "Price-to-Sales ratio compares stock prices to company revenues. Unlike earnings, sales are harder to manipulate. When P/S is elevated (above 2.5 for S&P 500), it suggests investors are paying a premium for revenue, which may not be sustainable."
+  }
+
+  // VIX
+  if (signalLower.includes("vix") || signalLower.includes("volatility")) {
+    return "The VIX measures expected market volatility over the next 30 days. Low VIX (below 15) signals complacency - investors aren't worried. Historically, extended periods of low volatility are often followed by sharp spikes and market pullbacks."
+  }
+
+  // Yield Curve
+  if (signalLower.includes("yield curve") || signalLower.includes("inversion")) {
+    return "The yield curve compares short-term and long-term interest rates. When short-term rates exceed long-term rates (inversion), it signals that investors expect economic weakness ahead. Inversions have preceded every US recession in the past 50 years."
+  }
+
+  // Mag7 Concentration
+  if (signalLower.includes("mag7") || signalLower.includes("concentration") || signalLower.includes("magnificent")) {
+    return "The Magnificent 7 (Apple, Microsoft, Google, Amazon, NVIDIA, Meta, Tesla) now dominate the S&P 500. High concentration means the index depends heavily on just a few stocks. If these leaders stumble, the entire market can fall sharply."
+  }
+
+  // Default
+  return "This indicator helps measure market risk. When it flashes a warning, it suggests conditions that have historically preceded market weakness. Consider reducing risk exposure or hedging your portfolio when multiple warnings appear together."
+}
+
+// Helper function to get crash amplifier tooltip
+function getCrashAmplifierTooltip(reason: string): string {
+  const reasonLower = reason.toLowerCase()
+
+  if (reasonLower.includes("50-day") || reasonLower.includes("50 day")) {
+    return "When a major index breaks below its 50-day moving average, it confirms that the medium-term trend has turned bearish. This is a significant technical breakdown that often leads to further selling as algorithmic traders and trend-followers exit positions."
+  }
+  if (reasonLower.includes("200-day") || reasonLower.includes("200 day")) {
+    return "The 200-day moving average is the most important long-term trend indicator. Breaking below it signals a potential shift from bull to bear market. Institutional investors often reduce exposure when this level breaks."
+  }
+  if (reasonLower.includes("death cross")) {
+    return "A death cross occurs when the 50-day average crosses below the 200-day average. It's a powerful bearish signal that has preceded major market declines. The opposite (golden cross) signals bullish conditions."
+  }
+  if (reasonLower.includes("vix") && reasonLower.includes("spike")) {
+    return "A VIX spike indicates sudden fear in the market. Large VIX moves often coincide with rapid market selloffs. When volatility explodes, it can trigger margin calls and forced selling, accelerating the decline."
+  }
+  if (reasonLower.includes("volume") || reasonLower.includes("selling")) {
+    return "High-volume selling indicates institutional investors are exiting. When big money sells aggressively, prices can fall quickly. This is different from low-volume pullbacks, which are less concerning."
+  }
+
+  return "Crash amplifiers are extreme technical signals that historically appear before or during major market corrections. When active, they add bonus points to the CCPI score because they significantly increase the probability of further downside."
+}
+
 export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
   const [data, setData] = useState<CCPIData | null>(null)
   const [history, setHistory] = useState<HistoricalData | null>(null)
@@ -559,7 +671,25 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl text-red-700">
                 <AlertTriangle className="h-6 w-6 text-red-600" />
-                CRASH AMPLIFIERS ACTIVE +{data.totalBonus || 0} BONUS POINTS
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="cursor-help border-b border-dashed border-red-400">
+                      CRASH AMPLIFIERS ACTIVE +{data.totalBonus || 0} BONUS POINTS
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="bottom"
+                    className="max-w-sm bg-white text-gray-900 border border-gray-200 shadow-lg p-3"
+                  >
+                    <p className="text-sm">
+                      <strong>What are Crash Amplifiers?</strong>
+                      <br />
+                      These are extreme market conditions that historically appear before major crashes. When detected,
+                      they add "bonus points" to the CCPI score because they significantly increase crash risk. Multiple
+                      amplifiers firing together is a serious warning sign that demands defensive positioning.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
               </CardTitle>
               <CardDescription className="text-red-700 font-medium">
                 {data.baseCCPI && data.totalBonus
@@ -570,13 +700,20 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
             <CardContent>
               <div className="space-y-2">
                 {data.crashAmplifiers?.map((amp, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between p-3 bg-white rounded-lg border-2 border-red-300"
-                  >
-                    <span className="text-sm font-semibold text-red-900">{amp.reason}</span>
-                    <Badge className="bg-red-600 text-white text-base font-bold">+{amp.points}</Badge>
-                  </div>
+                  <Tooltip key={i}>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center justify-between p-3 bg-white rounded-lg border-2 border-red-300 cursor-help hover:border-red-500 transition-colors">
+                        <span className="text-sm font-semibold text-red-900">{amp.reason}</span>
+                        <Badge className="bg-red-600 text-white text-base font-bold">+{amp.points}</Badge>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="right"
+                      className="max-w-xs bg-white text-gray-900 border border-gray-200 shadow-lg p-3"
+                    >
+                      <p className="text-sm">{getCrashAmplifierTooltip(amp.reason)}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 ))}
               </div>
             </CardContent>
@@ -589,11 +726,55 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-xl">
                 <AlertTriangle className="h-6 w-6 text-orange-600" />
-                Active Warning Signals
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="cursor-help border-b border-dashed border-orange-400">Active Warning Signals</span>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="bottom"
+                    className="max-w-sm bg-white text-gray-900 border border-gray-200 shadow-lg p-3"
+                  >
+                    <p className="text-sm">
+                      <strong>What are Warning Signals?</strong>
+                      <br />
+                      These are individual market indicators that are currently flashing caution. Each signal represents
+                      a different aspect of market health (momentum, valuation, sentiment, etc.).
+                      <br />
+                      <br />
+                      <strong className="text-red-600">HIGH RISK</strong> signals are severe and historically precede
+                      significant market declines.
+                      <br />
+                      <strong className="text-yellow-600">MEDIUM RISK</strong> signals warrant attention but are less
+                      urgent.
+                      <br />
+                      <br />
+                      The more signals that fire together, the higher the crash probability.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
               </CardTitle>
-              <div className="text-3xl font-bold text-orange-600">
-                {activeCanariesCount}/{data.totalIndicators || 34}
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="text-3xl font-bold text-orange-600 cursor-help">
+                    {activeCanariesCount}/{data.totalIndicators || 34}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="left"
+                  className="max-w-xs bg-white text-gray-900 border border-gray-200 shadow-lg p-3"
+                >
+                  <p className="text-sm">
+                    <strong>
+                      {activeCanariesCount} out of {data.totalIndicators || 34}
+                    </strong>{" "}
+                    warning signals are currently active.
+                    <br />
+                    <br />• <strong>0-5 signals:</strong> Low risk environment
+                    <br />• <strong>6-12 signals:</strong> Elevated caution needed
+                    <br />• <strong>13+ signals:</strong> High risk - consider defensive strategies
+                  </p>
+                </TooltipContent>
+              </Tooltip>
             </div>
             <CardDescription className="text-base mt-2">
               Last Updated: {data.lastUpdated ? new Date(data.lastUpdated).toLocaleString() : "Loading..."}
@@ -622,22 +803,31 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                   }[canary.severity]
 
                   return (
-                    <div
-                      key={i}
-                      className={`flex-1 min-w-[280px] p-4 rounded-lg border-2 ${severityConfig.bgColor} ${severityConfig.borderColor}`}
-                    >
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <Badge variant="outline" className="text-xs font-semibold">
-                          {canary.pillar}
-                        </Badge>
-                        <span
-                          className={`text-xs font-bold px-3 py-1 rounded-md ${severityConfig.badgeColor} shadow-sm whitespace-nowrap`}
+                    <Tooltip key={i}>
+                      <TooltipTrigger asChild>
+                        <div
+                          className={`flex-1 min-w-[280px] p-4 rounded-lg border-2 cursor-help hover:shadow-md transition-shadow ${severityConfig.bgColor} ${severityConfig.borderColor}`}
                         >
-                          {severityConfig.label}
-                        </span>
-                      </div>
-                      <p className={`text-sm font-semibold ${severityConfig.textColor}`}>{canary.signal}</p>
-                    </div>
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <Badge variant="outline" className="text-xs font-semibold">
+                              {canary.pillar}
+                            </Badge>
+                            <span
+                              className={`text-xs font-bold px-3 py-1 rounded-md ${severityConfig.badgeColor} shadow-sm whitespace-nowrap`}
+                            >
+                              {severityConfig.label}
+                            </span>
+                          </div>
+                          <p className={`text-sm font-semibold ${severityConfig.textColor}`}>{canary.signal}</p>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="top"
+                        className="max-w-sm bg-white text-gray-900 border border-gray-200 shadow-lg p-3"
+                      >
+                        <p className="text-sm">{getSignalTooltip(canary.signal)}</p>
+                      </TooltipContent>
+                    </Tooltip>
                   )
                 })}
             </div>
