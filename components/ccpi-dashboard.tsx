@@ -644,7 +644,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
         </Card>
 
         {/* Four Pillars - Collapsible Breakdown */}
-        <Accordion type="multiple" defaultValue={[]} className="space-y-4 pb-6 border-b border-gray-200">
+        <Accordion type="multiple" defaultValue={[]} className="space-y-4">
           {/* Pillar 1 - Momentum & Technical */}
           <AccordionItem value="pillar1" className="border rounded-lg px-4">
             <AccordionTrigger className="hover:no-underline py-10">
@@ -1992,10 +1992,12 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <div className="text-xs text-muted-foreground">Weight: 20% | 7 indicators</div>
                   </div>
                 </div>
-                <div className="text-2xl font-bold text-purple-600">{data.pillars.macro}/100</div>
+                {/* CHANGE: Changed score color from purple to blue to match other pillars */}
+                <div className="text-2xl font-bold text-blue-600">{data.pillars.macro}/100</div>
               </div>
             </AccordionTrigger>
-            <AccordionContent>
+            {/* CHANGE: Added pb-4 to ensure bottom border is visible */}
+            <AccordionContent className="pb-4">
               <div className="space-y-6 pt-4">
                 {/* TED Spread */}
                 {data.indicators?.tedSpread !== undefined && (
