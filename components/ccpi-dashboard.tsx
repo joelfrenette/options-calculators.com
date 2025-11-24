@@ -1985,18 +1985,14 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
           <AccordionItem value="pillar4" className="border rounded-lg px-4">
             <AccordionTrigger className="hover:no-underline py-10">
               <div className="flex items-center justify-between w-full pr-4">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <BarChart3 className="h-5 w-5 text-purple-600" />
-                  <div className="text-left">
-                    <div className="font-semibold text-base">Pillar 4 - Macro</div>
-                    <div className="text-xs text-muted-foreground">Weight: 20% | 7 indicators</div>
-                  </div>
+                  <span className="text-lg font-semibold">Pillar 4 - Macro</span>
+                  <span className="text-sm text-gray-600">Weight: 20% | 7 indicators</span>
                 </div>
-                {/* CHANGE: Changed score color from purple to blue to match other pillars */}
-                <div className="text-2xl font-bold text-blue-600">{data.pillars.macro}/100</div>
+                <span className="text-2xl font-bold text-blue-600">{data.pillars.macro}/100</span>
               </div>
             </AccordionTrigger>
-            {/* CHANGE: Added pb-4 to ensure bottom border is visible */}
             <AccordionContent className="pb-4">
               <div className="space-y-6 pt-4">
                 {/* TED Spread */}
