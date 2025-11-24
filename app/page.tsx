@@ -13,6 +13,7 @@ import { RotatingAdBanner } from "@/components/rotating-ad-banner"
 import { WheelScanner } from "@/components/wheel-scanner"
 import { CpiInflationAnalysis } from "@/components/cpi-inflation-analysis"
 import { CcpiDashboard } from "@/components/ccpi-dashboard"
+import { SocialSentiment } from "@/components/social-sentiment"
 import { Menu, X } from "lucide-react"
 import Image from "next/image"
 
@@ -21,6 +22,7 @@ const TABS = [
   { id: "risk-management", label: "VIX Volatility Index" },
   { id: "market-sentiment", label: "Fear & Greed Index" },
   { id: "panic-euphoria", label: "Panic/Euphoria Index" },
+  { id: "social-sentiment", label: "Social Sentiment Score" },
   { id: "ccpi", label: "CCPI: Crash Prediction Index" },
   { id: "fomc-predictions", label: "Fed Rate Analysis & Forecast" },
   { id: "cpi-inflation", label: "CPI Inflation Analysis & Forecast" },
@@ -167,6 +169,18 @@ export default function Home() {
                 </p>
               </div>
               <PanicEuphoria />
+            </div>
+          )}
+
+          {activeTab === "social-sentiment" && (
+            <div>
+              <div className="mb-4">
+                <p className="text-lg text-gray-600 text-balance">
+                  Live social media and survey sentiment aggregated from Reddit, Twitter, StockTwits, Google Trends,
+                  AAII, and CNN Fear & Greed
+                </p>
+              </div>
+              <SocialSentiment />
             </div>
           )}
 

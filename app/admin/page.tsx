@@ -1,12 +1,29 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from 'next/navigation'
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Download, LogOut, Database, Activity, CheckCircle2, XCircle, AlertCircle, Megaphone, BarChart3, TrendingUp, Gauge, Target, Github, ExternalLink, Trash2, Plus, Save, Image, Key, Zap } from 'lucide-react'
+import {
+  Download,
+  LogOut,
+  Database,
+  Activity,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  BarChart3,
+  Github,
+  ExternalLink,
+  Trash2,
+  Plus,
+  Save,
+  ImageIcon,
+  Zap,
+  Key,
+} from "lucide-react"
 import { ApiKeysManager } from "@/components/api-keys-manager"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CcpiAuditAdmin } from "@/components/ccpi-audit-admin"
@@ -106,36 +123,48 @@ ${auditResults.issues.length === 0 ? "✓ No fake data detected\n✓ No random n
 
 ## DATA SOURCES - ALL VERIFIED AS REAL
 
-${auditResults.dataSources.map((ds: any, i: number) => `
+${auditResults.dataSources
+  .map(
+    (ds: any, i: number) => `
 ${i + 1}. **${ds.page}** - ${ds.endpoint}
    - Primary: ${ds.primary}
    ${ds.fallback ? `- Fallback: ${ds.fallback}` : ""}
    - Status: ${ds.status}
    - Real Data: ${ds.realData ? "YES" : "NO"}
    - Details: ${ds.details || "N/A"}
-`).join("\n")}
+`,
+  )
+  .join("\n")}
 
 ---
 
 ## CALCULATIONS & FORMULAS - ALL LEGITIMATE
 
-${auditResults.calculations.map((calc: any, i: number) => `
+${auditResults.calculations
+  .map(
+    (calc: any, i: number) => `
 ${i + 1}. **${calc.name}**
    - Formula: ${calc.formula}
    - Source: ${calc.source}
    - Inputs: ${calc.inputs}
    - Weighting: ${calc.weighting}
    - ${calc.validated}
-`).join("\n")}
+`,
+  )
+  .join("\n")}
 
 ---
 
 ## CODE QUALITY CHECKS
 
-${auditResults.codeQuality.map((check: any) => `
+${auditResults.codeQuality
+  .map(
+    (check: any) => `
 - **${check.check}**: ${check.status}
   ${check.details}
-`).join("\n")}
+`,
+  )
+  .join("\n")}
 
 ---
 
@@ -153,7 +182,6 @@ ${auditResults.codeQuality.map((check: any) => `
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
   }
-
 
   const fetchAdData = async () => {
     try {
@@ -228,7 +256,6 @@ ${auditResults.codeQuality.map((check: any) => `
     }
   }
 
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
       <div className="max-w-7xl mx-auto">
@@ -245,36 +272,60 @@ ${auditResults.codeQuality.map((check: any) => `
 
         <Tabs defaultValue="status" className="w-full" onValueChange={setActiveTab}>
           <TabsList className="grid grid-cols-3 lg:grid-cols-7 gap-2 bg-slate-800 p-1 h-auto mb-6">
-            <TabsTrigger value="status" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
+            <TabsTrigger
+              value="status"
+              className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900"
+            >
               <Activity className="h-4 w-4 mr-2" />
               API Status
             </TabsTrigger>
-            <TabsTrigger value="ai-status" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
+            <TabsTrigger
+              value="ai-status"
+              className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900"
+            >
               <Zap className="h-4 w-4 mr-2" />
               AI Status
             </TabsTrigger>
-            <TabsTrigger value="sources" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
+            <TabsTrigger
+              value="sources"
+              className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900"
+            >
               <Database className="h-4 w-4 mr-2" />
               Data Sources
             </TabsTrigger>
-            <TabsTrigger value="keys" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
+            <TabsTrigger
+              value="keys"
+              className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900"
+            >
               <Key className="h-4 w-4 mr-2" />
               API Keys Management
             </TabsTrigger>
-            <TabsTrigger value="ccpi-audit" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
+            <TabsTrigger
+              value="ccpi-audit"
+              className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900"
+            >
               <CheckCircle2 className="h-4 w-4 mr-2" />
               CCPI Audit
             </TabsTrigger>
-            <TabsTrigger value="audit" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
+            <TabsTrigger
+              value="audit"
+              className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900"
+            >
               <CheckCircle2 className="h-4 w-4 mr-2" />
               Remaining Site Audit
             </TabsTrigger>
-            <TabsTrigger value="backup" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
+            <TabsTrigger
+              value="backup"
+              className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900"
+            >
               <Database className="h-4 w-4 mr-2" />
               Backup
             </TabsTrigger>
-            <TabsTrigger value="ads" className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900">
-              <Image className="h-4 w-4 mr-2" />
+            <TabsTrigger
+              value="ads"
+              className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900"
+            >
+              <ImageIcon className="h-4 w-4 mr-2" />
               Ads
             </TabsTrigger>
           </TabsList>
@@ -307,7 +358,12 @@ ${auditResults.codeQuality.map((check: any) => `
                       </Button>
                       <Button
                         variant="outline"
-                        onClick={() => window.open('https://vercel.com/joelfrenettes/options-calculators-com/settings/environment-variables', '_blank')}
+                        onClick={() =>
+                          window.open(
+                            "https://vercel.com/joelfrenettes/options-calculators-com/settings/environment-variables",
+                            "_blank",
+                          )
+                        }
                         className="bg-transparent"
                       >
                         <ExternalLink className="mr-2 h-4 w-4" />
@@ -317,7 +373,6 @@ ${auditResults.codeQuality.map((check: any) => `
                   </div>
                 </CardHeader>
                 <CardContent>
-
                   {apiStatuses && apiStatuses.length > 0 && (
                     <div className="space-y-3">
                       {apiStatuses.map((api) => (
@@ -342,31 +397,36 @@ ${auditResults.codeQuality.map((check: any) => `
                                 </span>
                               )}
                             </div>
-                            
+
                             {api.endpoint && (
                               <p className="text-xs text-slate-600 mb-2 font-mono bg-slate-100 px-2 py-1 rounded">
                                 <span className="font-semibold text-slate-700">Endpoint:</span> {api.endpoint}
                               </p>
                             )}
-                            
+
                             <p className="text-sm text-slate-700 mb-2">
-                              <span className="font-semibold">Purpose:</span> {api.message.split(' - ')[1] || api.message}
+                              <span className="font-semibold">Purpose:</span>{" "}
+                              {api.message.split(" - ")[1] || api.message}
                             </p>
-                            
+
                             {api.usedIn && api.usedIn.length > 0 && (
                               <p className="text-sm text-slate-600 mb-2">
                                 <span className="font-semibold">Used in:</span> {api.usedIn.join(", ")}
                               </p>
                             )}
-                            
+
                             <p className="text-sm text-slate-600">
-                              <span className="font-semibold">Status:</span>{' '}
-                              <span className={
-                                api.status === "online" ? "text-green-600 font-semibold" :
-                                api.status === "error" ? "text-red-600 font-semibold" :
-                                "text-yellow-600 font-semibold"
-                              }>
-                                {api.message.split(' - ')[0] || api.message}
+                              <span className="font-semibold">Status:</span>{" "}
+                              <span
+                                className={
+                                  api.status === "online"
+                                    ? "text-green-600 font-semibold"
+                                    : api.status === "error"
+                                      ? "text-red-600 font-semibold"
+                                      : "text-yellow-600 font-semibold"
+                                }
+                              >
+                                {api.message.split(" - ")[0] || api.message}
                               </span>
                             </p>
                             {!api.hasKey && api.status === "error" && (
@@ -384,7 +444,7 @@ ${auditResults.codeQuality.map((check: any) => `
                             ) : (
                               <AlertCircle className="h-8 w-8 text-yellow-600" />
                             )}
-                            
+
                             <div className="flex-shrink-0">
                               {api.status === "online" ? (
                                 <div className="relative">
@@ -560,7 +620,7 @@ ${auditResults.codeQuality.map((check: any) => `
               <Card className="bg-white">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Image className="h-5 w-5 text-blue-600" />
+                    <ImageIcon className="h-5 w-5 text-blue-600" />
                     Ad Banner Management
                   </CardTitle>
                   <CardDescription>Manage rotating banner ads on your site</CardDescription>
@@ -656,7 +716,6 @@ ${auditResults.codeQuality.map((check: any) => `
               </CardContent>
             </Card>
           </TabsContent>
-
         </Tabs>
       </div>
     </div>

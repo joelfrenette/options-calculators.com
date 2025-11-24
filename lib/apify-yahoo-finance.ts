@@ -44,6 +44,36 @@ export async function fetchApifyYahooFinance(ticker: string) {
   }
 }
 
+async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3): Promise<Response> {
+  let lastError: Error | null = null
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options)
+
+      // If we get a 502, retry with exponential backoff
+      if (response.status === 502 && attempt < maxRetries - 1) {
+        const delay = Math.min(1000 * Math.pow(2, attempt), 5000) // Max 5s delay
+        console.log(`[v0] Apify: Got 502, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`)
+        await new Promise((resolve) => setTimeout(resolve, delay))
+        continue
+      }
+
+      return response
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+      if (attempt < maxRetries - 1) {
+        const delay = Math.min(1000 * Math.pow(2, attempt), 5000)
+        console.log(`[v0] Apify: Fetch error, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`)
+        await new Promise((resolve) => setTimeout(resolve, delay))
+        continue
+      }
+    }
+  }
+
+  throw lastError || new Error("Failed after retries")
+}
+
 async function tryActor(actorId: string, actorName: string, ticker: string, token: string) {
   console.log(`[v0] Apify: Starting ${actorName} for ${ticker}...`)
 
@@ -85,73 +115,100 @@ async function tryActor(actorId: string, actorName: string, ticker: string, toke
   const datasetId = runData.data.defaultDatasetId
 
   let attempts = 0
-  const maxAttempts = 60
-  const pollInterval = 2000
+  const maxAttempts = 30 // Reduced from 60 to 30
+  const pollInterval = 3000 // Increased from 2000ms to 3000ms
 
   while (attempts < maxAttempts) {
     await new Promise((resolve) => setTimeout(resolve, pollInterval))
 
-    const statusResponse = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${token}`, {
-      signal: AbortSignal.timeout(10000),
-      headers: { Accept: "application/json" },
-    })
+    try {
+      const statusResponse = await fetchWithRetry(
+        `https://api.apify.com/v2/actor-runs/${runId}?token=${token}`,
+        {
+          signal: AbortSignal.timeout(10000),
+          headers: { Accept: "application/json" },
+        },
+        3, // Retry up to 3 times for 502s
+      )
 
-    if (!statusResponse.ok) {
-      throw new Error(`Failed to fetch run status: ${statusResponse.status}`)
-    }
-
-    const statusContentType = statusResponse.headers.get("content-type")
-    if (!statusContentType || !statusContentType.includes("application/json")) {
-      const errorText = await statusResponse.text()
-      console.error(`[v0] Apify: ${actorName} status returned non-JSON:`, errorText.substring(0, 200))
-      throw new Error(`Non-JSON status response`)
-    }
-
-    const statusData = await statusResponse.json()
-    const status = statusData.data.status
-
-    console.log(`[v0] Apify: ${actorName} poll ${attempts + 1}/${maxAttempts}, status: ${status}`)
-
-    if (status === "SUCCEEDED") {
-      console.log(`[v0] Apify: ${actorName} succeeded, fetching dataset ${datasetId}`)
-
-      const itemsResponse = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${token}`, {
-        signal: AbortSignal.timeout(10000),
-        headers: { Accept: "application/json" },
-      })
-
-      if (!itemsResponse.ok) {
-        throw new Error(`Failed to fetch dataset items: ${itemsResponse.status}`)
+      if (!statusResponse.ok) {
+        console.warn(
+          `[v0] Apify: ${actorName} status check failed with ${statusResponse.status}, will retry on next poll`,
+        )
+        attempts++
+        continue
       }
 
-      const itemsContentType = itemsResponse.headers.get("content-type")
-      if (!itemsContentType || !itemsContentType.includes("application/json")) {
-        const errorText = await itemsResponse.text()
-        console.error(`[v0] Apify: ${actorName} dataset returned non-JSON:`, errorText.substring(0, 200))
-        throw new Error(`Non-JSON dataset response`)
+      const statusContentType = statusResponse.headers.get("content-type")
+      if (!statusContentType || !statusContentType.includes("application/json")) {
+        const errorText = await statusResponse.text()
+        console.error(`[v0] Apify: ${actorName} status returned non-JSON:`, errorText.substring(0, 200))
+        throw new Error(`Non-JSON status response`)
       }
 
-      const items = await itemsResponse.json()
-      console.log(`[v0] Apify: ${actorName} fetched ${items.length} items for ${ticker}`)
+      const statusData = await statusResponse.json()
+      const status = statusData.data.status
 
-      if (!items || items.length === 0) {
-        console.warn(`[v0] Apify: ${actorName} returned no data for ${ticker}`)
-        return null
+      console.log(`[v0] Apify: ${actorName} poll ${attempts + 1}/${maxAttempts}, status: ${status}`)
+
+      if (status === "SUCCEEDED") {
+        console.log(`[v0] Apify: ${actorName} succeeded, fetching dataset ${datasetId}`)
+
+        const itemsResponse = await fetchWithRetry(
+          `https://api.apify.com/v2/datasets/${datasetId}/items?token=${token}`,
+          {
+            signal: AbortSignal.timeout(10000),
+            headers: { Accept: "application/json" },
+          },
+          3,
+        )
+
+        if (!itemsResponse.ok) {
+          throw new Error(`Failed to fetch dataset items: ${itemsResponse.status}`)
+        }
+
+        const itemsContentType = itemsResponse.headers.get("content-type")
+        if (!itemsContentType || !itemsContentType.includes("application/json")) {
+          const errorText = await itemsResponse.text()
+          console.error(`[v0] Apify: ${actorName} dataset returned non-JSON:`, errorText.substring(0, 200))
+          throw new Error(`Non-JSON dataset response`)
+        }
+
+        const items = await itemsResponse.json()
+        console.log(`[v0] Apify: ${actorName} fetched ${items.length} items for ${ticker}`)
+
+        if (!items || items.length === 0) {
+          console.warn(`[v0] Apify: ${actorName} returned no data for ${ticker}`)
+          return null
+        }
+
+        return {
+          data: items[0],
+          dataSource: `apify-live-${actorName.toLowerCase().replace(/\s/g, "-")}`,
+          actorUsed: actorName,
+          timestamp: new Date().toISOString(),
+        }
       }
 
-      return {
-        data: items[0],
-        dataSource: `apify-live-${actorName.toLowerCase().replace(/\s/g, "-")}`,
-        actorUsed: actorName,
-        timestamp: new Date().toISOString(),
+      if (status === "FAILED" || status === "ABORTED" || status === "TIMED-OUT") {
+        throw new Error(`Actor run ${status}`)
       }
+
+      attempts++
+    } catch (error) {
+      console.warn(
+        `[v0] Apify: ${actorName} poll ${attempts + 1} error:`,
+        error instanceof Error ? error.message : String(error),
+      )
+
+      // If we're near the end of max attempts, throw the error
+      if (attempts >= maxAttempts - 3) {
+        throw error
+      }
+
+      // Otherwise, continue polling
+      attempts++
     }
-
-    if (status === "FAILED" || status === "ABORTED" || status === "TIMED-OUT") {
-      throw new Error(`Actor run ${status}`)
-    }
-
-    attempts++
   }
 
   throw new Error(`Actor run timed out after ${(maxAttempts * pollInterval) / 1000} seconds`)

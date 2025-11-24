@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
 
 interface CPIData {
   currentCPI: number
@@ -86,6 +88,42 @@ export function CpiInflationAnalysis() {
     if (pressure === "High") return "bg-red-100 text-red-800 border-red-300"
     if (pressure === "Moderate") return "bg-yellow-100 text-yellow-800 border-yellow-300"
     return "bg-green-100 text-green-800 border-green-300"
+  }
+
+  if (loading) {
+    return (
+      <div className="container mx-auto p-4 max-w-7xl space-y-6">
+        <div className="text-center py-12">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="mt-4 text-gray-600">Loading CPI inflation data...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto p-4 max-w-7xl space-y-6">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+        <button onClick={fetchCPIData} className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
+          Try Again
+        </button>
+      </div>
+    )
+  }
+
+  if (!cpiData) {
+    return (
+      <div className="container mx-auto p-4 max-w-7xl space-y-6">
+        <div className="text-center py-12">
+          <p className="text-gray-600">No data available</p>
+        </div>
+      </div>
+    )
   }
 
   return (

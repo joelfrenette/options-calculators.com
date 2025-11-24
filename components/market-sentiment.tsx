@@ -429,19 +429,6 @@ export function MarketSentiment() {
   const CACHE_VERSION_KEY = "fearGreedCacheVersion"
   const CACHE_VERSION = "11.0" // Updated cache version to force refresh
 
-  // Placeholder declarations for variables used in useEffect and fetchData
-  // const [marketData, setMarketData] = useState<MarketData | null>(null)
-  // const [sentimentData, setSentimentData] = useState<SentimentData[]>([])
-  // const [loading, setLoading] = useState<boolean>(true)
-  // const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
-  // const [refreshing, setRefreshing] = useState<boolean>(false)
-
-  // Define cache keys and version
-  // const CACHE_KEY = "marketSentimentData"
-  // const CACHE_TIMESTAMP_KEY = "marketSentimentTimestamp"
-  // const CACHE_VERSION_KEY = "marketSentimentCacheVersion"
-  // const CACHE_VERSION = "v1" // Increment this when the cache structure changes
-
   // Define components based on CNN's Fear & Greed Index indicators
   const components = [
     {
@@ -1314,78 +1301,6 @@ export function MarketSentiment() {
           )
         })}
       </div>
-
-      {/* Sentiment Heatmap - KEEP */}
-      <Card className="shadow-sm border-gray-200">
-        <CardHeader className="bg-gray-50 border-b border-gray-200">
-          <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <TrendingUpIcon className="h-5 w-5 text-primary" />
-            Sentiment Heatmap
-          </CardTitle>
-          <p className="text-sm text-gray-600 mt-1">
-            AI-powered sentiment from social media discussions (Reddit, Twitter/X, financial forums)
-          </p>
-        </CardHeader>
-        <CardContent className="pt-4">
-          {/* Indices Section */}
-          <div>
-            <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-              <BarChartIcon className="h-4 w-4 text-primary" />
-              Major Indices
-            </h3>
-            <div className="space-y-3">
-              {safeSentimentData
-                .filter((item) => item.category === "index")
-                .map((item) => (
-                  <div
-                    key={item.ticker}
-                    className="p-4 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <div className="font-bold text-gray-900">{item.ticker}</div>
-                        <div className="text-sm text-gray-600">{item.sector}</div>
-                      </div>
-                      <div className="text-right">
-                        <div
-                          className={`text-lg font-bold ${item.netSentiment > 0 ? "text-green-600" : "text-red-600"}`}
-                        >
-                          {item.netSentiment > 0 ? "+" : ""}
-                          {item.netSentiment}
-                        </div>
-                        <div className="text-xs text-gray-500">{item.volume.toLocaleString()}k avg volume</div>
-                      </div>
-                    </div>
-
-                    {/* Sentiment Bar */}
-                    <div className="relative h-8 bg-gray-100 rounded-full overflow-hidden">
-                      {/* Smooth gradient background */}
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-
-                      {/* Visual marker showing the net sentiment position */}
-                      <div
-                        className="absolute top-0 bottom-0 w-1 bg-black/50"
-                        style={{
-                          left: `${item.bullishScore}%`,
-                          transition: "left 0.3s ease",
-                        }}
-                      />
-
-                      <div className="absolute inset-0 flex items-center justify-between px-3 text-xs font-semibold">
-                        <span className="text-white drop-shadow-md">Bullish {item.bullishScore}%</span>
-                        <span className="text-white drop-shadow-md">Bearish {item.bearishScore}%</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </div>
-
-          <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600">
-            AI-analyzed sentiment from Reddit, Twitter/X, YouTube, and financial forums. Updated every 15 minutes.
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Trade Recommendations accordion */}
       <Accordion type="multiple" className="space-y-0">
