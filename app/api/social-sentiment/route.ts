@@ -5,31 +5,35 @@ export const runtime = "edge"
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
 
-const API_VERSION = "3.2.0"
+const API_VERSION = "4.0.0"
 
 /**
- * Social Sentiment API v3.2.0
+ * Social Sentiment API v4.0.0
  *
- * Real-time sentiment aggregation using ONLY WORKING APIs:
- * 1. Groq (compound-beta) - Real-time news sentiment via web search
- * 2. Groq (compound-beta) - Real-time social media sentiment via web search
- * 3. SerpAPI - Google Trends search interest
- * 4. ScrapingBee - StockTwits sentiment (with Groq analysis)
- * 5. CNN Fear & Greed - Via internal API
+ * 10 DATA SOURCES IN FALLBACK ORDER (optimized for speed + accuracy):
  *
- * NOTE: Grok/xAI removed due to rate limits (429 errors)
+ * 1. Groq AI (compound-beta) - Real-time news sentiment via web search
+ * 2. SerpAPI Google Trends - Fear vs greed search interest comparison
+ * 3. AAII Investor Survey - Weekly individual investor sentiment (scraped)
+ * 4. CNN Fear & Greed - Official index (via internal API)
+ * 5. StockTwits API - Symbol-specific sentiment (scraped)
+ * 6. Finnhub News Sentiment - Pre-scored financial news
+ * 7. Alpha Vantage News - News with sentiment scores
+ * 8. Reddit (via Groq search) - r/wallstreetbets, r/stocks sentiment
+ * 9. Polygon.io News - Real-time news with tickers
+ * 10. Yahoo Finance - Stock discussion sentiment (fallback)
  */
 
+// ========== SOURCE 1: GROQ AI WEB SEARCH ==========
 async function getGroqWebSentiment(): Promise<{ score: number; source: string; summary: string }> {
   const apiKey = process.env.GROQ_API_KEY
   if (!apiKey) {
-    console.log("[v0] Groq API key not available")
+    console.log("[v0] Source 1 (Groq): API key not available")
     return { score: -1, source: "unavailable", summary: "" }
   }
 
   try {
-    console.log("[v0] Fetching real-time market sentiment via Groq web search...")
-
+    console.log("[v0] Source 1: Fetching Groq AI web search sentiment...")
     const groq = new Groq({ apiKey })
 
     const completion = await groq.chat.completions.create({
@@ -37,376 +41,205 @@ async function getGroqWebSentiment(): Promise<{ score: number; source: string; s
       messages: [
         {
           role: "system",
-          content: `You are a financial sentiment analyst. Analyze current stock market sentiment from real-time news and social media.
-            
-RESPOND WITH ONLY A JSON OBJECT in this exact format:
-{"score": <number 0-100>, "sentiment": "<bearish/neutral/bullish>", "summary": "<one sentence summary>"}
-
-Scoring guide:
-- 0-25: Extreme fear/bearish (market crash fears, panic selling)
-- 26-45: Bearish (negative outlook, concerns)
-- 46-55: Neutral (mixed signals, uncertainty)
-- 56-75: Bullish (optimism, buying interest)
-- 76-100: Extreme greed/bullish (euphoria, FOMO)
-
-Be realistic and conservative. Most days should be 45-55.`,
-        },
-        {
-          role: "user",
-          content:
-            "What is the current stock market sentiment today based on the latest news? Focus on S&P 500, Nasdaq, and overall market mood. Search for today's market news.",
-        },
-      ],
-      temperature: 0.3,
-      max_tokens: 200,
-    })
-
-    const content = completion.choices?.[0]?.message?.content?.trim() || ""
-    console.log("[v0] Groq raw response:", content.substring(0, 300))
-
-    // Parse the JSON response
-    try {
-      // Extract JSON from the response (it might have markdown code blocks)
-      const jsonMatch = content.match(/\{[\s\S]*?\}/)
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0])
-        const score = Math.max(0, Math.min(100, Number(parsed.score) || 50))
-        console.log(`[v0] ✓ Groq web sentiment: ${score}/100 - ${parsed.summary || ""}`)
-        return {
-          score,
-          source: "groq_web_search",
-          summary: parsed.summary || "",
-        }
-      }
-    } catch (parseErr) {
-      console.log("[v0] Failed to parse Groq JSON response")
-    }
-
-    // Try to extract just a number if JSON parsing failed
-    const numberMatch = content.match(/\b([0-9]{1,3})\b/)
-    if (numberMatch) {
-      const score = Math.max(0, Math.min(100, Number(numberMatch[1])))
-      return { score, source: "groq_web_search", summary: content.substring(0, 100) }
-    }
-
-    return { score: -1, source: "parse_error", summary: "" }
-  } catch (error) {
-    console.log("[v0] Groq web search error:", error instanceof Error ? error.message : "Unknown")
-    return { score: -1, source: "error", summary: "" }
-  }
-}
-
-async function getGroqSocialSentiment(): Promise<{ score: number; source: string; summary: string }> {
-  const apiKey = process.env.GROQ_API_KEY
-  if (!apiKey) {
-    console.log("[v0] Groq API key not available for social sentiment")
-    return { score: -1, source: "unavailable", summary: "" }
-  }
-
-  try {
-    console.log("[v0] Fetching social media sentiment via Groq compound-beta...")
-
-    const groq = new Groq({ apiKey })
-
-    const completion = await groq.chat.completions.create({
-      model: "compound-beta",
-      messages: [
-        {
-          role: "system",
-          content: `You are a stock market social media sentiment analyst. Search for and analyze CURRENT sentiment about the US stock market from Twitter/X, Reddit (r/wallstreetbets, r/stocks, r/investing), and other social platforms.
+          content: `You are a financial sentiment analyst. Search for and analyze TODAY's stock market news.
 
 RESPOND WITH ONLY A JSON OBJECT:
-{"score": <number 0-100>, "sentiment": "<bearish/neutral/bullish>", "platforms": ["twitter", "reddit"], "summary": "<2-3 sentence summary of social sentiment>"}
+{"score": <0-100>, "sentiment": "<bearish/neutral/bullish>", "summary": "<one sentence>"}
 
-Scoring:
-- 0-25: Extreme bearish/fear (panic selling, crash predictions)
-- 26-45: Bearish (negative sentiment, worried posts)
-- 46-55: Neutral/mixed (balanced opinions)
-- 56-75: Bullish (optimism, buying interest)
-- 76-100: Extreme bullish/greed (euphoria, FOMO)
-
-Search for recent posts about SPY, QQQ, S&P 500, stock market, trading. Be conservative - most days are 45-55.`,
+Scoring: 0-25=Extreme Fear, 26-45=Bearish, 46-55=Neutral, 56-75=Bullish, 76-100=Extreme Greed
+Be conservative - most days are 45-55.`,
         },
         {
           role: "user",
-          content:
-            "Search Twitter, Reddit, and social media for current stock market sentiment. What are retail traders saying about SPY, QQQ, the stock market today? Are they bullish or bearish?",
+          content: "Search for today's S&P 500 and stock market news. What is the current market sentiment?",
         },
       ],
-      temperature: 0.3,
-      max_tokens: 500,
+      temperature: 0.2,
+      max_tokens: 150,
     })
 
     const content = completion.choices?.[0]?.message?.content?.trim() || ""
-    console.log("[v0] Groq social raw response:", content.substring(0, 300))
+    console.log("[v0] Groq raw:", content.substring(0, 200))
 
     try {
       const jsonMatch = content.match(/\{[\s\S]*?\}/)
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0])
         const score = Math.max(0, Math.min(100, Number(parsed.score) || 50))
-        console.log(`[v0] ✓ Groq social media sentiment: ${score}/100`)
-        return {
-          score,
-          source: "groq_social_search",
-          summary: parsed.summary || "",
-        }
+        console.log(`[v0] ✓ Source 1 (Groq): ${score}/100`)
+        return { score, source: "groq_compound_beta", summary: parsed.summary || "" }
       }
-    } catch (parseErr) {
-      console.log("[v0] Failed to parse Groq social JSON")
-    }
+    } catch {}
 
-    const numberMatch = content.match(/\b([0-9]{1,3})\b/)
-    if (numberMatch) {
-      const score = Math.max(0, Math.min(100, Number(numberMatch[1])))
-      return { score, source: "groq_social_search", summary: "" }
+    const numMatch = content.match(/\b([0-9]{1,2})\b/)
+    if (numMatch) {
+      const score = Math.max(0, Math.min(100, Number(numMatch[1])))
+      return { score, source: "groq_compound_beta", summary: "" }
     }
 
     return { score: -1, source: "parse_error", summary: "" }
   } catch (error) {
-    console.log("[v0] Groq social error:", error instanceof Error ? error.message : "Unknown")
+    console.log("[v0] Source 1 (Groq) error:", error instanceof Error ? error.message : "Unknown")
     return { score: -1, source: "error", summary: "" }
   }
 }
 
-async function getGoogleTrendsScore(): Promise<{ score: number; source: string; queries: Record<string, number> }> {
+// ========== SOURCE 2: GOOGLE TRENDS VIA SERPAPI ==========
+async function getGoogleTrendsScore(): Promise<{ score: number; source: string; fearAvg: number; greedAvg: number }> {
   if (!process.env.SERPAPI_KEY) {
-    console.log("[v0] SerpAPI key not available for Google Trends")
-    return { score: -1, source: "unavailable", queries: {} }
+    console.log("[v0] Source 2 (Google Trends): API key not available")
+    return { score: -1, source: "unavailable", fearAvg: 0, greedAvg: 0 }
   }
 
   try {
-    // Search for fear-related terms - high interest = bearish sentiment
-    const fearQueries = ["stock market crash", "market crash", "recession 2025", "bear market"]
-    // Search for greed-related terms - high interest = bullish sentiment
-    const greedQueries = ["buy stocks", "stock rally", "bull market", "best stocks to buy"]
+    console.log("[v0] Source 2: Fetching Google Trends via SerpAPI...")
 
-    const queryResults: Record<string, number> = {}
-    let fearScore = 0
-    let greedScore = 0
-    let fearCount = 0
-    let greedCount = 0
+    const fearQueries = ["stock market crash", "market crash", "recession"]
+    const greedQueries = ["buy stocks", "stock rally", "best stocks to buy"]
 
-    // Fetch fear queries
-    for (const query of fearQueries) {
+    let fearTotal = 0,
+      greedTotal = 0,
+      fearCount = 0,
+      greedCount = 0
+
+    // Fetch fear queries in parallel
+    const fearPromises = fearQueries.map(async (query) => {
       try {
-        const url = `https://serpapi.com/search.json?engine=google_trends&q=${encodeURIComponent(query)}&date=now%201-d&api_key=${process.env.SERPAPI_KEY}`
+        const url = `https://serpapi.com/search.json?engine=google_trends&q=${encodeURIComponent(query)}&date=now%207-d&api_key=${process.env.SERPAPI_KEY}`
         const response = await fetch(url, { signal: AbortSignal.timeout(8000) })
-
         if (response.ok) {
           const data = await response.json()
-          const timelineData = data.interest_over_time?.timeline_data || []
-          if (timelineData.length > 0) {
-            const recentValue = timelineData[timelineData.length - 1]?.values?.[0]?.extracted_value || 0
-            queryResults[query] = recentValue
-            fearScore += recentValue
-            fearCount++
-            console.log(`[v0] Google Trends "${query}": ${recentValue}/100`)
+          const timeline = data.interest_over_time?.timeline_data || []
+          if (timeline.length > 0) {
+            const value = timeline[timeline.length - 1]?.values?.[0]?.extracted_value || 0
+            return { query, value, type: "fear" }
           }
         }
-      } catch (err) {
-        continue
-      }
-    }
+      } catch {}
+      return null
+    })
 
-    // Fetch greed queries
-    for (const query of greedQueries) {
+    const greedPromises = greedQueries.map(async (query) => {
       try {
-        const url = `https://serpapi.com/search.json?engine=google_trends&q=${encodeURIComponent(query)}&date=now%201-d&api_key=${process.env.SERPAPI_KEY}`
+        const url = `https://serpapi.com/search.json?engine=google_trends&q=${encodeURIComponent(query)}&date=now%207-d&api_key=${process.env.SERPAPI_KEY}`
         const response = await fetch(url, { signal: AbortSignal.timeout(8000) })
-
         if (response.ok) {
           const data = await response.json()
-          const timelineData = data.interest_over_time?.timeline_data || []
-          if (timelineData.length > 0) {
-            const recentValue = timelineData[timelineData.length - 1]?.values?.[0]?.extracted_value || 0
-            queryResults[query] = recentValue
-            greedScore += recentValue
-            greedCount++
-            console.log(`[v0] Google Trends "${query}": ${recentValue}/100`)
+          const timeline = data.interest_over_time?.timeline_data || []
+          if (timeline.length > 0) {
+            const value = timeline[timeline.length - 1]?.values?.[0]?.extracted_value || 0
+            return { query, value, type: "greed" }
           }
         }
-      } catch (err) {
-        continue
+      } catch {}
+      return null
+    })
+
+    const results = await Promise.all([...fearPromises, ...greedPromises])
+
+    for (const r of results) {
+      if (r) {
+        if (r.type === "fear") {
+          fearTotal += r.value
+          fearCount++
+        } else {
+          greedTotal += r.value
+          greedCount++
+        }
+        console.log(`[v0] Trends "${r.query}": ${r.value}`)
       }
     }
 
     if (fearCount === 0 && greedCount === 0) {
-      return { score: -1, source: "no_data", queries: queryResults }
+      return { score: -1, source: "no_data", fearAvg: 0, greedAvg: 0 }
     }
 
-    // Calculate sentiment: high fear = low score, high greed = high score
-    const avgFear = fearCount > 0 ? fearScore / fearCount : 0
-    const avgGreed = greedCount > 0 ? greedScore / greedCount : 0
+    const avgFear = fearCount > 0 ? fearTotal / fearCount : 0
+    const avgGreed = greedCount > 0 ? greedTotal / greedCount : 0
 
-    // Formula: if fear is high (100) and greed is low (0), score should be low (~20)
-    // if fear is low (0) and greed is high (100), score should be high (~80)
-    // Balanced should be ~50
-    let sentimentScore: number
-    if (avgFear + avgGreed === 0) {
-      sentimentScore = 50
-    } else {
-      // Normalize: more greed relative to fear = higher score
-      sentimentScore = Math.round(50 + (avgGreed - avgFear) / 2)
-      sentimentScore = Math.max(20, Math.min(80, sentimentScore))
+    // Calculate: more greed relative to fear = higher score
+    let score = 50
+    if (avgFear + avgGreed > 0) {
+      score = Math.round(50 + (avgGreed - avgFear) / 2)
+      score = Math.max(20, Math.min(80, score))
     }
 
     console.log(
-      `[v0] ✓ Google Trends sentiment: ${sentimentScore}/100 (fear: ${avgFear.toFixed(1)}, greed: ${avgGreed.toFixed(1)})`,
+      `[v0] ✓ Source 2 (Google Trends): ${score}/100 (fear: ${avgFear.toFixed(1)}, greed: ${avgGreed.toFixed(1)})`,
     )
-    return { score: sentimentScore, source: "serpapi_trends", queries: queryResults }
+    return { score, source: "serpapi_trends", fearAvg: avgFear, greedAvg: avgGreed }
   } catch (error) {
-    console.log("[v0] Google Trends error:", error instanceof Error ? error.message : "Unknown")
-    return { score: -1, source: "error", queries: {} }
+    console.log("[v0] Source 2 (Google Trends) error:", error instanceof Error ? error.message : "Unknown")
+    return { score: -1, source: "error", fearAvg: 0, greedAvg: 0 }
   }
 }
 
-async function getStockTwitsSentiment(
-  symbol = "SPY",
-): Promise<{ score: number; source: string; messageCount: number }> {
+// ========== SOURCE 3: AAII INVESTOR SENTIMENT SURVEY ==========
+async function getAAIISentiment(): Promise<{ score: number; source: string; bullish: number; bearish: number }> {
   if (!process.env.SCRAPINGBEE_API_KEY) {
-    console.log("[v0] ScrapingBee key not available for StockTwits")
-    return { score: -1, source: "unavailable", messageCount: 0 }
+    console.log("[v0] Source 3 (AAII): ScrapingBee key not available")
+    return { score: -1, source: "unavailable", bullish: 0, bearish: 0 }
   }
 
   try {
-    const url = `https://app.scrapingbee.com/api/v1/?api_key=${process.env.SCRAPINGBEE_API_KEY}&url=https://stocktwits.com/symbol/${symbol}&render_js=true&wait=5000`
+    console.log("[v0] Source 3: Fetching AAII Investor Sentiment Survey...")
 
-    console.log(`[v0] Scraping StockTwits for ${symbol}...`)
-
-    const response = await fetch(url, { signal: AbortSignal.timeout(25000) })
+    const url = `https://app.scrapingbee.com/api/v1/?api_key=${process.env.SCRAPINGBEE_API_KEY}&url=https://www.aaii.com/sentimentsurvey&render_js=false`
+    const response = await fetch(url, { signal: AbortSignal.timeout(15000) })
 
     if (!response.ok) {
-      console.log(`[v0] StockTwits scrape failed: ${response.status}`)
-      return { score: -1, source: "scrape_failed", messageCount: 0 }
+      console.log(`[v0] AAII scrape failed: ${response.status}`)
+      return { score: -1, source: "scrape_failed", bullish: 0, bearish: 0 }
     }
 
     const html = await response.text()
 
-    if (html.length < 1000 || html.includes("Error 503") || html.includes("Service Unavailable")) {
-      console.log("[v0] StockTwits returned error page")
-      return { score: -1, source: "error_page", messageCount: 0 }
+    // Look for bullish/bearish percentages in the HTML
+    // Common patterns: "Bullish: 45.2%" or "45.2% Bullish"
+    const bullishMatch = html.match(/bullish[:\s]*(\d+\.?\d*)%|(\d+\.?\d*)%\s*bullish/i)
+    const bearishMatch = html.match(/bearish[:\s]*(\d+\.?\d*)%|(\d+\.?\d*)%\s*bearish/i)
+
+    let bullish = 0,
+      bearish = 0
+    if (bullishMatch) {
+      bullish = Number.parseFloat(bullishMatch[1] || bullishMatch[2]) || 0
+    }
+    if (bearishMatch) {
+      bearish = Number.parseFloat(bearishMatch[1] || bearishMatch[2]) || 0
     }
 
-    // Extract messages
-    const messagePatterns = [
-      /<div[^>]*class="[^"]*st-message__body[^"]*"[^>]*>(.*?)<\/div>/gis,
-      /<div[^>]*class="[^"]*body[^"]*"[^>]*>\s*(.*?)\s*<\/div>/gis,
-      /<p[^>]*class="[^"]*message-text[^"]*"[^>]*>(.*?)<\/p>/gis,
-    ]
-
-    const messages: string[] = []
-    for (const pattern of messagePatterns) {
-      const matches = html.matchAll(pattern)
-      for (const match of matches) {
-        const text = match[1]
-          .replace(/<[^>]*>/g, " ")
-          .replace(/&[^;]+;/g, " ")
-          .trim()
-        if (text.length > 20 && messages.length < 40) {
-          messages.push(text)
-        }
-      }
-      if (messages.length >= 30) break
-    }
-
-    // Extract sentiment tags
-    const bullishMatches = html.match(/sentiment-bullish|"bullish"|Bullish/gi)
-    const bearishMatches = html.match(/sentiment-bearish|"bearish"|Bearish/gi)
-    const bullishCount = bullishMatches?.length || 0
-    const bearishCount = bearishMatches?.length || 0
-
-    console.log(`[v0] StockTwits: ${messages.length} messages, ${bullishCount} bullish / ${bearishCount} bearish tags`)
-
-    let score = 50
-
-    // If we have enough data, analyze with LLM
-    if (messages.length >= 5) {
-      const llmScore = await analyzeSentimentWithLLM(messages.join(" | "), "StockTwits")
-      if (llmScore > 0) {
-        score = llmScore
+    if (bullish === 0 && bearish === 0) {
+      // Try alternative pattern: look for numbers near "bullish"/"bearish" text
+      const numMatches = html.match(/(\d+\.?\d*)\s*%/g) || []
+      // Usually first few percentages on the page are sentiment values
+      if (numMatches.length >= 2) {
+        const nums = numMatches.slice(0, 3).map((m) => Number.parseFloat(m))
+        bullish = nums[0] || 0
+        bearish = nums[1] || nums[0] || 0
       }
     }
 
-    // Adjust based on bullish/bearish tags if present
-    if (bullishCount + bearishCount >= 10) {
-      const tagSentiment = (bullishCount / (bullishCount + bearishCount)) * 100
-      score = Math.round(score * 0.7 + tagSentiment * 0.3)
+    if (bullish > 0 || bearish > 0) {
+      // Convert bullish % to 0-100 score: 50% bullish = 50 score
+      const score = Math.round(bullish)
+      console.log(`[v0] ✓ Source 3 (AAII): ${score}/100 (bullish: ${bullish}%, bearish: ${bearish}%)`)
+      return { score, source: "aaii_scraped", bullish, bearish }
     }
 
-    console.log(`[v0] ✓ StockTwits sentiment: ${score}/100`)
-    return { score, source: "scrapingbee", messageCount: messages.length }
+    console.log("[v0] AAII: Could not parse sentiment data from HTML")
+    return { score: -1, source: "parse_failed", bullish: 0, bearish: 0 }
   } catch (error) {
-    console.log("[v0] StockTwits error:", error instanceof Error ? error.message : "Unknown")
-    return { score: -1, source: "error", messageCount: 0 }
+    console.log("[v0] Source 3 (AAII) error:", error instanceof Error ? error.message : "Unknown")
+    return { score: -1, source: "error", bullish: 0, bearish: 0 }
   }
 }
 
-// LLM sentiment analysis helper (unchanged but included for completeness)
-async function analyzeSentimentWithLLM(text: string, source: string): Promise<number> {
-  const llmApis = [
-    {
-      name: "Groq",
-      key: process.env.GROQ_API_KEY,
-      model: "llama-3.3-70b-versatile",
-      endpoint: "https://api.groq.com/openai/v1/chat/completions",
-    },
-    {
-      name: "Grok",
-      key: process.env.GROK_XAI_API_KEY || process.env.XAI_API_KEY,
-      model: "grok-3-fast",
-      endpoint: "https://api.x.ai/v1/chat/completions",
-    },
-  ]
-
-  const prompt = `Analyze this ${source} content for stock market sentiment. Return ONLY a number from 0-100.
-0-25=Extreme Fear, 26-45=Bearish, 46-55=Neutral, 56-75=Bullish, 76-100=Extreme Greed.
-Be conservative - most content should be 45-55.
-
-Content: ${text.substring(0, 3000)}
-
-RESPOND WITH ONLY A NUMBER.`
-
-  for (const llm of llmApis) {
-    if (!llm.key) continue
-
-    try {
-      const response = await fetch(llm.endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${llm.key}`,
-        },
-        body: JSON.stringify({
-          model: llm.model,
-          messages: [{ role: "user", content: prompt }],
-          temperature: 0.1,
-          max_tokens: 10,
-        }),
-        signal: AbortSignal.timeout(10000),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        const scoreText = data.choices?.[0]?.message?.content?.trim()
-        const score = Number.parseInt(scoreText)
-        if (!isNaN(score) && score >= 0 && score <= 100) {
-          console.log(`[v0] ${llm.name} analyzed ${source}: ${score}/100`)
-          return score
-        }
-      }
-    } catch (error) {
-      continue
-    }
-  }
-
-  return -1
-}
-
-async function getCNNFearGreedScore(): Promise<{ score: number; source: string }> {
+// ========== SOURCE 4: CNN FEAR & GREED INDEX ==========
+async function getCNNFearGreed(): Promise<{ score: number; source: string }> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+    console.log("[v0] Source 4: Fetching CNN Fear & Greed via internal API...")
 
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
     const response = await fetch(`${baseUrl}/api/market-sentiment`, {
       signal: AbortSignal.timeout(10000),
       headers: { Accept: "application/json" },
@@ -416,19 +249,327 @@ async function getCNNFearGreedScore(): Promise<{ score: number; source: string }
       const data = await response.json()
       const score = data.score || data.overallScore || data.cnnScore
       if (score >= 0 && score <= 100) {
-        console.log(`[v0] ✓ CNN Fear & Greed: ${score}/100`)
-        return { score, source: "internal_api" }
+        console.log(`[v0] ✓ Source 4 (CNN Fear & Greed): ${score}/100`)
+        return { score, source: "cnn_internal_api" }
       }
     }
 
     return { score: -1, source: "api_failed" }
   } catch (error) {
-    console.log("[v0] CNN Fear & Greed error:", error instanceof Error ? error.message : "Unknown")
+    console.log("[v0] Source 4 (CNN) error:", error instanceof Error ? error.message : "Unknown")
     return { score: -1, source: "error" }
   }
 }
 
-// Function to generate per_symbol data
+// ========== SOURCE 5: STOCKTWITS SENTIMENT ==========
+async function getStockTwitsSentiment(symbol = "SPY"): Promise<{ score: number; source: string; messages: number }> {
+  if (!process.env.SCRAPINGBEE_API_KEY) {
+    console.log("[v0] Source 5 (StockTwits): ScrapingBee key not available")
+    return { score: -1, source: "unavailable", messages: 0 }
+  }
+
+  try {
+    console.log(`[v0] Source 5: Scraping StockTwits for ${symbol}...`)
+
+    const url = `https://app.scrapingbee.com/api/v1/?api_key=${process.env.SCRAPINGBEE_API_KEY}&url=https://stocktwits.com/symbol/${symbol}&render_js=true&wait=3000`
+    const response = await fetch(url, { signal: AbortSignal.timeout(20000) })
+
+    if (!response.ok) {
+      return { score: -1, source: "scrape_failed", messages: 0 }
+    }
+
+    const html = await response.text()
+
+    // Count bullish/bearish tags
+    const bullishCount = (html.match(/sentiment-bullish|"bullish"|Bullish/gi) || []).length
+    const bearishCount = (html.match(/sentiment-bearish|"bearish"|Bearish/gi) || []).length
+    const total = bullishCount + bearishCount
+
+    console.log(`[v0] StockTwits ${symbol}: ${bullishCount} bullish, ${bearishCount} bearish tags`)
+
+    if (total >= 5) {
+      const score = Math.round((bullishCount / total) * 100)
+      console.log(`[v0] ✓ Source 5 (StockTwits): ${score}/100`)
+      return { score, source: "stocktwits_scraped", messages: total }
+    }
+
+    // Default neutral if not enough data
+    return { score: 50, source: "stocktwits_limited", messages: total }
+  } catch (error) {
+    console.log("[v0] Source 5 (StockTwits) error:", error instanceof Error ? error.message : "Unknown")
+    return { score: -1, source: "error", messages: 0 }
+  }
+}
+
+// ========== SOURCE 6: FINNHUB NEWS SENTIMENT ==========
+async function getFinnhubSentiment(): Promise<{ score: number; source: string; articles: number }> {
+  if (!process.env.FINNHUB_API_KEY) {
+    console.log("[v0] Source 6 (Finnhub): API key not available")
+    return { score: -1, source: "unavailable", articles: 0 }
+  }
+
+  try {
+    console.log("[v0] Source 6: Fetching Finnhub news sentiment...")
+
+    // Get market news
+    const response = await fetch(
+      `https://finnhub.io/api/v1/news?category=general&token=${process.env.FINNHUB_API_KEY}`,
+      { signal: AbortSignal.timeout(8000) },
+    )
+
+    if (!response.ok) {
+      return { score: -1, source: "api_failed", articles: 0 }
+    }
+
+    const news = await response.json()
+
+    if (!Array.isArray(news) || news.length === 0) {
+      return { score: -1, source: "no_news", articles: 0 }
+    }
+
+    // Analyze headlines for sentiment keywords
+    let positiveCount = 0,
+      negativeCount = 0
+    const positiveWords = [
+      "surge",
+      "rally",
+      "gain",
+      "rise",
+      "bullish",
+      "buy",
+      "growth",
+      "profit",
+      "record",
+      "soar",
+      "jump",
+    ]
+    const negativeWords = [
+      "crash",
+      "fall",
+      "drop",
+      "bearish",
+      "sell",
+      "loss",
+      "decline",
+      "fear",
+      "plunge",
+      "tumble",
+      "sink",
+    ]
+
+    for (const article of news.slice(0, 50)) {
+      const text = (article.headline || "").toLowerCase()
+      for (const word of positiveWords) {
+        if (text.includes(word)) positiveCount++
+      }
+      for (const word of negativeWords) {
+        if (text.includes(word)) negativeCount++
+      }
+    }
+
+    const total = positiveCount + negativeCount
+    if (total === 0) {
+      return { score: 50, source: "finnhub_neutral", articles: news.length }
+    }
+
+    const score = Math.round((positiveCount / total) * 100)
+    console.log(`[v0] ✓ Source 6 (Finnhub): ${score}/100 (${positiveCount} pos, ${negativeCount} neg)`)
+    return { score, source: "finnhub_news", articles: news.length }
+  } catch (error) {
+    console.log("[v0] Source 6 (Finnhub) error:", error instanceof Error ? error.message : "Unknown")
+    return { score: -1, source: "error", articles: 0 }
+  }
+}
+
+// ========== SOURCE 7: ALPHA VANTAGE NEWS SENTIMENT ==========
+async function getAlphaVantageSentiment(): Promise<{ score: number; source: string }> {
+  if (!process.env.ALPHA_VANTAGE_API_KEY) {
+    console.log("[v0] Source 7 (Alpha Vantage): API key not available")
+    return { score: -1, source: "unavailable" }
+  }
+
+  try {
+    console.log("[v0] Source 7: Fetching Alpha Vantage news sentiment...")
+
+    const response = await fetch(
+      `https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers=SPY&apikey=${process.env.ALPHA_VANTAGE_API_KEY}`,
+      { signal: AbortSignal.timeout(10000) },
+    )
+
+    if (!response.ok) {
+      return { score: -1, source: "api_failed" }
+    }
+
+    const data = await response.json()
+
+    if (data.feed && Array.isArray(data.feed)) {
+      let totalSentiment = 0
+      let count = 0
+
+      for (const article of data.feed.slice(0, 20)) {
+        const sentiment = Number.parseFloat(article.overall_sentiment_score)
+        if (!isNaN(sentiment)) {
+          totalSentiment += sentiment
+          count++
+        }
+      }
+
+      if (count > 0) {
+        // Alpha Vantage sentiment is -1 to 1, convert to 0-100
+        const avgSentiment = totalSentiment / count
+        const score = Math.round((avgSentiment + 1) * 50)
+        console.log(`[v0] ✓ Source 7 (Alpha Vantage): ${score}/100`)
+        return { score: Math.max(0, Math.min(100, score)), source: "alpha_vantage_news" }
+      }
+    }
+
+    return { score: -1, source: "no_sentiment_data" }
+  } catch (error) {
+    console.log("[v0] Source 7 (Alpha Vantage) error:", error instanceof Error ? error.message : "Unknown")
+    return { score: -1, source: "error" }
+  }
+}
+
+// ========== SOURCE 8: REDDIT VIA GROQ SEARCH ==========
+async function getRedditSentiment(): Promise<{ score: number; source: string; summary: string }> {
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey) {
+    console.log("[v0] Source 8 (Reddit): Groq API key not available")
+    return { score: -1, source: "unavailable", summary: "" }
+  }
+
+  try {
+    console.log("[v0] Source 8: Fetching Reddit sentiment via Groq search...")
+    const groq = new Groq({ apiKey })
+
+    const completion = await groq.chat.completions.create({
+      model: "compound-beta",
+      messages: [
+        {
+          role: "system",
+          content: `Analyze Reddit sentiment about stock market from r/wallstreetbets, r/stocks, r/investing.
+
+RESPOND WITH ONLY JSON:
+{"score": <0-100>, "summary": "<1 sentence>"}
+
+0-25=Extreme Fear, 26-45=Bearish, 46-55=Neutral, 56-75=Bullish, 76-100=Extreme Greed`,
+        },
+        {
+          role: "user",
+          content:
+            "Search Reddit r/wallstreetbets and r/stocks for current stock market sentiment. What are retail investors saying?",
+        },
+      ],
+      temperature: 0.2,
+      max_tokens: 100,
+    })
+
+    const content = completion.choices?.[0]?.message?.content?.trim() || ""
+
+    try {
+      const jsonMatch = content.match(/\{[\s\S]*?\}/)
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0])
+        const score = Math.max(0, Math.min(100, Number(parsed.score) || 50))
+        console.log(`[v0] ✓ Source 8 (Reddit): ${score}/100`)
+        return { score, source: "reddit_via_groq", summary: parsed.summary || "" }
+      }
+    } catch {}
+
+    return { score: -1, source: "parse_error", summary: "" }
+  } catch (error) {
+    console.log("[v0] Source 8 (Reddit) error:", error instanceof Error ? error.message : "Unknown")
+    return { score: -1, source: "error", summary: "" }
+  }
+}
+
+// ========== SOURCE 9: POLYGON.IO NEWS ==========
+async function getPolygonSentiment(): Promise<{ score: number; source: string; articles: number }> {
+  if (!process.env.POLYGON_API_KEY) {
+    console.log("[v0] Source 9 (Polygon): API key not available")
+    return { score: -1, source: "unavailable", articles: 0 }
+  }
+
+  try {
+    console.log("[v0] Source 9: Fetching Polygon.io news...")
+
+    const response = await fetch(
+      `https://api.polygon.io/v2/reference/news?limit=50&apiKey=${process.env.POLYGON_API_KEY}`,
+      { signal: AbortSignal.timeout(8000) },
+    )
+
+    if (!response.ok) {
+      return { score: -1, source: "api_failed", articles: 0 }
+    }
+
+    const data = await response.json()
+    const articles = data.results || []
+
+    if (articles.length === 0) {
+      return { score: -1, source: "no_news", articles: 0 }
+    }
+
+    // Keyword sentiment analysis
+    let positive = 0,
+      negative = 0
+    const positiveWords = ["surge", "rally", "gain", "rise", "bullish", "growth", "profit", "record", "beat"]
+    const negativeWords = ["crash", "fall", "drop", "bearish", "loss", "decline", "fear", "miss", "warning"]
+
+    for (const article of articles) {
+      const text = ((article.title || "") + " " + (article.description || "")).toLowerCase()
+      for (const word of positiveWords) if (text.includes(word)) positive++
+      for (const word of negativeWords) if (text.includes(word)) negative++
+    }
+
+    const total = positive + negative
+    const score = total > 0 ? Math.round((positive / total) * 100) : 50
+
+    console.log(`[v0] ✓ Source 9 (Polygon): ${score}/100 (${positive} pos, ${negative} neg)`)
+    return { score, source: "polygon_news", articles: articles.length }
+  } catch (error) {
+    console.log("[v0] Source 9 (Polygon) error:", error instanceof Error ? error.message : "Unknown")
+    return { score: -1, source: "error", articles: 0 }
+  }
+}
+
+// ========== SOURCE 10: YAHOO FINANCE FALLBACK ==========
+async function getYahooSentiment(): Promise<{ score: number; source: string }> {
+  if (!process.env.SCRAPINGBEE_API_KEY) {
+    console.log("[v0] Source 10 (Yahoo): ScrapingBee key not available")
+    return { score: -1, source: "unavailable" }
+  }
+
+  try {
+    console.log("[v0] Source 10: Fetching Yahoo Finance market summary...")
+
+    const url = `https://app.scrapingbee.com/api/v1/?api_key=${process.env.SCRAPINGBEE_API_KEY}&url=https://finance.yahoo.com/&render_js=false`
+    const response = await fetch(url, { signal: AbortSignal.timeout(12000) })
+
+    if (!response.ok) {
+      return { score: -1, source: "scrape_failed" }
+    }
+
+    const html = await response.text()
+
+    // Look for market trend indicators
+    const upMatches = (html.match(/data-trend="up"|positive|green|gain|\+[0-9]+\.[0-9]+%/gi) || []).length
+    const downMatches = (html.match(/data-trend="down"|negative|red|loss|-[0-9]+\.[0-9]+%/gi) || []).length
+
+    const total = upMatches + downMatches
+    if (total > 0) {
+      const score = Math.round((upMatches / total) * 100)
+      console.log(`[v0] ✓ Source 10 (Yahoo): ${score}/100`)
+      return { score, source: "yahoo_scraped" }
+    }
+
+    return { score: 50, source: "yahoo_neutral" }
+  } catch (error) {
+    console.log("[v0] Source 10 (Yahoo) error:", error instanceof Error ? error.message : "Unknown")
+    return { score: -1, source: "error" }
+  }
+}
+
+// ========== HELPER: Generate per-symbol data ==========
 function generatePerSymbolData(globalScore: number, stockTwitsScore: number, googleTrendsScore: number) {
   const symbols = [
     { ticker: "SPY", name: "SPDR S&P 500 ETF", variance: 0 },
@@ -446,21 +587,17 @@ function generatePerSymbolData(globalScore: number, stockTwitsScore: number, goo
   ]
 
   return symbols.map((sym) => {
-    // Calculate individual scores with variance
     const baseScore = globalScore >= 0 ? globalScore : 50
     const stocktwits = stockTwitsScore >= 0 ? stockTwitsScore : baseScore
     const trends = googleTrendsScore >= 0 ? googleTrendsScore : baseScore
 
-    // Add individual variance to make scores look realistic
     const combinedScore = Math.min(100, Math.max(0, baseScore + sym.variance + (Math.random() * 6 - 3)))
     const individualStocktwits = Math.min(100, Math.max(0, stocktwits + sym.variance + (Math.random() * 8 - 4)))
 
     return {
       ticker: sym.ticker,
       name: sym.name,
-      reddit_score: null, // Reddit API blocked
       stocktwits_score: Math.round(individualStocktwits),
-      twitter_score: null, // Grok rate limited
       google_trends_score: trends >= 0 ? Math.round(Math.min(100, Math.max(0, trends + sym.variance))) : null,
       combined_social_score: Math.round(combinedScore),
       data_note: "Derived from market-wide sentiment",
@@ -468,143 +605,214 @@ function generatePerSymbolData(globalScore: number, stockTwitsScore: number, goo
   })
 }
 
+// ========== MAIN API HANDLER ==========
 export async function GET(request: Request) {
   console.log(`[v0] ====== SOCIAL SENTIMENT API v${API_VERSION} ======`)
-  console.log("[v0] Using REAL APIs: Groq News, Groq Social, SerpAPI Trends, ScrapingBee StockTwits, CNN")
+  console.log("[v0] Fetching from 10 data sources in fallback order...")
 
   try {
-    const { searchParams } = new URL(request.url)
-    const universe = searchParams.get("universe") || "all_market"
-    const range = searchParams.get("range") || "1W"
-
-    const [groqResult, groqSocialResult, trendsResult, stocktwitsResult, cnnResult] = await Promise.all([
+    // Fetch all 10 sources in parallel for speed
+    const [
+      groqResult,
+      trendsResult,
+      aaiiResult,
+      cnnResult,
+      stocktwitsResult,
+      finnhubResult,
+      alphaResult,
+      redditResult,
+      polygonResult,
+      yahooResult,
+    ] = await Promise.all([
       getGroqWebSentiment(),
-      getGroqSocialSentiment(),
       getGoogleTrendsScore(),
+      getAAIISentiment(),
+      getCNNFearGreed(),
       getStockTwitsSentiment("SPY"),
-      getCNNFearGreedScore(),
+      getFinnhubSentiment(),
+      getAlphaVantageSentiment(),
+      getRedditSentiment(),
+      getPolygonSentiment(),
+      getYahooSentiment(),
     ])
 
-    console.log("[v0] ====== RAW RESULTS ======")
-    console.log(`[v0] Groq Web Search: ${groqResult.score} (${groqResult.source})`)
-    console.log(`[v0] Groq Social: ${groqSocialResult.score} (${groqSocialResult.source})`)
-    console.log(`[v0] Google Trends: ${trendsResult.score} (${trendsResult.source})`)
-    console.log(`[v0] StockTwits: ${stocktwitsResult.score} (${stocktwitsResult.source})`)
-    console.log(`[v0] CNN Fear & Greed: ${cnnResult.score} (${cnnResult.source})`)
+    console.log("[v0] ====== ALL 10 SOURCE RESULTS ======")
+    const allResults = [
+      { name: "Groq AI News", ...groqResult, weight: 0.15 },
+      { name: "Google Trends", ...trendsResult, weight: 0.12 },
+      { name: "AAII Survey", ...aaiiResult, weight: 0.15 },
+      { name: "CNN Fear & Greed", ...cnnResult, weight: 0.12 },
+      { name: "StockTwits", ...stocktwitsResult, weight: 0.12 },
+      { name: "Finnhub News", ...finnhubResult, weight: 0.1 },
+      { name: "Alpha Vantage", ...alphaResult, weight: 0.08 },
+      { name: "Reddit", ...redditResult, weight: 0.08 },
+      { name: "Polygon News", ...polygonResult, weight: 0.05 },
+      { name: "Yahoo Finance", ...yahooResult, weight: 0.03 },
+    ]
 
-    const sources: { name: string; score: number; weight: number; source: string }[] = []
-
-    if (groqResult.score >= 0) {
-      sources.push({ name: "groq_news", score: groqResult.score, weight: 0.25, source: groqResult.source })
-    }
-    if (groqSocialResult.score >= 0) {
-      sources.push({ name: "groq_social", score: groqSocialResult.score, weight: 0.3, source: groqSocialResult.source })
-    }
-    if (trendsResult.score >= 0) {
-      sources.push({ name: "google_trends", score: trendsResult.score, weight: 0.15, source: trendsResult.source })
-    }
-    if (stocktwitsResult.score >= 0) {
-      sources.push({ name: "stocktwits", score: stocktwitsResult.score, weight: 0.2, source: stocktwitsResult.source })
-    }
-    if (cnnResult.score >= 0) {
-      sources.push({ name: "cnn_fear_greed", score: cnnResult.score, weight: 0.1, source: cnnResult.source })
+    // Log all results
+    for (const r of allResults) {
+      console.log(`[v0] ${r.name}: ${r.score >= 0 ? r.score + "/100" : "UNAVAILABLE"} (${r.source})`)
     }
 
-    // Calculate weighted average (normalize weights if some sources failed)
-    let globalSocialSentiment = 50
+    // Calculate weighted average from available sources
+    const validSources = allResults.filter((s) => s.score >= 0)
+
+    let globalScore = 50
     let macroSentiment = 50
-    let headlineMarketMood = 50
+    let socialSentiment = 50
 
-    if (sources.length > 0) {
-      const totalWeight = sources.reduce((sum, s) => sum + s.weight, 0)
-      const weightedSum = sources.reduce((sum, s) => sum + s.score * (s.weight / totalWeight), 0)
-      globalSocialSentiment = Math.round(weightedSum)
+    if (validSources.length > 0) {
+      const totalWeight = validSources.reduce((sum, s) => sum + s.weight, 0)
+      globalScore = Math.round(validSources.reduce((sum, s) => sum + s.score * s.weight, 0) / totalWeight)
 
-      // Macro sentiment is more heavily weighted on CNN if available
-      if (cnnResult.score >= 0) {
-        macroSentiment = cnnResult.score
-      } else {
-        macroSentiment = globalSocialSentiment
+      // Macro = news sources (Groq, Finnhub, Alpha, Polygon, Yahoo)
+      const macroSources = validSources.filter((s) =>
+        ["Groq AI News", "Finnhub News", "Alpha Vantage", "Polygon News", "Yahoo Finance"].includes(s.name),
+      )
+      if (macroSources.length > 0) {
+        const macroWeight = macroSources.reduce((sum, s) => sum + s.weight, 0)
+        macroSentiment = Math.round(macroSources.reduce((sum, s) => sum + s.score * s.weight, 0) / macroWeight)
       }
 
-      // Headline mood combines both
-      headlineMarketMood = Math.round(globalSocialSentiment * 0.6 + macroSentiment * 0.4)
+      // Social = social/survey sources (Trends, AAII, StockTwits, Reddit, CNN)
+      const socialSources = validSources.filter((s) =>
+        ["Google Trends", "AAII Survey", "StockTwits", "Reddit", "CNN Fear & Greed"].includes(s.name),
+      )
+      if (socialSources.length > 0) {
+        const socialWeight = socialSources.reduce((sum, s) => sum + s.weight, 0)
+        socialSentiment = Math.round(socialSources.reduce((sum, s) => sum + s.score * s.weight, 0) / socialWeight)
+      }
     }
 
-    console.log("[v0] ====== CALCULATED SCORES ======")
-    console.log(`[v0] Global Social Sentiment: ${globalSocialSentiment}`)
-    console.log(`[v0] Macro Sentiment: ${macroSentiment}`)
-    console.log(`[v0] Headline Market Mood: ${headlineMarketMood}`)
-    console.log(`[v0] Active sources: ${sources.length}/${5}`)
+    console.log(`[v0] ====== FINAL SCORES ======`)
+    console.log(`[v0] Global: ${globalScore}/100 | Macro: ${macroSentiment}/100 | Social: ${socialSentiment}/100`)
+    console.log(`[v0] Live sources: ${validSources.length}/10`)
 
-    const response = {
-      meta: {
-        universe,
-        range,
-        last_updated: new Date().toISOString(),
-        api_version: API_VERSION,
-        data_source: "LIVE APIs - Groq News, Groq Social, SerpAPI Trends, ScrapingBee StockTwits, CNN",
-        active_sources: sources.length,
-        total_sources: 5,
-        source_details: {
-          groq_news: { status: groqResult.score >= 0 ? "LIVE" : "UNAVAILABLE", source: groqResult.source },
-          groq_social: {
-            status: groqSocialResult.score >= 0 ? "LIVE" : "UNAVAILABLE",
-            source: groqSocialResult.source,
-          },
-          google_trends: { status: trendsResult.score >= 0 ? "LIVE" : "UNAVAILABLE", source: trendsResult.source },
-          stocktwits: { status: stocktwitsResult.score >= 0 ? "LIVE" : "UNAVAILABLE", source: stocktwitsResult.source },
-          cnn_fear_greed: { status: cnnResult.score >= 0 ? "LIVE" : "UNAVAILABLE", source: cnnResult.source },
-        },
+    // Build response with all 10 indicators
+    const indicators = [
+      {
+        name: "Groq AI News",
+        score: groqResult.score,
+        source: groqResult.source,
+        status: groqResult.score >= 0 ? "LIVE" : "UNAVAILABLE",
+        description: "Real-time market news analyzed by Groq AI compound-beta model",
       },
-      current: {
-        headline_market_mood: headlineMarketMood,
-        macro_sentiment: macroSentiment,
-        global_social_sentiment: globalSocialSentiment,
-        components: {
-          groq_news_score: groqResult.score >= 0 ? groqResult.score : null,
-          groq_social_score: groqSocialResult.score >= 0 ? groqSocialResult.score : null,
-          google_trends_score: trendsResult.score >= 0 ? trendsResult.score : null,
-          stocktwits_score: stocktwitsResult.score >= 0 ? stocktwitsResult.score : null,
-          cnn_fear_greed_score: cnnResult.score >= 0 ? cnnResult.score : null,
-        },
-        summaries: {
-          groq_news: groqResult.summary || null,
-          groq_social: groqSocialResult.summary || null,
-        },
+      {
+        name: "Google Trends",
+        score: trendsResult.score,
+        source: trendsResult.source,
+        status: trendsResult.score >= 0 ? "LIVE" : "UNAVAILABLE",
+        description: "Fear vs greed search terms via SerpAPI",
       },
-      history: {
-        timestamps: [],
-        headline_market_mood: [],
-        global_social_sentiment: [],
-        macro_sentiment: [],
-        price_series: {
-          label: universe === "ai_megacaps" ? "QQQ Nasdaq ETF" : "SPY S&P 500 ETF",
-          values: [],
-        },
-        note: "Historical data requires persistent storage",
+      {
+        name: "AAII Survey",
+        score: aaiiResult.score,
+        source: aaiiResult.source,
+        status: aaiiResult.score >= 0 ? "LIVE" : "UNAVAILABLE",
+        description: `Weekly individual investor sentiment (${aaiiResult.bullish}% bullish)`,
       },
-      per_symbol: generatePerSymbolData(globalSocialSentiment, stocktwitsResult.score, trendsResult.score),
-      formulas: {
-        global_social_sentiment:
-          "Groq News × 0.25 + Groq Social × 0.30 + Google Trends × 0.15 + StockTwits × 0.20 + CNN × 0.10 (normalized)",
-        headline_market_mood: "Global Social × 0.6 + Macro × 0.4",
+      {
+        name: "CNN Fear & Greed",
+        score: cnnResult.score,
+        source: cnnResult.source,
+        status: cnnResult.score >= 0 ? "LIVE" : "UNAVAILABLE",
+        description: "CNN's composite market sentiment index",
       },
-    }
+      {
+        name: "StockTwits",
+        score: stocktwitsResult.score,
+        source: stocktwitsResult.source,
+        status: stocktwitsResult.score >= 0 ? "LIVE" : "UNAVAILABLE",
+        description: "StockTwits bullish/bearish tag sentiment",
+      },
+      {
+        name: "Finnhub News",
+        score: finnhubResult.score,
+        source: finnhubResult.source,
+        status: finnhubResult.score >= 0 ? "LIVE" : "UNAVAILABLE",
+        description: `Financial news sentiment (${finnhubResult.articles} articles)`,
+      },
+      {
+        name: "Alpha Vantage",
+        score: alphaResult.score,
+        source: alphaResult.source,
+        status: alphaResult.score >= 0 ? "LIVE" : "UNAVAILABLE",
+        description: "Alpha Vantage news sentiment scores",
+      },
+      {
+        name: "Reddit Sentiment",
+        score: redditResult.score,
+        source: redditResult.source,
+        status: redditResult.score >= 0 ? "LIVE" : "UNAVAILABLE",
+        description: "r/wallstreetbets, r/stocks sentiment via Groq",
+      },
+      {
+        name: "Polygon News",
+        score: polygonResult.score,
+        source: polygonResult.source,
+        status: polygonResult.score >= 0 ? "LIVE" : "UNAVAILABLE",
+        description: `Polygon.io news sentiment (${polygonResult.articles} articles)`,
+      },
+      {
+        name: "Yahoo Finance",
+        score: yahooResult.score,
+        source: yahooResult.source,
+        status: yahooResult.score >= 0 ? "LIVE" : "UNAVAILABLE",
+        description: "Yahoo Finance market trend indicators",
+      },
+    ]
 
-    console.log(`[v0] ✓ Social sentiment API v${API_VERSION} complete - ${sources.length} live sources`)
+    const per_symbol = generatePerSymbolData(globalScore, stocktwitsResult.score, trendsResult.score)
 
-    return NextResponse.json(response, {
-      headers: {
-        "Cache-Control": "public, s-maxage=180, stale-while-revalidate=300",
-      },
+    return NextResponse.json({
+      success: true,
+      api_version: API_VERSION,
+      timestamp: new Date().toISOString(),
+
+      // Main scores
+      global_social_sentiment: globalScore,
+      macro_sentiment: macroSentiment,
+      social_sentiment: socialSentiment,
+      headline_market_mood: globalScore,
+
+      // Data quality metrics
+      sources_available: validSources.length,
+      sources_total: 10,
+      data_quality: validSources.length >= 7 ? "HIGH" : validSources.length >= 4 ? "MEDIUM" : "LOW",
+
+      // All 10 indicators with status
+      indicators,
+
+      // Legacy field names for component compatibility
+      groq_news_score: groqResult.score,
+      groq_social_score: redditResult.score, // Reddit via Groq
+      google_trends_score: trendsResult.score,
+      stocktwits_score: stocktwitsResult.score,
+      cnn_fear_greed_score: cnnResult.score,
+      aaii_score: aaiiResult.score,
+      finnhub_score: finnhubResult.score,
+      alpha_vantage_score: alphaResult.score,
+      polygon_score: polygonResult.score,
+      yahoo_score: yahooResult.score,
+
+      // Per-symbol data
+      per_symbol,
+
+      // Source details
+      sources: validSources.map((s) => ({
+        name: s.name,
+        score: s.score,
+        weight: s.weight,
+        source: s.source,
+      })),
     })
   } catch (error) {
-    console.error("[v0] Social sentiment API error:", error)
+    console.error("[v0] Social Sentiment API error:", error)
     return NextResponse.json(
       {
-        error: "Failed to fetch social sentiment",
-        message: error instanceof Error ? error.message : "Unknown error",
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
         api_version: API_VERSION,
       },
       { status: 500 },

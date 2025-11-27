@@ -72,6 +72,13 @@ interface SocialSentimentData {
     combined_social_score: number
     data_note?: string
   }>
+  indicators: Array<{
+    name: string
+    score: number
+    status: string
+    description: string
+    source?: string
+  }>
 }
 
 // Sentiment interpretation buckets
@@ -523,10 +530,13 @@ export function SocialSentiment() {
                   side="right"
                   className="max-w-sm bg-gray-900 text-white p-3 rounded-lg shadow-xl border-0"
                 >
-                  <p className="text-xs text-gray-300">
-                    Each indicator contributes to the overall Headline Market Mood. Green badges indicate LIVE data,
-                    yellow indicates unavailable sources.
-                  </p>
+                  <div className="space-y-2">
+                    <p className="font-semibold text-sm">Component Sentiment Indicators</p>
+                    <p className="text-xs text-gray-300">
+                      Each indicator contributes to the overall Headline Market Mood. Green badges indicate LIVE data,
+                      yellow indicates unavailable sources.
+                    </p>
+                  </div>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -645,6 +655,79 @@ export function SocialSentiment() {
                   <div
                     className="absolute top-0 h-full w-1 bg-black shadow-lg"
                     style={{ left: `${Math.min(100, Math.max(0, indicator.value))}%`, transform: "translateX(-50%)" }}
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-gray-200 opacity-80" />
+                )}
+              </div>
+              <p className="text-xs text-gray-500">{indicator.description}</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* 10 Component Sentiment Indicators */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-blue-600" />
+            <CardTitle className="text-lg">10 Component Sentiment Indicators</CardTitle>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Info className="h-4 w-4 text-gray-400 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-sm bg-gray-900 text-white border-gray-700 z-50 p-3">
+                  <p className="font-semibold mb-1">10 Data Sources</p>
+                  <p className="text-xs text-gray-300">
+                    Real-time sentiment from: Groq AI News, Google Trends, AAII Survey, CNN Fear & Greed, StockTwits,
+                    Finnhub News, Alpha Vantage, Reddit, Polygon News, and Yahoo Finance. Sources are fetched in
+                    parallel with weighted averaging.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {(data.indicators || []).map((indicator, index) => (
+            <div key={index} className="space-y-1">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-700">{indicator.name}</span>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="h-3.5 w-3.5 text-gray-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs bg-gray-900 text-white border-gray-700 z-50 p-3">
+                        <p className="text-xs">{indicator.description}</p>
+                        {indicator.source && <p className="text-xs text-gray-400 mt-1">Source: {indicator.source}</p>}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <span
+                    className={`text-xs px-1.5 py-0.5 rounded ${
+                      indicator.status === "LIVE" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+                    }`}
+                  >
+                    {indicator.status}
+                  </span>
+                </div>
+                {indicator.score != null && indicator.score >= 0 ? (
+                  <span className="text-sm font-bold text-gray-900">{Math.round(indicator.score)}</span>
+                ) : (
+                  <span className="text-gray-400 text-xs">No data</span>
+                )}
+              </div>
+              <div className="relative h-3 bg-gradient-to-r from-green-500 via-yellow-400 to-red-500 rounded-full overflow-hidden">
+                {indicator.score != null && indicator.score >= 0 ? (
+                  <div
+                    className="absolute top-0 h-full w-1 bg-black shadow-lg"
+                    style={{
+                      left: `${100 - Math.min(100, Math.max(0, indicator.score))}%`,
+                      transform: "translateX(-50%)",
+                    }}
                   />
                 ) : (
                   <div className="absolute inset-0 bg-gray-200 opacity-80" />
