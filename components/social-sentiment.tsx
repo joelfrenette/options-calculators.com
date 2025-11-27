@@ -12,6 +12,16 @@ interface SocialSentimentData {
     universe: string
     range: string
     last_updated: string
+    api_version?: string
+    active_sources?: number
+    total_sources?: number
+    source_details?: {
+      groq_news?: { status: string; source: string }
+      groq_social?: { status: string; source: string }
+      google_trends?: { status: string; source: string }
+      stocktwits?: { status: string; source: string }
+      cnn_fear_greed?: { status: string; source: string }
+    }
     data_status?: {
       reddit: string
       twitter: string
@@ -26,12 +36,19 @@ interface SocialSentimentData {
     macro_sentiment: number
     global_social_sentiment: number
     components: {
-      reddit_score: number
-      stocktwits_score: number
-      twitter_score: number
-      google_trends_score: number
-      aaii_score: number
-      fear_greed_score: number
+      reddit_score?: number
+      stocktwits_score?: number
+      twitter_score?: number
+      google_trends_score?: number
+      aaii_score?: number
+      fear_greed_score?: number
+      groq_news_score?: number | null
+      groq_social_score?: number | null
+      cnn_fear_greed_score?: number | null
+    }
+    summaries?: {
+      groq_news?: string | null
+      groq_social?: string | null
     }
   }
   history: {
@@ -132,7 +149,7 @@ function SocialSentimentIndicator({
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger>
-                <Info className="h-3 w-3 text-gray-400 cursor-help" />
+                <Info className="h-3.5 w-3.5 text-gray-400 cursor-help" />
               </TooltipTrigger>
               <TooltipContent className="max-w-sm">
                 <p className="text-sm">{description}</p>
@@ -279,64 +296,64 @@ export function SocialSentiment() {
       {/* Hero Section - Main Scale Visual */}
       <Card className="shadow-sm border-gray-200">
         <CardHeader className="bg-gray-50 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-blue-600" />
-                Social Sentiment Historical Scale
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent
-                      side="right"
-                      className="max-w-sm bg-gray-900 text-white p-4 rounded-lg shadow-xl border-0"
-                    >
-                      <div className="space-y-2">
-                        <p className="font-semibold text-sm">How This Score Is Calculated</p>
-                        <p className="text-xs text-gray-300">
-                          The Headline Market Mood combines 6 data sources using AI-powered analysis:
-                        </p>
-                        <ul className="text-xs text-gray-300 list-disc pl-4 space-y-1">
-                          <li>
-                            <span className="text-white font-medium">Groq AI News Analysis</span> - Real-time market
-                            news sentiment
-                          </li>
-                          <li>
-                            <span className="text-white font-medium">Groq AI Social Search</span> - Twitter/Reddit
-                            discussions
-                          </li>
-                          <li>
-                            <span className="text-white font-medium">Google Trends</span> - Search interest in fear vs
-                            greed terms
-                          </li>
-                          <li>
-                            <span className="text-white font-medium">StockTwits</span> - Bullish/bearish post analysis
-                          </li>
-                          <li>
-                            <span className="text-white font-medium">CNN Fear & Greed</span> - Market indicators
-                            composite
-                          </li>
-                          <li>
-                            <span className="text-white font-medium">AAII Survey</span> - Weekly investor sentiment poll
-                          </li>
-                        </ul>
-                        <div className="pt-2 border-t border-gray-700">
-                          <p className="text-xs text-gray-400">Scale: 0 (Extreme Fear) → 100 (Extreme Greed)</p>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-blue-600" />
+                  Social Sentiment Historical Scale
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="right"
+                        className="max-w-sm bg-gray-900 text-white p-4 rounded-lg shadow-xl border-0"
+                      >
+                        <div className="space-y-2">
+                          <p className="font-semibold text-sm">How This Score Is Calculated</p>
+                          <p className="text-xs text-gray-300">
+                            The Headline Market Mood combines 5 data sources using AI-powered analysis:
+                          </p>
+                          <ul className="text-xs text-gray-300 list-disc pl-4 space-y-1">
+                            <li>
+                              <span className="text-white font-medium">Groq AI News Analysis</span> - Real-time market
+                              news sentiment (25%)
+                            </li>
+                            <li>
+                              <span className="text-white font-medium">Groq AI Social Search</span> - Twitter/Reddit
+                              discussions (30%)
+                            </li>
+                            <li>
+                              <span className="text-white font-medium">Google Trends</span> - Fear vs greed search terms
+                              (15%)
+                            </li>
+                            <li>
+                              <span className="text-white font-medium">StockTwits</span> - Bullish/bearish post analysis
+                              (20%)
+                            </li>
+                            <li>
+                              <span className="text-white font-medium">CNN Fear & Greed</span> - Market indicators
+                              composite (10%)
+                            </li>
+                          </ul>
+                          <div className="pt-2 border-t border-gray-700">
+                            <p className="text-xs text-gray-400">Scale: 0 (Extreme Fear) → 100 (Extreme Greed)</p>
+                          </div>
                         </div>
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </CardTitle>
-              <p className="text-sm text-gray-600 mt-1">
-                Visual representation of sentiment zones from bearish to bullish
-              </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </CardTitle>
+                <p className="text-sm text-gray-600 mt-1">
+                  Visual representation of sentiment zones from bearish to bullish
+                </p>
+              </div>
+              <RefreshButton onRefresh={handleRefresh} isRefreshing={refreshing} lastUpdated={lastUpdated} />
             </div>
-            <RefreshButton onRefresh={handleRefresh} isRefreshing={refreshing} lastUpdated={lastUpdated} />
             {isFromCache && (
-              <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded flex items-center gap-2">
+              <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded flex items-center gap-2">
                 <span className="inline-block w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
                 Showing cached data from {lastUpdated?.toLocaleString()}. Press Refresh to load live data.
               </div>
@@ -492,11 +509,11 @@ export function SocialSentiment() {
         </CardContent>
       </Card>
 
-      {/* Component Sentiment Indicators - Added tooltips to each indicator */}
+      {/* Component Sentiment Indicators - Updated to match actual API fields */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />6 Component Sentiment Indicators
+            <BarChart3 className="h-5 w-5" />5 Component Sentiment Indicators
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger>
@@ -508,41 +525,44 @@ export function SocialSentiment() {
                 >
                   <p className="text-xs text-gray-300">
                     Each indicator contributes to the overall Headline Market Mood. Green badges indicate LIVE data,
-                    yellow indicates cached or estimated values.
+                    yellow indicates unavailable sources.
                   </p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </CardTitle>
           <CardDescription>
-            Individual scores from Reddit, Twitter, StockTwits, Google Trends, AAII Survey, and CNN Fear & Greed
+            Individual scores from Groq AI News, Groq AI Social, StockTwits, Google Trends, and CNN Fear & Greed
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {[
             {
-              name: "Reddit Sentiment",
-              value: data.current.components.reddit_score,
-              description: "r/wallstreetbets hot posts analyzed by AI",
-              status: data.meta.data_status?.reddit,
+              name: "Groq AI News Sentiment",
+              value: data.current.components.groq_news_score,
+              description: "Real-time market news analyzed by Groq AI",
+              status: data.meta.source_details?.groq_news?.status,
+              weight: "25%",
               tooltipDetail:
-                "Groq AI analyzes trending posts from Reddit's r/wallstreetbets, r/stocks, and r/investing subreddits to gauge retail investor sentiment.",
-              methodology: "Posts are scored 0-100 based on bullish vs bearish language patterns.",
+                "Groq's compound-beta model performs real-time web search for current market news, earnings reports, and economic indicators.",
+              methodology: "AI analyzes news headlines and articles for bullish/bearish sentiment on a 0-100 scale.",
             },
             {
-              name: "Twitter / X Sentiment",
-              value: data.current.components.twitter_score,
-              description: "Twitter search results analyzed by AI",
-              status: data.meta.data_status?.twitter,
+              name: "Groq AI Social Sentiment",
+              value: data.current.components.groq_social_score,
+              description: "Twitter/Reddit discussions analyzed by Groq AI",
+              status: data.meta.source_details?.groq_social?.status,
+              weight: "30%",
               tooltipDetail:
-                "Groq AI searches real-time Twitter/X posts about stocks, market conditions, and trading sentiment.",
-              methodology: "Web search results are analyzed for positive/negative market outlook.",
+                "Groq's compound-beta model searches Twitter, Reddit, and social media for real-time market sentiment discussions.",
+              methodology: "AI evaluates social media posts for retail investor sentiment and trending topics.",
             },
             {
               name: "StockTwits Sentiment",
               value: data.current.components.stocktwits_score,
               description: "StockTwits posts + bullish/bearish tags",
-              status: data.meta.data_status?.stocktwits,
+              status: data.meta.source_details?.stocktwits?.status,
+              weight: "20%",
               tooltipDetail:
                 "ScrapingBee fetches recent StockTwits posts which are then analyzed by Groq AI for sentiment.",
               methodology: "User-tagged bullish/bearish posts combined with AI text analysis.",
@@ -550,42 +570,35 @@ export function SocialSentiment() {
             {
               name: "Google Trends",
               value: data.current.components.google_trends_score,
-              description: "Inverted 'stock market crash' search volume (SerpAPI)",
-              status: data.meta.data_status?.google_trends,
+              description: "Fear vs greed search terms via SerpAPI",
+              status: data.meta.source_details?.google_trends?.status,
+              weight: "15%",
               tooltipDetail:
-                "SerpAPI fetches Google Trends data for fear terms ('stock market crash', 'recession') and greed terms ('buy stocks', 'stock rally').",
-              methodology: "Fear searches reduce score, greed searches increase it. High fear search = low sentiment.",
+                "SerpAPI fetches Google Trends data comparing fear terms ('stock market crash', 'recession') vs greed terms ('buy stocks', 'stock rally').",
+              methodology: "High fear searches = low score. High greed searches = high score. Normalized to 0-100.",
             },
             {
-              name: "AAII Investor Sentiment",
-              value: data.current.components.aaii_score,
-              description: "AAII.com weekly survey (scraped)",
-              status: data.meta.data_status?.aaii,
+              name: "CNN Fear & Greed Index",
+              value: data.current.components.cnn_fear_greed_score,
+              description: "CNN's composite market sentiment index",
+              status: data.meta.source_details?.cnn_fear_greed?.status,
+              weight: "10%",
               tooltipDetail:
-                "American Association of Individual Investors conducts weekly polls asking members if they're bullish, bearish, or neutral.",
-              methodology: "Score = (Bullish% - Bearish% + 50) normalized to 0-100 scale.",
-            },
-            {
-              name: "CNN Fear & Greed",
-              value: data.current.components.fear_greed_score,
-              description: "CNN Fear & Greed Index (scraped)",
-              status: data.meta.data_status?.cnn,
-              tooltipDetail:
-                "CNN's composite index based on 7 market indicators: stock price momentum, stock price strength, stock price breadth, put/call options, junk bond demand, market volatility (VIX), and safe haven demand.",
-              methodology: "Already scaled 0-100 by CNN. Direct feed from market-sentiment API.",
+                "CNN's composite index based on 7 market indicators: momentum, strength, breadth, put/call ratio, junk bond demand, VIX, and safe haven demand.",
+              methodology: "Already scaled 0-100 by CNN. Fetched via internal market-sentiment API.",
             },
           ].map((indicator, index) => (
             <div key={index} className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-700">{indicator.name}</span>
+                  <span className="font-medium">{indicator.name}</span>
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger>
-                        <Info className="h-3.5 w-3.5 text-gray-400 hover:text-gray-600 cursor-help" />
+                        <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent
-                        side="top"
+                        side="right"
                         className="max-w-sm bg-gray-900 text-white p-4 rounded-lg shadow-xl border-0 z-50"
                       >
                         <div className="space-y-2">
@@ -593,36 +606,49 @@ export function SocialSentiment() {
                           <p className="text-xs text-gray-300">{indicator.tooltipDetail}</p>
                           <div className="pt-2 border-t border-gray-700">
                             <p className="text-xs text-gray-400">
-                              <span className="text-gray-200 font-medium">Method:</span> {indicator.methodology}
+                              <span className="text-white font-medium">Weight:</span> {indicator.weight}
                             </p>
-                          </div>
-                          <div className="pt-1">
-                            <p className="text-xs text-gray-400">
-                              <span className="text-gray-200 font-medium">Current:</span> {indicator.value} ={" "}
-                              {getSentimentLabel(indicator.value)}
+                            <p className="text-xs text-gray-400 mt-1">
+                              <span className="text-white font-medium">Methodology:</span> {indicator.methodology}
                             </p>
                           </div>
                         </div>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
-                  {indicator.status && (
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded ${indicator.status === "LIVE" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}
-                    >
-                      {indicator.status}
-                    </span>
-                  )}
+                  {/* Status badge */}
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full ${
+                      indicator.status === "LIVE"
+                        ? "bg-green-100 text-green-700"
+                        : indicator.value != null && indicator.value >= 0
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-gray-100 text-gray-500"
+                    }`}
+                  >
+                    {indicator.status === "LIVE"
+                      ? "LIVE"
+                      : indicator.value != null && indicator.value >= 0
+                        ? "CACHED"
+                        : "UNAVAILABLE"}
+                  </span>
                 </div>
-                <span className="font-semibold text-gray-900">{indicator.value}</span>
+                {indicator.value != null && indicator.value >= 0 ? (
+                  <span className="font-bold">{Math.round(indicator.value)}</span>
+                ) : (
+                  <span className="text-gray-400 text-xs">No data</span>
+                )}
               </div>
-              <div className="relative h-4 w-full rounded-full overflow-hidden bg-gradient-to-r from-green-500 via-yellow-400 to-red-500">
-                <div
-                  className="absolute inset-0 bg-gray-200"
-                  style={{
-                    clipPath: `polygon(${100 - indicator.value}% 0, 100% 0, 100% 100%, ${100 - indicator.value}% 100%)`,
-                  }}
-                ></div>
+              {/* Sentiment bar */}
+              <div className="relative h-3 bg-gradient-to-r from-red-500 via-yellow-400 to-green-500 rounded-full overflow-hidden">
+                {indicator.value != null && indicator.value >= 0 ? (
+                  <div
+                    className="absolute top-0 h-full w-1 bg-black shadow-lg"
+                    style={{ left: `${Math.min(100, Math.max(0, indicator.value))}%`, transform: "translateX(-50%)" }}
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-gray-200 opacity-80" />
+                )}
               </div>
               <p className="text-xs text-gray-500">{indicator.description}</p>
             </div>
