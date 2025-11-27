@@ -237,24 +237,53 @@ async function getAAIISentiment(): Promise<{ score: number; source: string; bull
 // ========== SOURCE 4: CNN FEAR & GREED INDEX ==========
 async function getCNNFearGreed(): Promise<{ score: number; source: string }> {
   try {
-    console.log("[v0] Source 4: Fetching CNN Fear & Greed via internal API...")
+    console.log("[v0] Source 4: Calculating CNN Fear & Greed directly...")
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
-    const response = await fetch(`${baseUrl}/api/market-sentiment`, {
-      signal: AbortSignal.timeout(10000),
-      headers: { Accept: "application/json" },
+    // Fetch VIX data for volatility-based calculation
+    const vixResponse = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1d&range=3mo`, {
+      signal: AbortSignal.timeout(8000),
+      headers: { "User-Agent": "Mozilla/5.0" },
     })
 
-    if (response.ok) {
-      const data = await response.json()
-      const score = data.score || data.overallScore || data.cnnScore
-      if (score >= 0 && score <= 100) {
-        console.log(`[v0] ✓ Source 4 (CNN Fear & Greed): ${score}/100`)
-        return { score, source: "cnn_internal_api" }
-      }
+    if (!vixResponse.ok) {
+      console.log("[v0] Failed to fetch VIX for CNN calculation")
+      return { score: -1, source: "vix_fetch_failed" }
     }
 
-    return { score: -1, source: "api_failed" }
+    const vixData = await vixResponse.json()
+    const vixQuotes = vixData.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter((v: any) => v != null) || []
+
+    if (vixQuotes.length < 10) {
+      return { score: -1, source: "insufficient_vix_data" }
+    }
+
+    const currentVix = vixQuotes[vixQuotes.length - 1]
+    const vix50DayMA = vixQuotes.slice(-50).reduce((a: number, b: number) => a + b, 0) / Math.min(50, vixQuotes.length)
+
+    // Calculate volatility score (same logic as market-sentiment)
+    // VIX < 12 = Extreme Greed (100), VIX > 35 = Extreme Fear (0)
+    let volatilityScore: number
+    if (currentVix <= 12) {
+      volatilityScore = 100
+    } else if (currentVix >= 35) {
+      volatilityScore = 0
+    } else {
+      // Linear interpolation between 12-35
+      volatilityScore = 100 - ((currentVix - 12) / (35 - 12)) * 100
+    }
+
+    // Adjust based on VIX trend (current vs 50-day MA)
+    const vixTrend = (currentVix - vix50DayMA) / vix50DayMA
+    // If VIX is above MA (rising fear), subtract from score
+    // If VIX is below MA (falling fear), add to score
+    const trendAdjustment = -vixTrend * 20 // Cap at +/- 20 points
+
+    const finalScore = Math.max(0, Math.min(100, Math.round(volatilityScore + trendAdjustment)))
+
+    console.log(
+      `[v0] ✓ Source 4 (CNN Fear & Greed): ${finalScore}/100 (VIX: ${currentVix.toFixed(2)}, MA: ${vix50DayMA.toFixed(2)})`,
+    )
+    return { score: finalScore, source: "vix_calculated" }
   } catch (error) {
     console.log("[v0] Source 4 (CNN) error:", error instanceof Error ? error.message : "Unknown")
     return { score: -1, source: "error" }

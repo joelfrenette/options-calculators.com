@@ -1114,34 +1114,6 @@ export function MarketSentiment() {
         </Card>
       )}
 
-      {fromCache && cacheTimestamp && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <InfoIcon />
-            <span className="text-sm text-yellow-800">
-              Showing cached data from <strong>{formatCacheTime(cacheTimestamp)}</strong>
-            </span>
-          </div>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="text-sm text-yellow-700 hover:text-yellow-900 font-medium flex items-center gap-1"
-          >
-            {refreshing ? (
-              <>
-                <div className="w-3 h-3 border-2 border-yellow-600 border-t-transparent rounded-full animate-spin" />
-                Refreshing...
-              </>
-            ) : (
-              <>
-                <RefreshIcon />
-                Refresh Now
-              </>
-            )}
-          </button>
-        </div>
-      )}
-
       {/* Fear & Greed Historical Scale - KEEP */}
       <Card className="shadow-sm border-gray-200">
         <CardHeader className="bg-gray-50 border-b border-gray-200">
