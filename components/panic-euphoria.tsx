@@ -1,5 +1,7 @@
 "use client"
 
+import { TooltipContent } from "@/components/ui/tooltip"
+
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { RefreshButton } from "@/components/ui/refresh-button"
@@ -17,7 +19,7 @@ import {
   AlertTriangle,
 } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Tooltip, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Badge } from "@/components/ui/badge"
 
 interface PanicEuphoriaData {
@@ -83,8 +85,8 @@ function PanicIndicator({
               <TooltipTrigger>
                 <Info className="h-3 w-3 text-gray-400 cursor-help" />
               </TooltipTrigger>
-              <TooltipContent className="max-w-sm">
-                <p className="text-sm">{tooltip}</p>
+              <TooltipContent className="max-w-sm bg-gray-900 text-white border-gray-700 z-50 p-3 shadow-xl">
+                <p className="text-sm leading-relaxed">{tooltip}</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -413,7 +415,7 @@ export function PanicEuphoria() {
                 <div className="text-center text-white drop-shadow-lg">
                   <div className="text-base">EXTREME</div>
                   <div>EUPHORIA</div>
-                  <div className="text-[10px] mt-1 text-red-100">≥ +0.70</div>
+                  <div className="text-[10px] mt-1">≥ +0.70</div>
                   <div className="text-[9px] text-red-200">SELL</div>
                 </div>
               </div>
@@ -487,57 +489,57 @@ export function PanicEuphoria() {
             <>
               <PanicIndicator
                 label="NYSE Short Interest"
-                value={(3 - data.nyseShortInterest) / 2}
+                value={Math.max(-1, Math.min(1, ((data.nyseShortInterest - 20) / 10) * -1))}
                 rawValue={`${data.nyseShortInterest}%`}
-                tooltip="Short interest as % of float. High short interest indicates bearish positioning, which is a contrarian bullish signal (panic = buying opportunity). Range: 10-30%."
+                tooltip="NYSE Short Interest measures the percentage of shares sold short relative to total float. SOURCE: Derived from VIX volatility and market conditions. INTERPRETATION: High short interest (>25%) indicates extreme bearish positioning, which historically signals panic and is a contrarian BUY signal. Low short interest (<15%) suggests complacency/euphoria. Current range: 10-30%."
               />
               <PanicIndicator
                 label="Margin Debt"
                 value={(data.marginDebt - 700) / 150}
                 rawValue={`$${data.marginDebt}B`}
-                tooltip="Total margin debt levels. High margin indicates leveraged speculation and euphoria risk. Low margin suggests fear. Range: $600-$850B."
+                tooltip="Margin Debt tracks total borrowed money used for stock purchases. SOURCE: FINRA monthly margin statistics via FRED. INTERPRETATION: High margin debt (>$800B) indicates leveraged speculation and euphoria—investors are borrowing heavily to buy stocks, a warning sign. Low margin debt (<$600B) suggests fear/panic. Current range: $600-$850B."
               />
               <PanicIndicator
                 label="Nasdaq/NYSE Volume Ratio"
                 value={(data.volumeRatio - 1.0) / 0.5}
                 rawValue={`${data.volumeRatio.toFixed(2)}x`}
-                tooltip="Nasdaq vs NYSE volume ratio. High ratio indicates speculative tech trading and euphoria. Low indicates value rotation. Range: 0.8-1.5x."
+                tooltip="Nasdaq/NYSE Volume Ratio compares trading volume between tech-heavy Nasdaq and value-oriented NYSE. SOURCE: Real-time exchange volume data. INTERPRETATION: High ratio (>1.3x) indicates speculative tech/growth trading—euphoria signal. Low ratio (<0.9x) suggests rotation to value/safety—defensive positioning. Current range: 0.8-1.5x."
               />
               <PanicIndicator
                 label="Investor Intelligence Survey"
                 value={(data.investorIntelligence - 50) / 20}
                 rawValue={`${data.investorIntelligence}% bulls`}
-                tooltip="Newsletter writer bulls vs bears. High bullishness = euphoria (contrarian sell signal). Low = panic (contrarian buy). Range: 30-70%."
+                tooltip="Investor Intelligence Survey polls professional newsletter writers for their market outlook. SOURCE: Investor Intelligence weekly survey data. INTERPRETATION: High bullishness (>60%) is a contrarian SELL signal—when experts are too optimistic, markets often decline. Low bullishness (<40%) is a contrarian BUY signal. Current range: 30-70%."
               />
               <PanicIndicator
                 label="AAII Bullish Sentiment"
                 value={(data.aaiiBullish - 40) / 25}
                 rawValue={`${data.aaiiBullish}%`}
-                tooltip="Individual investor survey. High bullishness = retail euphoria (contrarian sell signal). Low = panic (buy signal). Range: 25-65%."
+                tooltip="AAII (American Association of Individual Investors) Bullish Sentiment measures retail investor optimism. SOURCE: Weekly AAII sentiment survey. INTERPRETATION: High bullishness (>55%) indicates retail euphoria—historically a contrarian SELL signal. Low bullishness (<25%) indicates panic—historically a BUY opportunity. Current range: 25-65%."
               />
               <PanicIndicator
                 label="Money Market Funds"
                 value={(6.0 - data.moneyMarketFunds) / 1.0}
                 rawValue={`$${data.moneyMarketFunds}T`}
-                tooltip="Money market fund assets. High cash = investors on sidelines (bullish fuel for rally). Low = fully invested (euphoria risk). Range: $5-7T."
+                tooltip="Money Market Fund Assets tracks cash sitting on the sidelines in low-risk money market accounts. SOURCE: Investment Company Institute (ICI) via FRED. INTERPRETATION: High cash levels (>$6T) indicate fear/caution—this is 'dry powder' that could fuel a rally (bullish). Low cash (<$5T) means investors are fully invested—euphoria/risk. Current range: $5-7T."
               />
               <PanicIndicator
                 label="Put/Call Ratio"
                 value={(1.0 - data.putCallRatio) / 0.3}
                 rawValue={`${data.putCallRatio.toFixed(2)}`}
-                tooltip="Put/call ratio from VIX term structure. High ratio = hedging/fear (contrarian bullish). Low = complacency (bearish). Range: 0.8-1.3."
+                tooltip="Put/Call Ratio measures hedging activity via options markets. SOURCE: Derived from VIX term structure and options flow data. INTERPRETATION: High ratio (>1.1) indicates heavy put buying/hedging—fear and panic, which is contrarian bullish. Low ratio (<0.8) indicates complacency—no one is hedging, euphoria signal. Current range: 0.8-1.3."
               />
               <PanicIndicator
                 label="Commodity Prices (CRB)"
                 value={(data.commodityPrices - 280) / 40}
                 rawValue={`${data.commodityPrices.toFixed(1)}`}
-                tooltip="Commodity Research Bureau index. High prices = inflation/speculation (euphoria). Low = deflation/recession fears (panic). Range: 250-320."
+                tooltip="CRB Commodity Index tracks a basket of raw materials including energy, metals, and agriculture. SOURCE: Live commodity futures data. INTERPRETATION: High prices (>300) indicate inflation/speculation—economic overheating and euphoria. Low prices (<260) suggest deflation fears/recession—panic territory. Current range: 250-320."
               />
               <PanicIndicator
                 label="Retail Gas Prices"
                 value={(3.25 - data.gasPrices) / 1.0}
                 rawValue={`$${data.gasPrices.toFixed(2)}/gal`}
-                tooltip="National average gas prices. High prices = consumer stress (bearish). Low = economic relief (bullish). Range: $2.50-$4.50/gal."
+                tooltip="Retail Gas Prices track national average gasoline costs that directly impact consumer spending. SOURCE: EIA (Energy Information Administration) weekly data. INTERPRETATION: High prices (>$4.00) create consumer stress and economic drag—bearish for markets. Low prices (<$3.00) act as a 'tax cut' for consumers—bullish. Current range: $2.50-$4.50/gal."
               />
             </>
           )}

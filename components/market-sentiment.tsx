@@ -422,12 +422,14 @@ export function MarketSentiment() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [fromCache, setFromCache] = useState(false)
+  const [cacheTimestamp, setCacheTimestamp] = useState<string | null>(null)
 
   // Define cache keys and version
   const CACHE_KEY = "market_sentiment_data"
   const CACHE_TIMESTAMP_KEY = "market_sentiment_timestamp"
   const CACHE_VERSION_KEY = "fearGreedCacheVersion"
-  const CACHE_VERSION = "11.0" // Updated cache version to force refresh
+  const CACHE_VERSION = "12.0" // Updated cache version for new caching behavior
 
   // Define components based on CNN's Fear & Greed Index indicators
   const components = [
@@ -626,14 +628,14 @@ export function MarketSentiment() {
     const cachedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY)
     const cacheVersion = localStorage.getItem(CACHE_VERSION_KEY)
 
-    if (cachedData && cachedTimestamp && cacheVersion === CACHE_VERSION) {
+    // Check cache version and if data is from cache
+    const isDataFromCache = cachedData && cachedTimestamp && cacheVersion === CACHE_VERSION
+
+    if (isDataFromCache) {
       try {
         const data = JSON.parse(cachedData)
-        const cacheAge = Date.now() - new Date(cachedTimestamp).getTime()
-        const maxAge = 5 * 60 * 1000 // 5 minutes
 
         if (
-          cacheAge < maxAge &&
           typeof data.score === "number" &&
           data.score >= 0 &&
           data.score <= 100 &&
@@ -654,6 +656,8 @@ export function MarketSentiment() {
         ) {
           setMarketData(data)
           setLastUpdated(new Date(cachedTimestamp))
+          setFromCache(true)
+          setCacheTimestamp(cachedTimestamp)
           console.log(
             "[v0] Loaded valid cached CNN data with charts (score:",
             data.score,
@@ -662,11 +666,18 @@ export function MarketSentiment() {
             ")",
           )
           setLoading(false)
-        } else {
-          console.log("[v0] Cache expired or missing chartData, fetching fresh CNN data with charts...")
-          if (!data.chartData?.dates?.length) {
-            console.log("[v0]   Missing chartData - need fresh data")
+
+          if (cachedSentiment) {
+            try {
+              const sentiment = JSON.parse(cachedSentiment)
+              setSentimentData(Array.isArray(sentiment) ? sentiment : [])
+            } catch (error) {
+              console.error("[v0] Error loading cached sentiment:", error)
+            }
           }
+          return // Return early - don't auto-fetch when cache is valid
+        } else {
+          console.log("[v0] Cache data invalid, fetching fresh CNN data with charts...")
           fetchData()
         }
       } catch (error) {
@@ -697,22 +708,6 @@ export function MarketSentiment() {
         console.error("[v0] Error loading cached sentiment:", error)
       }
     }
-
-    // Moved setLoading(false) to the end of the fetchData call or after initial checks
-    // to ensure it's only set when data is truly loaded or fetch is attempted.
-    // For initial load, if cached data is present, we can set loading false earlier.
-    if (cachedData && cacheVersion === CACHE_VERSION && marketData) {
-      // This case is handled within the cache validation block now
-    } else if (!cachedData || cacheVersion !== CACHE_VERSION) {
-      // If fetching new data, loading is managed within fetchData
-    } else if (cachedSentiment && !cachedData) {
-      setLoading(false)
-    } else if (!cachedData && !cachedSentiment) {
-      // If no cached data at all, loading is handled by fetchData
-    } else {
-      // Fallback for any other edge cases, though typically handled above
-      setLoading(false)
-    }
   }, [])
 
   const fetchData = async () => {
@@ -721,6 +716,7 @@ export function MarketSentiment() {
       if (!marketData && !loading) {
         setLoading(true)
       }
+      setFromCache(false)
       console.log("[v0] Fetching fresh Fear & Greed data from API...")
       const [marketRes, sentimentRes] = await Promise.all([
         fetch("/api/market-sentiment", {
@@ -756,9 +752,11 @@ export function MarketSentiment() {
         }
 
         setMarketData(market)
+        const timestamp = new Date().toISOString()
         localStorage.setItem(CACHE_KEY, JSON.stringify(market))
-        localStorage.setItem(CACHE_TIMESTAMP_KEY, new Date().toISOString())
+        localStorage.setItem(CACHE_TIMESTAMP_KEY, timestamp)
         localStorage.setItem(CACHE_VERSION_KEY, CACHE_VERSION)
+        setCacheTimestamp(timestamp)
         console.log("[v0] Fear & Greed data cached successfully with version", CACHE_VERSION)
       } else {
         const errorData = await marketRes.json().catch(() => ({}))
@@ -796,6 +794,11 @@ export function MarketSentiment() {
     setRefreshing(true)
     await fetchData()
     setRefreshing(false)
+  }
+
+  const formatCacheTime = (isoString: string) => {
+    const date = new Date(isoString)
+    return date.toLocaleString()
   }
 
   const getScoreColor = (score: number) => {

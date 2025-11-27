@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button"
 import { TrendingDown, AlertTriangle, Activity, DollarSign, BarChart3, Users } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Download } from "lucide-react"
-import { RefreshButton } from "@/components/ui/refresh-button"
 
 import type { CCPIData, HistoricalData } from "@/lib/ccpi/types"
 import { getReadableColor, getRegimeZone, sortCanaries, countActiveWarnings } from "@/lib/ccpi/calculations"
@@ -313,6 +312,8 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
   const [isChatOpen, setIsChatOpen] = useState(false)
+  const [fromCache, setFromCache] = useState(false)
+  const [cacheTimestamp, setCacheTimestamp] = useState<string | null>(null)
 
   const pillarData = useMemo(() => {
     if (!data) return []
@@ -379,6 +380,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
     try {
       setIsRefreshing(true)
       setLoading(true)
+      setFromCache(false)
       setRefreshProgress(5)
       setRefreshStatus("Initializing CCPI calculation...")
       setError(null)
@@ -412,6 +414,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
 
       setData(cachedData)
       saveCCPIToCache(cachedData)
+      setCacheTimestamp(cachedData.timestamp)
 
       try {
         await fetch("/api/ccpi/cache", {
@@ -454,14 +457,22 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
       const cached = loadCCPIFromCache()
       if (cached) {
         setData(cached)
+        setFromCache(true)
+        setCacheTimestamp(cached.timestamp || null)
+        // Don't auto-fetch - only refresh when user clicks button
+        if (cached.executiveSummary) {
+          setExecutiveSummary(cached.executiveSummary)
+        }
+      } else {
+        // No cache exists, fetch fresh data
+        await fetchCCPIData()
       }
-      await fetchCCPIData()
     }
 
     loadInitialData()
-  }, [fetchCCPIData])
+  }, []) // Remove fetchCCPIData dependency to prevent auto-refresh
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <div className="flex items-center justify-center p-12">
         <div className="text-center">
@@ -538,7 +549,8 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 />
               </button>
             </div>
-            <RefreshButton onClick={fetchCCPIData} isLoading={isRefreshing} loadingText="Refreshing..." />
+            {/* Removed the refresh button from here to manage with cache indicator */}
+            {/* <RefreshButton onClick={fetchCCPIData} isLoading={isRefreshing} loadingText="Refreshing..." /> */}
           </div>
         </div>
 

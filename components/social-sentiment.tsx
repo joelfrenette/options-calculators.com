@@ -151,6 +151,14 @@ function SocialSentimentIndicator({
   )
 }
 
+function getSentimentInterpretation(score: number): string {
+  if (score >= 75) return "Strong buying interest - market participants are very optimistic"
+  if (score >= 56) return "Moderate optimism - generally positive market outlook"
+  if (score >= 45) return "Mixed signals - no clear directional bias"
+  if (score >= 25) return "Cautious sentiment - participants showing concern"
+  return "High fear levels - significant pessimism in the market"
+}
+
 export function SocialSentiment() {
   const [data, setData] = useState<SocialSentimentData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -160,6 +168,10 @@ export function SocialSentiment() {
   const [refreshing, setRefreshing] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [isFromCache, setIsFromCache] = useState(false)
+
+  const CACHE_KEY = "social_sentiment_cache"
+  const CACHE_TIMESTAMP_KEY = "social_sentiment_cache_timestamp"
 
   const fetchData = async () => {
     try {
@@ -169,6 +181,14 @@ export function SocialSentiment() {
         const result = await response.json()
         setData(result)
         setLastUpdated(new Date())
+        setIsFromCache(false)
+        try {
+          localStorage.setItem(CACHE_KEY, JSON.stringify(result))
+          localStorage.setItem(CACHE_TIMESTAMP_KEY, new Date().toISOString())
+          console.log("[v0] Social sentiment data cached to localStorage")
+        } catch (e) {
+          console.warn("[v0] Failed to cache data to localStorage:", e)
+        }
         console.log("[v0] Social sentiment data loaded successfully")
       } else {
         console.error("[v0] Social sentiment API error:", response.status)
@@ -181,13 +201,34 @@ export function SocialSentiment() {
   }
 
   useEffect(() => {
-    async function initialFetch() {
-      setLoading(true)
-      await fetchData()
-      setLoading(false)
+    function loadFromCache() {
+      try {
+        const cachedData = localStorage.getItem(CACHE_KEY)
+        const cachedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY)
+
+        if (cachedData) {
+          const parsed = JSON.parse(cachedData)
+          setData(parsed)
+          setIsFromCache(true)
+          if (cachedTimestamp) {
+            setLastUpdated(new Date(cachedTimestamp))
+          }
+          console.log("[v0] Loaded social sentiment from cache")
+          setLoading(false)
+          return true
+        }
+      } catch (e) {
+        console.warn("[v0] Failed to load from cache:", e)
+      }
+      return false
     }
 
-    initialFetch()
+    const hasCache = loadFromCache()
+
+    if (!hasCache) {
+      console.log("[v0] No cache found, fetching fresh data")
+      fetchData().finally(() => setLoading(false))
+    }
   }, [])
 
   const handleRefresh = async () => {
@@ -217,7 +258,17 @@ export function SocialSentiment() {
     )
   }
 
-  const filteredSymbols = data.per_symbol.filter(
+  if (!data) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <p className="text-gray-600">No sentiment data available</p>
+        </div>
+      </div>
+    )
+  }
+
+  const filteredSymbols = (data.per_symbol || []).filter(
     (s) =>
       s.ticker.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.name.toLowerCase().includes(searchQuery.toLowerCase()),
@@ -233,12 +284,63 @@ export function SocialSentiment() {
               <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <BarChart3 className="h-5 w-5 text-blue-600" />
                 Social Sentiment Historical Scale
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="right"
+                      className="max-w-sm bg-gray-900 text-white p-4 rounded-lg shadow-xl border-0"
+                    >
+                      <div className="space-y-2">
+                        <p className="font-semibold text-sm">How This Score Is Calculated</p>
+                        <p className="text-xs text-gray-300">
+                          The Headline Market Mood combines 6 data sources using AI-powered analysis:
+                        </p>
+                        <ul className="text-xs text-gray-300 list-disc pl-4 space-y-1">
+                          <li>
+                            <span className="text-white font-medium">Groq AI News Analysis</span> - Real-time market
+                            news sentiment
+                          </li>
+                          <li>
+                            <span className="text-white font-medium">Groq AI Social Search</span> - Twitter/Reddit
+                            discussions
+                          </li>
+                          <li>
+                            <span className="text-white font-medium">Google Trends</span> - Search interest in fear vs
+                            greed terms
+                          </li>
+                          <li>
+                            <span className="text-white font-medium">StockTwits</span> - Bullish/bearish post analysis
+                          </li>
+                          <li>
+                            <span className="text-white font-medium">CNN Fear & Greed</span> - Market indicators
+                            composite
+                          </li>
+                          <li>
+                            <span className="text-white font-medium">AAII Survey</span> - Weekly investor sentiment poll
+                          </li>
+                        </ul>
+                        <div className="pt-2 border-t border-gray-700">
+                          <p className="text-xs text-gray-400">Scale: 0 (Extreme Fear) → 100 (Extreme Greed)</p>
+                        </div>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </CardTitle>
               <p className="text-sm text-gray-600 mt-1">
                 Visual representation of sentiment zones from bearish to bullish
               </p>
             </div>
             <RefreshButton onRefresh={handleRefresh} isRefreshing={refreshing} lastUpdated={lastUpdated} />
+            {isFromCache && (
+              <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded flex items-center gap-2">
+                <span className="inline-block w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
+                Showing cached data from {lastUpdated?.toLocaleString()}. Press Refresh to load live data.
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent className="pt-6">
@@ -307,7 +409,31 @@ export function SocialSentiment() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-gray-700">Macro Sentiment</span>
+                  <span className="text-sm font-semibold text-gray-700 flex items-center gap-1">
+                    Macro Sentiment
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-3.5 w-3.5 text-gray-400 hover:text-gray-600 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          className="max-w-xs bg-gray-900 text-white p-3 rounded-lg shadow-xl border-0"
+                        >
+                          <div className="space-y-2">
+                            <p className="font-semibold text-sm">Macro Sentiment</p>
+                            <p className="text-xs text-gray-300">
+                              Combines AAII Investor Survey (weekly poll of individual investors) with CNN Fear & Greed
+                              Index (7 market indicators).
+                            </p>
+                            <p className="text-xs text-gray-400 pt-1 border-t border-gray-700">
+                              {getSentimentInterpretation(data?.current.macro_sentiment ?? 50)}
+                            </p>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </span>
                   <span className="text-lg font-bold text-gray-900">
                     {data ? Math.round(data.current.macro_sentiment) : 53}
                   </span>
@@ -322,7 +448,31 @@ export function SocialSentiment() {
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-gray-700">Social Sentiment</span>
+                  <span className="text-sm font-semibold text-gray-700 flex items-center gap-1">
+                    Social Sentiment
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-3.5 w-3.5 text-gray-400 hover:text-gray-600 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          className="max-w-xs bg-gray-900 text-white p-3 rounded-lg shadow-xl border-0"
+                        >
+                          <div className="space-y-2">
+                            <p className="font-semibold text-sm">Social Sentiment</p>
+                            <p className="text-xs text-gray-300">
+                              AI-analyzed sentiment from social platforms: Reddit (r/wallstreetbets), Twitter/X market
+                              discussions, and StockTwits posts using Groq compound-beta.
+                            </p>
+                            <p className="text-xs text-gray-400 pt-1 border-t border-gray-700">
+                              {getSentimentInterpretation(data?.current.global_social_sentiment ?? 50)}
+                            </p>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </span>
                   <span className="text-lg font-bold text-gray-900">
                     {data ? Math.round(data.current.global_social_sentiment) : 64}
                   </span>
@@ -342,11 +492,27 @@ export function SocialSentiment() {
         </CardContent>
       </Card>
 
-      {/* Component Sentiment Indicators */}
+      {/* Component Sentiment Indicators - Added tooltips to each indicator */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5" />6 Component Sentiment Indicators
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent
+                  side="right"
+                  className="max-w-sm bg-gray-900 text-white p-3 rounded-lg shadow-xl border-0"
+                >
+                  <p className="text-xs text-gray-300">
+                    Each indicator contributes to the overall Headline Market Mood. Green badges indicate LIVE data,
+                    yellow indicates cached or estimated values.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </CardTitle>
           <CardDescription>
             Individual scores from Reddit, Twitter, StockTwits, Google Trends, AAII Survey, and CNN Fear & Greed
@@ -359,42 +525,87 @@ export function SocialSentiment() {
               value: data.current.components.reddit_score,
               description: "r/wallstreetbets hot posts analyzed by AI",
               status: data.meta.data_status?.reddit,
+              tooltipDetail:
+                "Groq AI analyzes trending posts from Reddit's r/wallstreetbets, r/stocks, and r/investing subreddits to gauge retail investor sentiment.",
+              methodology: "Posts are scored 0-100 based on bullish vs bearish language patterns.",
             },
             {
               name: "Twitter / X Sentiment",
               value: data.current.components.twitter_score,
               description: "Twitter search results analyzed by AI",
               status: data.meta.data_status?.twitter,
+              tooltipDetail:
+                "Groq AI searches real-time Twitter/X posts about stocks, market conditions, and trading sentiment.",
+              methodology: "Web search results are analyzed for positive/negative market outlook.",
             },
             {
               name: "StockTwits Sentiment",
               value: data.current.components.stocktwits_score,
               description: "StockTwits posts + bullish/bearish tags",
               status: data.meta.data_status?.stocktwits,
+              tooltipDetail:
+                "ScrapingBee fetches recent StockTwits posts which are then analyzed by Groq AI for sentiment.",
+              methodology: "User-tagged bullish/bearish posts combined with AI text analysis.",
             },
             {
               name: "Google Trends",
               value: data.current.components.google_trends_score,
               description: "Inverted 'stock market crash' search volume (SerpAPI)",
               status: data.meta.data_status?.google_trends,
+              tooltipDetail:
+                "SerpAPI fetches Google Trends data for fear terms ('stock market crash', 'recession') and greed terms ('buy stocks', 'stock rally').",
+              methodology: "Fear searches reduce score, greed searches increase it. High fear search = low sentiment.",
             },
             {
               name: "AAII Investor Sentiment",
               value: data.current.components.aaii_score,
               description: "AAII.com weekly survey (scraped)",
               status: data.meta.data_status?.aaii,
+              tooltipDetail:
+                "American Association of Individual Investors conducts weekly polls asking members if they're bullish, bearish, or neutral.",
+              methodology: "Score = (Bullish% - Bearish% + 50) normalized to 0-100 scale.",
             },
             {
               name: "CNN Fear & Greed",
               value: data.current.components.fear_greed_score,
               description: "CNN Fear & Greed Index (scraped)",
               status: data.meta.data_status?.cnn,
+              tooltipDetail:
+                "CNN's composite index based on 7 market indicators: stock price momentum, stock price strength, stock price breadth, put/call options, junk bond demand, market volatility (VIX), and safe haven demand.",
+              methodology: "Already scaled 0-100 by CNN. Direct feed from market-sentiment API.",
             },
           ].map((indicator, index) => (
             <div key={index} className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-gray-700">{indicator.name}</span>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="h-3.5 w-3.5 text-gray-400 hover:text-gray-600 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="top"
+                        className="max-w-sm bg-gray-900 text-white p-4 rounded-lg shadow-xl border-0 z-50"
+                      >
+                        <div className="space-y-2">
+                          <p className="font-semibold text-sm">{indicator.name}</p>
+                          <p className="text-xs text-gray-300">{indicator.tooltipDetail}</p>
+                          <div className="pt-2 border-t border-gray-700">
+                            <p className="text-xs text-gray-400">
+                              <span className="text-gray-200 font-medium">Method:</span> {indicator.methodology}
+                            </p>
+                          </div>
+                          <div className="pt-1">
+                            <p className="text-xs text-gray-400">
+                              <span className="text-gray-200 font-medium">Current:</span> {indicator.value} ={" "}
+                              {getSentimentLabel(indicator.value)}
+                            </p>
+                          </div>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   {indicator.status && (
                     <span
                       className={`text-[10px] px-1.5 py-0.5 rounded ${indicator.status === "LIVE" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}
@@ -419,12 +630,31 @@ export function SocialSentiment() {
         </CardContent>
       </Card>
 
-      {/* Sentiment Heatmap Section */}
+      {/* Sentiment Heatmap Section - Added tooltips to heatmap items */}
       <Card className="shadow-sm border-gray-200">
         <CardHeader className="bg-gray-50 border-b border-gray-200">
           <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-primary" />
             Sentiment Heatmap
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent
+                  side="right"
+                  className="max-w-sm bg-gray-900 text-white p-3 rounded-lg shadow-xl border-0"
+                >
+                  <div className="space-y-2">
+                    <p className="font-semibold text-sm">Sentiment Heatmap</p>
+                    <p className="text-xs text-gray-300">
+                      Per-symbol sentiment derived from StockTwits data combined with market-wide social sentiment.
+                      Click on any symbol for detailed breakdown.
+                    </p>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </CardTitle>
           <p className="text-sm text-gray-600 mt-1">
             AI-powered sentiment from social media discussions (Reddit, Twitter/X, financial forums)
@@ -437,7 +667,7 @@ export function SocialSentiment() {
               Major Indices
             </h3>
             <div className="space-y-4">
-              {data.per_symbol
+              {(data.per_symbol || [])
                 .filter((s) => ["SPY", "QQQ", "IWM", "DIA"].includes(s.ticker))
                 .map((item) => (
                   <div key={item.ticker} className="space-y-1">
@@ -445,6 +675,34 @@ export function SocialSentiment() {
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-sm text-gray-900">{item.ticker}</span>
                         <span className="text-xs text-gray-500">{item.name}</span>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent
+                              side="top"
+                              className="max-w-xs bg-gray-900 text-white p-3 rounded-lg shadow-xl border-0 z-50"
+                            >
+                              <div className="space-y-2">
+                                <p className="font-semibold text-sm">
+                                  {item.ticker} - {item.name}
+                                </p>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                                  <span className="text-gray-400">StockTwits:</span>
+                                  <span className="text-white font-medium">{Math.round(item.stocktwits_score)}</span>
+                                  <span className="text-gray-400">Combined:</span>
+                                  <span className="text-white font-medium">
+                                    {Math.round(item.combined_social_score)}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-gray-400 pt-1 border-t border-gray-700">
+                                  {getSentimentInterpretation(item.combined_social_score)}
+                                </p>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </div>
                       <div className="text-right">
                         <span className="font-bold text-gray-900">{Math.round(item.combined_social_score)}</span>
@@ -475,12 +733,44 @@ export function SocialSentiment() {
         </CardContent>
       </Card>
 
-      {/* Per Symbol Breakdown */}
+      {/* Per Symbol Breakdown - Improved tooltip styling and content */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Per-Symbol Social Sentiment</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                Per-Symbol Social Sentiment
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="right"
+                      className="max-w-sm bg-gray-900 text-white p-3 rounded-lg shadow-xl border-0"
+                    >
+                      <div className="space-y-2">
+                        <p className="font-semibold text-sm">Per-Symbol Sentiment</p>
+                        <p className="text-xs text-gray-300">
+                          Individual stock sentiment primarily from StockTwits, blended with market-wide social
+                          sentiment from Reddit and Twitter for context.
+                        </p>
+                        <div className="pt-2 border-t border-gray-700 text-xs text-gray-400">
+                          <p>
+                            <span className="text-green-400">Green (60-100):</span> Bullish sentiment
+                          </p>
+                          <p>
+                            <span className="text-yellow-400">Yellow (40-59):</span> Neutral sentiment
+                          </p>
+                          <p>
+                            <span className="text-red-400">Red (0-39):</span> Bearish sentiment
+                          </p>
+                        </div>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </CardTitle>
               <CardDescription>Individual stock sentiment from StockTwits</CardDescription>
             </div>
             <div className="w-64">
@@ -498,7 +788,7 @@ export function SocialSentiment() {
           </div>
         </CardHeader>
         <CardContent>
-          {data.per_symbol.length > 0 && data.per_symbol[0].data_note && (
+          {(data.per_symbol || []).length > 0 && data.per_symbol[0].data_note && (
             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-gray-700">
               {data.per_symbol[0].data_note}
             </div>
@@ -516,25 +806,62 @@ export function SocialSentiment() {
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger>
-                            <Info className="h-3 w-3 text-gray-400" />
+                            <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
                           </TooltipTrigger>
-                          <TooltipContent className="max-w-sm">
-                            <div className="space-y-1 text-xs">
-                              <div className="flex justify-between gap-4">
-                                <span>StockTwits (LIVE):</span>
-                                <span className="font-semibold">{Math.round(symbol.stocktwits_score)}</span>
+                          <TooltipContent
+                            side="top"
+                            align="start"
+                            className="max-w-sm bg-gray-900 text-white p-4 rounded-lg shadow-xl border-0 z-50"
+                          >
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between border-b border-gray-700 pb-2">
+                                <span className="font-bold text-sm">{symbol.ticker}</span>
+                                <span
+                                  className={`text-xs px-2 py-0.5 rounded ${
+                                    symbol.combined_social_score >= 60
+                                      ? "bg-green-600"
+                                      : symbol.combined_social_score >= 40
+                                        ? "bg-yellow-600"
+                                        : "bg-red-600"
+                                  }`}
+                                >
+                                  {getSentimentLabel(symbol.combined_social_score)}
+                                </span>
                               </div>
-                              <div className="flex justify-between gap-4 text-gray-400">
-                                <span>Reddit:</span>
-                                <span>Market-wide only</span>
+
+                              <div className="space-y-2">
+                                <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">
+                                  Data Sources
+                                </p>
+                                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-400">StockTwits</span>
+                                    <span className="text-green-400 font-semibold">
+                                      {Math.round(symbol.stocktwits_score)}{" "}
+                                      <span className="text-[10px] text-green-500">LIVE</span>
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-400">Combined</span>
+                                    <span className="text-white font-semibold">
+                                      {Math.round(symbol.combined_social_score)}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between col-span-2 pt-1 border-t border-gray-800">
+                                    <span className="text-gray-500">Reddit/Twitter</span>
+                                    <span className="text-gray-500 text-[10px]">Market-wide only</span>
+                                  </div>
+                                </div>
                               </div>
-                              <div className="flex justify-between gap-4 text-gray-400">
-                                <span>Twitter:</span>
-                                <span>Market-wide only</span>
+
+                              <div className="pt-2 border-t border-gray-700">
+                                <p className="text-xs text-gray-400">
+                                  {getSentimentInterpretation(symbol.combined_social_score)}
+                                </p>
                               </div>
-                              <div className="flex justify-between gap-4 text-gray-400">
-                                <span>Google Trends:</span>
-                                <span>Market-wide only</span>
+
+                              <div className="text-[10px] text-gray-500 pt-1">
+                                Score derived from StockTwits posts + market-wide social signals
                               </div>
                             </div>
                           </TooltipContent>
