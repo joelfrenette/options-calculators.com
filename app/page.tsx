@@ -14,27 +14,46 @@ import { WheelScanner } from "@/components/wheel-scanner"
 import { CpiInflationAnalysis } from "@/components/cpi-inflation-analysis"
 import { CcpiDashboard } from "@/components/ccpi-dashboard"
 import { SocialSentiment } from "@/components/social-sentiment"
-import { Menu, X } from "lucide-react"
+import { EarningsEconomicCalendar } from "@/components/earnings-economic-calendar"
+import { JobsReportDashboard } from "@/components/jobs-report-dashboard"
+import { Menu, X, TrendingUp, Zap } from "lucide-react"
 import Image from "next/image"
 
-const TABS = [
-  { id: "trend-analysis", label: "Index Trend Analysis & Forecast" },
-  { id: "risk-management", label: "VIX Volatility Index" },
-  { id: "market-sentiment", label: "Fear & Greed Index" },
-  { id: "panic-euphoria", label: "Panic/Euphoria Index" },
-  { id: "social-sentiment", label: "Social Sentiment Score" },
-  { id: "ccpi", label: "CCPI: Crash Prediction Index" },
-  { id: "fomc-predictions", label: "Fed Rate Analysis & Forecast" },
-  { id: "cpi-inflation", label: "CPI Inflation Analysis & Forecast" },
-  { id: "earnings-iv-crusher", label: "Earnings EM Calculator" },
+const ANALYZE_TABS = [
+  { id: "earnings-calendar", label: "Earnings Calendar" },
+  { id: "trend-analysis", label: "Index Trend" },
+  { id: "risk-management", label: "VIX Index" },
+  { id: "market-sentiment", label: "Fear & Greed" },
+  { id: "panic-euphoria", label: "Panic Index" },
+  { id: "social-sentiment", label: "Social Sentiment" },
+  { id: "ccpi", label: "CCPI" },
+  { id: "fomc-predictions", label: "Fed Rate" },
+  { id: "jobs", label: "Jobs" },
+  { id: "cpi-inflation", label: "CPI Inflation" },
+]
+
+const EXECUTE_TABS = [
+  { id: "earnings-iv-crusher", label: "Earnings EM" },
   { id: "greeks", label: "Greeks Calculator" },
   { id: "risk-rewards", label: "ROI Calculator" },
   { id: "wheel-scanner", label: "Put Selling Scanner" },
 ]
 
+type Category = "analyze" | "execute"
+
 export default function Home() {
-  const [activeTab, setActiveTab] = useState("trend-analysis")
+  const [activeCategory, setActiveCategory] = useState<Category>("analyze")
+  const [activeTab, setActiveTab] = useState("earnings-calendar")
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  const currentTabs = activeCategory === "analyze" ? ANALYZE_TABS : EXECUTE_TABS
+
+  const handleCategoryChange = (category: Category) => {
+    setActiveCategory(category)
+    // Set first tab of the new category as active
+    const firstTab = category === "analyze" ? ANALYZE_TABS[0] : EXECUTE_TABS[0]
+    setActiveTab(firstTab.id)
+  }
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId)
@@ -76,10 +95,39 @@ export default function Home() {
           </div>
         </div>
 
+        <div className="container mx-auto px-4 bg-gray-50 border-b border-gray-200">
+          <div className="max-w-5xl mx-auto">
+            <div className="hidden md:flex gap-1 py-1">
+              <button
+                onClick={() => handleCategoryChange("analyze")}
+                className={`flex items-center gap-2 px-6 py-2.5 text-sm font-bold rounded-t-lg transition-all ${
+                  activeCategory === "analyze"
+                    ? "bg-white text-primary border-t-2 border-x border-primary border-gray-200 -mb-px"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                }`}
+              >
+                <TrendingUp className="h-4 w-4" />
+                ANALYZE
+              </button>
+              <button
+                onClick={() => handleCategoryChange("execute")}
+                className={`flex items-center gap-2 px-6 py-2.5 text-sm font-bold rounded-t-lg transition-all ${
+                  activeCategory === "execute"
+                    ? "bg-white text-primary border-t-2 border-x border-primary border-gray-200 -mb-px"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                }`}
+              >
+                <Zap className="h-4 w-4" />
+                EXECUTE
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div className="container mx-auto px-4">
           <div className="max-w-5xl mx-auto">
             <nav className="hidden md:flex border-b border-gray-200 -mx-4 px-4">
-              {TABS.map((tab) => (
+              {currentTabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
@@ -95,9 +143,32 @@ export default function Home() {
             </nav>
 
             {mobileMenuOpen && (
-              <div className="md:hidden absolute left-0 right-0 top-[72px] bg-white border-b border-gray-200 shadow-lg z-50">
+              <div className="md:hidden absolute left-0 right-0 top-[72px] bg-white border-b border-gray-200 shadow-lg z-50 max-h-[80vh] overflow-y-auto">
                 <nav className="py-2">
-                  {TABS.map((tab) => (
+                  {/* Category Headers */}
+                  <div className="px-4 py-2 flex gap-2 border-b border-gray-100 mb-2">
+                    <button
+                      onClick={() => setActiveCategory("analyze")}
+                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-bold rounded-lg transition-all ${
+                        activeCategory === "analyze" ? "bg-primary text-white" : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      <TrendingUp className="h-4 w-4" />
+                      ANALYZE
+                    </button>
+                    <button
+                      onClick={() => setActiveCategory("execute")}
+                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-bold rounded-lg transition-all ${
+                        activeCategory === "execute" ? "bg-primary text-white" : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      <Zap className="h-4 w-4" />
+                      EXECUTE
+                    </button>
+                  </div>
+
+                  {/* Tab Items */}
+                  {currentTabs.map((tab) => (
                     <button
                       key={tab.id}
                       onClick={() => handleTabChange(tab.id)}
@@ -115,7 +186,18 @@ export default function Home() {
             )}
 
             <div className="md:hidden mt-2 pb-2 border-b border-gray-200">
-              <p className="text-sm font-semibold text-primary">{TABS.find((tab) => tab.id === activeTab)?.label}</p>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`text-xs font-bold px-2 py-0.5 rounded ${
+                    activeCategory === "analyze" ? "bg-primary/10 text-primary" : "bg-amber-100 text-amber-700"
+                  }`}
+                >
+                  {activeCategory === "analyze" ? "ANALYZE" : "EXECUTE"}
+                </span>
+                <p className="text-sm font-semibold text-primary">
+                  {currentTabs.find((tab) => tab.id === activeTab)?.label}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -127,6 +209,17 @@ export default function Home() {
 
       <main className="container mx-auto px-4 py-4">
         <div className="max-w-5xl mx-auto">
+          {activeTab === "earnings-calendar" && (
+            <div>
+              <div className="mb-4">
+                <p className="text-lg text-gray-600 text-balance">
+                  Track upcoming earnings reports and economic events with AI-powered market impact analysis
+                </p>
+              </div>
+              <EarningsEconomicCalendar />
+            </div>
+          )}
+
           {activeTab === "trend-analysis" && (
             <div>
               <div className="mb-4">
@@ -204,6 +297,17 @@ export default function Home() {
                 </p>
               </div>
               <FomcPredictions />
+            </div>
+          )}
+
+          {activeTab === "jobs" && (
+            <div>
+              <div className="mb-4">
+                <p className="text-lg text-gray-600 text-balance">
+                  Analyze jobs data and get insights for market trends and economic conditions
+                </p>
+              </div>
+              <JobsReportDashboard />
             </div>
           )}
 
