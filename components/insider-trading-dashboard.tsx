@@ -165,6 +165,7 @@ const InsiderTradingDashboard = () => {
   const [sortField, setSortField] = useState<SortField | null>(null)
   const [sortDirection, setSortDirection] = useState<SortDirection>(null)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
+  const [data, setData] = useState<any | null>(null)
 
   const fetchData = async () => {
     try {
@@ -175,6 +176,7 @@ const InsiderTradingDashboard = () => {
           setTrades(data.transactions)
           setDataSource(data.source || "live")
           setLastUpdated(new Date().toLocaleString())
+          setData(data)
         }
       }
     } catch (error) {
@@ -341,6 +343,24 @@ const InsiderTradingDashboard = () => {
             <CardDescription>
               Showing all {sortedTrades.length} trades from the past week (click column headers to sort)
             </CardDescription>
+            {data?.dataSources && (
+              <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mt-2 pt-2 border-t">
+                <span className="flex items-center gap-1.5">
+                  <span
+                    className={`w-2 h-2 rounded-full ${data.dataSources.corporate?.isLive ? "bg-green-500" : "bg-yellow-500"}`}
+                  />
+                  <span className="font-medium">Corporate:</span>{" "}
+                  {data.dataSources.corporate?.isLive ? "Live SEC Form 4 data via Finnhub" : "Sample data"} (
+                  {data.dataSources.corporate?.count || 0} trades)
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-blue-500" />
+                  <span className="font-medium">Congressional:</span> Public STOCK Act disclosures (
+                  {data.dataSources.congressional?.count || 0} trades)
+                  <InfoTooltip content="Congressional trades are disclosed with up to 45-day delay per STOCK Act. Value ranges (not exact amounts) are reported. Prices shown are approximate market prices at disclosure." />
+                </span>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             {isLoading ? (

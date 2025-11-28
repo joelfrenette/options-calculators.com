@@ -37,7 +37,7 @@ const ANALYZE_TABS = [
   { id: "ccpi", label: "Crash & Corrections Prediction Index" },
   { id: "fomc-predictions", label: "FOMC Fed Rate Forecaster" },
   { id: "cpi-inflation", label: "BLS CPI Inflation Forecaster" },
-  { id: "jobs", label: "BLS Jobs Rate" },
+  { id: "jobs", label: "BLS Jobs Rate Forecaster" },
 ]
 
 const SCAN_TABS = [

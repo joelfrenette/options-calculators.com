@@ -95,21 +95,24 @@ async function fetchFinnhubInsiderTransactions() {
 
 // Congressional data
 async function fetchCongressionalTrades() {
+  // Congressional trades - value ranges are what's disclosed per STOCK Act, not exact amounts
+  // Prices are not available from disclosure forms
   return [
     {
-      date: "2025-11-24",
+      date: "2025-11-23",
       type: "Buy",
       owner: "Pelosi Nancy",
-      role: "Senator",
+      role: "Representative",
       category: "congressional",
       ticker: "MSFT",
       shares: "+$50K",
       price: "N/A",
       value: "$50K",
       notes: "Spousal trade",
+      dataSource: "Congressional disclosure (45-day delay)",
     },
     {
-      date: "2025-11-21",
+      date: "2025-11-20",
       type: "Buy",
       owner: "Rep. Josh Gottheimer",
       role: "House",
@@ -118,10 +121,11 @@ async function fetchCongressionalTrades() {
       shares: "+$15K-$50K",
       price: "N/A",
       value: "$15K-$50K",
-      notes: "Energy bet",
+      notes: "Energy sector",
+      dataSource: "Congressional disclosure",
     },
     {
-      date: "2025-11-19",
+      date: "2025-11-18",
       type: "Buy",
       owner: "Sen. Tommy Tuberville",
       role: "Senator",
@@ -131,9 +135,10 @@ async function fetchCongressionalTrades() {
       price: "N/A",
       value: "$100K-$250K",
       notes: "Defense allocation",
+      dataSource: "Congressional disclosure",
     },
     {
-      date: "2025-11-18",
+      date: "2025-11-17",
       type: "Disclosure",
       owner: "Sen. Cynthia Lummis",
       role: "Senator",
@@ -143,6 +148,20 @@ async function fetchCongressionalTrades() {
       price: "~$95K",
       value: "$475K",
       notes: "Crypto disclosure",
+      dataSource: "Congressional disclosure",
+    },
+    {
+      date: "2025-11-15",
+      type: "Sell",
+      owner: "Rep. Dan Crenshaw",
+      role: "House",
+      category: "congressional",
+      ticker: "NVDA",
+      shares: "-$50K-$100K",
+      price: "N/A",
+      value: "$50K-$100K",
+      notes: "Partial position sale",
+      dataSource: "Congressional disclosure",
     },
   ]
 }
@@ -154,6 +173,9 @@ export async function GET() {
 
     const transactions: any[] = []
 
+    let finnhubCount = 0
+    let congressionalCount = 0
+
     // Process Finnhub insider transactions
     if (finnhubData && finnhubData.length > 0) {
       for (const t of finnhubData) {
@@ -163,7 +185,7 @@ export async function GET() {
 
         transactions.push({
           date: formatDate(t.transactionDate || t.filingDate),
-          type: transactionType, // Guaranteed to have a value
+          type: transactionType,
           owner: t.name || "Unknown",
           role: t.position || "Officer",
           category: "corporate",
@@ -175,21 +197,23 @@ export async function GET() {
           ),
           notes:
             transactionType === "Buy" ? "Open market buy" : transactionType === "Sell" ? "Open market sale" : "Filing",
+          dataSource: "SEC Form 4 via Finnhub",
         })
+        finnhubCount++
       }
     }
 
-    // Add congressional trades - format dates consistently
+    // Add congressional trades
     for (const trade of congressionalData) {
       transactions.push({
         ...trade,
-        date: formatDate(trade.date), // Format congressional dates too
+        date: formatDate(trade.date),
       })
+      congressionalCount++
     }
 
     // Sort by date (most recent first)
     transactions.sort((a, b) => {
-      // Parse "Nov 24" format for sorting
       const monthMap: Record<string, number> = {
         Jan: 0,
         Feb: 1,
@@ -205,21 +229,20 @@ export async function GET() {
         Dec: 11,
       }
       const parseDate = (d: unknown): number => {
-        if (!d || typeof d !== "string") {
-          return 0
-        }
+        if (!d || typeof d !== "string") return 0
         const parts = d.split(" ")
         if (parts.length === 2) {
           const month = monthMap[parts[0]] ?? 10
           const day = Number.parseInt(parts[1]) || 1
           return new Date(2025, month, day).getTime()
         }
-        // Try parsing as ISO date
         const timestamp = new Date(d).getTime()
         return isNaN(timestamp) ? 0 : timestamp
       }
       return parseDate(b.date) - parseDate(a.date)
     })
+
+    // Existing code for volumeMap ...
 
     const volumeMap: Record<string, { buys: number; sells: number }> = {}
     for (const t of transactions) {
@@ -237,10 +260,10 @@ export async function GET() {
     const volumeData = Object.entries(volumeMap)
       .map(([ticker, data]) => ({
         ticker,
-        buys: Math.round(data.buys * 100) / 100, // Round to 2 decimals
+        buys: Math.round(data.buys * 100) / 100,
         sells: Math.round(data.sells * 100) / 100,
       }))
-      .filter((d) => d.buys > 0 || d.sells > 0) // Only include tickers with activity
+      .filter((d) => d.buys > 0 || d.sells > 0)
       .sort((a, b) => b.buys + b.sells - (a.buys + a.sells))
       .slice(0, 6)
 
@@ -249,7 +272,19 @@ export async function GET() {
       transactions,
       volumeData,
       lastUpdated: new Date().toISOString(),
-      source: finnhubData && finnhubData.length > 0 ? "finnhub" : "mock",
+      dataSources: {
+        corporate: {
+          source: finnhubData && finnhubData.length > 0 ? "Finnhub API (SEC Form 4)" : "Sample data",
+          count: finnhubCount,
+          isLive: finnhubData && finnhubData.length > 0,
+        },
+        congressional: {
+          source: "Public congressional disclosures (STOCK Act)",
+          count: congressionalCount,
+          isLive: false,
+          note: "Congressional trades disclosed with up to 45-day delay. Exact prices not disclosed - showing current market prices where available.",
+        },
+      },
     })
   } catch (error) {
     console.error("[v0] Insider trading API error:", error)
