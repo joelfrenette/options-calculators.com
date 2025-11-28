@@ -418,56 +418,96 @@ export function SocialSentiment() {
             </div>
           </CardHeader>
           <CardContent className="pt-6">
-            {/* Main Sentiment Gauge */}
-            <div className="relative mb-8">
-              {/* Score Display */}
-              <div className="absolute left-1/2 -translate-x-1/2 -top-2 bg-gray-900 text-white px-3 py-1 rounded-lg text-center z-10">
-                <div className="text-xs text-gray-300">TODAY</div>
-                <div className="text-2xl font-bold">{Math.round(safeNumber(data?.global_social_sentiment, 50))}</div>
-                <div className="text-xs">{getSentimentLabel(safeNumber(data?.global_social_sentiment, 50))}</div>
-              </div>
+            {/* Main Sentiment Gauge - Fear & Greed Style */}
+            <div className="space-y-6">
+              <div className="relative">
+                {/* Tall Gradient Bar */}
+                <div className="h-24 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded-lg shadow-inner" />
 
-              {/* Gradient Bar */}
-              <div className="h-12 rounded-lg overflow-hidden flex mt-8">
-                <div className="flex-1 bg-green-600 flex items-end justify-start p-2">
-                  <div className="text-white text-xs font-bold">
-                    <div>EXTREME</div>
+                {/* Zone Labels Overlay */}
+                <div className="absolute inset-0 flex items-center justify-between px-2 text-xs font-bold">
+                  <div className="text-center text-white drop-shadow-lg">
+                    <div className="text-base">EXTREME</div>
                     <div>BULLISH</div>
-                    <div className="text-green-200">75-100</div>
+                    <div className="text-[10px] mt-1">75-100</div>
                   </div>
-                </div>
-                <div className="flex-1 bg-green-400 flex items-end justify-center p-2">
-                  <div className="text-white text-xs font-bold text-center">
+                  <div className="text-center text-white drop-shadow-lg">
                     <div>BULLISH</div>
-                    <div className="text-green-100">56-74</div>
+                    <div className="text-[10px] mt-1">56-74</div>
                   </div>
-                </div>
-                <div className="flex-1 bg-yellow-400 flex items-end justify-center p-2">
-                  <div className="text-gray-800 text-xs font-bold text-center">
+                  <div className="text-center text-gray-800 drop-shadow">
                     <div>NEUTRAL</div>
-                    <div className="text-yellow-700">45-55</div>
+                    <div className="text-[10px] mt-1">45-55</div>
+                  </div>
+                  <div className="text-center text-white drop-shadow-lg">
+                    <div>BEARISH</div>
+                    <div className="text-[10px] mt-1">25-44</div>
+                  </div>
+                  <div className="text-center text-white drop-shadow-lg">
+                    <div className="text-base">EXTREME</div>
+                    <div>BEARISH</div>
+                    <div className="text-[10px] mt-1">0-24</div>
                   </div>
                 </div>
-                <div className="flex-1 bg-orange-500 flex items-end justify-center p-2">
-                  <div className="text-white text-xs font-bold text-center">
-                    <div>BEARISH</div>
-                    <div className="text-orange-200">25-44</div>
+
+                {/* Moving Indicator with Floating Score */}
+                {data && (
+                  <div
+                    className="absolute top-0 bottom-0 w-2 bg-black shadow-lg transition-all duration-500"
+                    style={{ left: `calc(${100 - safeNumber(data.global_social_sentiment, 50)}% - 4px)` }}
+                  >
+                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                      <div className="bg-black text-white px-4 py-2 rounded-lg shadow-xl">
+                        <div className="text-xs font-semibold">TODAY</div>
+                        <div className="text-2xl font-bold">
+                          {Math.round(safeNumber(data.global_social_sentiment, 50))}
+                        </div>
+                        <div className="text-xs text-center">
+                          {getSentimentLabel(safeNumber(data.global_social_sentiment, 50))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Macro vs Social Split - Enhanced style */}
+              <div className="grid grid-cols-2 gap-6 mt-8">
+                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-gray-700">Macro Sentiment</span>
+                    <span className="text-2xl font-bold text-gray-900">
+                      {Math.round(safeNumber(data?.macro_sentiment, 47))}
+                    </span>
+                  </div>
+                  <div className="h-3 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded-full overflow-hidden relative">
+                    <div
+                      className="absolute top-0 bottom-0 w-1 bg-black shadow-md transition-all duration-300"
+                      style={{ left: `calc(${100 - safeNumber(data?.macro_sentiment, 47)}% - 2px)` }}
+                    />
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {getSentimentLabel(safeNumber(data?.macro_sentiment, 47))}
                   </div>
                 </div>
-                <div className="flex-1 bg-red-600 flex items-end justify-end p-2">
-                  <div className="text-white text-xs font-bold text-right">
-                    <div>EXTREME</div>
-                    <div>BEARISH</div>
-                    <div className="text-red-200">0-24</div>
+                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-gray-700">Social Sentiment</span>
+                    <span className="text-2xl font-bold text-gray-900">
+                      {Math.round(safeNumber(data?.social_sentiment, 54))}
+                    </span>
+                  </div>
+                  <div className="h-3 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded-full overflow-hidden relative">
+                    <div
+                      className="absolute top-0 bottom-0 w-1 bg-black shadow-md transition-all duration-300"
+                      style={{ left: `calc(${100 - safeNumber(data?.social_sentiment, 54)}% - 2px)` }}
+                    />
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {getSentimentLabel(safeNumber(data?.social_sentiment, 54))}
                   </div>
                 </div>
               </div>
-            </div>
-
-            {/* Macro vs Social Split */}
-            <div className="grid grid-cols-2 gap-6">
-              <SentimentPill label="Macro Sentiment" value={safeNumber(data?.macro_sentiment, 47)} />
-              <SentimentPill label="Social Sentiment" value={safeNumber(data?.social_sentiment, 54)} />
             </div>
           </CardContent>
         </Card>

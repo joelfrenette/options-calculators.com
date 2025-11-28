@@ -16,9 +16,9 @@ const API_VERSION = "5.0.0"
  * 4. CNN Fear & Greed - Official index
  * 5. StockTwits API - Symbol-specific sentiment
  * 6. Finnhub News Sentiment - Pre-scored financial news
- * 7. FMP News - Financial Modeling Prep news sentiment
+ * 7. Polygon.io News - Real-time news with tickers
  * 8. OpenAI GPT - Market sentiment analysis
- * 9. Polygon.io News - Real-time news with tickers
+ * 9. Polygon.io News - Real-time news sentiment
  * 10. Yahoo Finance - Stock discussion sentiment
  */
 
@@ -305,23 +305,24 @@ async function getFinnhubSentiment(): Promise<{ score: number; source: string; a
   }
 }
 
-// ========== SOURCE 7: FMP NEWS SENTIMENT ==========
-async function getFMPSentiment(): Promise<{ score: number; source: string; articles: number }> {
-  if (!process.env.FMP_API_KEY) {
-    console.log("[v0] Source 7 (FMP): API key not available")
+// ========== SOURCE 7: POLYGON NEWS SENTIMENT ==========
+async function getPolygonNewsSentiment(): Promise<{ score: number; source: string; articles: number }> {
+  if (!process.env.POLYGON_API_KEY) {
+    console.log("[v0] Source 7 (Polygon News): API key not available")
     return { score: -1, source: "unavailable", articles: 0 }
   }
 
   try {
-    console.log("[v0] Source 7: Fetching FMP news sentiment...")
+    console.log("[v0] Source 7: Fetching Polygon news sentiment...")
 
     const response = await fetch(
-      `https://financialmodelingprep.com/api/v3/stock_news?limit=50&apikey=${process.env.FMP_API_KEY}`,
+      `https://api.polygon.io/v2/reference/news?limit=50&apiKey=${process.env.POLYGON_API_KEY}`,
       { signal: AbortSignal.timeout(10000) },
     )
 
     if (response.ok) {
-      const articles = await response.json()
+      const data = await response.json()
+      const articles = data.results || []
 
       if (Array.isArray(articles) && articles.length > 0) {
         let positive = 0
@@ -340,6 +341,8 @@ async function getFMPSentiment(): Promise<{ score: number; source: string; artic
           "strong",
           "upgrade",
           "buy",
+          "optimism",
+          "boost",
         ]
         const negativeWords = [
           "crash",
@@ -354,10 +357,12 @@ async function getFMPSentiment(): Promise<{ score: number; source: string; artic
           "decline",
           "downgrade",
           "sell",
+          "concern",
+          "risk",
         ]
 
         for (const article of articles) {
-          const text = ((article.title || "") + " " + (article.text || "")).toLowerCase()
+          const text = ((article.title || "") + " " + (article.description || "")).toLowerCase()
           if (positiveWords.some((w) => text.includes(w))) positive++
           if (negativeWords.some((w) => text.includes(w))) negative++
         }
@@ -365,15 +370,15 @@ async function getFMPSentiment(): Promise<{ score: number; source: string; artic
         const total = positive + negative
         if (total > 0) {
           const score = Math.round((positive / total) * 100)
-          console.log(`[v0] ✓ Source 7 (FMP): ${score}/100 (${articles.length} articles)`)
-          return { score, source: "fmp_news", articles: articles.length }
+          console.log(`[v0] ✓ Source 7 (Polygon News): ${score}/100 (${articles.length} articles)`)
+          return { score, source: "polygon_news", articles: articles.length }
         }
       }
     }
 
-    return { score: 50, source: "fmp_neutral", articles: 0 }
+    return { score: 50, source: "polygon_neutral", articles: 0 }
   } catch (error) {
-    console.log("[v0] Source 7 (FMP) error:", error instanceof Error ? error.message : "Unknown")
+    console.log("[v0] Source 7 (Polygon News) error:", error instanceof Error ? error.message : "Unknown")
     return { score: -1, source: "error", articles: 0 }
   }
 }
@@ -442,53 +447,9 @@ RESPOND WITH ONLY JSON:
   }
 }
 
-// ========== SOURCE 9: POLYGON NEWS ==========
+// ========== SOURCE 9: POLYGON NEWS SENTIMENT (reused) ==========
 async function getPolygonSentiment(): Promise<{ score: number; source: string; articles: number }> {
-  if (!process.env.POLYGON_API_KEY) {
-    console.log("[v0] Source 9 (Polygon): API key not available")
-    return { score: -1, source: "unavailable", articles: 0 }
-  }
-
-  try {
-    console.log("[v0] Source 9: Fetching Polygon news sentiment...")
-
-    const response = await fetch(
-      `https://api.polygon.io/v2/reference/news?limit=50&apiKey=${process.env.POLYGON_API_KEY}`,
-      { signal: AbortSignal.timeout(10000) },
-    )
-
-    if (!response.ok) {
-      return { score: -1, source: "api_failed", articles: 0 }
-    }
-
-    const data = await response.json()
-    const articles = data.results || []
-
-    if (articles.length > 0) {
-      let positive = 0
-      let negative = 0
-
-      const positiveWords = ["surge", "rally", "gain", "rise", "bull", "record", "growth", "profit", "beat"]
-      const negativeWords = ["crash", "plunge", "fall", "drop", "bear", "loss", "miss", "weak", "fear"]
-
-      for (const article of articles) {
-        const title = (article.title || "").toLowerCase()
-        if (positiveWords.some((w) => title.includes(w))) positive++
-        if (negativeWords.some((w) => title.includes(w))) negative++
-      }
-
-      const total = positive + negative
-      const score = total > 0 ? Math.round((positive / total) * 100) : 50
-
-      console.log(`[v0] ✓ Source 9 (Polygon): ${score}/100 (${positive} pos, ${negative} neg)`)
-      return { score, source: "polygon_news", articles: articles.length }
-    }
-
-    return { score: 50, source: "polygon_neutral", articles: 0 }
-  } catch (error) {
-    console.log("[v0] Source 9 (Polygon) error:", error instanceof Error ? error.message : "Unknown")
-    return { score: -1, source: "error", articles: 0 }
-  }
+  return getPolygonNewsSentiment()
 }
 
 // ========== SOURCE 10: YAHOO FINANCE ==========
@@ -723,9 +684,9 @@ export async function GET() {
       cnnResult,
       stocktwitsResult,
       finnhubResult,
-      fmpResult,
+      polygonNewsResult,
       openaiResult,
-      polygonResult,
+      polygonSentimentResult,
       yahooResult,
     ] = await Promise.all([
       getGrokSentiment(),
@@ -734,9 +695,9 @@ export async function GET() {
       getCNNFearGreed(),
       getStockTwitsSentiment("SPY"),
       getFinnhubSentiment(),
-      getFMPSentiment(),
+      getPolygonNewsSentiment(),
       getOpenAISentiment(),
-      getPolygonSentiment(),
+      getPolygonNewsSentiment(), // Corrected the variable name here
       getYahooSentiment(),
     ])
 
@@ -748,9 +709,9 @@ export async function GET() {
       { name: "CNN Fear & Greed", ...cnnResult, weight: 0.12 },
       { name: "StockTwits", ...stocktwitsResult, weight: 0.12 },
       { name: "Finnhub News", ...finnhubResult, weight: 0.1 },
-      { name: "FMP News", ...fmpResult, weight: 0.08 },
+      { name: "Polygon News", ...polygonNewsResult, weight: 0.08 },
       { name: "OpenAI GPT", ...openaiResult, weight: 0.08 },
-      { name: "Polygon News", ...polygonResult, weight: 0.05 },
+      { name: "Polygon Sentiment", ...polygonSentimentResult, weight: 0.05 },
       { name: "Yahoo Finance", ...yahooResult, weight: 0.03 },
     ]
 
@@ -773,7 +734,7 @@ export async function GET() {
     console.log(`[v0] ====== FINAL SCORE: ${globalScore}/100 (${validSources.length}/10 sources) ======`)
 
     // Macro vs Social split
-    const macroSources = ["AAII Survey", "CNN Fear & Greed", "Finnhub News", "FMP News", "Polygon News"]
+    const macroSources = ["AAII Survey", "CNN Fear & Greed", "Finnhub News", "Polygon News"]
     const socialSources = ["Grok AI", "StockTwits", "OpenAI GPT", "Google Trends"]
 
     const macroValid = validSources.filter((s) => macroSources.includes(s.name))
@@ -840,11 +801,11 @@ export async function GET() {
         weight: 0.1,
       },
       {
-        name: "FMP News",
-        score: fmpResult.score,
-        source: fmpResult.source,
-        status: fmpResult.score >= 0 ? "LIVE" : "UNAVAILABLE",
-        description: `FMP market news sentiment (${fmpResult.articles} articles)`,
+        name: "Polygon News",
+        score: polygonNewsResult.score,
+        source: polygonNewsResult.source,
+        status: polygonNewsResult.score >= 0 ? "LIVE" : "UNAVAILABLE",
+        description: `Polygon.io news sentiment (${polygonNewsResult.articles} articles)`,
         weight: 0.08,
       },
       {
@@ -856,11 +817,11 @@ export async function GET() {
         weight: 0.08,
       },
       {
-        name: "Polygon News",
-        score: polygonResult.score,
-        source: polygonResult.source,
-        status: polygonResult.score >= 0 ? "LIVE" : "UNAVAILABLE",
-        description: `Polygon.io news sentiment (${polygonResult.articles} articles)`,
+        name: "Polygon Sentiment",
+        score: polygonSentimentResult.score,
+        source: polygonSentimentResult.source,
+        status: polygonSentimentResult.score >= 0 ? "LIVE" : "UNAVAILABLE",
+        description: `Polygon.io news sentiment (${polygonSentimentResult.articles} articles)`,
         weight: 0.05,
       },
       {

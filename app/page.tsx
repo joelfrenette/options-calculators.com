@@ -35,9 +35,9 @@ const ANALYZE_TABS = [
   { id: "panic-euphoria", label: "Panic Index" },
   { id: "social-sentiment", label: "Social Sentiment" },
   { id: "ccpi", label: "CCPI" },
+  { id: "cpi-inflation", label: "CPI Inflation" },
   { id: "fomc-predictions", label: "Fed Rate" },
   { id: "jobs", label: "Jobs" },
-  { id: "cpi-inflation", label: "CPI Inflation" },
   { id: "insiders", label: "Insiders" },
 ]
 
@@ -101,12 +101,12 @@ export default function Home() {
         return <SocialSentiment />
       case "ccpi":
         return <CcpiDashboard />
+      case "cpi-inflation":
+        return <CpiInflationAnalysis />
       case "fomc-predictions":
         return <FomcPredictions />
       case "jobs":
         return <JobsReportDashboard />
-      case "cpi-inflation":
-        return <CpiInflationAnalysis />
       case "insiders":
         return <InsiderTradingDashboard />
       // SCAN tabs
