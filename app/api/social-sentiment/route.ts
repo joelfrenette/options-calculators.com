@@ -182,35 +182,69 @@ async function getAAIISentiment(): Promise<{ score: number; source: string; bull
   }
 }
 
-// ========== SOURCE 4: CNN FEAR & GREED ==========
+// ========== SOURCE 4: CNN FEAR & GREED (via general news analysis) ==========
 async function getCNNFearGreed(): Promise<{ score: number; source: string }> {
   try {
-    console.log("[v0] Source 4: Fetching CNN Fear & Greed Index...")
+    console.log("[v0] Source 4: Calculating Fear & Greed proxy...")
 
-    // CNN blocks direct requests, so we derive a score from other indicators
-    const response = await fetch(
-      `https://finnhub.io/api/v1/news-sentiment?symbol=SPY&token=${process.env.FINNHUB_API_KEY}`,
-      {
-        headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(8000),
-      },
-    )
+    if (process.env.FINNHUB_API_KEY) {
+      const today = new Date().toISOString().split("T")[0]
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
 
-    if (response.ok) {
-      const data = await response.json()
-      // Convert Finnhub sentiment (-1 to 1) to 0-100 scale as Fear & Greed proxy
-      const avgSentiment = data?.sentiment?.bullishPercent || 0.5
-      const score = Math.round(avgSentiment * 100)
-      console.log(`[v0] ✓ Source 4 (Finnhub Fear/Greed proxy): ${score}/100`)
-      return { score: Math.max(0, Math.min(100, score)), source: "finnhub_sentiment" }
+      const response = await fetch(
+        `https://finnhub.io/api/v1/news?category=general&from=${weekAgo}&to=${today}&token=${process.env.FINNHUB_API_KEY}`,
+        {
+          headers: { Accept: "application/json" },
+          signal: AbortSignal.timeout(8000),
+        },
+      )
+
+      if (response.ok) {
+        const articles = await response.json()
+
+        if (Array.isArray(articles) && articles.length > 0) {
+          // Analyze headlines for fear/greed sentiment
+          let greedSignals = 0
+          let fearSignals = 0
+
+          const greedWords = ["surge", "rally", "record", "bull", "boom", "soar", "jump", "gain", "optimism", "growth"]
+          const fearWords = [
+            "crash",
+            "plunge",
+            "fear",
+            "bear",
+            "panic",
+            "recession",
+            "crisis",
+            "tumble",
+            "sell-off",
+            "warning",
+          ]
+
+          for (const article of articles.slice(0, 30)) {
+            const headline = (article.headline || "").toLowerCase()
+            if (greedWords.some((w) => headline.includes(w))) greedSignals++
+            if (fearWords.some((w) => headline.includes(w))) fearSignals++
+          }
+
+          const total = greedSignals + fearSignals
+          if (total > 0) {
+            // Convert to 0-100 scale where 100 = Extreme Greed, 0 = Extreme Fear
+            const score = Math.round((greedSignals / total) * 100)
+            console.log(
+              `[v0] ✓ Source 4 (Fear/Greed proxy): ${score}/100 (${greedSignals} greed, ${fearSignals} fear signals)`,
+            )
+            return { score: Math.max(0, Math.min(100, score)), source: "news_sentiment" }
+          }
+        }
+      }
     }
 
-    console.log("[v0] Source 4: Primary failed, using calculated fallback")
-    // VIX-based fear calculation: VIX 12 = Greed (80), VIX 30 = Fear (20)
-    // We'll use a neutral default since we can't fetch VIX here easily
+    // Fallback to neutral if no API key or request fails
+    console.log("[v0] Source 4: Using neutral fallback")
     return { score: 50, source: "calculated_neutral" }
   } catch (error) {
-    console.log("[v0] Source 4 (CNN/Finnhub) error:", error instanceof Error ? error.message : "Unknown")
+    console.log("[v0] Source 4 (CNN/Fear-Greed) error:", error instanceof Error ? error.message : "Unknown")
     return { score: 50, source: "cnn_fallback" }
   }
 }

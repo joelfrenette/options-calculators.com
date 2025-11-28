@@ -22,8 +22,38 @@ import {
 } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
 
-// Fallback sample data
-const fallbackTrades = [
+interface Trade {
+  date: string
+  type: string
+  owner: string
+  role: string
+  category: string
+  ticker: string
+  shares: string
+  price: string
+  value: string
+  notes: string
+}
+
+function formatDateDisplay(dateStr: string): string {
+  if (!dateStr) return "N/A"
+
+  // If already in "MMM DD" format, return as-is
+  if (/^[A-Z][a-z]{2}\s\d{1,2}$/.test(dateStr)) {
+    return dateStr
+  }
+
+  try {
+    const date = new Date(dateStr)
+    if (isNaN(date.getTime())) return dateStr
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+  } catch {
+    return dateStr
+  }
+}
+
+// Fallback sample data with consistent date format
+const fallbackTrades: Trade[] = [
   {
     date: "Nov 25",
     type: "Sell",
@@ -49,7 +79,7 @@ const fallbackTrades = [
     notes: "Spousal trade",
   },
   {
-    date: "Nov 22",
+    date: "Nov 23",
     type: "Sell",
     owner: "Huang Jensen",
     role: "CEO",
@@ -61,7 +91,7 @@ const fallbackTrades = [
     notes: "10b5-1 plan",
   },
   {
-    date: "Nov 21",
+    date: "Nov 22",
     type: "Buy",
     owner: "Rep. Josh Gottheimer",
     role: "House",
@@ -73,7 +103,7 @@ const fallbackTrades = [
     notes: "Energy bet",
   },
   {
-    date: "Nov 20",
+    date: "Nov 21",
     type: "Sell",
     owner: "Zuckerberg Mark",
     role: "CEO",
@@ -85,7 +115,7 @@ const fallbackTrades = [
     notes: "Scheduled sale",
   },
   {
-    date: "Nov 19",
+    date: "Nov 20",
     type: "Buy",
     owner: "Sen. Tommy Tuberville",
     role: "Senator",
@@ -97,7 +127,7 @@ const fallbackTrades = [
     notes: "Defense allocation",
   },
   {
-    date: "Nov 18",
+    date: "Nov 19",
     type: "Disclosure",
     owner: "Sen. Cynthia Lummis",
     role: "Senator",
@@ -109,46 +139,31 @@ const fallbackTrades = [
     notes: "Crypto disclosure",
   },
   {
-    date: "Nov 17",
+    date: "Nov 18",
     type: "Sell",
-    owner: "Nadella Satya",
-    role: "CEO",
+    owner: "Dabiri John",
+    role: "Officer",
     category: "corporate",
-    ticker: "MSFT",
-    shares: "-30,000",
-    price: "$415/share",
-    value: "$12.45M",
-    notes: "Annual plan sale",
+    ticker: "NVDA",
+    shares: "-17,792",
+    price: "$179.42/share",
+    value: "$3.2M",
+    notes: "Open market sale",
   },
 ]
 
 const fallbackVolumeData = [
-  { ticker: "AAPL", buys: 2.5, sells: 10.0 },
-  { ticker: "NVDA", buys: 1.8, sells: 7.0 },
-  { ticker: "MSFT", buys: 4.2, sells: 2.1 },
-  { ticker: "XOM", buys: 3.5, sells: 0.8 },
-  { ticker: "TSLA", buys: 0.9, sells: 5.2 },
+  { ticker: "AAPL", buys: 0, sells: 22 },
+  { ticker: "NVDA", buys: 0, sells: 10.2 },
+  { ticker: "META", buys: 0, sells: 43.5 },
+  { ticker: "MSFT", buys: 0.05, sells: 0 },
+  { ticker: "LMT", buys: 0.18, sells: 0 },
 ]
-
-interface Trade {
-  date: string
-  type: string
-  owner: string
-  role: string
-  category: string
-  ticker: string
-  shares: string
-  price: string
-  value: string
-  notes: string
-}
 
 type SortField = "date" | "type" | "owner" | "ticker" | "shares" | "price" | "value" | "notes"
 type SortDirection = "asc" | "desc" | null
 
-export { InsiderTradingDashboard }
-
-export default function InsiderTradingDashboard() {
+const InsiderTradingDashboard = () => {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [trades, setTrades] = useState<Trade[]>(fallbackTrades)
@@ -244,16 +259,22 @@ export default function InsiderTradingDashboard() {
   }, [trades, sortField, sortDirection])
 
   const getTypeBadge = (type: string) => {
-    switch (type) {
-      case "Buy":
-        return <Badge className="bg-green-500 hover:bg-green-600 text-white">Buy</Badge>
-      case "Sell":
-        return <Badge className="bg-red-500 hover:bg-red-600 text-white">Sell</Badge>
-      case "Disclosure":
-        return <Badge className="bg-orange-500 hover:bg-orange-600 text-white">Disclosure</Badge>
-      default:
-        return <Badge variant="secondary">{type || "N/A"}</Badge>
+    const normalizedType = (type || "").toLowerCase()
+    if (normalizedType === "buy" || normalizedType.includes("buy") || normalizedType === "p") {
+      return <Badge className="bg-green-500 hover:bg-green-600 text-white text-xs px-2 py-0.5">Buy</Badge>
     }
+    if (normalizedType === "sell" || normalizedType.includes("sell") || normalizedType === "s") {
+      return <Badge className="bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-0.5">Sell</Badge>
+    }
+    if (normalizedType === "disclosure" || normalizedType.includes("disclos")) {
+      return <Badge className="bg-orange-500 hover:bg-orange-600 text-white text-xs px-2 py-0.5">Disclosure</Badge>
+    }
+    // Fallback - show whatever type we have or "N/A"
+    return (
+      <Badge variant="secondary" className="text-xs px-2 py-0.5">
+        {type || "N/A"}
+      </Badge>
+    )
   }
 
   const getCategoryIcon = (category: string) => {
@@ -320,7 +341,7 @@ export default function InsiderTradingDashboard() {
                 <XAxis dataKey="ticker" tick={{ fill: "#6B7280", fontSize: 12 }} />
                 <YAxis tickFormatter={(v) => `$${v}M`} tick={{ fill: "#6B7280", fontSize: 12 }} width={60} />
                 <Tooltip
-                  formatter={(value: number) => [`$${value.toFixed(1)}M`, ""]}
+                  formatter={(value: number) => [`$${value.toFixed(2)}M`, ""]}
                   contentStyle={{ borderRadius: "8px", border: "1px solid #E5E7EB" }}
                 />
                 <Legend />
@@ -367,7 +388,7 @@ export default function InsiderTradingDashboard() {
                       <div className="flex items-center">Date {getSortIcon("date")}</div>
                     </th>
                     <th
-                      className="text-left py-3 px-2 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 select-none min-w-[80px]"
+                      className="text-left py-3 px-2 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 select-none min-w-[70px]"
                       onClick={() => handleSort("type")}
                     >
                       <div className="flex items-center">Type {getSortIcon("type")}</div>
@@ -414,7 +435,7 @@ export default function InsiderTradingDashboard() {
                   {sortedTrades.map((trade, index) => (
                     <tr key={index} className="border-b border-gray-100 hover:bg-blue-50/50 transition-colors">
                       <td className="py-3 px-2 text-sm text-gray-700 font-medium whitespace-nowrap">
-                        {trade.date || "N/A"}
+                        {formatDateDisplay(trade.date)}
                       </td>
                       <td className="py-3 px-2 whitespace-nowrap">{getTypeBadge(trade.type)}</td>
                       <td className="py-3 px-2">
@@ -449,138 +470,123 @@ export default function InsiderTradingDashboard() {
         <CardHeader>
           <CardTitle className="text-[#0D9488] flex items-center gap-2">
             <TrendingUp className="h-5 w-5" />
-            AI Insights: Insider Activity Analysis
+            AI Insights: Insider Activity & Options Impact
           </CardTitle>
         </CardHeader>
         <CardContent>
           <Accordion type="single" collapsible className="w-full">
             <AccordionItem value="tech-selling">
-              <AccordionTrigger>Tech Sector Selling Pressure</AccordionTrigger>
-              <AccordionContent>
-                <div className="space-y-4">
-                  <p className="text-gray-600">
-                    Heavy insider selling in AAPL, NVDA, and META signals potential profit-taking at current valuations.
-                    CEO-level sales often precede periods of consolidation.
-                  </p>
-                  <div className="bg-amber-50 rounded-lg p-4">
-                    <h4 className="font-semibold text-amber-800 flex items-center gap-2 mb-2">
-                      <AlertTriangle className="h-4 w-4" />
-                      What to Watch:
-                    </h4>
-                    <ul className="list-disc list-inside text-amber-700 space-y-1">
-                      <li>Elevated put/call ratios on tech names</li>
-                      <li>IV expansion in AAPL and NVDA options</li>
-                      <li>Support levels at 50-day moving averages</li>
-                    </ul>
-                  </div>
-                  <div className="bg-teal-50 rounded-lg p-4">
-                    <h4 className="font-semibold text-teal-800 flex items-center gap-2 mb-2">
-                      <Lightbulb className="h-4 w-4" />
-                      Trading Strategy:
-                    </h4>
-                    <ul className="list-disc list-inside text-teal-700 space-y-1">
-                      <li>Consider put spreads on AAPL 30-45 DTE</li>
-                      <li>Iron condors on NVDA if IV rank {">"} 50</li>
-                      <li>Wait for confirmation before directional plays</li>
-                    </ul>
-                  </div>
-                  <RunScenarioInAIDialog
-                    context={{
-                      type: "insider",
-                      title: "Tech Sector Selling Pressure",
-                      details:
-                        "Heavy insider selling in AAPL, NVDA, and META signals potential profit-taking. CEO-level sales often precede consolidation periods.",
-                      additionalContext: {
-                        tickers: ["AAPL", "NVDA", "META"],
-                        sentiment: "bearish",
-                        strategy: "put spreads, iron condors",
-                      },
-                    }}
-                  />
+              <AccordionTrigger className="text-[#1E3A8A] hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  Tech Sector Insider Selling
                 </div>
+              </AccordionTrigger>
+              <AccordionContent className="space-y-4">
+                <p className="text-gray-600">
+                  Multiple tech executives have executed significant sales this week. Tim Cook (AAPL), Jensen Huang
+                  (NVDA), and Mark Zuckerberg (META) have all reduced holdings through 10b5-1 plans.
+                </p>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-amber-800 flex items-center gap-2 mb-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    What to Watch:
+                  </h4>
+                  <ul className="list-disc list-inside text-amber-700 space-y-1 text-sm">
+                    <li>IV typically rises 5-10% following large insider sales</li>
+                    <li>Consider put spreads if further weakness develops</li>
+                    <li>Monitor support levels for potential bounces</li>
+                  </ul>
+                </div>
+                <RunScenarioInAIDialog
+                  context={{
+                    type: "insider",
+                    title: "Tech Sector Insider Selling",
+                    details:
+                      "Multiple tech executives selling: AAPL, NVDA, META all seeing insider sales through 10b5-1 plans",
+                  }}
+                />
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="congressional-energy">
-              <AccordionTrigger>Congressional Energy & Defense Bets</AccordionTrigger>
-              <AccordionContent>
-                <div className="space-y-4">
-                  <p className="text-gray-600">
-                    Multiple congressional members adding to XOM and LMT positions suggests potential policy tailwinds
-                    for energy and defense sectors.
-                  </p>
-                  <div className="bg-green-50 rounded-lg p-4">
-                    <h4 className="font-semibold text-green-800 flex items-center gap-2 mb-2">
-                      <Target className="h-4 w-4" />
-                      Bullish Signals:
-                    </h4>
-                    <ul className="list-disc list-inside text-green-700 space-y-1">
-                      <li>Bipartisan buying in defense names</li>
-                      <li>Energy sector accumulation ahead of winter</li>
-                      <li>Infrastructure spending implications</li>
-                    </ul>
-                  </div>
-                  <div className="bg-teal-50 rounded-lg p-4">
-                    <h4 className="font-semibold text-teal-800 flex items-center gap-2 mb-2">
-                      <Lightbulb className="h-4 w-4" />
-                      Trading Strategy:
-                    </h4>
-                    <ul className="list-disc list-inside text-teal-700 space-y-1">
-                      <li>Bull call spreads on XOM with 60 DTE</li>
-                      <li>Cash-secured puts on LMT at support</li>
-                      <li>Consider XLE ETF calls for sector exposure</li>
-                    </ul>
-                  </div>
-                  <RunScenarioInAIDialog
-                    context={{
-                      type: "insider",
-                      title: "Congressional Energy & Defense Bets",
-                      details:
-                        "Multiple congressional members adding to XOM and LMT positions suggests potential policy tailwinds for energy and defense sectors.",
-                      additionalContext: {
-                        tickers: ["XOM", "LMT", "XLE"],
-                        sentiment: "bullish",
-                        strategy: "bull call spreads, cash-secured puts",
-                      },
-                    }}
-                  />
+            <AccordionItem value="congress">
+              <AccordionTrigger className="text-[#1E3A8A] hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <Landmark className="h-4 w-4 text-blue-600" />
+                  Congressional Trading Activity
                 </div>
+              </AccordionTrigger>
+              <AccordionContent className="space-y-4">
+                <p className="text-gray-600">
+                  Notable congressional trades include defense sector allocations and energy bets. Sen. Tuberville
+                  increased LMT position while Rep. Gottheimer added XOM exposure.
+                </p>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-blue-800 flex items-center gap-2 mb-2">
+                    <Lightbulb className="h-4 w-4" />
+                    Trading Ideas:
+                  </h4>
+                  <ul className="list-disc list-inside text-blue-700 space-y-1 text-sm">
+                    <li>Defense sector may see continued interest</li>
+                    <li>Energy plays suggest confidence in oil prices</li>
+                    <li>Consider bull call spreads on LMT, XOM</li>
+                  </ul>
+                </div>
+                <RunScenarioInAIDialog
+                  context={{
+                    type: "insider",
+                    title: "Congressional Trading Activity",
+                    details:
+                      "Defense and energy buying from congress members: LMT and XOM accumulation signals sector confidence",
+                  }}
+                />
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="crypto-disclosure">
-              <AccordionTrigger>Crypto Holdings Disclosure</AccordionTrigger>
-              <AccordionContent>
-                <div className="space-y-4">
-                  <p className="text-gray-600">
-                    Senator Lummis's BTC disclosure highlights growing institutional and political acceptance of
-                    cryptocurrency as an asset class.
-                  </p>
-                  <div className="bg-purple-50 rounded-lg p-4">
-                    <h4 className="font-semibold text-purple-800 flex items-center gap-2 mb-2">
-                      <ArrowRight className="h-4 w-4" />
-                      Implications:
-                    </h4>
-                    <ul className="list-disc list-inside text-purple-700 space-y-1">
-                      <li>Regulatory clarity may be forthcoming</li>
-                      <li>Crypto-related equities may benefit</li>
-                      <li>Watch for policy announcements</li>
+            <AccordionItem value="strategy">
+              <AccordionTrigger className="text-[#1E3A8A] hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <Target className="h-4 w-4 text-green-600" />
+                  Recommended Options Strategies
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="space-y-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-red-800 mb-2">Bearish Tech Plays</h4>
+                    <ul className="text-red-700 text-sm space-y-1">
+                      <li>
+                        <ArrowRight className="h-3 w-3 inline mr-1" />
+                        AAPL: Bear put spread $220/$210
+                      </li>
+                      <li>
+                        <ArrowRight className="h-3 w-3 inline mr-1" />
+                        NVDA: Long put $130 strike
+                      </li>
                     </ul>
                   </div>
-                  <RunScenarioInAIDialog
-                    context={{
-                      type: "insider",
-                      title: "Crypto Holdings Disclosure",
-                      details:
-                        "Senator Lummis's BTC disclosure highlights growing institutional and political acceptance of cryptocurrency.",
-                      additionalContext: {
-                        tickers: ["BTC", "COIN", "MSTR"],
-                        sentiment: "neutral-bullish",
-                        strategy: "crypto-related equities options",
-                      },
-                    }}
-                  />
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-green-800 mb-2">Bullish Sector Plays</h4>
+                    <ul className="text-green-700 text-sm space-y-1">
+                      <li>
+                        <ArrowRight className="h-3 w-3 inline mr-1" />
+                        LMT: Bull call spread $520/$540
+                      </li>
+                      <li>
+                        <ArrowRight className="h-3 w-3 inline mr-1" />
+                        XOM: Cash-secured put $105
+                      </li>
+                    </ul>
+                  </div>
                 </div>
+                <RunScenarioInAIDialog
+                  context={{
+                    type: "strategy",
+                    title: "Insider-Driven Options Strategies",
+                    details:
+                      "Bearish tech (AAPL, NVDA put spreads) vs Bullish defense/energy (LMT, XOM call spreads) based on insider flows",
+                  }}
+                />
               </AccordionContent>
             </AccordionItem>
           </Accordion>
@@ -589,3 +595,7 @@ export default function InsiderTradingDashboard() {
     </div>
   )
 }
+
+export { InsiderTradingDashboard }
+
+export default InsiderTradingDashboard

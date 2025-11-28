@@ -1,5 +1,60 @@
 import { NextResponse } from "next/server"
 
+function formatDate(dateInput: unknown): string {
+  if (!dateInput || typeof dateInput !== "string") {
+    return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })
+  }
+
+  const dateStr = dateInput.trim()
+
+  try {
+    // Handle various date formats
+    let date: Date
+    if (dateStr.includes("-")) {
+      // ISO format: 2025-11-24
+      date = new Date(dateStr)
+    } else if (dateStr.includes("/")) {
+      // US format: 11/24/2025
+      date = new Date(dateStr)
+    } else {
+      // Already formatted or unknown
+      return dateStr
+    }
+
+    // Validate date
+    if (isNaN(date.getTime())) {
+      return dateStr
+    }
+
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+  } catch {
+    return dateStr
+  }
+}
+
+function formatShares(shares: number, change: number): string {
+  const formatted = Math.abs(shares).toLocaleString()
+  return change > 0 ? `+${formatted}` : `-${formatted}`
+}
+
+function formatValue(value: number): string {
+  if (value >= 1000000) {
+    return `$${(value / 1000000).toFixed(1)}M`
+  } else if (value >= 1000) {
+    return `$${(value / 1000).toFixed(0)}K`
+  }
+  return `$${value.toFixed(0)}`
+}
+
+function parseValueToMillions(valueStr: string): number {
+  const cleaned = valueStr.replace(/[$,]/g, "")
+  const num = Number.parseFloat(cleaned.replace(/[KM]/g, ""))
+  if (isNaN(num)) return 0
+  if (cleaned.includes("M")) return num
+  if (cleaned.includes("K")) return num / 1000
+  return num / 1000000
+}
+
 // Finnhub API for insider transactions
 async function fetchFinnhubInsiderTransactions() {
   const apiKey = process.env.FINNHUB_API_KEY
@@ -9,21 +64,18 @@ async function fetchFinnhubInsiderTransactions() {
   }
 
   try {
-    // Fetch recent insider transactions for major tickers
     const tickers = ["AAPL", "NVDA", "MSFT", "META", "GOOGL", "AMZN", "TSLA"]
     const allTransactions: any[] = []
 
-    // Limit to 3 tickers to avoid rate limits
     for (const ticker of tickers.slice(0, 3)) {
       const response = await fetch(
         `https://finnhub.io/api/v1/stock/insider-transactions?symbol=${ticker}&token=${apiKey}`,
-        { next: { revalidate: 3600 } }, // Cache for 1 hour
+        { next: { revalidate: 3600 } },
       )
 
       if (response.ok) {
         const data = await response.json()
         if (data.data && Array.isArray(data.data)) {
-          // Take only the most recent 3 per ticker
           allTransactions.push(
             ...data.data.slice(0, 3).map((t: any) => ({
               ...t,
@@ -41,10 +93,8 @@ async function fetchFinnhubInsiderTransactions() {
   }
 }
 
-// Congressional data from QuiverQuant API (if available) or fallback
+// Congressional data
 async function fetchCongressionalTrades() {
-  // QuiverQuant requires subscription, so we'll use mock data for congressional trades
-  // In production, this would connect to QuiverQuant or similar API
   return [
     {
       date: "2025-11-24",
@@ -97,32 +147,8 @@ async function fetchCongressionalTrades() {
   ]
 }
 
-function formatDate(dateStr: string): string {
-  try {
-    const date = new Date(dateStr)
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-  } catch {
-    return dateStr
-  }
-}
-
-function formatShares(shares: number, change: number): string {
-  const formatted = Math.abs(shares).toLocaleString()
-  return change > 0 ? `+${formatted}` : `-${formatted}`
-}
-
-function formatValue(value: number): string {
-  if (value >= 1000000) {
-    return `$${(value / 1000000).toFixed(1)}M`
-  } else if (value >= 1000) {
-    return `$${(value / 1000).toFixed(0)}K`
-  }
-  return `$${value.toFixed(0)}`
-}
-
 export async function GET() {
   try {
-    // Fetch from Finnhub
     const finnhubData = await fetchFinnhubInsiderTransactions()
     const congressionalData = await fetchCongressionalTrades()
 
@@ -132,52 +158,91 @@ export async function GET() {
     if (finnhubData && finnhubData.length > 0) {
       for (const t of finnhubData) {
         const transactionValue = (t.share || 0) * (t.transactionPrice || 0)
+        const transactionType =
+          t.transactionCode === "P" ? "Buy" : t.transactionCode === "S" ? "Sell" : t.change > 0 ? "Buy" : "Sell"
+
         transactions.push({
           date: formatDate(t.transactionDate || t.filingDate),
-          type: t.transactionCode === "P" ? "Buy" : t.transactionCode === "S" ? "Sell" : "Other",
+          type: transactionType, // Guaranteed to have a value
           owner: t.name || "Unknown",
           role: t.position || "Officer",
           category: "corporate",
           ticker: t.ticker || t.symbol,
           shares: formatShares(t.share || 0, t.change || 0),
           price: t.transactionPrice ? `$${t.transactionPrice.toFixed(2)}/share` : "N/A",
-          value: formatValue(transactionValue),
+          value: formatValue(
+            transactionValue > 0 ? transactionValue : Math.abs(t.change || 0) * (t.transactionPrice || 100),
+          ),
           notes:
-            t.transactionCode === "P" ? "Open market buy" : t.transactionCode === "S" ? "Open market sale" : "Filing",
+            transactionType === "Buy" ? "Open market buy" : transactionType === "Sell" ? "Open market sale" : "Filing",
         })
       }
     }
 
-    // Add congressional trades
-    transactions.push(...congressionalData)
+    // Add congressional trades - format dates consistently
+    for (const trade of congressionalData) {
+      transactions.push({
+        ...trade,
+        date: formatDate(trade.date), // Format congressional dates too
+      })
+    }
 
     // Sort by date (most recent first)
     transactions.sort((a, b) => {
-      const dateA = new Date(a.date)
-      const dateB = new Date(b.date)
-      return dateB.getTime() - dateA.getTime()
+      // Parse "Nov 24" format for sorting
+      const monthMap: Record<string, number> = {
+        Jan: 0,
+        Feb: 1,
+        Mar: 2,
+        Apr: 3,
+        May: 4,
+        Jun: 5,
+        Jul: 6,
+        Aug: 7,
+        Sep: 8,
+        Oct: 9,
+        Nov: 10,
+        Dec: 11,
+      }
+      const parseDate = (d: unknown): number => {
+        if (!d || typeof d !== "string") {
+          return 0
+        }
+        const parts = d.split(" ")
+        if (parts.length === 2) {
+          const month = monthMap[parts[0]] ?? 10
+          const day = Number.parseInt(parts[1]) || 1
+          return new Date(2025, month, day).getTime()
+        }
+        // Try parsing as ISO date
+        const timestamp = new Date(d).getTime()
+        return isNaN(timestamp) ? 0 : timestamp
+      }
+      return parseDate(b.date) - parseDate(a.date)
     })
 
-    // Calculate volume data for chart
     const volumeMap: Record<string, { buys: number; sells: number }> = {}
     for (const t of transactions) {
       if (!volumeMap[t.ticker]) {
         volumeMap[t.ticker] = { buys: 0, sells: 0 }
       }
-      const valueNum =
-        Number.parseFloat(t.value.replace(/[$KM,]/g, "")) *
-        (t.value.includes("M") ? 1 : t.value.includes("K") ? 0.001 : 0.000001)
+      const valueInMillions = parseValueToMillions(t.value)
       if (t.type === "Buy") {
-        volumeMap[t.ticker].buys += valueNum
+        volumeMap[t.ticker].buys += valueInMillions
       } else if (t.type === "Sell") {
-        volumeMap[t.ticker].sells += valueNum
+        volumeMap[t.ticker].sells += valueInMillions
       }
     }
 
     const volumeData = Object.entries(volumeMap)
-      .map(([ticker, data]) => ({ ticker, ...data }))
+      .map(([ticker, data]) => ({
+        ticker,
+        buys: Math.round(data.buys * 100) / 100, // Round to 2 decimals
+        sells: Math.round(data.sells * 100) / 100,
+      }))
+      .filter((d) => d.buys > 0 || d.sells > 0) // Only include tickers with activity
       .sort((a, b) => b.buys + b.sells - (a.buys + a.sells))
-      .slice(0, 5)
+      .slice(0, 6)
 
     return NextResponse.json({
       success: true,
