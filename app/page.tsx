@@ -28,20 +28,20 @@ import { Menu, X, TrendingUp, Zap, Search } from "lucide-react"
 import Image from "next/image"
 
 const ANALYZE_TABS = [
-  { id: "earnings-calendar", label: "Earnings Calendar" },
-  { id: "trend-analysis", label: "Index Trend" },
-  { id: "risk-management", label: "VIX Index" },
-  { id: "market-sentiment", label: "Fear & Greed" },
-  { id: "panic-euphoria", label: "Panic Index" },
+  { id: "earnings-calendar", label: "Earnings & Economic Calendar" },
+  { id: "trend-analysis", label: "Index Trend Analysis" },
+  { id: "risk-management", label: "CBOE VIX Volatility Index" },
+  { id: "market-sentiment", label: "CNN's Fear & Greed" },
+  { id: "panic-euphoria", label: "Citibank's Panic & Euphoria Index" },
   { id: "social-sentiment", label: "Social Sentiment" },
-  { id: "ccpi", label: "CCPI" },
-  { id: "cpi-inflation", label: "CPI Inflation" },
-  { id: "fomc-predictions", label: "Fed Rate" },
-  { id: "jobs", label: "Jobs" },
-  { id: "insiders", label: "Insiders" },
+  { id: "ccpi", label: "Comprehensive Crash Prediction Index" },
+  { id: "fomc-predictions", label: "FOMC Fed Rate" },
+  { id: "cpi-inflation", label: "BLS CPI Inflation" },
+  { id: "jobs", label: "BLS Jobs Rate" },
 ]
 
 const SCAN_TABS = [
+  { id: "insiders", label: "Insider Trading Scanner" },
   { id: "wheel-scanner", label: "Put Scanner" },
   { id: "credit-spread-scanner", label: "Credit Spreads" },
   { id: "iron-condor-scanner", label: "Iron Condors" },
@@ -101,10 +101,10 @@ export default function Home() {
         return <SocialSentiment />
       case "ccpi":
         return <CcpiDashboard />
-      case "cpi-inflation":
-        return <CpiInflationAnalysis />
       case "fomc-predictions":
         return <FomcPredictions />
+      case "cpi-inflation":
+        return <CpiInflationAnalysis />
       case "jobs":
         return <JobsReportDashboard />
       case "insiders":
