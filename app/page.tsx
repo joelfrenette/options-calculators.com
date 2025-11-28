@@ -16,7 +16,10 @@ import { CcpiDashboard } from "@/components/ccpi-dashboard"
 import { SocialSentiment } from "@/components/social-sentiment"
 import { EarningsEconomicCalendar } from "@/components/earnings-economic-calendar"
 import { JobsReportDashboard } from "@/components/jobs-report-dashboard"
-import { Menu, X, TrendingUp, Zap } from "lucide-react"
+import { InsiderTradingDashboard } from "@/components/insider-trading-dashboard"
+import { OptionsStrategyToolbox } from "@/components/options-strategy-toolbox"
+import { ExitRulesDashboard } from "@/components/exit-rules-dashboard"
+import { Menu, X, TrendingUp, Zap, Search } from "lucide-react"
 import Image from "next/image"
 
 const ANALYZE_TABS = [
@@ -30,34 +33,110 @@ const ANALYZE_TABS = [
   { id: "fomc-predictions", label: "Fed Rate" },
   { id: "jobs", label: "Jobs" },
   { id: "cpi-inflation", label: "CPI Inflation" },
+  { id: "insiders", label: "Insiders" },
+]
+
+const SCAN_TABS = [
+  { id: "wheel-scanner", label: "Put Scanner" },
+  { id: "earnings-scanner", label: "Earnings Scanner" },
+  { id: "iv-scanner", label: "IV Scanner" },
+  { id: "unusual-activity", label: "Unusual Activity" },
 ]
 
 const EXECUTE_TABS = [
+  { id: "credit-spreads", label: "Credit Spreads" },
+  { id: "iron-condors", label: "Iron Condors" },
+  { id: "calendar-spreads", label: "Calendars" },
+  { id: "butterflies", label: "Butterflies" },
+  { id: "collars", label: "Collars" },
+  { id: "diagonals", label: "Diagonals" },
+  { id: "straddles-strangles", label: "Straddles" },
+  { id: "wheel-strategy", label: "Wheel" },
+  { id: "exit-rules", label: "Exit Rules" },
   { id: "earnings-iv-crusher", label: "Earnings EM" },
-  { id: "greeks", label: "Greeks Calculator" },
-  { id: "risk-rewards", label: "ROI Calculator" },
-  { id: "wheel-scanner", label: "Put Selling Scanner" },
+  { id: "greeks", label: "Greeks Calc" },
+  { id: "risk-rewards", label: "ROI Calc" },
 ]
 
-type Category = "analyze" | "execute"
+type Category = "analyze" | "scan" | "execute"
 
 export default function Home() {
   const [activeCategory, setActiveCategory] = useState<Category>("analyze")
   const [activeTab, setActiveTab] = useState("earnings-calendar")
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  const currentTabs = activeCategory === "analyze" ? ANALYZE_TABS : EXECUTE_TABS
+  const currentTabs = activeCategory === "analyze" ? ANALYZE_TABS : activeCategory === "scan" ? SCAN_TABS : EXECUTE_TABS
 
   const handleCategoryChange = (category: Category) => {
     setActiveCategory(category)
-    // Set first tab of the new category as active
-    const firstTab = category === "analyze" ? ANALYZE_TABS[0] : EXECUTE_TABS[0]
+    const firstTab = category === "analyze" ? ANALYZE_TABS[0] : category === "scan" ? SCAN_TABS[0] : EXECUTE_TABS[0]
     setActiveTab(firstTab.id)
   }
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId)
     setMobileMenuOpen(false)
+  }
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case "earnings-calendar":
+        return <EarningsEconomicCalendar />
+      case "trend-analysis":
+        return <TrendAnalysis />
+      case "risk-management":
+        return <RiskCalculator />
+      case "market-sentiment":
+        return <MarketSentiment />
+      case "panic-euphoria":
+        return <PanicEuphoria />
+      case "social-sentiment":
+        return <SocialSentiment />
+      case "ccpi":
+        return <CcpiDashboard />
+      case "fomc-predictions":
+        return <FomcPredictions />
+      case "jobs":
+        return <JobsReportDashboard />
+      case "cpi-inflation":
+        return <CpiInflationAnalysis />
+      case "insiders":
+        return <InsiderTradingDashboard />
+      case "wheel-scanner":
+        return <WheelScanner />
+      case "earnings-scanner":
+        return <EarningsVolatilityCalculator />
+      case "iv-scanner":
+        return <WheelScanner />
+      case "unusual-activity":
+        return <WheelScanner />
+      case "credit-spreads":
+        return <OptionsStrategyToolbox strategy="credit-spreads" />
+      case "iron-condors":
+        return <OptionsStrategyToolbox strategy="iron-condors" />
+      case "calendar-spreads":
+        return <OptionsStrategyToolbox strategy="calendar-spreads" />
+      case "butterflies":
+        return <OptionsStrategyToolbox strategy="butterflies" />
+      case "collars":
+        return <OptionsStrategyToolbox strategy="collars" />
+      case "diagonals":
+        return <OptionsStrategyToolbox strategy="diagonals" />
+      case "straddles-strangles":
+        return <OptionsStrategyToolbox strategy="straddles-strangles" />
+      case "wheel-strategy":
+        return <OptionsStrategyToolbox strategy="wheel" />
+      case "exit-rules":
+        return <ExitRulesDashboard />
+      case "earnings-iv-crusher":
+        return <EarningsVolatilityCalculator />
+      case "greeks":
+        return <GreeksCalculator />
+      case "risk-rewards":
+        return <RiskRewardCalculator />
+      default:
+        return <EarningsEconomicCalendar />
+    }
   }
 
   return (
@@ -97,24 +176,35 @@ export default function Home() {
 
         <div className="container mx-auto px-4 bg-gray-50 border-b border-gray-200">
           <div className="max-w-5xl mx-auto">
-            <div className="hidden md:flex gap-1 py-1">
+            <div className="hidden md:grid grid-cols-3 gap-0 py-0">
               <button
                 onClick={() => handleCategoryChange("analyze")}
-                className={`flex items-center gap-2 px-6 py-2.5 text-sm font-bold rounded-t-lg transition-all ${
+                className={`flex items-center justify-center gap-2 px-6 py-3 text-sm font-bold transition-all border-b-2 ${
                   activeCategory === "analyze"
-                    ? "bg-white text-primary border-t-2 border-x border-primary border-gray-200 -mb-px"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                    ? "bg-emerald-700 text-white border-emerald-700"
+                    : "bg-white text-gray-600 hover:bg-gray-100 hover:text-gray-900 border-gray-200"
                 }`}
               >
                 <TrendingUp className="h-4 w-4" />
                 ANALYZE
               </button>
               <button
+                onClick={() => handleCategoryChange("scan")}
+                className={`flex items-center justify-center gap-2 px-6 py-3 text-sm font-bold transition-all border-b-2 border-x border-gray-200 ${
+                  activeCategory === "scan"
+                    ? "bg-emerald-700 text-white border-emerald-700"
+                    : "bg-white text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                }`}
+              >
+                <Search className="h-4 w-4" />
+                SCAN
+              </button>
+              <button
                 onClick={() => handleCategoryChange("execute")}
-                className={`flex items-center gap-2 px-6 py-2.5 text-sm font-bold rounded-t-lg transition-all ${
+                className={`flex items-center justify-center gap-2 px-6 py-3 text-sm font-bold transition-all border-b-2 ${
                   activeCategory === "execute"
-                    ? "bg-white text-primary border-t-2 border-x border-primary border-gray-200 -mb-px"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                    ? "bg-emerald-700 text-white border-emerald-700"
+                    : "bg-white text-gray-600 hover:bg-gray-100 hover:text-gray-900 border-gray-200"
                 }`}
               >
                 <Zap className="h-4 w-4" />
@@ -145,29 +235,36 @@ export default function Home() {
             {mobileMenuOpen && (
               <div className="md:hidden absolute left-0 right-0 top-[72px] bg-white border-b border-gray-200 shadow-lg z-50 max-h-[80vh] overflow-y-auto">
                 <nav className="py-2">
-                  {/* Category Headers */}
                   <div className="px-4 py-2 flex gap-2 border-b border-gray-100 mb-2">
                     <button
                       onClick={() => setActiveCategory("analyze")}
-                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-bold rounded-lg transition-all ${
-                        activeCategory === "analyze" ? "bg-primary text-white" : "bg-gray-100 text-gray-600"
+                      className={`flex-1 flex items-center justify-center gap-1 px-2 py-2 text-xs font-bold rounded-lg transition-all ${
+                        activeCategory === "analyze" ? "bg-emerald-700 text-white" : "bg-gray-100 text-gray-600"
                       }`}
                     >
-                      <TrendingUp className="h-4 w-4" />
+                      <TrendingUp className="h-3 w-3" />
                       ANALYZE
                     </button>
                     <button
-                      onClick={() => setActiveCategory("execute")}
-                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-bold rounded-lg transition-all ${
-                        activeCategory === "execute" ? "bg-primary text-white" : "bg-gray-100 text-gray-600"
+                      onClick={() => setActiveCategory("scan")}
+                      className={`flex-1 flex items-center justify-center gap-1 px-2 py-2 text-xs font-bold rounded-lg transition-all ${
+                        activeCategory === "scan" ? "bg-emerald-700 text-white" : "bg-gray-100 text-gray-600"
                       }`}
                     >
-                      <Zap className="h-4 w-4" />
+                      <Search className="h-3 w-3" />
+                      SCAN
+                    </button>
+                    <button
+                      onClick={() => setActiveCategory("execute")}
+                      className={`flex-1 flex items-center justify-center gap-1 px-2 py-2 text-xs font-bold rounded-lg transition-all ${
+                        activeCategory === "execute" ? "bg-emerald-700 text-white" : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      <Zap className="h-3 w-3" />
                       EXECUTE
                     </button>
                   </div>
 
-                  {/* Tab Items */}
                   {currentTabs.map((tab) => (
                     <button
                       key={tab.id}
@@ -187,212 +284,74 @@ export default function Home() {
 
             <div className="md:hidden mt-2 pb-2 border-b border-gray-200">
               <div className="flex items-center gap-2">
-                <span
-                  className={`text-xs font-bold px-2 py-0.5 rounded ${
-                    activeCategory === "analyze" ? "bg-primary/10 text-primary" : "bg-amber-100 text-amber-700"
-                  }`}
-                >
-                  {activeCategory === "analyze" ? "ANALYZE" : "EXECUTE"}
-                </span>
-                <p className="text-sm font-semibold text-primary">
-                  {currentTabs.find((tab) => tab.id === activeTab)?.label}
-                </p>
+                <div className="flex gap-1 flex-1">
+                  <button
+                    onClick={() => handleCategoryChange("analyze")}
+                    className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-bold rounded transition-all ${
+                      activeCategory === "analyze" ? "bg-emerald-700 text-white" : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    <TrendingUp className="h-3 w-3" />
+                    ANALYZE
+                  </button>
+                  <button
+                    onClick={() => handleCategoryChange("scan")}
+                    className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-bold rounded transition-all ${
+                      activeCategory === "scan" ? "bg-emerald-700 text-white" : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    <Search className="h-3 w-3" />
+                    SCAN
+                  </button>
+                  <button
+                    onClick={() => handleCategoryChange("execute")}
+                    className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-bold rounded transition-all ${
+                      activeCategory === "execute" ? "bg-emerald-700 text-white" : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    <Zap className="h-3 w-3" />
+                    EXECUTE
+                  </button>
+                </div>
               </div>
+              <select
+                value={activeTab}
+                onChange={(e) => handleTabChange(e.target.value)}
+                className="w-full mt-2 p-2 border border-gray-300 rounded-lg text-sm font-medium bg-white"
+              >
+                {currentTabs.map((tab) => (
+                  <option key={tab.id} value={tab.id}>
+                    {tab.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
       </header>
 
-      {mobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 bg-black bg-opacity-20 z-40" onClick={() => setMobileMenuOpen(false)} />
-      )}
-
-      <main className="container mx-auto px-4 py-4">
-        <div className="max-w-5xl mx-auto">
-          {activeTab === "earnings-calendar" && (
-            <div>
-              <div className="mb-4">
-                <p className="text-lg text-gray-600 text-balance">
-                  Track upcoming earnings reports and economic events with AI-powered market impact analysis
-                </p>
-              </div>
-              <EarningsEconomicCalendar />
-            </div>
-          )}
-
-          {activeTab === "trend-analysis" && (
-            <div>
-              <div className="mb-4">
-                <p className="text-lg text-gray-600 text-balance">
-                  Assess market and sector trends with technical indicators to make informed trading decisions
-                </p>
-              </div>
-              <TrendAnalysis />
-            </div>
-          )}
-
-          {activeTab === "risk-management" && (
-            <div>
-              <div className="mb-4">
-                <p className="text-lg text-gray-600 text-balance">
-                  Calculate your recommended cash allocation based on current VIX volatility levels
-                </p>
-              </div>
-              <RiskCalculator />
-            </div>
-          )}
-
-          {activeTab === "market-sentiment" && (
-            <div>
-              <div className="mb-4">
-                <p className="text-lg text-gray-600 text-balance">
-                  Comprehensive Fear & Greed Index combining 7 market indicators to guide your options trading strategy
-                </p>
-              </div>
-              <MarketSentiment />
-            </div>
-          )}
-
-          {activeTab === "panic-euphoria" && (
-            <div>
-              <div className="mb-4">
-                <p className="text-lg text-gray-600 text-balance">
-                  Citibank's Panic/Euphoria Model identifies extreme market sentiment using 9 indicators to spot
-                  contrarian buying opportunities
-                </p>
-              </div>
-              <PanicEuphoria />
-            </div>
-          )}
-
-          {activeTab === "social-sentiment" && (
-            <div>
-              <div className="mb-4">
-                <p className="text-lg text-gray-600 text-balance">
-                  Live social media and survey sentiment aggregated from Reddit, Twitter, StockTwits, Google Trends,
-                  AAII, and CNN Fear & Greed
-                </p>
-              </div>
-              <SocialSentiment />
-            </div>
-          )}
-
-          {activeTab === "ccpi" && (
-            <div>
-              <div className="mb-4">
-                <p className="text-lg text-gray-600 text-balance">
-                  Early-warning oracle for AI-led market corrections with regime-based options playbooks for
-                  professional traders
-                </p>
-              </div>
-              <CcpiDashboard />
-            </div>
-          )}
-
-          {activeTab === "fomc-predictions" && (
-            <div>
-              <div className="mb-4">
-                <p className="text-lg text-gray-600 text-balance">
-                  Anticipate FOMC outcomes using Fed Funds futures data and get options trading strategy suggestions
-                </p>
-              </div>
-              <FomcPredictions />
-            </div>
-          )}
-
-          {activeTab === "jobs" && (
-            <div>
-              <div className="mb-4">
-                <p className="text-lg text-gray-600 text-balance">
-                  Analyze jobs data and get insights for market trends and economic conditions
-                </p>
-              </div>
-              <JobsReportDashboard />
-            </div>
-          )}
-
-          {activeTab === "cpi-inflation" && (
-            <div>
-              <div className="mb-4">
-                <p className="text-lg text-gray-600 text-balance">
-                  Track inflation trends and forecast future CPI levels with options strategies for inflation trading
-                </p>
-              </div>
-              <CpiInflationAnalysis />
-            </div>
-          )}
-
-          {activeTab === "earnings-iv-crusher" && (
-            <div>
-              <div className="mb-4">
-                <p className="text-lg text-gray-600 text-balance">
-                  Analyze earnings volatility risk and calculate expected moves to avoid IV crush disasters
-                </p>
-              </div>
-              <EarningsVolatilityCalculator />
-            </div>
-          )}
-
-          {activeTab === "greeks" && (
-            <div>
-              <div className="mb-4">
-                <p className="text-lg text-gray-600 text-balance">
-                  Calculate option Greeks and get strategy-specific recommendations for optimal trade selection
-                </p>
-              </div>
-              <GreeksCalculator />
-            </div>
-          )}
-
-          {activeTab === "risk-rewards" && (
-            <div>
-              <div className="mb-4">
-                <p className="text-lg text-gray-600 text-balance">
-                  Calculate annualized ROI and compare against market benchmarks to evaluate trade quality
-                </p>
-              </div>
-              <RiskRewardCalculator />
-            </div>
-          )}
-
-          {activeTab === "wheel-scanner" && (
-            <div>
-              <div className="mb-4">
-                <p className="text-lg text-gray-600 text-balance">
-                  Scan stocks for optimal put-selling opportunities with using fundamental and technical analysis
-                </p>
-              </div>
-              <WheelScanner />
-            </div>
-          )}
+      <main className="min-h-screen bg-gray-50/50">
+        <div className="container mx-auto px-4">
+          <div className="max-w-5xl mx-auto py-6">{renderContent()}</div>
         </div>
       </main>
 
-      <footer className="border-t border-gray-200 mt-8 py-4 bg-gray-50">
-        <div className="container mx-auto px-4">
-          <div className="max-w-5xl mx-auto">
-            <p className="text-center text-sm text-gray-600 mb-3">
-              © 2025 OPTIONS-CALCULATORS.COM - Professional Tools for Options Traders
-            </p>
-            <p className="text-center text-xs text-gray-500 leading-relaxed max-w-4xl mx-auto">
-              This{" "}
-              <a
-                href="https://www.options-calculators.com/login"
-                className="text-gray-500 hover:text-primary transition-colors"
-              >
-                website
-              </a>{" "}
-              and its free AI-powered tools (including calculators, predictions, and analyses) are for educational and
-              entertainment purposes only and do not constitute financial, investment, legal, or professional advice of
-              any kind. We are not financial advisors, brokers, or certified professionals; all content is based on
-              algorithms, formulas, and third-party data that may contain errors, inaccuracies, or biases—use at your
-              own risk, with no guarantees of performance, profitability, or suitability. Always consult qualified
-              experts and conduct your own due diligence before making decisions; we disclaim all liability for any
-              losses or damages arising from reliance on this site. Additionally, we may earn commissions or other
-              compensation from affiliate links or referrals to recommended software, services, or products on this
-              site, at no extra cost to you.
-            </p>
-          </div>
+      <footer className="bg-white border-t border-gray-200 py-4 mt-8">
+        <div className="container mx-auto px-4 text-center">
+          <p className="text-sm text-gray-500 mb-2">
+            &copy; 2025 OPTIONS-CALCULATORS.COM - Professional Tools for Options Traders
+          </p>
+          <p className="text-xs text-gray-400 max-w-4xl mx-auto">
+            This website and its free AI-powered tools (including calculators, predictions, and analyses) are for
+            educational and entertainment purposes only and do not constitute financial, investment, legal, or
+            professional advice of any kind. We are not financial advisors, brokers, or certified professionals; all
+            content is based on algorithms, formulas, and third-party data that may contain errors, inaccuracies, or
+            biases—use at your own risk, with no guarantees of performance, profitability, or suitability. Always
+            consult qualified experts and conduct your own due diligence before making decisions; we disclaim all
+            liability for any losses or damages arising from reliance on this site. Additionally, we may earn
+            commissions or other compensation from affiliate links or referrals to recommended software, services, or
+            products on this site, at no extra cost to you.
+          </p>
         </div>
       </footer>
     </div>
