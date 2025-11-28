@@ -224,10 +224,10 @@ export function CreditSpreadScanner() {
               <div>
                 <label className="text-sm font-medium mb-2 block">Spread Type</label>
                 <Select value={spreadType} onValueChange={(v: "all" | "bull-put" | "bear-call") => setSpreadType(v)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white border shadow-lg z-50">
                     <SelectItem value="all">All Spreads</SelectItem>
                     <SelectItem value="bull-put">Bull Put (Bullish)</SelectItem>
                     <SelectItem value="bear-call">Bear Call (Bearish)</SelectItem>

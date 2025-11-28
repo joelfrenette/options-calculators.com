@@ -124,21 +124,21 @@ export default function Home() {
         return <EarningsPlaysScanner />
       // EXECUTE tabs
       case "credit-spreads":
-        return <OptionsStrategyToolbox initialStrategy="credit-spreads" />
+        return <OptionsStrategyToolbox strategy="credit-spreads" />
       case "iron-condors":
-        return <OptionsStrategyToolbox initialStrategy="iron-condors" />
+        return <OptionsStrategyToolbox strategy="iron-condors" />
       case "calendar-spreads":
-        return <OptionsStrategyToolbox initialStrategy="calendar-spreads" />
+        return <OptionsStrategyToolbox strategy="calendar-spreads" />
       case "butterflies":
-        return <OptionsStrategyToolbox initialStrategy="butterflies" />
+        return <OptionsStrategyToolbox strategy="butterflies" />
       case "collars":
-        return <OptionsStrategyToolbox initialStrategy="collars" />
+        return <OptionsStrategyToolbox strategy="collars" />
       case "diagonals":
-        return <OptionsStrategyToolbox initialStrategy="diagonals" />
+        return <OptionsStrategyToolbox strategy="diagonals" />
       case "straddles-strangles":
-        return <OptionsStrategyToolbox initialStrategy="straddles-strangles" />
+        return <OptionsStrategyToolbox strategy="straddles-strangles" />
       case "wheel-strategy":
-        return <OptionsStrategyToolbox initialStrategy="wheel" />
+        return <OptionsStrategyToolbox strategy="wheel-strategy" />
       case "exit-rules":
         return <ExitRulesDashboard />
       case "earnings-iv-crusher":

@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server"
 import Groq from "groq-sdk"
 
-export const runtime = "edge"
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
 
-const API_VERSION = "4.0.0"
+const API_VERSION = "4.0.1"
 
 /**
- * Social Sentiment API v4.0.0
+ * Social Sentiment API v4.0.1
  *
  * 10 DATA SOURCES IN FALLBACK ORDER (optimized for speed + accuracy):
  *

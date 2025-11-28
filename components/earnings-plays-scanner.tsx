@@ -311,10 +311,10 @@ export function EarningsPlaysScanner() {
                   value={strategyFilter}
                   onValueChange={(v: "all" | "straddle" | "strangle" | "iron-condor" | "0dte") => setStrategyFilter(v)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white border shadow-lg z-50">
                     <SelectItem value="all">All Strategies</SelectItem>
                     <SelectItem value="straddle">Straddles Only</SelectItem>
                     <SelectItem value="strangle">Strangles Only</SelectItem>
@@ -326,10 +326,10 @@ export function EarningsPlaysScanner() {
               <div>
                 <label className="text-sm font-medium mb-2 block">Timeframe</label>
                 <Select value={timeframe} onValueChange={(v: "week" | "2weeks" | "month") => setTimeframe(v)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white border shadow-lg z-50">
                     <SelectItem value="week">This Week</SelectItem>
                     <SelectItem value="2weeks">Next 2 Weeks</SelectItem>
                     <SelectItem value="month">This Month</SelectItem>

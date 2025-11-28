@@ -261,10 +261,10 @@ export function WheelStrategyScreener() {
               <div>
                 <label className="text-sm font-medium mb-2 block">Fundamental Grade</label>
                 <Select value={fundamentalGrade} onValueChange={(v: "all" | "a" | "b") => setFundamentalGrade(v)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white border shadow-lg z-50">
                     <SelectItem value="all">All Grades</SelectItem>
                     <SelectItem value="a">A Grade Only</SelectItem>
                     <SelectItem value="b">B+ or Better</SelectItem>

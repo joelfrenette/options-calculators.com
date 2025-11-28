@@ -251,10 +251,10 @@ export function HighIVWatchlist() {
               <div>
                 <label className="text-sm font-medium mb-2 block">Sort By</label>
                 <Select value={sortBy} onValueChange={(v: "ivRank" | "ivPercentile" | "hvRatio") => setSortBy(v)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white border shadow-lg z-50">
                     <SelectItem value="ivRank">IV Rank</SelectItem>
                     <SelectItem value="ivPercentile">IV Percentile</SelectItem>
                     <SelectItem value="hvRatio">IV/HV Ratio</SelectItem>
@@ -264,10 +264,10 @@ export function HighIVWatchlist() {
               <div>
                 <label className="text-sm font-medium mb-2 block">Show Only</label>
                 <Select value={showOnly} onValueChange={(v: "all" | "sell" | "buy") => setShowOnly(v)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white border shadow-lg z-50">
                     <SelectItem value="all">All Stocks</SelectItem>
                     <SelectItem value="sell">Sell Premium Candidates</SelectItem>
                     <SelectItem value="buy">Buy Premium Candidates</SelectItem>
