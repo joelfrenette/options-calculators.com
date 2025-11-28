@@ -24,6 +24,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts"
+import { RunScenarioInAIDialog } from "@/components/run-scenario-ai-dialog"
 
 // Sample unemployment data (last 12 months)
 const unemploymentData = [
@@ -336,12 +337,21 @@ export function JobsReportDashboard() {
                   </ul>
                 </div>
               </div>
-              <Button
-                variant="outline"
-                className="mt-4 text-[#0D9488] border-[#0D9488] hover:bg-[#0D9488] hover:text-white bg-transparent"
-              >
-                Model in Calculator
-              </Button>
+              <RunScenarioInAIDialog
+                context={{
+                  type: "jobs",
+                  title: "UNRATE at 4.1%: Near Full Employment",
+                  details:
+                    "Unemployment at 4.1% suggests a resilient labor market. Fed may maintain hawkish stance, impacting rate-sensitive sectors. Watch for yield curve movements.",
+                  additionalContext: {
+                    "Current Rate": "4.1%",
+                    "Fed Implication": "Hawkish bias likely continues",
+                    "Strategy Focus": "Rate-sensitive sectors, financials, yield plays",
+                  },
+                }}
+                buttonVariant="outline"
+                buttonClassName="mt-4 text-[#0D9488] border-[#0D9488] hover:bg-[#0D9488] hover:text-white bg-transparent"
+              />
             </CardContent>
           )}
         </Card>
@@ -389,12 +399,21 @@ export function JobsReportDashboard() {
                   </ul>
                 </div>
               </div>
-              <Button
-                variant="outline"
-                className="mt-4 text-[#0D9488] border-[#0D9488] hover:bg-[#0D9488] hover:text-white bg-transparent"
-              >
-                Model in Calculator
-              </Button>
+              <RunScenarioInAIDialog
+                context={{
+                  type: "jobs",
+                  title: "TRU at 24.7%: Hidden Labor Weakness",
+                  details:
+                    "True Rate of Unemployment (TRU) at 24.7% reveals hidden labor market stress not captured by headline numbers. Part-time and underemployment elevated.",
+                  additionalContext: {
+                    "TRU Rate": "24.7%",
+                    "Gap vs UNRATE": "20.6% hidden unemployment",
+                    Implications: "Consumer spending headwinds, defensive positioning",
+                  },
+                }}
+                buttonVariant="outline"
+                buttonClassName="mt-4 text-[#0D9488] border-[#0D9488] hover:bg-[#0D9488] hover:text-white bg-transparent"
+              />
             </CardContent>
           )}
         </Card>
@@ -405,7 +424,7 @@ export function JobsReportDashboard() {
             onClick={() => toggleAccordion(2)}
             className="w-full px-6 py-4 flex items-center justify-between text-left"
           >
-            <span className="text-lg font-semibold text-[#1E3A8A]">NFP Expectations: December Release Strategy</span>
+            <span className="text-lg font-semibold text-[#1E3A8A]">NFP Preview: +180K Expected</span>
             {expandedAccordion === 2 ? (
               <ChevronUp className="h-5 w-5 text-[#0D9488]" />
             ) : (
@@ -416,8 +435,8 @@ export function JobsReportDashboard() {
             <CardContent className="pt-0 pb-6">
               <div className="bg-blue-50/50 rounded-lg p-4 mb-4">
                 <p className="text-gray-700">
-                  160k forecast = Goldilocks scenario. Hot print ({">"}200k) boosts USD and pressures growth stocks.
-                  Miss ({"<"}100k) triggers risk-off but supports rate cut bets.
+                  Non-Farm Payrolls expected at +180K. A beat could strengthen dollar and pressure gold. A miss may
+                  boost rate cut expectations.
                 </p>
               </div>
               <div className="grid md:grid-cols-2 gap-4">
@@ -442,12 +461,21 @@ export function JobsReportDashboard() {
                   </ul>
                 </div>
               </div>
-              <Button
-                variant="outline"
-                className="mt-4 text-[#0D9488] border-[#0D9488] hover:bg-[#0D9488] hover:text-white bg-transparent"
-              >
-                Model in Calculator
-              </Button>
+              <RunScenarioInAIDialog
+                context={{
+                  type: "jobs",
+                  title: "NFP Preview: +180K Expected",
+                  details:
+                    "Non-Farm Payrolls expected at +180K. A beat could strengthen dollar and pressure gold. A miss may boost rate cut expectations.",
+                  additionalContext: {
+                    Expectation: "+180K jobs",
+                    Previous: "+254K",
+                    "Key Levels": "Above 200K = hawkish, Below 150K = dovish",
+                  },
+                }}
+                buttonVariant="outline"
+                buttonClassName="mt-4 text-[#0D9488] border-[#0D9488] hover:bg-[#0D9488] hover:text-white bg-transparent"
+              />
             </CardContent>
           )}
         </Card>

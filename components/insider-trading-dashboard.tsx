@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { RunScenarioInAIDialog } from "@/components/run-scenario-ai-dialog"
 import {
   RefreshCw,
   TrendingUp,
@@ -359,10 +360,21 @@ export default function InsiderTradingDashboard() {
                     </li>
                   </ul>
                 </div>
-                <Button className="bg-[#0D9488] hover:bg-[#0F766E] text-white">
-                  Model Spread in Calculator
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
+                <RunScenarioInAIDialog
+                  context={{
+                    type: "insider",
+                    title: "AAPL Exec Sells: Bearish Tech Signal",
+                    details:
+                      "Heavy selling by top execs ($22M) amid iPhone slowdown fears—could pressure Nasdaq, VIX +5% if clusters grow. Tim Cook's sale follows Q4 guidance concerns.",
+                    ticker: "AAPL",
+                    additionalContext: {
+                      "Transaction Type": "Sell",
+                      Value: "$22M",
+                      "Strategy Suggestions": "Bear put spreads (10-15 delta, 30 DTE), Widen iron condors on QQQ",
+                    },
+                  }}
+                  buttonClassName="bg-[#0D9488] hover:bg-[#0F766E] text-white"
+                />
               </div>
             </AccordionContent>
           </AccordionItem>
@@ -410,10 +422,21 @@ export default function InsiderTradingDashboard() {
                     </li>
                   </ul>
                 </div>
-                <Button className="bg-[#0D9488] hover:bg-[#0F766E] text-white">
-                  Model Spread in Calculator
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
+                <RunScenarioInAIDialog
+                  context={{
+                    type: "insider",
+                    title: "Pelosi MSFT Buy: AI Momentum Play",
+                    details:
+                      "Congressional buy aligns with Copilot revenue uptick—bullish IV expansion likely, good entry for bull call spreads into Q1 AI narratives.",
+                    ticker: "MSFT",
+                    additionalContext: {
+                      "Transaction Type": "Buy",
+                      Value: "$50K",
+                      "Strategy Suggestions": "Bull call spreads above $450, Cash-secured puts near $420 support",
+                    },
+                  }}
+                  buttonClassName="bg-[#0D9488] hover:bg-[#0F766E] text-white"
+                />
               </div>
             </AccordionContent>
           </AccordionItem>
@@ -461,10 +484,22 @@ export default function InsiderTradingDashboard() {
                     </li>
                   </ul>
                 </div>
-                <Button className="bg-[#0D9488] hover:bg-[#0F766E] text-white">
-                  Model Spread in Calculator
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
+                <RunScenarioInAIDialog
+                  context={{
+                    type: "insider",
+                    title: "NVDA Exec Sells: Routine or Warning?",
+                    details:
+                      "10b5-1 plan sale—likely tax-driven, but watch for follow-on sales. AI hype may support dips; consider diagonal spreads.",
+                    ticker: "NVDA",
+                    additionalContext: {
+                      "Transaction Type": "Sell (10b5-1)",
+                      Value: "$7M",
+                      "Strategy Suggestions":
+                        "Diagonal spreads to capture theta, Avoid naked calls—AI momentum can surprise",
+                    },
+                  }}
+                  buttonClassName="bg-[#0D9488] hover:bg-[#0F766E] text-white"
+                />
               </div>
             </AccordionContent>
           </AccordionItem>
@@ -512,10 +547,21 @@ export default function InsiderTradingDashboard() {
                     </li>
                   </ul>
                 </div>
-                <Button className="bg-[#0D9488] hover:bg-[#0F766E] text-white">
-                  Model Spread in Calculator
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
+                <RunScenarioInAIDialog
+                  context={{
+                    type: "insider",
+                    title: "XOM Cluster Buys: Energy Sector Signal",
+                    details:
+                      "Multiple execs buying ahead of OPEC meeting—bullish energy sector signal. Consider covered calls if already long XOM.",
+                    ticker: "XOM",
+                    additionalContext: {
+                      "Transaction Type": "Cluster Buy",
+                      Value: "$1.2M (multiple execs)",
+                      "Strategy Suggestions": "Bull put spreads below $105, Covered calls if long XOM",
+                    },
+                  }}
+                  buttonClassName="bg-[#0D9488] hover:bg-[#0F766E] text-white"
+                />
               </div>
             </AccordionContent>
           </AccordionItem>

@@ -1,10 +1,23 @@
 "use client"
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine, Area, ComposedChart } from "recharts"
-import { TrendingUp, DollarSign, Target, Clock, Activity, Shield, Calculator, Sparkles, Sailboat } from "lucide-react"
+import { RunScenarioInAIDialog } from "@/components/run-scenario-ai-dialog"
+import {
+  TrendingUp,
+  DollarSign,
+  Target,
+  Clock,
+  Activity,
+  Shield,
+  Calculator,
+  Sparkles,
+  RefreshCw,
+  Loader2,
+} from "lucide-react"
 
 // Strategy configurations
 const STRATEGIES = {
@@ -24,9 +37,30 @@ const STRATEGIES = {
     },
     payoff: generateCreditSpreadPayoff(),
     setups: [
-      { ticker: "SPY", setup: "545/540 Put Credit Spread", credit: "$2.15", pop: "72%", direction: "Bullish" },
-      { ticker: "QQQ", setup: "470/465 Put Credit Spread", credit: "$1.85", pop: "68%", direction: "Bullish" },
-      { ticker: "IWM", setup: "220/225 Call Credit Spread", credit: "$1.95", pop: "70%", direction: "Bearish" },
+      {
+        ticker: "SPY",
+        setup: "545/540 Put Credit Spread",
+        credit: "$2.15",
+        pop: "72%",
+        direction: "Bullish",
+        signal: "Strong",
+      },
+      {
+        ticker: "QQQ",
+        setup: "470/465 Put Credit Spread",
+        credit: "$1.85",
+        pop: "68%",
+        direction: "Bullish",
+        signal: "Moderate",
+      },
+      {
+        ticker: "IWM",
+        setup: "220/225 Call Credit Spread",
+        credit: "$1.95",
+        pop: "70%",
+        direction: "Bearish",
+        signal: "Weak",
+      },
     ],
     insights: {
       outlook:
@@ -62,9 +96,23 @@ const STRATEGIES = {
     },
     payoff: generateIronCondorPayoff(),
     setups: [
-      { ticker: "SPY", setup: "550/545 – 580/585", credit: "$3.20", pop: "78%", direction: "Neutral" },
-      { ticker: "QQQ", setup: "460/455 – 490/495", credit: "$2.85", pop: "75%", direction: "Neutral" },
-      { ticker: "IWM", setup: "210/205 – 230/235", credit: "$2.40", pop: "76%", direction: "Neutral" },
+      {
+        ticker: "SPY",
+        setup: "550/545 – 580/585",
+        credit: "$3.20",
+        pop: "78%",
+        direction: "Neutral",
+        signal: "Strong",
+      },
+      {
+        ticker: "QQQ",
+        setup: "460/455 – 490/495",
+        credit: "$2.85",
+        pop: "75%",
+        direction: "Neutral",
+        signal: "Moderate",
+      },
+      { ticker: "IWM", setup: "210/205 – 230/235", credit: "$2.40", pop: "76%", direction: "Neutral", signal: "Weak" },
     ],
     insights: {
       outlook:
@@ -100,9 +148,30 @@ const STRATEGIES = {
     },
     payoff: generateCalendarPayoff(),
     setups: [
-      { ticker: "AAPL", setup: "190 Call Calendar (Dec/Jan)", credit: "$3.50 debit", pop: "55%", direction: "Neutral" },
-      { ticker: "MSFT", setup: "420 Put Calendar (Dec/Jan)", credit: "$4.20 debit", pop: "52%", direction: "Neutral" },
-      { ticker: "NVDA", setup: "480 Call Calendar (Dec/Jan)", credit: "$8.50 debit", pop: "50%", direction: "Neutral" },
+      {
+        ticker: "AAPL",
+        setup: "190 Call Calendar (Dec/Jan)",
+        credit: "$3.50 debit",
+        pop: "55%",
+        direction: "Neutral",
+        signal: "Strong",
+      },
+      {
+        ticker: "MSFT",
+        setup: "420 Put Calendar (Dec/Jan)",
+        credit: "$4.20 debit",
+        pop: "52%",
+        direction: "Neutral",
+        signal: "Moderate",
+      },
+      {
+        ticker: "NVDA",
+        setup: "480 Call Calendar (Dec/Jan)",
+        credit: "$8.50 debit",
+        pop: "50%",
+        direction: "Neutral",
+        signal: "Weak",
+      },
     ],
     insights: {
       outlook:
@@ -144,6 +213,7 @@ const STRATEGIES = {
         credit: "$1.20 debit",
         pop: "35%",
         direction: "Bullish Target",
+        signal: "Strong",
       },
       {
         ticker: "TSLA",
@@ -151,6 +221,7 @@ const STRATEGIES = {
         credit: "$2.50 debit",
         pop: "32%",
         direction: "Bearish Target",
+        signal: "Moderate",
       },
       {
         ticker: "AMD",
@@ -158,6 +229,7 @@ const STRATEGIES = {
         credit: "$1.80 debit",
         pop: "38%",
         direction: "Bullish Target",
+        signal: "Weak",
       },
     ],
     insights: {
@@ -200,6 +272,7 @@ const STRATEGIES = {
         credit: "$0.50 credit",
         pop: "Protected",
         direction: "Hedge Long",
+        signal: "Strong",
       },
       {
         ticker: "NVDA",
@@ -207,6 +280,7 @@ const STRATEGIES = {
         credit: "$2.00 debit",
         pop: "Protected",
         direction: "Hedge Long",
+        signal: "Moderate",
       },
       {
         ticker: "MSFT",
@@ -214,6 +288,7 @@ const STRATEGIES = {
         credit: "$0.80 credit",
         pop: "Protected",
         direction: "Hedge Long",
+        signal: "Weak",
       },
     ],
     insights: {
@@ -256,9 +331,24 @@ const STRATEGIES = {
         credit: "$4.20 debit",
         pop: "62%",
         direction: "Bullish",
+        signal: "Strong",
       },
-      { ticker: "META", setup: "Buy Jan 560C, Sell Dec 580C", credit: "$8.50 debit", pop: "58%", direction: "Bullish" },
-      { ticker: "AMZN", setup: "Buy Jan 200P, Sell Dec 195P", credit: "$3.80 debit", pop: "60%", direction: "Bearish" },
+      {
+        ticker: "META",
+        setup: "Buy Jan 560C, Sell Dec 580C",
+        credit: "$8.50 debit",
+        pop: "58%",
+        direction: "Bullish",
+        signal: "Moderate",
+      },
+      {
+        ticker: "AMZN",
+        setup: "Buy Jan 200P, Sell Dec 195P",
+        credit: "$3.80 debit",
+        pop: "60%",
+        direction: "Bearish",
+        signal: "Weak",
+      },
     ],
     insights: {
       outlook:
@@ -294,9 +384,30 @@ const STRATEGIES = {
     },
     payoff: generateStraddlePayoff(),
     setups: [
-      { ticker: "TSLA", setup: "250 Straddle (Dec)", credit: "$18.00 debit", pop: "42%", direction: "Big Move" },
-      { ticker: "NVDA", setup: "475/485 Strangle (Dec)", credit: "$12.50 debit", pop: "45%", direction: "Big Move" },
-      { ticker: "COIN", setup: "280 Straddle (Dec)", credit: "$22.00 debit", pop: "40%", direction: "Big Move" },
+      {
+        ticker: "TSLA",
+        setup: "250 Straddle (Dec)",
+        credit: "$18.00 debit",
+        pop: "42%",
+        direction: "Big Move",
+        signal: "Strong",
+      },
+      {
+        ticker: "NVDA",
+        setup: "475/485 Strangle (Dec)",
+        credit: "$12.50 debit",
+        pop: "45%",
+        direction: "Big Move",
+        signal: "Moderate",
+      },
+      {
+        ticker: "COIN",
+        setup: "280 Straddle (Dec)",
+        credit: "$22.00 debit",
+        pop: "40%",
+        direction: "Big Move",
+        signal: "Weak",
+      },
     ],
     insights: {
       outlook:
@@ -332,9 +443,30 @@ const STRATEGIES = {
     },
     payoff: generateWheelPayoff(),
     setups: [
-      { ticker: "AMD", setup: "Sell 130 Put (30 DTE)", credit: "$2.80", pop: "75%", direction: "Wheel Entry" },
-      { ticker: "SOFI", setup: "Sell 14 Put (30 DTE)", credit: "$0.45", pop: "72%", direction: "Wheel Entry" },
-      { ticker: "PLTR", setup: "Sell 65 Put (30 DTE)", credit: "$1.90", pop: "70%", direction: "Wheel Entry" },
+      {
+        ticker: "AMD",
+        setup: "Sell 130 Put (30 DTE)",
+        credit: "$2.80",
+        pop: "75%",
+        direction: "Wheel Entry",
+        signal: "Strong",
+      },
+      {
+        ticker: "SOFI",
+        setup: "Sell 14 Put (30 DTE)",
+        credit: "$0.45",
+        pop: "72%",
+        direction: "Wheel Entry",
+        signal: "Moderate",
+      },
+      {
+        ticker: "PLTR",
+        setup: "Sell 65 Put (30 DTE)",
+        credit: "$1.90",
+        pop: "70%",
+        direction: "Wheel Entry",
+        signal: "Weak",
+      },
     ],
     insights: {
       outlook:
@@ -445,8 +577,44 @@ interface OptionsStrategyToolboxProps {
 export function OptionsStrategyToolbox({ strategy }: OptionsStrategyToolboxProps) {
   const config = STRATEGIES[strategy]
 
+  const [setups, setSetups] = useState(config?.setups || [])
+  const [isScanning, setIsScanning] = useState(false)
+  const [lastScanned, setLastScanned] = useState<Date | null>(null)
+
   if (!config) {
     return <div className="p-8 text-center text-gray-500">Strategy not found</div>
+  }
+
+  const handleRefreshSetups = async () => {
+    setIsScanning(true)
+    try {
+      const response = await fetch("/api/strategy-scanner", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ strategy, strategyName: config.name }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.setups && data.setups.length > 0) {
+          setSetups(data.setups)
+          setLastScanned(new Date())
+        }
+      }
+    } catch (error) {
+      console.error("Error scanning for setups:", error)
+    } finally {
+      setIsScanning(false)
+    }
+  }
+
+  const getPayoffChartData = (payoffData: { x: number; y: number }[]) => {
+    return payoffData.map((point) => ({
+      x: point.x,
+      profit: point.y > 0 ? point.y : 0,
+      loss: point.y < 0 ? point.y : 0,
+      y: point.y,
+    }))
   }
 
   return (
@@ -454,13 +622,28 @@ export function OptionsStrategyToolbox({ strategy }: OptionsStrategyToolboxProps
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-sky-100 to-teal-50 border-b border-sky-200">
         <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="flex items-center gap-4 mb-2">
-            <h1 className="text-3xl md:text-4xl font-bold text-navy-900" style={{ color: "#1E3A8A" }}>
-              {config.name}
-            </h1>
-            <Badge className={config.badgeColor}>{config.badge}</Badge>
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="flex items-center gap-4 mb-2">
+                <h1 className="text-3xl md:text-4xl font-bold text-navy-900" style={{ color: "#1E3A8A" }}>
+                  {config.name}
+                </h1>
+                <Badge className={config.badgeColor}>{config.badge}</Badge>
+              </div>
+              <p className="text-lg text-teal-700">{config.tagline}</p>
+            </div>
+            <Button
+              onClick={handleRefreshSetups}
+              disabled={isScanning}
+              className="bg-white text-teal-700 border border-teal-300 hover:bg-teal-50 shadow-sm"
+            >
+              {isScanning ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+              {isScanning ? "Scanning..." : "Refresh"}
+            </Button>
           </div>
-          <p className="text-lg text-teal-700">{config.tagline}</p>
+          {lastScanned && (
+            <p className="text-xs text-teal-600 mt-2">Last scanned: {lastScanned.toLocaleTimeString()}</p>
+          )}
         </div>
       </div>
 
@@ -468,43 +651,50 @@ export function OptionsStrategyToolbox({ strategy }: OptionsStrategyToolboxProps
         {/* Main Content: Payoff Diagram + Stats */}
         <div className="grid lg:grid-cols-5 gap-6 mb-8">
           {/* Payoff Diagram */}
-          <Card className="lg:col-span-2 shadow-md">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg font-semibold" style={{ color: "#1E3A8A" }}>
-                Payoff Diagram
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-64">
+          <Card className="lg:col-span-2 shadow-sm">
+            <CardContent className="p-6">
+              <h3 className="font-semibold text-gray-800 mb-4">Payoff Diagram</h3>
+              <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={config.payoff} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <ComposedChart
+                    data={getPayoffChartData(config.payoff)}
+                    margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                     <XAxis dataKey="x" tick={{ fontSize: 10 }} tickFormatter={(v) => `$${v}`} />
                     <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => (v > 0 ? `+${v}` : v)} />
                     <ReferenceLine y={0} stroke="#9CA3AF" strokeWidth={2} />
                     <defs>
                       <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#10B981" stopOpacity={0.3} />
-                        <stop offset="100%" stopColor="#10B981" stopOpacity={0} />
+                        <stop offset="0%" stopColor="#10B981" stopOpacity={0.4} />
+                        <stop offset="100%" stopColor="#10B981" stopOpacity={0.1} />
                       </linearGradient>
-                      <linearGradient id="lossGradient" x1="0" y1="1" x2="0" y2="0">
-                        <stop offset="0%" stopColor="#EF4444" stopOpacity={0.3} />
-                        <stop offset="100%" stopColor="#EF4444" stopOpacity={0} />
+                      <linearGradient id="lossGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#EF4444" stopOpacity={0.1} />
+                        <stop offset="100%" stopColor="#EF4444" stopOpacity={0.4} />
                       </linearGradient>
                     </defs>
                     <Area
                       type="monotone"
-                      dataKey="y"
+                      dataKey="profit"
                       stroke="none"
                       fill="url(#profitGradient)"
+                      fillOpacity={1}
+                      isAnimationActive={false}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="loss"
+                      stroke="none"
+                      fill="url(#lossGradient)"
                       fillOpacity={1}
                       isAnimationActive={false}
                     />
                     <Line
                       type="monotone"
                       dataKey="y"
-                      stroke="#0D9488"
-                      strokeWidth={3}
+                      stroke="#374151"
+                      strokeWidth={2}
                       dot={false}
                       isAnimationActive={false}
                     />
@@ -578,7 +768,7 @@ export function OptionsStrategyToolbox({ strategy }: OptionsStrategyToolboxProps
               </div>
               <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
                 <div className="flex items-center gap-2 text-gray-700 mb-1">
-                  <Calculator className="h-4 w-4" />
+                  <Calculator className="h-4 w-4 mr-2" />
                   <span className="text-xs font-medium">Breakeven</span>
                 </div>
                 <p className="text-sm font-semibold text-gray-900">{config.stats.breakeven}</p>
@@ -594,10 +784,19 @@ export function OptionsStrategyToolbox({ strategy }: OptionsStrategyToolboxProps
             <h2 className="text-xl font-bold" style={{ color: "#1E3A8A" }}>
               Best Current Setups This Week
             </h2>
+            {isScanning && (
+              <Badge className="bg-teal-100 text-teal-700 ml-2">
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                AI Scanning Markets...
+              </Badge>
+            )}
           </div>
           <div className="grid md:grid-cols-3 gap-4">
-            {config.setups.map((setup, idx) => (
-              <Card key={idx} className="shadow-md hover:shadow-lg transition-shadow">
+            {setups.map((setup, idx) => (
+              <Card
+                key={idx}
+                className={`shadow-md hover:shadow-lg transition-shadow ${isScanning ? "opacity-50" : ""}`}
+              >
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-2xl font-bold" style={{ color: "#1E3A8A" }}>
@@ -618,10 +817,21 @@ export function OptionsStrategyToolbox({ strategy }: OptionsStrategyToolboxProps
                       <span className="ml-1 font-semibold text-blue-600">{setup.pop}</span>
                     </div>
                   </div>
-                  <Button className="w-full text-white" style={{ backgroundColor: "#0D9488" }}>
-                    <Calculator className="h-4 w-4 mr-2" />
-                    Open in Calculator
-                  </Button>
+                  <RunScenarioInAIDialog
+                    context={{
+                      type: "strategy",
+                      title: `${setup.ticker} ${setup.setup}`,
+                      details: `${setup.setup} on ${setup.ticker}. Premium: ${setup.credit}, Probability of Profit: ${setup.pop}. Signal strength: ${setup.signal}.`,
+                      ticker: setup.ticker,
+                      additionalContext: {
+                        Strategy: setup.setup,
+                        Premium: setup.credit,
+                        POP: setup.pop,
+                        Signal: setup.signal,
+                      },
+                    }}
+                    buttonClassName="w-full text-white bg-[#0D9488] hover:bg-[#0F766E]"
+                  />
                 </CardContent>
               </Card>
             ))}
@@ -688,7 +898,7 @@ export function OptionsStrategyToolbox({ strategy }: OptionsStrategyToolboxProps
         {/* Bottom Banner */}
         <div className="rounded-xl p-6 text-center relative overflow-hidden" style={{ backgroundColor: "#CCFBF1" }}>
           <div className="relative z-10">
-            <Sailboat className="h-10 w-10 mx-auto mb-3 text-teal-600" />
+            <RefreshCw className="h-10 w-10 mx-auto mb-3 text-teal-600" />
             <p className="text-lg font-semibold" style={{ color: "#1E3A8A" }}>
               Master every strategy with precision — calculate, execute, win.
             </p>

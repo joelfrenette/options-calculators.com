@@ -8,7 +8,6 @@ import {
   Clock,
   TrendingUp,
   AlertTriangle,
-  ExternalLink,
   MessageSquare,
   Sparkles,
   Send,
@@ -28,6 +27,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
+import { RunScenarioInAIDialog } from "@/components/run-scenario-ai-dialog"
 
 const earningsData = [
   {
@@ -316,10 +316,14 @@ function InsightAccordion({ insights, type }: { insights: typeof earningsInsight
                   </ul>
                 </div>
 
-                <Button className="bg-teal-600 hover:bg-teal-700 text-white w-full sm:w-auto">
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Run Scenario in Calculator
-                </Button>
+                <RunScenarioInAIDialog
+                  context={{
+                    type: "earnings",
+                    title: insight.title,
+                    details: `${insight.summary} Key points: ${insight.watchPoints.join(", ")}. Trading tips: ${insight.tradingTips.join(", ")}`,
+                  }}
+                  buttonClassName="bg-teal-600 hover:bg-teal-700 text-white w-full sm:w-auto"
+                />
               </div>
             </AccordionContent>
           </AccordionItem>
