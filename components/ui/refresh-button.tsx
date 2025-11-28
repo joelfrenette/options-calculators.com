@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 interface RefreshButtonProps {
-  onClick: () => void | Promise<void>
+  onClick?: () => void | Promise<void>
+  onRefresh?: () => void | Promise<void>
   loading?: boolean
   isLoading?: boolean
   disabled?: boolean
@@ -21,10 +22,11 @@ interface RefreshButtonProps {
 
 export function RefreshButton({
   onClick,
+  onRefresh,
   loading = false,
   isLoading = false,
   disabled = false,
-  variant = "outline",
+  variant = "default",
   size = "sm",
   className,
   showText = true,
@@ -32,7 +34,10 @@ export function RefreshButton({
   children,
 }: RefreshButtonProps) {
   const handleClick = async () => {
-    await onClick()
+    const handler = onClick || onRefresh
+    if (handler) {
+      await handler()
+    }
   }
 
   const isButtonLoading = loading || isLoading
@@ -44,7 +49,7 @@ export function RefreshButton({
       onClick={handleClick}
       disabled={disabled || isButtonLoading}
       className={cn(
-        "bg-green-50 hover:bg-green-100 border-green-200 transition-all duration-200",
+        "bg-emerald-600 hover:bg-emerald-700 text-white border-0 transition-all duration-200",
         isButtonLoading && "cursor-wait",
         className,
       )}

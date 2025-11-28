@@ -526,12 +526,7 @@ export function FomcPredictions() {
                 {lastUpdated && <span className="ml-2 text-xs">(Updated: {lastUpdated.toLocaleTimeString()})</span>}
               </CardDescription>
             </div>
-            <RefreshButton
-              onClick={fetchFomcData}
-              isLoading={loading}
-              variant="default"
-              className="bg-primary hover:bg-primary/90"
-            />
+            <RefreshButton onClick={fetchFomcData} isLoading={loading} />
           </div>
         </CardHeader>
       </Card>

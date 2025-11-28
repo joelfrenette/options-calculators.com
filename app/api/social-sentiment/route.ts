@@ -145,35 +145,103 @@ async function getGoogleTrendsScore(): Promise<{ score: number; source: string }
   }
 }
 
-// ========== SOURCE 3: AAII SURVEY ==========
+// ========== SOURCE 3: AAII INVESTOR SENTIMENT ==========
 async function getAAIISentiment(): Promise<{ score: number; source: string; bullish: number }> {
   try {
     console.log("[v0] Source 3: Fetching AAII Investor Sentiment...")
 
-    // AAII publishes weekly sentiment - use known recent values or scrape
-    const response = await fetch("https://www.aaii.com/sentimentsurvey", {
-      headers: { "User-Agent": "Mozilla/5.0" },
-      signal: AbortSignal.timeout(8000),
-    })
+    const scrapingBeeKey = process.env.SCRAPINGBEE_API_KEY
 
-    if (response.ok) {
-      const html = await response.text()
+    if (scrapingBeeKey) {
+      const targetUrl = encodeURIComponent("https://www.aaii.com/sentimentsurvey")
+      const scrapingBeeUrl = `https://app.scrapingbee.com/api/v1/?api_key=${scrapingBeeKey}&url=${targetUrl}&render_js=true`
 
-      // Extract bullish percentage
-      const bullMatch = html.match(/Bullish[:\s]+(\d+(?:\.\d+)?)/i)
-      const bearMatch = html.match(/Bearish[:\s]+(\d+(?:\.\d+)?)/i)
+      const response = await fetch(scrapingBeeUrl, {
+        signal: AbortSignal.timeout(15000),
+      })
 
-      if (bullMatch && bearMatch) {
-        const bullish = Number.parseFloat(bullMatch[1])
-        const bearish = Number.parseFloat(bearMatch[1])
-        // Score: normalize to 0-100 (historically ranges 20-50%)
-        const score = Math.round((bullish / (bullish + bearish)) * 100)
-        console.log(`[v0] ✓ Source 3 (AAII): ${score}/100 (${bullish}% bullish)`)
-        return { score, source: "aaii_survey", bullish }
+      if (response.ok) {
+        const html = await response.text()
+
+        // Extract bullish percentage from the page
+        const bullMatch =
+          html.match(/Bullish[:\s]*(\d+(?:\.\d+)?)\s*%/i) || html.match(/(\d+(?:\.\d+)?)\s*%\s*Bullish/i)
+        const bearMatch =
+          html.match(/Bearish[:\s]*(\d+(?:\.\d+)?)\s*%/i) || html.match(/(\d+(?:\.\d+)?)\s*%\s*Bearish/i)
+        const neutralMatch = html.match(/Neutral[:\s]*(\d+(?:\.\d+)?)\s*%/i)
+
+        if (bullMatch) {
+          const bullish = Number.parseFloat(bullMatch[1])
+          const bearish = bearMatch ? Number.parseFloat(bearMatch[1]) : (100 - bullish) / 2
+          // Score: normalize to 0-100 scale
+          const score = Math.round((bullish / (bullish + bearish)) * 100)
+          console.log(`[v0] ✓ Source 3 (AAII via ScrapingBee): ${score}/100 (${bullish}% bullish)`)
+          return { score, source: "aaii_live", bullish }
+        }
       }
     }
 
-    // Fallback to historical average
+    const alphaVantageKey = process.env.ALPHA_VANTAGE_API_KEY
+    if (alphaVantageKey) {
+      const avResponse = await fetch(
+        `https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers=SPY&apikey=${alphaVantageKey}`,
+        { signal: AbortSignal.timeout(8000) },
+      )
+
+      if (avResponse.ok) {
+        const data = await avResponse.json()
+        if (data.feed && data.feed.length > 0) {
+          // Average sentiment scores from recent articles
+          const sentiments = data.feed.slice(0, 20).map((item: any) => {
+            const tickerSentiment = item.ticker_sentiment?.find((t: any) => t.ticker === "SPY")
+            return tickerSentiment ? Number.parseFloat(tickerSentiment.ticker_sentiment_score) : 0
+          })
+          const avgSentiment = sentiments.reduce((a: number, b: number) => a + b, 0) / sentiments.length
+          // Convert -1 to 1 scale to 0-100 (investor sentiment scale)
+          const score = Math.round((avgSentiment + 1) * 50)
+          const bullish = Math.round(30 + avgSentiment * 20) // Map to typical AAII bullish range (20-50%)
+          console.log(`[v0] ✓ Source 3 (AAII proxy via AlphaVantage): ${score}/100 (${bullish}% bullish equiv)`)
+          return { score, source: "alphavantage_sentiment", bullish }
+        }
+      }
+    }
+
+    const finnhubKey = process.env.FINNHUB_API_KEY
+    if (finnhubKey) {
+      const newsResponse = await fetch(`https://finnhub.io/api/v1/news?category=general&token=${finnhubKey}`, {
+        signal: AbortSignal.timeout(8000),
+      })
+
+      if (newsResponse.ok) {
+        const news = await newsResponse.json()
+        if (Array.isArray(news) && news.length > 0) {
+          // Analyze headlines for bullish/bearish keywords
+          let bullishCount = 0
+          let bearishCount = 0
+          const bullishWords = ["rally", "surge", "gain", "rise", "high", "record", "up", "bull", "growth", "profit"]
+          const bearishWords = ["fall", "drop", "decline", "low", "crash", "down", "bear", "loss", "fear", "sell"]
+
+          news.slice(0, 30).forEach((item: any) => {
+            const headline = (item.headline || "").toLowerCase()
+            bullishWords.forEach((word) => {
+              if (headline.includes(word)) bullishCount++
+            })
+            bearishWords.forEach((word) => {
+              if (headline.includes(word)) bearishCount++
+            })
+          })
+
+          const total = bullishCount + bearishCount || 1
+          const bullishRatio = bullishCount / total
+          const score = Math.round(bullishRatio * 100)
+          const bullish = Math.round(25 + bullishRatio * 25) // Map to AAII typical range
+          console.log(`[v0] ✓ Source 3 (AAII proxy via Finnhub news): ${score}/100`)
+          return { score, source: "finnhub_news_sentiment", bullish }
+        }
+      }
+    }
+
+    // Final fallback: historical average (AAII long-term average is ~38% bullish)
     console.log("[v0] Source 3 (AAII): Using historical average")
     return { score: 38, source: "aaii_historical", bullish: 33 }
   } catch (error) {
@@ -676,7 +744,7 @@ function generateFallbackSummary(score: number): { summary: string; outlook: str
 function generatePerSymbolData(globalScore: number, stockTwitsScore: number, grokScore: number) {
   const indices = [
     { symbol: "SPY", name: "S&P 500 ETF", variance: 0 },
-    { symbol: "QQQ", name: "Nasdaq 100 ETF", variance: 5 },
+    { symbol: "QQQ", name: "Nasdaq 100 ETF", variance: 3 },
     { symbol: "IWM", name: "Russell 2000 ETF", variance: -5 },
     { symbol: "DIA", name: "Dow Jones ETF", variance: -2 },
   ]
@@ -688,7 +756,7 @@ function generatePerSymbolData(globalScore: number, stockTwitsScore: number, gro
   return indices.map((idx) => {
     // Blend multiple sources
     const blendedScore = Math.round(baseScore * 0.4 + stocktwits * 0.3 + ai * 0.3 + idx.variance)
-    const finalScore = Math.min(100, Math.max(0, blendedScore + (Math.random() * 4 - 2)))
+    const finalScore = Math.min(100, Math.max(0, blendedScore))
 
     return {
       symbol: idx.symbol,

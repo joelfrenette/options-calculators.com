@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -16,11 +16,13 @@ import {
   AlertTriangle,
   CheckCircle2,
   Info,
-  DollarSign,
   Target,
+  Loader2,
+  Wifi,
+  WifiOff,
 } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { TooltipProvider } from "@/components/ui/tooltip"
 
 interface EarningsPlay {
   ticker: string
@@ -39,124 +41,32 @@ interface EarningsPlay {
   direction: "bullish" | "bearish" | "neutral"
   signal: "strong" | "moderate" | "speculative"
   thesis: string
+  dataSource?: string
+  isLive?: boolean
 }
-
-const MOCK_PLAYS: EarningsPlay[] = [
-  {
-    ticker: "CRM",
-    company: "Salesforce Inc",
-    earningsDate: "Dec 3",
-    earningsTime: "AMC",
-    daysToEarnings: 6,
-    price: 325.0,
-    expectedMove: 18.5,
-    expectedMovePercent: 5.7,
-    ivRank: 72,
-    historicalBeat: 75,
-    avgPostEarningsMove: 6.2,
-    straddlePrice: 19.5,
-    strategy: "straddle",
-    direction: "neutral",
-    signal: "strong",
-    thesis: "AI narrative strong, expected move underpriced vs historical",
-  },
-  {
-    ticker: "AVGO",
-    company: "Broadcom Inc",
-    earningsDate: "Dec 5",
-    earningsTime: "AMC",
-    daysToEarnings: 8,
-    price: 185.0,
-    expectedMove: 12.0,
-    expectedMovePercent: 6.5,
-    ivRank: 68,
-    historicalBeat: 80,
-    avgPostEarningsMove: 7.8,
-    straddlePrice: 13.2,
-    strategy: "0dte-call",
-    direction: "bullish",
-    signal: "strong",
-    thesis: "VMware integration + AI chip demand, tends to beat big",
-  },
-  {
-    ticker: "LULU",
-    company: "Lululemon",
-    earningsDate: "Dec 5",
-    earningsTime: "AMC",
-    daysToEarnings: 8,
-    price: 320.0,
-    expectedMove: 22.0,
-    expectedMovePercent: 6.9,
-    ivRank: 75,
-    historicalBeat: 65,
-    avgPostEarningsMove: 8.5,
-    straddlePrice: 24.0,
-    strategy: "iron-condor",
-    direction: "neutral",
-    signal: "moderate",
-    thesis: "Expected move seems fair, sell premium if neutral",
-  },
-  {
-    ticker: "DOCU",
-    company: "DocuSign Inc",
-    earningsDate: "Dec 5",
-    earningsTime: "AMC",
-    daysToEarnings: 8,
-    price: 92.0,
-    expectedMove: 8.5,
-    expectedMovePercent: 9.2,
-    ivRank: 82,
-    historicalBeat: 70,
-    avgPostEarningsMove: 11.5,
-    straddlePrice: 9.8,
-    strategy: "straddle",
-    direction: "neutral",
-    signal: "strong",
-    thesis: "High IV but historically moves bigger than expected",
-  },
-  {
-    ticker: "MDB",
-    company: "MongoDB Inc",
-    earningsDate: "Dec 9",
-    earningsTime: "AMC",
-    daysToEarnings: 12,
-    price: 285.0,
-    expectedMove: 28.0,
-    expectedMovePercent: 9.8,
-    ivRank: 78,
-    historicalBeat: 60,
-    avgPostEarningsMove: 12.2,
-    straddlePrice: 30.5,
-    strategy: "strangle",
-    direction: "neutral",
-    signal: "moderate",
-    thesis: "Cloud growth slowing, but AI database narrative emerging",
-  },
-  {
-    ticker: "COST",
-    company: "Costco Wholesale",
-    earningsDate: "Dec 12",
-    earningsTime: "AMC",
-    daysToEarnings: 15,
-    price: 920.0,
-    expectedMove: 32.0,
-    expectedMovePercent: 3.5,
-    ivRank: 42,
-    historicalBeat: 85,
-    avgPostEarningsMove: 3.8,
-    straddlePrice: 34.0,
-    strategy: "0dte-call",
-    direction: "bullish",
-    signal: "strong",
-    thesis: "Consistent beater, holiday shopping tailwind",
-  },
-]
 
 export function EarningsPlaysScanner() {
   const [strategyFilter, setStrategyFilter] = useState<"all" | "straddle" | "strangle" | "iron-condor" | "0dte">("all")
   const [timeframe, setTimeframe] = useState<"week" | "2weeks" | "month">("2weeks")
   const [isLoading, setIsLoading] = useState(false)
-  const [plays, setPlays] = useState<EarningsPlay[]>(MOCK_PLAYS)
+  const [plays, setPlays] = useState<EarningsPlay[]>([])
+  const [isLiveData, setIsLiveData] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const cached = localStorage.getItem("earnings-plays-scanner-cache")
+    if (cached) {
+      try {
+        const { data, timestamp, isLive } = JSON.parse(cached)
+        setPlays(data)
+        setLastUpdated(timestamp)
+        setIsLiveData(isLive)
+      } catch {
+        // Invalid cache
+      }
+    }
+  }, [])
 
   const filteredPlays = plays.filter((p) => {
     if (strategyFilter === "0dte" && !p.strategy.startsWith("0dte")) return false
@@ -166,9 +76,41 @@ export function EarningsPlaysScanner() {
     return true
   })
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setIsLoading(true)
-    setTimeout(() => setIsLoading(false), 1500)
+    setError(null)
+
+    try {
+      const response = await fetch("/api/strategy-scanner?type=earnings")
+
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (data.earningsPlays && data.earningsPlays.length > 0) {
+        setPlays(data.earningsPlays)
+        setIsLiveData(data.isLive === true)
+        setLastUpdated(new Date().toISOString())
+
+        localStorage.setItem(
+          "earnings-plays-scanner-cache",
+          JSON.stringify({
+            data: data.earningsPlays,
+            timestamp: new Date().toISOString(),
+            isLive: data.isLive === true,
+          }),
+        )
+      } else {
+        setError("No earnings plays found in the selected timeframe")
+      }
+    } catch (err) {
+      console.error("[Earnings Plays Scanner] Fetch error:", err)
+      setError("Failed to fetch live earnings data")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const getSignalBadge = (signal: string) => {
@@ -201,21 +143,21 @@ export function EarningsPlaysScanner() {
     switch (direction) {
       case "bullish":
         return (
-          <Badge className="bg-green-100 text-green-800">
+          <Badge variant="outline" className="border-green-300 text-green-700">
             <TrendingUp className="w-3 h-3 mr-1" />
             Bullish
           </Badge>
         )
       case "bearish":
         return (
-          <Badge className="bg-red-100 text-red-800">
+          <Badge variant="outline" className="border-red-300 text-red-700">
             <TrendingDown className="w-3 h-3 mr-1" />
             Bearish
           </Badge>
         )
       default:
         return (
-          <Badge className="bg-gray-100 text-gray-800">
+          <Badge variant="outline" className="border-slate-300 text-slate-700">
             <Target className="w-3 h-3 mr-1" />
             Neutral
           </Badge>
@@ -225,281 +167,185 @@ export function EarningsPlaysScanner() {
 
   const getStrategyBadge = (strategy: string) => {
     const colors: Record<string, string> = {
-      straddle: "bg-purple-100 text-purple-800 border-purple-300",
-      strangle: "bg-indigo-100 text-indigo-800 border-indigo-300",
-      "iron-condor": "bg-blue-100 text-blue-800 border-blue-300",
-      "0dte-call": "bg-green-100 text-green-800 border-green-300",
-      "0dte-put": "bg-red-100 text-red-800 border-red-300",
+      straddle: "bg-purple-100 text-purple-800",
+      strangle: "bg-indigo-100 text-indigo-800",
+      "iron-condor": "bg-blue-100 text-blue-800",
+      "0dte-call": "bg-green-100 text-green-800",
+      "0dte-put": "bg-red-100 text-red-800",
     }
-    const labels: Record<string, string> = {
-      straddle: "Straddle",
-      strangle: "Strangle",
-      "iron-condor": "Iron Condor",
-      "0dte-call": "0DTE Call",
-      "0dte-put": "0DTE Put",
-    }
-    return <Badge className={colors[strategy] || "bg-gray-100"}>{labels[strategy] || strategy}</Badge>
+    return <Badge className={colors[strategy] || "bg-slate-100 text-slate-800"}>{strategy.replace("-", " ")}</Badge>
   }
 
   return (
     <TooltipProvider>
-      <div className="space-y-6">
-        {/* Hero Section */}
-        <div className="bg-gradient-to-r from-violet-600 to-purple-600 rounded-xl p-6 text-white">
+      <Card>
+        <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Calendar className="w-6 h-6" />
-                <h1 className="text-2xl font-bold">Earnings Plays Scanner</h1>
-              </div>
-              <p className="text-violet-100">Find high-probability earnings trades: straddles, strangles, 0DTE plays</p>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-blue-500" />
+                Earnings Plays Scanner
+                {isLiveData ? (
+                  <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-300">
+                    <Wifi className="w-3 h-3 mr-1" />
+                    LIVE
+                  </Badge>
+                ) : plays.length > 0 ? (
+                  <Badge variant="outline" className="ml-2 bg-yellow-50 text-yellow-700 border-yellow-300">
+                    <WifiOff className="w-3 h-3 mr-1" />
+                    Cached
+                  </Badge>
+                ) : null}
+              </CardTitle>
+              <CardDescription>
+                Options strategies for upcoming earnings announcements
+                {lastUpdated && (
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    Updated: {new Date(lastUpdated).toLocaleTimeString()}
+                  </span>
+                )}
+              </CardDescription>
             </div>
-            <Button onClick={handleRefresh} variant="secondary" disabled={isLoading}>
-              <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-              Scan Now
+            <Button onClick={handleRefresh} disabled={isLoading} size="sm">
+              {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+              {isLoading ? "Scanning..." : "Refresh"}
             </Button>
           </div>
-        </div>
-
-        {/* This Week's Highlights */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <CheckCircle2 className="w-5 h-5 text-green-600" />
-                <span className="font-semibold text-green-800">Best Straddle</span>
-              </div>
-              <p className="text-2xl font-bold text-green-900">CRM</p>
-              <p className="text-sm text-green-700">Dec 3 AMC - Expected move underpriced</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="w-5 h-5 text-blue-600" />
-                <span className="font-semibold text-blue-800">Best 0DTE Call</span>
-              </div>
-              <p className="text-2xl font-bold text-blue-900">AVGO</p>
-              <p className="text-sm text-blue-700">Dec 5 AMC - 80% beat rate, AI catalyst</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <DollarSign className="w-5 h-5 text-purple-600" />
-                <span className="font-semibold text-purple-800">Best Premium Sale</span>
-              </div>
-              <p className="text-2xl font-bold text-purple-900">LULU</p>
-              <p className="text-sm text-purple-700">Dec 5 AMC - Iron condor, fair pricing</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filters */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Filter className="w-5 h-5 text-violet-600" />
-              Scan Filters
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="text-sm font-medium mb-2 block">Strategy Type</label>
-                <Select
-                  value={strategyFilter}
-                  onValueChange={(v: "all" | "straddle" | "strangle" | "iron-condor" | "0dte") => setStrategyFilter(v)}
-                >
-                  <SelectTrigger className="bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border shadow-lg z-50">
-                    <SelectItem value="all">All Strategies</SelectItem>
-                    <SelectItem value="straddle">Straddles Only</SelectItem>
-                    <SelectItem value="strangle">Strangles Only</SelectItem>
-                    <SelectItem value="iron-condor">Iron Condors Only</SelectItem>
-                    <SelectItem value="0dte">0DTE Plays Only</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Timeframe</label>
-                <Select value={timeframe} onValueChange={(v: "week" | "2weeks" | "month") => setTimeframe(v)}>
-                  <SelectTrigger className="bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border shadow-lg z-50">
-                    <SelectItem value="week">This Week</SelectItem>
-                    <SelectItem value="2weeks">Next 2 Weeks</SelectItem>
-                    <SelectItem value="month">This Month</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+        </CardHeader>
+        <CardContent>
+          {/* Filters */}
+          <div className="flex flex-wrap gap-4 mb-6 p-4 bg-slate-50 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-slate-500" />
+              <span className="text-sm font-medium">Filters:</span>
             </div>
-          </CardContent>
-        </Card>
+            <Select
+              value={strategyFilter}
+              onValueChange={(v: "all" | "straddle" | "strangle" | "iron-condor" | "0dte") => setStrategyFilter(v)}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Strategies</SelectItem>
+                <SelectItem value="straddle">Straddle</SelectItem>
+                <SelectItem value="strangle">Strangle</SelectItem>
+                <SelectItem value="iron-condor">Iron Condor</SelectItem>
+                <SelectItem value="0dte">0DTE</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={timeframe} onValueChange={(v: "week" | "2weeks" | "month") => setTimeframe(v)}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="week">This Week</SelectItem>
+                <SelectItem value="2weeks">Next 2 Weeks</SelectItem>
+                <SelectItem value="month">This Month</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-        {/* Results */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Upcoming Earnings Plays</CardTitle>
-                <CardDescription>{filteredPlays.length} actionable setups found</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b text-left text-sm text-muted-foreground">
-                    <th className="pb-3 font-medium">TICKER</th>
-                    <th className="pb-3 font-medium">EARNINGS</th>
-                    <th className="pb-3 font-medium">PRICE</th>
-                    <th className="pb-3 font-medium">
-                      <Tooltip>
-                        <TooltipTrigger className="flex items-center gap-1">
-                          EXP MOVE <Info className="w-3 h-3" />
-                        </TooltipTrigger>
-                        <TooltipContent>Expected Move priced into options</TooltipContent>
-                      </Tooltip>
-                    </th>
-                    <th className="pb-3 font-medium">
-                      <Tooltip>
-                        <TooltipTrigger className="flex items-center gap-1">
-                          AVG MOVE <Info className="w-3 h-3" />
-                        </TooltipTrigger>
-                        <TooltipContent>Historical average post-earnings move</TooltipContent>
-                      </Tooltip>
-                    </th>
-                    <th className="pb-3 font-medium">IV RANK</th>
-                    <th className="pb-3 font-medium">STRATEGY</th>
-                    <th className="pb-3 font-medium">DIRECTION</th>
-                    <th className="pb-3 font-medium">SIGNAL</th>
-                    <th className="pb-3 font-medium"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredPlays.map((play, idx) => (
-                    <tr key={idx} className="border-b last:border-0 hover:bg-muted/50">
-                      <td className="py-4">
-                        <div>
-                          <span className="font-semibold text-violet-600">{play.ticker}</span>
-                          <p className="text-xs text-muted-foreground">{play.company}</p>
-                        </div>
-                      </td>
-                      <td className="py-4">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-muted-foreground" />
-                          <div>
-                            <span className="font-medium">{play.earningsDate}</span>
-                            <Badge variant="outline" className="ml-2 text-xs">
-                              {play.earningsTime}
-                            </Badge>
-                          </div>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">{play.daysToEarnings} days</p>
-                      </td>
-                      <td className="py-4 font-mono">${play.price.toFixed(2)}</td>
-                      <td className="py-4">
-                        <div>
-                          <span className="font-semibold">±${play.expectedMove.toFixed(2)}</span>
-                          <p className="text-xs text-muted-foreground">±{play.expectedMovePercent}%</p>
-                        </div>
-                      </td>
-                      <td className="py-4">
-                        <span
-                          className={`font-semibold ${play.avgPostEarningsMove > play.expectedMovePercent ? "text-green-600" : "text-red-600"}`}
-                        >
-                          ±{play.avgPostEarningsMove}%
-                        </span>
-                      </td>
-                      <td className="py-4">
-                        <Badge variant={play.ivRank >= 60 ? "default" : "outline"}>{play.ivRank}%</Badge>
-                      </td>
-                      <td className="py-4">{getStrategyBadge(play.strategy)}</td>
-                      <td className="py-4">{getDirectionBadge(play.direction)}</td>
-                      <td className="py-4">{getSignalBadge(play.signal)}</td>
-                      <td className="py-4">
-                        <Button size="sm" variant="outline" className="gap-1 bg-transparent">
-                          Trade <ArrowUpRight className="w-3 h-3" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
+          )}
 
-        {/* AI Insights */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2 text-violet-700">
-              <Zap className="w-5 h-5" />
-              AI Insights: Earnings Trading Strategies
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="straddles">
-                <AccordionTrigger className="font-semibold">When to Buy Straddles</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground space-y-2">
-                  <p>
-                    Straddles profit when the stock moves more than the expected move priced into options. Look for
-                    stocks that historically move bigger than expected.
-                  </p>
-                  <div className="bg-violet-50 border border-violet-200 rounded-lg p-3 mt-2">
-                    <p className="font-medium text-violet-800">Best Candidates:</p>
-                    <ul className="text-sm text-violet-700 list-disc list-inside mt-1">
-                      <li>Historical move &gt; expected move by 20%+</li>
-                      <li>Major catalyst beyond just earnings (guidance, M&A)</li>
-                      <li>IV Rank not at extreme highs (&lt;80%)</li>
-                      <li>Liquid options with tight spreads</li>
-                    </ul>
+          {plays.length === 0 && !isLoading && (
+            <div className="text-center py-8 text-muted-foreground">
+              <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No earnings plays data loaded.</p>
+              <p className="text-sm">Click Refresh to scan for upcoming earnings opportunities.</p>
+            </div>
+          )}
+
+          <Accordion type="single" collapsible className="space-y-2">
+            {filteredPlays.map((play, idx) => (
+              <AccordionItem key={`${play.ticker}-${idx}`} value={`${play.ticker}-${idx}`}>
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center justify-between w-full pr-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-blue-100">
+                        <Calendar className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <div className="text-left">
+                        <div className="font-semibold">{play.ticker}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {play.earningsDate} {play.earningsTime}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {getSignalBadge(play.signal)}
+                      {getStrategyBadge(play.strategy)}
+                      <div className="text-right">
+                        <div className="font-semibold">{play.daysToEarnings}d</div>
+                        <div className="text-xs text-muted-foreground">±{play.expectedMovePercent.toFixed(1)}%</div>
+                      </div>
+                      <ArrowUpRight className="w-4 h-4 text-slate-400" />
+                    </div>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-lg">
+                    <div>
+                      <div className="text-xs text-muted-foreground">Company</div>
+                      <div className="font-medium">{play.company}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Price</div>
+                      <div className="font-medium">${play.price.toFixed(2)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Expected Move</div>
+                      <div className="font-medium">
+                        ±${play.expectedMove.toFixed(2)} ({play.expectedMovePercent.toFixed(1)}%)
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">IV Rank</div>
+                      <div className="font-medium">{play.ivRank}%</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Historical Beat Rate</div>
+                      <div className="font-medium">{play.historicalBeat}%</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Avg Post-Earnings Move</div>
+                      <div className="font-medium">{play.avgPostEarningsMove.toFixed(1)}%</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">ATM Straddle</div>
+                      <div className="font-medium">${play.straddlePrice.toFixed(2)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Direction</div>
+                      <div>{getDirectionBadge(play.direction)}</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <Info className="w-4 h-4 text-blue-500 mt-0.5" />
+                      <div className="text-sm text-blue-800">{play.thesis}</div>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    Data: {play.dataSource || "Finnhub + Polygon + calculated"}
                   </div>
                 </AccordionContent>
               </AccordionItem>
-              <AccordionItem value="0dte">
-                <AccordionTrigger className="font-semibold">0DTE Earnings Plays</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground space-y-2">
-                  <p>
-                    0DTE options on earnings day offer massive leverage but require strong conviction and risk
-                    management.
-                  </p>
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-2">
-                    <p className="font-medium text-yellow-800">Risk Management:</p>
-                    <ul className="text-sm text-yellow-700 list-disc list-inside mt-1">
-                      <li>Never risk more than 1% of portfolio on 0DTE</li>
-                      <li>Wait for after-hours price action to settle</li>
-                      <li>Buy ATM or slightly OTM for best risk/reward</li>
-                      <li>Set stop losses and don&apos;t chase</li>
-                    </ul>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="selling">
-                <AccordionTrigger className="font-semibold">Selling Premium Into Earnings</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground space-y-2">
-                  <p>Iron condors and strangles can profit from IV crush when stocks move less than expected.</p>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-2">
-                    <p className="font-medium text-blue-800">Best Setups:</p>
-                    <ul className="text-sm text-blue-700 list-disc list-inside mt-1">
-                      <li>Expected move &gt; historical average move</li>
-                      <li>IV Rank above 60% (rich premium)</li>
-                      <li>No major secondary catalysts</li>
-                      <li>Wide strikes for high probability</li>
-                    </ul>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-          </CardContent>
-        </Card>
-      </div>
+            ))}
+          </Accordion>
+
+          {plays.length > 0 && (
+            <div className="mt-4 pt-4 border-t text-xs text-muted-foreground flex items-center justify-between">
+              <span>Data: Finnhub (earnings calendar) + Polygon (prices/IV)</span>
+              <span>
+                {filteredPlays.length} of {plays.length} plays shown
+              </span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </TooltipProvider>
   )
 }

@@ -16,6 +16,7 @@ import { getReadableColor, getRegimeZone, sortCanaries, countActiveWarnings } fr
 import { saveCCPIToCache, loadCCPIFromCache, saveHistoryToCache } from "@/lib/ccpi/cache"
 import { REFRESH_STATUS_MESSAGES } from "@/lib/ccpi/constants"
 import { CCPIChatModal } from "./ccpi-chat-modal"
+import { RefreshButton } from "./ui/refresh-button" // Assuming RefreshButton is in ui/refresh-button.tsx
 
 interface CCPIIndicatorTooltipProps {
   title: string
@@ -549,8 +550,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 />
               </button>
             </div>
-            {/* Removed the refresh button from here to manage with cache indicator */}
-            {/* <RefreshButton onClick={fetchCCPIData} isLoading={isRefreshing} loadingText="Refreshing..." /> */}
+            <RefreshButton onClick={fetchCCPIData} isLoading={isRefreshing} />
           </div>
         </div>
 

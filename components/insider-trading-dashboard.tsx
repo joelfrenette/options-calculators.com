@@ -2,25 +2,23 @@
 
 import { useState, useMemo, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { RunScenarioInAIDialog } from "@/components/run-scenario-ai-dialog"
+import { RefreshButton } from "@/components/ui/refresh-button"
 import {
-  RefreshCw,
   TrendingUp,
   Building2,
   Landmark,
-  ArrowRight,
   AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  ArrowUpDown,
   Lightbulb,
   Target,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-  Loader2,
+  ArrowRight,
 } from "lucide-react"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
 
 interface Trade {
   date: string
@@ -152,14 +150,6 @@ const fallbackTrades: Trade[] = [
   },
 ]
 
-const fallbackVolumeData = [
-  { ticker: "AAPL", buys: 0, sells: 22 },
-  { ticker: "NVDA", buys: 0, sells: 10.2 },
-  { ticker: "META", buys: 0, sells: 43.5 },
-  { ticker: "MSFT", buys: 0.05, sells: 0 },
-  { ticker: "LMT", buys: 0.18, sells: 0 },
-]
-
 type SortField = "date" | "owner" | "ticker" | "shares" | "price" | "value" | "notes"
 type SortDirection = "asc" | "desc" | null
 
@@ -167,7 +157,6 @@ const InsiderTradingDashboard = () => {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [trades, setTrades] = useState<Trade[]>(fallbackTrades)
-  const [volumeData, setVolumeData] = useState(fallbackVolumeData)
   const [dataSource, setDataSource] = useState<string>("mock")
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [sortField, setSortField] = useState<SortField | null>(null)
@@ -180,15 +169,12 @@ const InsiderTradingDashboard = () => {
         const data = await response.json()
         if (data.success && data.transactions?.length > 0) {
           setTrades(data.transactions)
-          if (data.volumeData?.length > 0) {
-            setVolumeData(data.volumeData)
-          }
-          setDataSource(data.source || "api")
-          setLastUpdated(data.lastUpdated)
+          setDataSource(data.source || "live")
+          setLastUpdated(new Date().toLocaleString())
         }
       }
     } catch (error) {
-      console.error("[v0] Failed to fetch insider data:", error)
+      console.error("Error fetching insider trading data:", error)
     } finally {
       setIsLoading(false)
     }
@@ -225,9 +211,9 @@ const InsiderTradingDashboard = () => {
       return <ArrowUpDown className="h-3 w-3 ml-1 opacity-50" />
     }
     if (sortDirection === "asc") {
-      return <ArrowUp className="h-3 w-3 ml-1 text-[#0D9488]" />
+      return <ChevronUp className="h-3 w-3 ml-1 text-[#0D9488]" />
     }
-    return <ArrowDown className="h-3 w-3 ml-1 text-[#0D9488]" />
+    return <ChevronDown className="h-3 w-3 ml-1 text-[#0D9488]" />
   }
 
   const sortedTrades = useMemo(() => {
@@ -285,84 +271,41 @@ const InsiderTradingDashboard = () => {
     )
   }
 
-  const formatLastUpdated = () => {
-    if (!lastUpdated) return "Nov 27, 2025"
-    try {
-      return new Date(lastUpdated).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
-    } catch {
-      return "Nov 27, 2025"
-    }
-  }
-
   return (
     <div className="space-y-6">
-      {/* Hero Section */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-[#1E3A8A]">Insider & Congressional Trading Tracker</h1>
-          <p className="text-[#0D9488] mt-1">
-            Latest Disclosures (Updated: {formatLastUpdated()})
-            {dataSource === "finnhub" && (
-              <Badge variant="outline" className="ml-2 text-xs">
-                Live Data
-              </Badge>
-            )}
+          <h2 className="text-2xl font-bold text-[#1E3A8A]">Insider & Congressional Trading Tracker</h2>
+          <p className="text-sm text-muted-foreground">
+            Latest Disclosures (Updated:{" "}
+            {lastUpdated || new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+            )
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-4">
-          <Button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="bg-[#0D9488] hover:bg-[#0B7A6E] text-white"
-          >
-            {isRefreshing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-            Refresh
-          </Button>
-        </div>
+        <RefreshButton onClick={handleRefresh} isLoading={isRefreshing} loadingText="Refreshing..." />
       </div>
 
-      {/* Row 1: Weekly Volume Chart */}
-      <Card className="bg-white shadow-md border-0">
-        <CardHeader>
-          <CardTitle className="text-[#1E3A8A] flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            Weekly Buy vs. Sell Volume ($M)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[250px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={volumeData} barGap={4}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                <XAxis dataKey="ticker" tick={{ fill: "#6B7280", fontSize: 12 }} />
-                <YAxis tickFormatter={(v) => `$${v}M`} tick={{ fill: "#6B7280", fontSize: 12 }} width={60} />
-                <Tooltip
-                  formatter={(value: number) => [`$${value.toFixed(2)}M`, ""]}
-                  contentStyle={{ borderRadius: "8px", border: "1px solid #E5E7EB" }}
-                />
-                <Legend />
-                <Bar dataKey="buys" name="Buys" fill="#22C55E" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="sells" name="Sells" fill="#EF4444" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* AI Insight Banner */}
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
-        <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
-        <div>
-          <span className="font-semibold text-amber-800">Net selling in tech signals caution</span>
-          <span className="text-amber-700">—watch for IV lift on AAPL, NVDA options.</span>
+      <div className="flex items-center justify-between gap-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+        <div className="flex items-center gap-3">
+          <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />
+          <p className="text-sm text-amber-800">
+            <span className="font-semibold">Net selling in tech signals caution</span>
+            <span className="text-amber-700"> — watch for IV lift on AAPL, NVDA options.</span>
+          </p>
         </div>
+        <RunScenarioInAIDialog
+          context={{
+            type: "insider",
+            title: "Tech Insider Selling Alert",
+            details: "Net selling in tech sector signals caution. Watch for IV lift on AAPL, NVDA options.",
+          }}
+          buttonVariant="outline"
+          buttonClassName="border-amber-400 text-amber-700 hover:bg-amber-100 whitespace-nowrap"
+        />
       </div>
 
-      {/* Row 2: Trades Table */}
+      {/* Recent Insider Transactions Table */}
       <Card className="bg-white shadow-md border-0">
         <CardHeader>
           <CardTitle className="text-[#1E3A8A]">Recent Insider Transactions</CardTitle>
@@ -372,10 +315,7 @@ const InsiderTradingDashboard = () => {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-[#0D9488]" />
-              <span className="ml-3 text-gray-500">Loading insider transactions...</span>
-            </div>
+            <LoadingSpinner message="Loading insider transactions..." />
           ) : sortedTrades.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -458,7 +398,7 @@ const InsiderTradingDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Row 3: AI Insights */}
+      {/* AI Insights Section */}
       <Card className="bg-white shadow-md border-0">
         <CardHeader>
           <CardTitle className="text-[#0D9488] flex items-center gap-2">
@@ -519,7 +459,7 @@ const InsiderTradingDashboard = () => {
                     <Lightbulb className="h-4 w-4" />
                     Trading Ideas:
                   </h4>
-                  <ul className="list-disc list-inside text-blue-700 space-y-1 text-sm">
+                  <ul className="text-blue-700 text-sm space-y-1">
                     <li>Defense sector may see continued interest</li>
                     <li>Energy plays suggest confidence in oil prices</li>
                     <li>Consider bull call spreads on LMT, XOM</li>

@@ -1,14 +1,26 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
-import { RefreshCw, Flame, TrendingUp, TrendingDown, Zap, Filter, ArrowUpRight, Info, Activity } from "lucide-react"
+import {
+  RefreshCw,
+  Flame,
+  TrendingUp,
+  TrendingDown,
+  Filter,
+  ArrowUpRight,
+  Info,
+  Activity,
+  Loader2,
+  Wifi,
+  WifiOff,
+} from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { TooltipProvider } from "@/components/ui/tooltip"
 
 interface IVCandidate {
   ticker: string
@@ -23,115 +35,33 @@ interface IVCandidate {
   daysToEvent: number | null
   recommendation: "sell-premium" | "buy-premium" | "neutral"
   reason: string
+  dataSource?: string
+  isLive?: boolean
 }
-
-const MOCK_CANDIDATES: IVCandidate[] = [
-  {
-    ticker: "MARA",
-    company: "Marathon Digital",
-    price: 24.5,
-    ivRank: 92,
-    ivPercentile: 95,
-    currentIV: 125,
-    historicalIV: 85,
-    hvRatio: 1.47,
-    catalyst: "Bitcoin volatility",
-    daysToEvent: null,
-    recommendation: "sell-premium",
-    reason: "Extreme IV with no immediate catalyst - premium selling opportunity",
-  },
-  {
-    ticker: "SMCI",
-    company: "Super Micro Computer",
-    price: 32.0,
-    ivRank: 88,
-    ivPercentile: 91,
-    currentIV: 145,
-    historicalIV: 95,
-    hvRatio: 1.53,
-    catalyst: "Audit concerns",
-    daysToEvent: null,
-    recommendation: "sell-premium",
-    reason: "Elevated uncertainty IV, iron condors attractive",
-  },
-  {
-    ticker: "RIVN",
-    company: "Rivian Automotive",
-    price: 11.5,
-    ivRank: 78,
-    ivPercentile: 82,
-    currentIV: 95,
-    historicalIV: 72,
-    hvRatio: 1.32,
-    catalyst: "Earnings Dec 5",
-    daysToEvent: 8,
-    recommendation: "neutral",
-    reason: "IV elevated but earnings approaching - wait or play the event",
-  },
-  {
-    ticker: "GME",
-    company: "GameStop Corp",
-    price: 27.0,
-    ivRank: 72,
-    ivPercentile: 78,
-    currentIV: 85,
-    historicalIV: 65,
-    hvRatio: 1.31,
-    catalyst: null,
-    daysToEvent: null,
-    recommendation: "sell-premium",
-    reason: "Meme stock premium still elevated, sell OTM strangles",
-  },
-  {
-    ticker: "TSLA",
-    company: "Tesla Inc",
-    price: 342.0,
-    ivRank: 68,
-    ivPercentile: 72,
-    currentIV: 62,
-    historicalIV: 48,
-    hvRatio: 1.29,
-    catalyst: null,
-    daysToEvent: null,
-    recommendation: "sell-premium",
-    reason: "Post-election IV still elevated, mean reversion expected",
-  },
-  {
-    ticker: "NVDA",
-    company: "NVIDIA Corp",
-    price: 475.0,
-    ivRank: 45,
-    ivPercentile: 52,
-    currentIV: 48,
-    historicalIV: 45,
-    hvRatio: 1.07,
-    catalyst: "Blackwell ramp",
-    daysToEvent: null,
-    recommendation: "neutral",
-    reason: "IV fair value - no edge for premium sellers",
-  },
-  {
-    ticker: "SPY",
-    company: "SPDR S&P 500",
-    price: 598.0,
-    ivRank: 22,
-    ivPercentile: 28,
-    currentIV: 12,
-    historicalIV: 15,
-    hvRatio: 0.8,
-    catalyst: null,
-    daysToEvent: null,
-    recommendation: "buy-premium",
-    reason: "Historically low IV - buy protection or long straddles",
-  },
-]
 
 export function HighIVWatchlist() {
   const [minIvRank, setMinIvRank] = useState([50])
   const [sortBy, setSortBy] = useState<"ivRank" | "ivPercentile" | "hvRatio">("ivRank")
   const [showOnly, setShowOnly] = useState<"all" | "sell" | "buy">("all")
   const [isLoading, setIsLoading] = useState(false)
-  const [candidates, setCandidates] = useState<IVCandidate[]>(MOCK_CANDIDATES)
+  const [candidates, setCandidates] = useState<IVCandidate[]>([])
+  const [isLiveData, setIsLiveData] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const cached = localStorage.getItem("high-iv-watchlist-cache")
+    if (cached) {
+      try {
+        const { data, timestamp, isLive } = JSON.parse(cached)
+        setCandidates(data)
+        setLastUpdated(timestamp)
+        setIsLiveData(isLive)
+      } catch {
+        // Invalid cache
+      }
+    }
+  }, [])
 
   const filteredCandidates = candidates
     .filter((c) => {
@@ -146,9 +76,41 @@ export function HighIVWatchlist() {
       return b.hvRatio - a.hvRatio
     })
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setIsLoading(true)
-    setTimeout(() => setIsLoading(false), 1500)
+    setError(null)
+
+    try {
+      const response = await fetch("/api/strategy-scanner?type=high-iv")
+
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (data.highIV && data.highIV.length > 0) {
+        setCandidates(data.highIV)
+        setIsLiveData(data.isLive === true)
+        setLastUpdated(new Date().toISOString())
+
+        localStorage.setItem(
+          "high-iv-watchlist-cache",
+          JSON.stringify({
+            data: data.highIV,
+            timestamp: new Date().toISOString(),
+            isLive: data.isLive === true,
+          }),
+        )
+      } else {
+        setError("No high IV candidates found")
+      }
+    } catch (err) {
+      console.error("[High IV Watchlist] Fetch error:", err)
+      setError("Failed to fetch live data")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const getRecommendationBadge = (rec: string) => {
@@ -169,7 +131,7 @@ export function HighIVWatchlist() {
         )
       default:
         return (
-          <Badge className="bg-gray-100 text-gray-800 border-gray-300">
+          <Badge className="bg-slate-100 text-slate-800 border-slate-300">
             <Activity className="w-3 h-3 mr-1" />
             Neutral
           </Badge>
@@ -177,282 +139,174 @@ export function HighIVWatchlist() {
     }
   }
 
-  const getIVRankColor = (rank: number) => {
-    if (rank >= 80) return "text-red-600 bg-red-50"
-    if (rank >= 50) return "text-orange-600 bg-orange-50"
-    if (rank >= 30) return "text-yellow-600 bg-yellow-50"
-    return "text-green-600 bg-green-50"
+  const getIVRankColor = (ivRank: number) => {
+    if (ivRank >= 80) return "text-red-600"
+    if (ivRank >= 60) return "text-orange-500"
+    if (ivRank >= 40) return "text-yellow-500"
+    if (ivRank >= 20) return "text-green-500"
+    return "text-blue-500"
   }
 
   return (
     <TooltipProvider>
-      <div className="space-y-6">
-        {/* Hero Section */}
-        <div className="bg-gradient-to-r from-red-600 to-orange-500 rounded-xl p-6 text-white">
+      <Card>
+        <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Flame className="w-6 h-6" />
-                <h1 className="text-2xl font-bold">High IV Rank Watchlist</h1>
-              </div>
-              <p className="text-red-100">Track elevated implied volatility for premium selling opportunities</p>
+              <CardTitle className="flex items-center gap-2">
+                <Flame className="w-5 h-5 text-orange-500" />
+                High IV Watchlist
+                {isLiveData ? (
+                  <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-300">
+                    <Wifi className="w-3 h-3 mr-1" />
+                    LIVE
+                  </Badge>
+                ) : candidates.length > 0 ? (
+                  <Badge variant="outline" className="ml-2 bg-yellow-50 text-yellow-700 border-yellow-300">
+                    <WifiOff className="w-3 h-3 mr-1" />
+                    Cached
+                  </Badge>
+                ) : null}
+              </CardTitle>
+              <CardDescription>
+                Stocks with elevated implied volatility for premium selling
+                {lastUpdated && (
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    Updated: {new Date(lastUpdated).toLocaleTimeString()}
+                  </span>
+                )}
+              </CardDescription>
             </div>
-            <Button onClick={handleRefresh} variant="secondary" disabled={isLoading}>
-              <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-              Refresh
+            <Button onClick={handleRefresh} disabled={isLoading} size="sm">
+              {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+              {isLoading ? "Scanning..." : "Refresh"}
             </Button>
           </div>
-        </div>
-
-        {/* Key Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="bg-red-50 border-red-200">
-            <CardContent className="p-4 text-center">
-              <p className="text-sm text-red-700 font-medium">Extreme IV (80%+)</p>
-              <p className="text-2xl font-bold text-red-800">{candidates.filter((c) => c.ivRank >= 80).length}</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-orange-50 border-orange-200">
-            <CardContent className="p-4 text-center">
-              <p className="text-sm text-orange-700 font-medium">Elevated IV (50-80%)</p>
-              <p className="text-2xl font-bold text-orange-800">
-                {candidates.filter((c) => c.ivRank >= 50 && c.ivRank < 80).length}
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="bg-green-50 border-green-200">
-            <CardContent className="p-4 text-center">
-              <p className="text-sm text-green-700 font-medium">Low IV (&lt;30%)</p>
-              <p className="text-2xl font-bold text-green-800">{candidates.filter((c) => c.ivRank < 30).length}</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-blue-50 border-blue-200">
-            <CardContent className="p-4 text-center">
-              <p className="text-sm text-blue-700 font-medium">Upcoming Catalysts</p>
-              <p className="text-2xl font-bold text-blue-800">{candidates.filter((c) => c.catalyst).length}</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filters */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Filter className="w-5 h-5 text-red-600" />
-              Filters
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <label className="text-sm font-medium mb-2 block">Min IV Rank: {minIvRank[0]}%</label>
-                <Slider value={minIvRank} onValueChange={setMinIvRank} min={0} max={90} step={5} className="mt-3" />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Sort By</label>
-                <Select value={sortBy} onValueChange={(v: "ivRank" | "ivPercentile" | "hvRatio") => setSortBy(v)}>
-                  <SelectTrigger className="bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border shadow-lg z-50">
-                    <SelectItem value="ivRank">IV Rank</SelectItem>
-                    <SelectItem value="ivPercentile">IV Percentile</SelectItem>
-                    <SelectItem value="hvRatio">IV/HV Ratio</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Show Only</label>
-                <Select value={showOnly} onValueChange={(v: "all" | "sell" | "buy") => setShowOnly(v)}>
-                  <SelectTrigger className="bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border shadow-lg z-50">
-                    <SelectItem value="all">All Stocks</SelectItem>
-                    <SelectItem value="sell">Sell Premium Candidates</SelectItem>
-                    <SelectItem value="buy">Buy Premium Candidates</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+        </CardHeader>
+        <CardContent>
+          {/* Filters */}
+          <div className="flex flex-wrap gap-4 mb-6 p-4 bg-slate-50 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-slate-500" />
+              <span className="text-sm font-medium">Filters:</span>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Results */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>IV Watchlist</CardTitle>
-                <CardDescription>{filteredCandidates.length} stocks with notable IV levels</CardDescription>
-              </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-600">Min IV Rank:</span>
+              <Slider value={minIvRank} onValueChange={setMinIvRank} min={0} max={90} step={10} className="w-24" />
+              <span className="text-sm font-medium w-8">{minIvRank[0]}%</span>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b text-left text-sm text-muted-foreground">
-                    <th className="pb-3 font-medium">TICKER</th>
-                    <th className="pb-3 font-medium">PRICE</th>
-                    <th className="pb-3 font-medium">
-                      <Tooltip>
-                        <TooltipTrigger className="flex items-center gap-1">
-                          IV RANK <Info className="w-3 h-3" />
-                        </TooltipTrigger>
-                        <TooltipContent>Current IV vs 52-week range</TooltipContent>
-                      </Tooltip>
-                    </th>
-                    <th className="pb-3 font-medium">
-                      <Tooltip>
-                        <TooltipTrigger className="flex items-center gap-1">
-                          IV %ILE <Info className="w-3 h-3" />
-                        </TooltipTrigger>
-                        <TooltipContent>% of days IV was lower</TooltipContent>
-                      </Tooltip>
-                    </th>
-                    <th className="pb-3 font-medium">CURRENT IV</th>
-                    <th className="pb-3 font-medium">
-                      <Tooltip>
-                        <TooltipTrigger className="flex items-center gap-1">
-                          IV/HV <Info className="w-3 h-3" />
-                        </TooltipTrigger>
-                        <TooltipContent>Implied vs Historical Volatility</TooltipContent>
-                      </Tooltip>
-                    </th>
-                    <th className="pb-3 font-medium">CATALYST</th>
-                    <th className="pb-3 font-medium">ACTION</th>
-                    <th className="pb-3 font-medium"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCandidates.map((candidate, idx) => (
-                    <tr key={idx} className="border-b last:border-0 hover:bg-muted/50">
-                      <td className="py-4">
-                        <div>
-                          <span className="font-semibold text-red-600">{candidate.ticker}</span>
-                          <p className="text-xs text-muted-foreground">{candidate.company}</p>
+            <Select value={sortBy} onValueChange={(v: "ivRank" | "ivPercentile" | "hvRatio") => setSortBy(v)}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ivRank">IV Rank</SelectItem>
+                <SelectItem value="ivPercentile">IV Percentile</SelectItem>
+                <SelectItem value="hvRatio">HV Ratio</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={showOnly} onValueChange={(v: "all" | "sell" | "buy") => setShowOnly(v)}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Show" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="sell">Sell Premium</SelectItem>
+                <SelectItem value="buy">Buy Premium</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
+          )}
+
+          {candidates.length === 0 && !isLoading && (
+            <div className="text-center py-8 text-muted-foreground">
+              <Flame className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No IV watchlist data loaded.</p>
+              <p className="text-sm">Click Refresh to scan for high IV opportunities.</p>
+            </div>
+          )}
+
+          <Accordion type="single" collapsible className="space-y-2">
+            {filteredCandidates.map((candidate, idx) => (
+              <AccordionItem key={`${candidate.ticker}-${idx}`} value={`${candidate.ticker}-${idx}`}>
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center justify-between w-full pr-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-orange-100">
+                        <Flame className="w-4 h-4 text-orange-600" />
+                      </div>
+                      <div className="text-left">
+                        <div className="font-semibold">{candidate.ticker}</div>
+                        <div className="text-xs text-muted-foreground">${candidate.price.toFixed(2)}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      {getRecommendationBadge(candidate.recommendation)}
+                      <div className="text-right">
+                        <div className={`font-semibold ${getIVRankColor(candidate.ivRank)}`}>
+                          {candidate.ivRank}% IV Rank
                         </div>
-                      </td>
-                      <td className="py-4 font-mono">${candidate.price.toFixed(2)}</td>
-                      <td className="py-4">
-                        <Badge className={`font-bold ${getIVRankColor(candidate.ivRank)}`}>{candidate.ivRank}%</Badge>
-                      </td>
-                      <td className="py-4">
-                        <Badge variant="outline">{candidate.ivPercentile}%</Badge>
-                      </td>
-                      <td className="py-4 font-mono">{candidate.currentIV}%</td>
-                      <td className="py-4">
-                        <span
-                          className={`font-semibold ${candidate.hvRatio >= 1.2 ? "text-red-600" : candidate.hvRatio <= 0.9 ? "text-green-600" : "text-muted-foreground"}`}
-                        >
-                          {candidate.hvRatio.toFixed(2)}x
-                        </span>
-                      </td>
-                      <td className="py-4">
-                        {candidate.catalyst ? (
-                          <div>
-                            <span className="text-sm font-medium">{candidate.catalyst}</span>
-                            {candidate.daysToEvent && (
-                              <p className="text-xs text-muted-foreground">{candidate.daysToEvent} days</p>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">None</span>
-                        )}
-                      </td>
-                      <td className="py-4">{getRecommendationBadge(candidate.recommendation)}</td>
-                      <td className="py-4">
-                        <Button size="sm" variant="outline" className="gap-1 bg-transparent">
-                          Analyze <ArrowUpRight className="w-3 h-3" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+                        <div className="text-xs text-muted-foreground">{candidate.hvRatio.toFixed(2)}x HV</div>
+                      </div>
+                      <ArrowUpRight className="w-4 h-4 text-slate-400" />
+                    </div>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-lg">
+                    <div>
+                      <div className="text-xs text-muted-foreground">Company</div>
+                      <div className="font-medium">{candidate.company}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Current IV</div>
+                      <div className="font-medium">{candidate.currentIV}%</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Historical IV</div>
+                      <div className="font-medium">{candidate.historicalIV}%</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">IV Percentile</div>
+                      <div className="font-medium">{candidate.ivPercentile}%</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Catalyst</div>
+                      <div className="font-medium">{candidate.catalyst || "None"}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Days to Event</div>
+                      <div className="font-medium">{candidate.daysToEvent ?? "N/A"}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Data Source</div>
+                      <div className="font-medium text-xs">{candidate.dataSource || "API"}</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 p-3 bg-orange-50 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <Info className="w-4 h-4 text-orange-500 mt-0.5" />
+                      <div className="text-sm text-orange-800">{candidate.reason}</div>
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
 
-        {/* AI Insights */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2 text-red-700">
-              <Zap className="w-5 h-5" />
-              AI Insights: IV Analysis
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="iv-basics">
-                <AccordionTrigger className="font-semibold">Understanding IV Rank vs IV Percentile</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground space-y-2">
-                  <p>
-                    <strong>IV Rank</strong> tells you where current IV sits within the 52-week high/low range.{" "}
-                    <strong>IV Percentile</strong> tells you what percentage of days had lower IV.
-                  </p>
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 mt-2">
-                    <p className="font-medium text-red-800">Key Insight:</p>
-                    <p className="text-sm text-red-700 mt-1">
-                      IV Percentile is often more reliable because IV Rank can be skewed by a single extreme day. Use
-                      both together for confirmation.
-                    </p>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="selling-strategies">
-                <AccordionTrigger className="font-semibold">High IV Selling Strategies</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground space-y-2">
-                  <p>When IV Rank is above 50%, selling premium has a statistical edge as IV typically mean-reverts.</p>
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mt-2">
-                    <p className="font-medium text-orange-800">Best Strategies:</p>
-                    <ul className="text-sm text-orange-700 list-disc list-inside mt-1">
-                      <li>
-                        <strong>Iron Condors:</strong> Neutral outlook, range-bound expected
-                      </li>
-                      <li>
-                        <strong>Short Strangles:</strong> Higher risk, higher reward (naked)
-                      </li>
-                      <li>
-                        <strong>Credit Spreads:</strong> Directional bias with defined risk
-                      </li>
-                      <li>
-                        <strong>Cash-Secured Puts:</strong> Bullish, willing to own stock
-                      </li>
-                    </ul>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="low-iv">
-                <AccordionTrigger className="font-semibold">Low IV Buying Opportunities</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground space-y-2">
-                  <p>When IV Rank is below 30%, options are cheap relative to history - consider buying strategies.</p>
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-2">
-                    <p className="font-medium text-green-800">Best Strategies:</p>
-                    <ul className="text-sm text-green-700 list-disc list-inside mt-1">
-                      <li>
-                        <strong>Long Straddles:</strong> Expecting big move, unsure of direction
-                      </li>
-                      <li>
-                        <strong>Calendar Spreads:</strong> Buy far-dated, sell near-dated
-                      </li>
-                      <li>
-                        <strong>Protective Puts:</strong> Cheap portfolio insurance
-                      </li>
-                      <li>
-                        <strong>LEAPS:</strong> Long-term bullish positions at discount
-                      </li>
-                    </ul>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-          </CardContent>
-        </Card>
-      </div>
+          {candidates.length > 0 && (
+            <div className="mt-4 pt-4 border-t text-xs text-muted-foreground flex items-center justify-between">
+              <span>Data: Polygon.io (options) + Finnhub (profiles)</span>
+              <span>
+                {filteredCandidates.length} of {candidates.length} candidates shown
+              </span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </TooltipProvider>
   )
 }
-
-export default HighIVWatchlist

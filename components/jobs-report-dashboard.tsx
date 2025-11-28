@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import {
-  RefreshCw,
   TrendingUp,
   AlertTriangle,
   ChevronDown,
@@ -13,7 +12,7 @@ import {
   DollarSign,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { RefreshButton } from "@/components/ui/refresh-button"
 import {
   LineChart,
   Line,
@@ -102,14 +101,8 @@ export function JobsReportDashboard() {
               Latest Unemployment Data & Insights (Updated: Nov 2025)
             </p>
           </div>
-          <Button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="bg-[#0D9488] hover:bg-[#0F766E] text-white gap-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-            {refreshing ? "Refreshing..." : "Refresh Data"}
-          </Button>
+          {/* Replace Button with RefreshButton */}
+          <RefreshButton onClick={handleRefresh} isLoading={refreshing} />
         </div>
       </div>
 

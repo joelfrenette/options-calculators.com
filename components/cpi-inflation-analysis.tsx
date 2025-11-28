@@ -6,6 +6,7 @@ import { RefreshButton } from "@/components/ui/refresh-button"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
 
 interface CPIData {
   currentCPI: number
@@ -94,8 +95,7 @@ export function CpiInflationAnalysis() {
     return (
       <div className="container mx-auto p-4 max-w-7xl space-y-6">
         <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          <p className="mt-4 text-gray-600">Loading CPI inflation data...</p>
+          <LoadingSpinner message="Loading CPI inflation data..." />
         </div>
       </div>
     )
@@ -158,12 +158,7 @@ export function CpiInflationAnalysis() {
               >
                 {showCalculations ? "Hide" : "Show"} Calculations
               </button>
-              <RefreshButton
-                onClick={fetchCPIData}
-                isLoading={loading}
-                variant="default"
-                className="bg-primary hover:bg-primary/90"
-              />
+              <RefreshButton onClick={fetchCPIData} isLoading={loading} />
             </div>
           </div>
         </CardHeader>

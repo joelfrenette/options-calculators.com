@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
 // import {
 //   Activity,
 //   TrendingUp,
@@ -1066,26 +1067,13 @@ export function MarketSentiment() {
     ]
   }
 
+  // CHANGE: Replace custom loading spinner with LoadingSpinner
   if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 gap-4">
-        <div className="relative">
-          <div className="w-12 h-12 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin"></div>
-        </div>
-        <div className="text-gray-600 font-medium">Loading Fear & Greed Index data...</div>
-      </div>
-    )
+    return <LoadingSpinner message="Loading Fear & Greed Index data..." />
   }
 
   if (!marketData) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 gap-4">
-        <div className="relative">
-          <div className="w-12 h-12 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin"></div>
-        </div>
-        <div className="text-gray-600 font-medium">Loading market data...</div>
-      </div>
-    )
+    return <LoadingSpinner message="Loading market data..." />
   }
 
   const recommendations = getTradeRecommendations(marketData.overallScore)
@@ -1127,7 +1115,7 @@ export function MarketSentiment() {
                 Visual representation of sentiment zones from extreme greed to extreme fear
               </p>
             </div>
-            <RefreshButton onClick={handleRefresh} loading={refreshing} />
+            <RefreshButton onClick={handleRefresh} isLoading={refreshing} />
           </div>
         </CardHeader>
         <CardContent className="pt-6">

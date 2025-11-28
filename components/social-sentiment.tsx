@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import {
   Dialog,
   DialogContent,
@@ -23,11 +23,11 @@ import {
   Sparkles,
   MessageSquare,
   Send,
-  Loader2,
   ArrowUpRight,
   ArrowDownRight,
   Minus,
   Database,
+  Loader2,
 } from "lucide-react"
 
 interface SocialSentimentData {
@@ -326,6 +326,7 @@ export function SocialSentiment() {
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [loadingSource, setLoadingSource] = useState("")
   const [isFromCache, setIsFromCache] = useState(false)
+  const [needsInitialFetch, setNeedsInitialFetch] = useState(false)
 
   const CACHE_KEY = "social_sentiment_cache_v6"
   const CACHE_TIMESTAMP_KEY = "social_sentiment_cache_timestamp_v6"
@@ -397,9 +398,22 @@ export function SocialSentiment() {
         setData(JSON.parse(cached))
         setLastUpdated(cacheTimestamp ? new Date(Number.parseInt(cacheTimestamp)) : null)
         setIsFromCache(true)
-      } catch {}
+      } catch {
+        // Cache parse failed, need to fetch
+        setNeedsInitialFetch(true)
+      }
+    } else {
+      // No cache exists, need to fetch
+      setNeedsInitialFetch(true)
     }
   }, [])
+
+  useEffect(() => {
+    if (needsInitialFetch && !loading) {
+      fetchSentiment()
+      setNeedsInitialFetch(false)
+    }
+  }, [needsInitialFetch, loading, fetchSentiment])
 
   const handleRefresh = () => {
     fetchSentiment()
@@ -413,28 +427,7 @@ export function SocialSentiment() {
   return (
     <TooltipProvider>
       <div className="space-y-6">
-        {loading && (
-          <Card className="shadow-lg border-teal-200 bg-gradient-to-br from-teal-50 to-white">
-            <CardContent className="py-8">
-              <div className="flex flex-col items-center gap-4">
-                <div className="relative">
-                  <Loader2 className="h-12 w-12 text-teal-600 animate-spin" />
-                  <Database className="h-5 w-5 text-teal-700 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-                </div>
-                <div className="text-center">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">Loading Sentiment Data</h3>
-                  <p className="text-sm text-teal-600 font-medium">{loadingSource}</p>
-                </div>
-                <div className="w-full max-w-md">
-                  <Progress value={loadingProgress} className="h-3" />
-                  <p className="text-xs text-gray-500 text-center mt-2">
-                    {Math.round(loadingProgress)}% - Fetching from {data.sources_total || 10} data sources
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {loading && <LoadingSpinner message="Loading social sentiment data..." size="lg" />}
 
         <Card className="shadow-sm border-gray-200">
           <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">

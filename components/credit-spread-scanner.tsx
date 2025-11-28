@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -17,9 +17,12 @@ import {
   AlertTriangle,
   CheckCircle2,
   Info,
+  Loader2,
+  Wifi,
+  WifiOff,
 } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { TooltipProvider } from "@/components/ui/tooltip"
 
 interface SpreadSetup {
   ticker: string
@@ -37,119 +40,33 @@ interface SpreadSetup {
   riskReward: string
   signal: "strong" | "moderate" | "speculative"
   reason: string
+  dataSource?: string
+  isLive?: boolean
 }
-
-const MOCK_SETUPS: SpreadSetup[] = [
-  {
-    ticker: "AAPL",
-    company: "Apple Inc",
-    type: "bull-put",
-    shortStrike: 180,
-    longStrike: 175,
-    expiration: "Dec 20",
-    dte: 23,
-    credit: 0.85,
-    maxLoss: 4.15,
-    probability: 78,
-    ivRank: 42,
-    delta: -0.18,
-    riskReward: "1:4.9",
-    signal: "strong",
-    reason: "Strong support at $180, earnings behind us, low IV crush risk",
-  },
-  {
-    ticker: "MSFT",
-    company: "Microsoft Corp",
-    type: "bull-put",
-    shortStrike: 410,
-    longStrike: 405,
-    expiration: "Dec 20",
-    dte: 23,
-    credit: 0.72,
-    maxLoss: 4.28,
-    probability: 82,
-    ivRank: 35,
-    delta: -0.15,
-    riskReward: "1:5.9",
-    signal: "strong",
-    reason: "AI momentum intact, cloud growth accelerating",
-  },
-  {
-    ticker: "NVDA",
-    company: "NVIDIA Corp",
-    type: "bear-call",
-    shortStrike: 520,
-    longStrike: 525,
-    expiration: "Dec 13",
-    dte: 16,
-    credit: 1.15,
-    maxLoss: 3.85,
-    probability: 68,
-    ivRank: 65,
-    delta: 0.28,
-    riskReward: "1:3.3",
-    signal: "moderate",
-    reason: "Elevated IV after earnings, resistance at $520",
-  },
-  {
-    ticker: "SPY",
-    company: "SPDR S&P 500",
-    type: "bull-put",
-    shortStrike: 580,
-    longStrike: 575,
-    expiration: "Dec 20",
-    dte: 23,
-    credit: 0.65,
-    maxLoss: 4.35,
-    probability: 85,
-    ivRank: 28,
-    delta: -0.12,
-    riskReward: "1:6.7",
-    signal: "strong",
-    reason: "Broad market strength, Santa rally seasonality",
-  },
-  {
-    ticker: "TSLA",
-    company: "Tesla Inc",
-    type: "bear-call",
-    shortStrike: 360,
-    longStrike: 365,
-    expiration: "Dec 13",
-    dte: 16,
-    credit: 1.45,
-    maxLoss: 3.55,
-    probability: 62,
-    ivRank: 72,
-    delta: 0.32,
-    riskReward: "1:2.4",
-    signal: "speculative",
-    reason: "High IV, resistance zone, but momentum strong",
-  },
-  {
-    ticker: "AMD",
-    company: "AMD Inc",
-    type: "bull-put",
-    shortStrike: 135,
-    longStrike: 130,
-    expiration: "Dec 20",
-    dte: 23,
-    credit: 0.92,
-    maxLoss: 4.08,
-    probability: 74,
-    ivRank: 48,
-    delta: -0.22,
-    riskReward: "1:4.4",
-    signal: "moderate",
-    reason: "AI chip demand, support at $135",
-  },
-]
 
 export function CreditSpreadScanner() {
   const [spreadType, setSpreadType] = useState<"all" | "bull-put" | "bear-call">("all")
   const [minProbability, setMinProbability] = useState([70])
   const [maxDte, setMaxDte] = useState([45])
   const [isLoading, setIsLoading] = useState(false)
-  const [setups, setSetups] = useState<SpreadSetup[]>(MOCK_SETUPS)
+  const [setups, setSetups] = useState<SpreadSetup[]>([])
+  const [isLiveData, setIsLiveData] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const cached = localStorage.getItem("credit-spread-scanner-cache")
+    if (cached) {
+      try {
+        const { data, timestamp, isLive } = JSON.parse(cached)
+        setSetups(data)
+        setLastUpdated(timestamp)
+        setIsLiveData(isLive)
+      } catch {
+        // Invalid cache, will fetch fresh
+      }
+    }
+  }, [])
 
   const filteredSetups = setups.filter((s) => {
     if (spreadType !== "all" && s.type !== spreadType) return false
@@ -158,9 +75,41 @@ export function CreditSpreadScanner() {
     return true
   })
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setIsLoading(true)
-    setTimeout(() => setIsLoading(false), 1500)
+    setError(null)
+
+    try {
+      const response = await fetch("/api/strategy-scanner?type=credit-spreads")
+
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (data.creditSpreads && data.creditSpreads.length > 0) {
+        setSetups(data.creditSpreads)
+        setIsLiveData(data.isLive === true)
+        setLastUpdated(new Date().toISOString())
+
+        localStorage.setItem(
+          "credit-spread-scanner-cache",
+          JSON.stringify({
+            data: data.creditSpreads,
+            timestamp: new Date().toISOString(),
+            isLive: data.isLive === true,
+          }),
+        )
+      } else {
+        setError("No setups found matching criteria")
+      }
+    } catch (err) {
+      console.error("[Credit Spread Scanner] Fetch error:", err)
+      setError("Failed to fetch live data. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const getSignalBadge = (signal: string) => {
@@ -191,239 +140,175 @@ export function CreditSpreadScanner() {
 
   return (
     <TooltipProvider>
-      <div className="space-y-6">
-        {/* Hero Section */}
-        <div className="bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl p-6 text-white">
+      <Card>
+        <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Target className="w-6 h-6" />
-                <h1 className="text-2xl font-bold">Credit Spread Scanner</h1>
-              </div>
-              <p className="text-blue-100">
-                Find high-probability bull put and bear call spreads with optimal risk/reward
-              </p>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="w-5 h-5 text-blue-500" />
+                Credit Spread Scanner
+                {isLiveData ? (
+                  <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-300">
+                    <Wifi className="w-3 h-3 mr-1" />
+                    LIVE
+                  </Badge>
+                ) : setups.length > 0 ? (
+                  <Badge variant="outline" className="ml-2 bg-yellow-50 text-yellow-700 border-yellow-300">
+                    <WifiOff className="w-3 h-3 mr-1" />
+                    Cached
+                  </Badge>
+                ) : null}
+              </CardTitle>
+              <CardDescription>
+                High-probability bull put and bear call spreads
+                {lastUpdated && (
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    Updated: {new Date(lastUpdated).toLocaleTimeString()}
+                  </span>
+                )}
+              </CardDescription>
             </div>
-            <Button onClick={handleRefresh} variant="secondary" disabled={isLoading}>
-              <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-              Scan Now
+            <Button onClick={handleRefresh} disabled={isLoading} size="sm">
+              {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+              {isLoading ? "Scanning..." : "Refresh"}
             </Button>
           </div>
-        </div>
-
-        {/* Filters */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Filter className="w-5 h-5 text-blue-600" />
-              Scan Filters
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <label className="text-sm font-medium mb-2 block">Spread Type</label>
-                <Select value={spreadType} onValueChange={(v: "all" | "bull-put" | "bear-call") => setSpreadType(v)}>
-                  <SelectTrigger className="bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border shadow-lg z-50">
-                    <SelectItem value="all">All Spreads</SelectItem>
-                    <SelectItem value="bull-put">Bull Put (Bullish)</SelectItem>
-                    <SelectItem value="bear-call">Bear Call (Bearish)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Min Probability: {minProbability[0]}%</label>
-                <Slider
-                  value={minProbability}
-                  onValueChange={setMinProbability}
-                  min={50}
-                  max={90}
-                  step={5}
-                  className="mt-3"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Max DTE: {maxDte[0]} days</label>
-                <Slider value={maxDte} onValueChange={setMaxDte} min={7} max={60} step={1} className="mt-3" />
-              </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-4 mb-6 p-4 bg-slate-50 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-slate-500" />
+              <span className="text-sm font-medium">Filters:</span>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Results */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Top Credit Spread Setups</CardTitle>
-                <CardDescription>{filteredSetups.length} setups match your criteria</CardDescription>
-              </div>
-              <div className="flex gap-2">
-                <Badge variant="outline" className="gap-1">
-                  <TrendingUp className="w-3 h-3 text-green-600" />
-                  Bull Put
-                </Badge>
-                <Badge variant="outline" className="gap-1">
-                  <TrendingDown className="w-3 h-3 text-red-600" />
-                  Bear Call
-                </Badge>
-              </div>
+            <Select value={spreadType} onValueChange={(v: "all" | "bull-put" | "bear-call") => setSpreadType(v)}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="bull-put">Bull Put</SelectItem>
+                <SelectItem value="bear-call">Bear Call</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-600">Min Prob:</span>
+              <Slider
+                value={minProbability}
+                onValueChange={setMinProbability}
+                min={50}
+                max={90}
+                step={5}
+                className="w-24"
+              />
+              <span className="text-sm font-medium w-8">{minProbability[0]}%</span>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b text-left text-sm text-muted-foreground">
-                    <th className="pb-3 font-medium">TICKER</th>
-                    <th className="pb-3 font-medium">TYPE</th>
-                    <th className="pb-3 font-medium">STRIKES</th>
-                    <th className="pb-3 font-medium">EXP</th>
-                    <th className="pb-3 font-medium">CREDIT</th>
-                    <th className="pb-3 font-medium">MAX LOSS</th>
-                    <th className="pb-3 font-medium">
-                      <Tooltip>
-                        <TooltipTrigger className="flex items-center gap-1">
-                          POP <Info className="w-3 h-3" />
-                        </TooltipTrigger>
-                        <TooltipContent>Probability of Profit</TooltipContent>
-                      </Tooltip>
-                    </th>
-                    <th className="pb-3 font-medium">IV RANK</th>
-                    <th className="pb-3 font-medium">SIGNAL</th>
-                    <th className="pb-3 font-medium"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredSetups.map((setup, idx) => (
-                    <tr key={idx} className="border-b last:border-0 hover:bg-muted/50">
-                      <td className="py-4">
-                        <div>
-                          <span className="font-semibold text-blue-600">{setup.ticker}</span>
-                          <p className="text-xs text-muted-foreground">{setup.company}</p>
-                        </div>
-                      </td>
-                      <td className="py-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-600">Max DTE:</span>
+              <Slider value={maxDte} onValueChange={setMaxDte} min={7} max={60} step={7} className="w-24" />
+              <span className="text-sm font-medium w-8">{maxDte[0]}d</span>
+            </div>
+          </div>
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
+          )}
+
+          {setups.length === 0 && !isLoading && (
+            <div className="text-center py-8 text-muted-foreground">
+              <Target className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No credit spread data loaded.</p>
+              <p className="text-sm">Click Refresh to scan for opportunities.</p>
+            </div>
+          )}
+
+          <Accordion type="single" collapsible className="space-y-2">
+            {filteredSetups.map((setup, idx) => (
+              <AccordionItem key={`${setup.ticker}-${setup.type}-${idx}`} value={`${setup.ticker}-${idx}`}>
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center justify-between w-full pr-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${setup.type === "bull-put" ? "bg-green-100" : "bg-red-100"}`}>
                         {setup.type === "bull-put" ? (
-                          <Badge className="bg-green-100 text-green-800 border-green-300">
-                            <TrendingUp className="w-3 h-3 mr-1" />
-                            Bull Put
-                          </Badge>
+                          <TrendingUp className="w-4 h-4 text-green-600" />
                         ) : (
-                          <Badge className="bg-red-100 text-red-800 border-red-300">
-                            <TrendingDown className="w-3 h-3 mr-1" />
-                            Bear Call
-                          </Badge>
+                          <TrendingDown className="w-4 h-4 text-red-600" />
                         )}
-                      </td>
-                      <td className="py-4 font-mono text-sm">
-                        ${setup.shortStrike}/{setup.longStrike}
-                      </td>
-                      <td className="py-4">
-                        <div>
-                          <span className="font-medium">{setup.expiration}</span>
-                          <p className="text-xs text-muted-foreground">{setup.dte} DTE</p>
-                        </div>
-                      </td>
-                      <td className="py-4 font-semibold text-green-600">${setup.credit.toFixed(2)}</td>
-                      <td className="py-4 font-semibold text-red-600">${setup.maxLoss.toFixed(2)}</td>
-                      <td className="py-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-12 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full ${setup.probability >= 75 ? "bg-green-500" : setup.probability >= 65 ? "bg-yellow-500" : "bg-orange-500"}`}
-                              style={{ width: `${setup.probability}%` }}
-                            />
-                          </div>
-                          <span className="font-medium">{setup.probability}%</span>
-                        </div>
-                      </td>
-                      <td className="py-4">
-                        <Badge variant={setup.ivRank >= 50 ? "default" : "outline"}>{setup.ivRank}%</Badge>
-                      </td>
-                      <td className="py-4">{getSignalBadge(setup.signal)}</td>
-                      <td className="py-4">
-                        <Button size="sm" variant="outline" className="gap-1 bg-transparent">
-                          Trade <ArrowUpRight className="w-3 h-3" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+                      </div>
+                      <div className="text-left">
+                        <div className="font-semibold">{setup.ticker}</div>
+                        <div className="text-xs text-muted-foreground">{setup.company}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      {getSignalBadge(setup.signal)}
+                      <div className="text-right">
+                        <div className="font-semibold text-green-600">${setup.credit.toFixed(2)} credit</div>
+                        <div className="text-xs text-muted-foreground">{setup.probability}% prob</div>
+                      </div>
+                      <ArrowUpRight className="w-4 h-4 text-slate-400" />
+                    </div>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-lg">
+                    <div>
+                      <div className="text-xs text-muted-foreground">Strategy</div>
+                      <div className="font-medium capitalize">{setup.type.replace("-", " ")}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Strikes</div>
+                      <div className="font-medium">
+                        ${setup.shortStrike} / ${setup.longStrike}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Expiration</div>
+                      <div className="font-medium">
+                        {setup.expiration} ({setup.dte}d)
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Max Loss</div>
+                      <div className="font-medium text-red-600">${setup.maxLoss.toFixed(2)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">IV Rank</div>
+                      <div className="font-medium">{setup.ivRank}%</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Delta</div>
+                      <div className="font-medium">{setup.delta.toFixed(2)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Risk/Reward</div>
+                      <div className="font-medium">{setup.riskReward}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Data Source</div>
+                      <div className="font-medium text-xs">{setup.dataSource || "API"}</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <Info className="w-4 h-4 text-blue-500 mt-0.5" />
+                      <div className="text-sm text-blue-800">{setup.reason}</div>
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
 
-        {/* AI Insights */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2 text-teal-700">
-              <Zap className="w-5 h-5" />
-              AI Insights: Credit Spread Strategy
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="when-to-use">
-                <AccordionTrigger className="font-semibold">When to Use Credit Spreads</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground space-y-2">
-                  <p>
-                    Credit spreads work best when you have a directional bias but want defined risk. Bull put spreads
-                    profit when the underlying stays above your short strike, while bear call spreads profit when it
-                    stays below.
-                  </p>
-                  <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 mt-2">
-                    <p className="font-medium text-teal-800">Ideal Conditions:</p>
-                    <ul className="text-sm text-teal-700 list-disc list-inside mt-1">
-                      <li>IV Rank above 30% for better premium</li>
-                      <li>Clear support/resistance levels to place strikes</li>
-                      <li>21-45 DTE for optimal theta decay</li>
-                    </ul>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="risk-management">
-                <AccordionTrigger className="font-semibold">Risk Management Rules</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground space-y-2">
-                  <p>The key to credit spread success is position sizing and knowing when to exit.</p>
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-2">
-                    <p className="font-medium text-yellow-800">Exit Guidelines:</p>
-                    <ul className="text-sm text-yellow-700 list-disc list-inside mt-1">
-                      <li>Take profit at 50% of max credit</li>
-                      <li>Cut losses at 2x the credit received</li>
-                      <li>Close or roll at 21 DTE if not yet profitable</li>
-                      <li>Never risk more than 2-3% of account per trade</li>
-                    </ul>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="current-market">
-                <AccordionTrigger className="font-semibold">Current Market Assessment</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground space-y-2">
-                  <p>
-                    With VIX in the low-to-mid range and overall bullish market momentum, bull put spreads on quality
-                    names offer favorable risk/reward. Focus on stocks with clear technical support levels.
-                  </p>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-2">
-                    <p className="font-medium text-blue-800">This Week's Focus:</p>
-                    <ul className="text-sm text-blue-700 list-disc list-inside mt-1">
-                      <li>Favor bull put spreads on mega-cap tech</li>
-                      <li>Consider bear call spreads on extended names like TSLA</li>
-                      <li>Watch for post-holiday volume return for better fills</li>
-                    </ul>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-          </CardContent>
-        </Card>
-      </div>
+          {setups.length > 0 && (
+            <div className="mt-4 pt-4 border-t text-xs text-muted-foreground flex items-center justify-between">
+              <span>Data: Polygon.io (prices) + Black-Scholes calculations</span>
+              <span>
+                {filteredSetups.length} of {setups.length} setups shown
+              </span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </TooltipProvider>
   )
 }
-
-export default CreditSpreadScanner

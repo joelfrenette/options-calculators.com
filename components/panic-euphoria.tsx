@@ -5,6 +5,7 @@ import { TooltipContent } from "@/components/ui/tooltip"
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { RefreshButton } from "@/components/ui/refresh-button"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import {
   Activity,
   TrendingUp,
@@ -351,7 +352,7 @@ export function PanicEuphoria() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-gray-600">Loading Panic/Euphoria model data...</div>
+        <LoadingSpinner message="Loading Panic/Euphoria model data..." />
       </div>
     )
   }
@@ -437,7 +438,7 @@ export function PanicEuphoria() {
                       </div>
                       <div className="text-xs text-center">{getScoreLabel(data.overallScore)}</div>
                     </div>
-                    <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-black mx-auto" />
+                    <div className="w-0 h-0 border-l-8 border-r-8 border-transparent border-t-black mx-auto" />
                   </div>
                 </div>
               )}

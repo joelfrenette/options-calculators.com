@@ -224,11 +224,7 @@ export function TrendAnalysis() {
                 Assess market and sector trends with technical indicators to make informed trading decisions
               </CardDescription>
             </div>
-            <RefreshButton
-              onClick={fetchData}
-              isLoading={loading}
-              className="bg-green-50 hover:bg-green-100 border-green-200"
-            />
+            <RefreshButton onClick={fetchData} isLoading={loading} />
           </div>
         </CardHeader>
         <CardContent className="pt-6">
@@ -521,11 +517,7 @@ export function TrendAnalysis() {
               <CardTitle className="text-lg font-bold text-gray-900">Index Trend Analysis & Forecast</CardTitle>
               <CardDescription>Real-time trends and options strategies for major index funds</CardDescription>
             </div>
-            <RefreshButton
-              onClick={fetchData}
-              isLoading={loading}
-              className="bg-green-50 hover:bg-green-100 border-green-200"
-            />
+            <RefreshButton onClick={fetchData} isLoading={loading} />
           </div>
         </CardHeader>
         <CardContent className="pt-4">

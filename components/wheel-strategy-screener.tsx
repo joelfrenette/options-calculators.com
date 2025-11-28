@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -16,9 +16,12 @@ import {
   CheckCircle2,
   Info,
   Percent,
+  Loader2,
+  Wifi,
+  WifiOff,
 } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { TooltipProvider } from "@/components/ui/tooltip"
 
 interface WheelCandidate {
   ticker: string
@@ -34,107 +37,33 @@ interface WheelCandidate {
   signal: "strong" | "moderate" | "speculative"
   fundamentals: string
   reason: string
+  dataSource?: string
+  isLive?: boolean
 }
-
-const MOCK_CANDIDATES: WheelCandidate[] = [
-  {
-    ticker: "AAPL",
-    company: "Apple Inc",
-    price: 189.5,
-    putStrike: 180,
-    putPremium: 2.85,
-    putDte: 30,
-    annualizedReturn: 19.2,
-    ivRank: 42,
-    divYield: 0.5,
-    cashRequired: 18000,
-    signal: "strong",
-    fundamentals: "A+",
-    reason: "Best-in-class balance sheet, services growth, buyback machine",
-  },
-  {
-    ticker: "MSFT",
-    company: "Microsoft Corp",
-    price: 425.0,
-    putStrike: 410,
-    putPremium: 4.2,
-    putDte: 30,
-    annualizedReturn: 12.4,
-    ivRank: 35,
-    divYield: 0.7,
-    cashRequired: 41000,
-    signal: "strong",
-    fundamentals: "A+",
-    reason: "AI leader, Azure growth, recurring revenue model",
-  },
-  {
-    ticker: "AMD",
-    company: "AMD Inc",
-    price: 142.0,
-    putStrike: 135,
-    putPremium: 3.45,
-    putDte: 30,
-    annualizedReturn: 31.2,
-    ivRank: 58,
-    divYield: 0,
-    cashRequired: 13500,
-    signal: "moderate",
-    fundamentals: "B+",
-    reason: "AI chip demand, but more volatile than NVDA",
-  },
-  {
-    ticker: "JPM",
-    company: "JPMorgan Chase",
-    price: 205.0,
-    putStrike: 195,
-    putPremium: 2.9,
-    putDte: 30,
-    annualizedReturn: 18.1,
-    ivRank: 32,
-    divYield: 2.2,
-    cashRequired: 19500,
-    signal: "strong",
-    fundamentals: "A",
-    reason: "Best-of-breed bank, rising rates benefit, strong dividend",
-  },
-  {
-    ticker: "COST",
-    company: "Costco Wholesale",
-    price: 920.0,
-    putStrike: 890,
-    putPremium: 8.5,
-    putDte: 30,
-    annualizedReturn: 11.6,
-    ivRank: 28,
-    divYield: 0.5,
-    cashRequired: 89000,
-    signal: "strong",
-    fundamentals: "A",
-    reason: "Recession-resistant, membership model, consistent growth",
-  },
-  {
-    ticker: "PLTR",
-    company: "Palantir Technologies",
-    price: 65.0,
-    putStrike: 60,
-    putPremium: 2.15,
-    putDte: 30,
-    annualizedReturn: 43.5,
-    ivRank: 72,
-    divYield: 0,
-    cashRequired: 6000,
-    signal: "speculative",
-    fundamentals: "B",
-    reason: "High IV = high premium, but volatile AI play",
-  },
-]
 
 export function WheelStrategyScreener() {
   const [minReturn, setMinReturn] = useState([15])
   const [maxCash, setMaxCash] = useState([50000])
   const [fundamentalGrade, setFundamentalGrade] = useState<"all" | "a" | "b">("all")
   const [isLoading, setIsLoading] = useState(false)
-  const [candidates, setCandidates] = useState<WheelCandidate[]>(MOCK_CANDIDATES)
+  const [candidates, setCandidates] = useState<WheelCandidate[]>([])
+  const [isLiveData, setIsLiveData] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const cached = localStorage.getItem("wheel-strategy-screener-cache")
+    if (cached) {
+      try {
+        const { data, timestamp, isLive } = JSON.parse(cached)
+        setCandidates(data)
+        setLastUpdated(timestamp)
+        setIsLiveData(isLive)
+      } catch {
+        // Invalid cache
+      }
+    }
+  }, [])
 
   const filteredCandidates = candidates.filter((c) => {
     if (c.annualizedReturn < minReturn[0]) return false
@@ -144,9 +73,41 @@ export function WheelStrategyScreener() {
     return true
   })
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setIsLoading(true)
-    setTimeout(() => setIsLoading(false), 1500)
+    setError(null)
+
+    try {
+      const response = await fetch("/api/strategy-scanner?type=wheel")
+
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (data.wheelCandidates && data.wheelCandidates.length > 0) {
+        setCandidates(data.wheelCandidates)
+        setIsLiveData(data.isLive === true)
+        setLastUpdated(new Date().toISOString())
+
+        localStorage.setItem(
+          "wheel-strategy-screener-cache",
+          JSON.stringify({
+            data: data.wheelCandidates,
+            timestamp: new Date().toISOString(),
+            isLive: data.isLive === true,
+          }),
+        )
+      } else {
+        setError("No wheel strategy candidates found")
+      }
+    } catch (err) {
+      console.error("[Wheel Strategy Screener] Fetch error:", err)
+      setError("Failed to fetch live data")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const getSignalBadge = (signal: string) => {
@@ -183,244 +144,161 @@ export function WheelStrategyScreener() {
 
   return (
     <TooltipProvider>
-      <div className="space-y-6">
-        {/* Hero Section */}
-        <div className="bg-gradient-to-r from-amber-600 to-orange-600 rounded-xl p-6 text-white">
+      <Card>
+        <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <RotateCcw className="w-6 h-6" />
-                <h1 className="text-2xl font-bold">Wheel Strategy Screener</h1>
-              </div>
-              <p className="text-amber-100">
-                Find quality stocks for cash-secured puts with excellent fundamentals and premium
-              </p>
+              <CardTitle className="flex items-center gap-2">
+                <RotateCcw className="w-5 h-5 text-indigo-500" />
+                Wheel Strategy Screener
+                {isLiveData ? (
+                  <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-300">
+                    <Wifi className="w-3 h-3 mr-1" />
+                    LIVE
+                  </Badge>
+                ) : candidates.length > 0 ? (
+                  <Badge variant="outline" className="ml-2 bg-yellow-50 text-yellow-700 border-yellow-300">
+                    <WifiOff className="w-3 h-3 mr-1" />
+                    Cached
+                  </Badge>
+                ) : null}
+              </CardTitle>
+              <CardDescription>
+                Cash-secured put candidates for the wheel strategy
+                {lastUpdated && (
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    Updated: {new Date(lastUpdated).toLocaleTimeString()}
+                  </span>
+                )}
+              </CardDescription>
             </div>
-            <Button onClick={handleRefresh} variant="secondary" disabled={isLoading}>
-              <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-              Scan Now
+            <Button onClick={handleRefresh} disabled={isLoading} size="sm">
+              {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+              {isLoading ? "Scanning..." : "Refresh"}
             </Button>
           </div>
-        </div>
-
-        {/* Key Metrics */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="bg-green-50 border-green-200">
-            <CardContent className="p-4 text-center">
-              <p className="text-sm text-green-700 font-medium">Avg Annualized Return</p>
-              <p className="text-2xl font-bold text-green-800">22.5%</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-blue-50 border-blue-200">
-            <CardContent className="p-4 text-center">
-              <p className="text-sm text-blue-700 font-medium">Stocks Scanned</p>
-              <p className="text-2xl font-bold text-blue-800">1,247</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-purple-50 border-purple-200">
-            <CardContent className="p-4 text-center">
-              <p className="text-sm text-purple-700 font-medium">Quality Candidates</p>
-              <p className="text-2xl font-bold text-purple-800">{filteredCandidates.length}</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-amber-50 border-amber-200">
-            <CardContent className="p-4 text-center">
-              <p className="text-sm text-amber-700 font-medium">Avg IV Rank</p>
-              <p className="text-2xl font-bold text-amber-800">44%</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filters */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Filter className="w-5 h-5 text-amber-600" />
-              Screening Filters
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <label className="text-sm font-medium mb-2 block">Min Annualized Return: {minReturn[0]}%</label>
-                <Slider value={minReturn} onValueChange={setMinReturn} min={5} max={50} step={5} className="mt-3" />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">
-                  Max Cash Required: ${maxCash[0].toLocaleString()}
-                </label>
-                <Slider
-                  value={maxCash}
-                  onValueChange={setMaxCash}
-                  min={5000}
-                  max={100000}
-                  step={5000}
-                  className="mt-3"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Fundamental Grade</label>
-                <Select value={fundamentalGrade} onValueChange={(v: "all" | "a" | "b") => setFundamentalGrade(v)}>
-                  <SelectTrigger className="bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border shadow-lg z-50">
-                    <SelectItem value="all">All Grades</SelectItem>
-                    <SelectItem value="a">A Grade Only</SelectItem>
-                    <SelectItem value="b">B+ or Better</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+        </CardHeader>
+        <CardContent>
+          {/* Filters */}
+          <div className="flex flex-wrap gap-4 mb-6 p-4 bg-slate-50 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-slate-500" />
+              <span className="text-sm font-medium">Filters:</span>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Results */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Top Wheel Candidates</CardTitle>
-                <CardDescription>Stocks you&apos;d be happy to own at a discount</CardDescription>
-              </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-600">Min Return:</span>
+              <Slider value={minReturn} onValueChange={setMinReturn} min={5} max={50} step={5} className="w-24" />
+              <span className="text-sm font-medium w-8">{minReturn[0]}%</span>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b text-left text-sm text-muted-foreground">
-                    <th className="pb-3 font-medium">TICKER</th>
-                    <th className="pb-3 font-medium">PRICE</th>
-                    <th className="pb-3 font-medium">PUT STRIKE</th>
-                    <th className="pb-3 font-medium">PREMIUM</th>
-                    <th className="pb-3 font-medium">
-                      <Tooltip>
-                        <TooltipTrigger className="flex items-center gap-1">
-                          ANN. RET <Info className="w-3 h-3" />
-                        </TooltipTrigger>
-                        <TooltipContent>Annualized Return if Put Expires Worthless</TooltipContent>
-                      </Tooltip>
-                    </th>
-                    <th className="pb-3 font-medium">IV RANK</th>
-                    <th className="pb-3 font-medium">GRADE</th>
-                    <th className="pb-3 font-medium">CASH REQ</th>
-                    <th className="pb-3 font-medium">SIGNAL</th>
-                    <th className="pb-3 font-medium"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCandidates.map((candidate, idx) => (
-                    <tr key={idx} className="border-b last:border-0 hover:bg-muted/50">
-                      <td className="py-4">
-                        <div>
-                          <span className="font-semibold text-amber-600">{candidate.ticker}</span>
-                          <p className="text-xs text-muted-foreground">{candidate.company}</p>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-600">Max Cash:</span>
+              <Slider value={maxCash} onValueChange={setMaxCash} min={5000} max={100000} step={5000} className="w-24" />
+              <span className="text-sm font-medium w-16">${(maxCash[0] / 1000).toFixed(0)}k</span>
+            </div>
+            <Select value={fundamentalGrade} onValueChange={(v: "all" | "a" | "b") => setFundamentalGrade(v)}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Fundamentals" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Grades</SelectItem>
+                <SelectItem value="a">A Grade Only</SelectItem>
+                <SelectItem value="b">B+ and Above</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
+          )}
+
+          {candidates.length === 0 && !isLoading && (
+            <div className="text-center py-8 text-muted-foreground">
+              <RotateCcw className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No wheel strategy data loaded.</p>
+              <p className="text-sm">Click Refresh to scan for wheel candidates.</p>
+            </div>
+          )}
+
+          <Accordion type="single" collapsible className="space-y-2">
+            {filteredCandidates.map((candidate, idx) => (
+              <AccordionItem key={`${candidate.ticker}-${idx}`} value={`${candidate.ticker}-${idx}`}>
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center justify-between w-full pr-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-indigo-100">
+                        <RotateCcw className="w-4 h-4 text-indigo-600" />
+                      </div>
+                      <div className="text-left">
+                        <div className="font-semibold">{candidate.ticker}</div>
+                        <div className="text-xs text-muted-foreground">${candidate.price.toFixed(2)}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      {getSignalBadge(candidate.signal)}
+                      {getFundamentalBadge(candidate.fundamentals)}
+                      <div className="text-right">
+                        <div className="font-semibold text-green-600">
+                          <Percent className="w-3 h-3 inline mr-1" />
+                          {candidate.annualizedReturn.toFixed(1)}% ann.
                         </div>
-                      </td>
-                      <td className="py-4 font-mono">${candidate.price.toFixed(2)}</td>
-                      <td className="py-4 font-mono font-semibold">${candidate.putStrike}</td>
-                      <td className="py-4 font-semibold text-green-600">${candidate.putPremium.toFixed(2)}</td>
-                      <td className="py-4">
-                        <div className="flex items-center gap-2">
-                          <Percent className="w-4 h-4 text-green-600" />
-                          <span
-                            className={`font-bold ${candidate.annualizedReturn >= 20 ? "text-green-600" : candidate.annualizedReturn >= 15 ? "text-yellow-600" : "text-muted-foreground"}`}
-                          >
-                            {candidate.annualizedReturn.toFixed(1)}%
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-4">
-                        <Badge variant={candidate.ivRank >= 50 ? "default" : "outline"}>{candidate.ivRank}%</Badge>
-                      </td>
-                      <td className="py-4">{getFundamentalBadge(candidate.fundamentals)}</td>
-                      <td className="py-4 font-mono text-sm">${candidate.cashRequired.toLocaleString()}</td>
-                      <td className="py-4">{getSignalBadge(candidate.signal)}</td>
-                      <td className="py-4">
-                        <Button size="sm" variant="outline" className="gap-1 bg-transparent">
-                          Trade <ArrowUpRight className="w-3 h-3" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+                        <div className="text-xs text-muted-foreground">${candidate.putPremium.toFixed(2)} prem</div>
+                      </div>
+                      <ArrowUpRight className="w-4 h-4 text-slate-400" />
+                    </div>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-lg">
+                    <div>
+                      <div className="text-xs text-muted-foreground">Company</div>
+                      <div className="font-medium">{candidate.company}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Put Strike</div>
+                      <div className="font-medium">${candidate.putStrike}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">DTE</div>
+                      <div className="font-medium">{candidate.putDte} days</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Cash Required</div>
+                      <div className="font-medium">${candidate.cashRequired.toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">IV Rank</div>
+                      <div className="font-medium">{candidate.ivRank}%</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Div Yield</div>
+                      <div className="font-medium">{candidate.divYield.toFixed(1)}%</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Data Source</div>
+                      <div className="font-medium text-xs">{candidate.dataSource || "API"}</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 p-3 bg-indigo-50 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <Info className="w-4 h-4 text-indigo-500 mt-0.5" />
+                      <div className="text-sm text-indigo-800">{candidate.reason}</div>
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
 
-        {/* AI Insights */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2 text-amber-700">
-              <Zap className="w-5 h-5" />
-              AI Insights: Wheel Strategy Selection
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="stock-selection">
-                <AccordionTrigger className="font-semibold">What Makes a Good Wheel Stock?</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground space-y-2">
-                  <p>
-                    The best wheel candidates are stocks you&apos;d genuinely want to own long-term at a discount. Focus
-                    on quality over premium.
-                  </p>
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-2">
-                    <p className="font-medium text-amber-800">Selection Criteria:</p>
-                    <ul className="text-sm text-amber-700 list-disc list-inside mt-1">
-                      <li>Strong balance sheet and cash flow</li>
-                      <li>Dividend paying (bonus income if assigned)</li>
-                      <li>Liquid options with tight bid-ask spreads</li>
-                      <li>IV Rank 30%+ for worthwhile premium</li>
-                      <li>Avoid earnings, FDA events during the trade</li>
-                    </ul>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="management">
-                <AccordionTrigger className="font-semibold">Position Management</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground space-y-2">
-                  <p>The wheel works best with proper position sizing and exit rules.</p>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-2">
-                    <p className="font-medium text-blue-800">Management Rules:</p>
-                    <ul className="text-sm text-blue-700 list-disc list-inside mt-1">
-                      <li>Sell puts at 70-80% probability (OTM)</li>
-                      <li>Roll for credit if tested before expiration</li>
-                      <li>If assigned, immediately sell covered calls</li>
-                      <li>Target call strikes at or above cost basis</li>
-                      <li>Never more than 5% of portfolio in one wheel</li>
-                    </ul>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="current-picks">
-                <AccordionTrigger className="font-semibold">This Week&apos;s Top Picks</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground space-y-2">
-                  <p>Based on current IV levels, fundamentals, and technical setups:</p>
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-2">
-                    <p className="font-medium text-green-800">Recommended Setups:</p>
-                    <ul className="text-sm text-green-700 list-disc list-inside mt-1">
-                      <li>
-                        <strong>AAPL $180 Put:</strong> Strong support, post-earnings stability
-                      </li>
-                      <li>
-                        <strong>JPM $195 Put:</strong> Bank strength + 2.2% dividend if assigned
-                      </li>
-                      <li>
-                        <strong>MSFT $410 Put:</strong> AI leader, cloud growth intact
-                      </li>
-                    </ul>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-          </CardContent>
-        </Card>
-      </div>
+          {candidates.length > 0 && (
+            <div className="mt-4 pt-4 border-t text-xs text-muted-foreground flex items-center justify-between">
+              <span>Data: Polygon.io (prices/options) + Finnhub (fundamentals)</span>
+              <span>
+                {filteredCandidates.length} of {candidates.length} candidates shown
+              </span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </TooltipProvider>
   )
 }
-
-export default WheelStrategyScreener
