@@ -533,7 +533,7 @@ export function SocialSentiment() {
                       </span>
                     </div>
                     <div className="relative h-3 rounded-full overflow-hidden mb-1">
-                      <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-400 to-green-500" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-400 to-red-500" />
                       <div
                         className="absolute top-0 bottom-0 right-0 bg-gray-200"
                         style={{ width: `${100 - safeNumber(data?.macro_sentiment, 47)}%` }}
@@ -557,7 +557,7 @@ export function SocialSentiment() {
                       </span>
                     </div>
                     <div className="relative h-3 rounded-full overflow-hidden mb-1">
-                      <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-400 to-green-500" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-400 to-red-500" />
                       <div
                         className="absolute top-0 bottom-0 right-0 bg-gray-200"
                         style={{ width: `${100 - safeNumber(data?.social_sentiment, 54)}%` }}
@@ -641,7 +641,7 @@ export function SocialSentiment() {
                       </div>
 
                       <div className="relative h-3 bg-gray-100 rounded-full overflow-hidden mb-3">
-                        <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-400 to-green-500" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-400 to-red-500" />
                         <div
                           className="absolute top-0 bottom-0 right-0 bg-gray-200"
                           style={{ width: `${100 - score}%` }}
@@ -723,7 +723,6 @@ export function SocialSentiment() {
                     </Tooltip>
                   </TooltipProvider>
                 </CardTitle>
-                {/* Existing code */}
               </div>
               <AskAIDialog sentimentData={data} />
             </div>
