@@ -426,8 +426,10 @@ export function SocialSentiment() {
     fetchSentiment()
   }
 
-  const fiveComponentIndicators = (data?.indicators || []).slice(0, 5)
-  const tenComponentIndicators = data?.indicators || []
+  const allIndicators = data?.indicators || []
+  const uniqueIndicators = Array.from(new Map(allIndicators.map((ind) => [ind.name, ind])).values()).sort((a, b) =>
+    a.name.localeCompare(b.name),
+  )
 
   const indexData = (data?.per_symbol || []).filter((s) => ["SPY", "QQQ", "IWM", "DIA"].includes(s.symbol))
 
@@ -465,8 +467,40 @@ export function SocialSentiment() {
             <div className="space-y-6">
               <ConditionalTooltip content="Global Social Sentiment aggregates sentiment from news, social media, and market data. Scores 0-24 (Extreme Bearish) signal fear, good for selling puts. Scores 75-100 (Extreme Bullish) signal greed, consider protective strategies. Contrarian traders often fade extremes.">
                 <div className="relative cursor-help">
-                  <div className="h-24 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded-lg shadow-inner" />
-                  {/* Existing code for gauge labels and indicator */}
+                  <div className="relative h-20 rounded-lg overflow-hidden shadow-sm border border-gray-300">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded-lg shadow-inner" />
+
+                    <div className="absolute inset-0 flex items-center justify-between px-2 text-xs font-bold">
+                      {/* Extreme Bullish - LEFT/GREEN */}
+                      <div className="text-center text-white drop-shadow-lg">
+                        <div className="text-base">EXTREME</div>
+                        <div>BULLISH</div>
+                        <div className="text-[10px] mt-1">81-100</div>
+                      </div>
+                      {/* Bullish */}
+                      <div className="text-center text-white drop-shadow-lg">
+                        <div>BULLISH</div>
+                        <div className="text-[10px] mt-1">61-80</div>
+                      </div>
+                      {/* Neutral */}
+                      <div className="text-center text-gray-800 drop-shadow">
+                        <div>NEUTRAL</div>
+                        <div className="text-[10px] mt-1">41-60</div>
+                      </div>
+                      {/* Bearish */}
+                      <div className="text-center text-white drop-shadow-lg">
+                        <div>BEARISH</div>
+                        <div className="text-[10px] mt-1">21-40</div>
+                      </div>
+                      {/* Extreme Bearish - RIGHT/RED */}
+                      <div className="text-center text-white drop-shadow-lg">
+                        <div className="text-base">EXTREME</div>
+                        <div>BEARISH</div>
+                        <div className="text-[10px] mt-1">0-20</div>
+                      </div>
+                    </div>
+                  </div>
+
                   {data && (
                     <div
                       className="absolute top-0 bottom-0 w-2 bg-black shadow-lg transition-all duration-500"
@@ -482,13 +516,12 @@ export function SocialSentiment() {
                             {getSentimentLabel(safeNumber(data.global_social_sentiment, 50))}
                           </div>
                         </div>
+                        <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-black mx-auto" />
                       </div>
                     </div>
                   )}
                 </div>
               </ConditionalTooltip>
-
-              {/* Existing code */}
 
               <div className="grid grid-cols-2 gap-6 mt-8">
                 <ConditionalTooltip content="Macro Sentiment tracks institutional and economic indicators like bond yields, currency moves, and cross-asset flows. Low readings suggest risk-off environment - favor defined-risk strategies. High readings indicate risk-on, suitable for directional plays.">
@@ -499,10 +532,15 @@ export function SocialSentiment() {
                         {Math.round(safeNumber(data?.macro_sentiment, 47))}
                       </span>
                     </div>
-                    <div className="h-3 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded-full overflow-hidden relative">
+                    <div className="relative h-3 rounded-full overflow-hidden mb-1">
+                      <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-400 to-green-500" />
                       <div
-                        className="absolute top-0 bottom-0 w-1 bg-black shadow-md transition-all duration-300"
-                        style={{ left: `calc(${100 - safeNumber(data?.macro_sentiment, 47)}% - 2px)` }}
+                        className="absolute top-0 bottom-0 right-0 bg-gray-200"
+                        style={{ width: `${100 - safeNumber(data?.macro_sentiment, 47)}%` }}
+                      />
+                      <div
+                        className="absolute top-0 bottom-0 w-1 bg-gray-800 rounded"
+                        style={{ left: `${safeNumber(data?.macro_sentiment, 47)}%`, transform: "translateX(-50%)" }}
                       />
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
@@ -518,17 +556,23 @@ export function SocialSentiment() {
                         {Math.round(safeNumber(data?.social_sentiment, 54))}
                       </span>
                     </div>
-                    <div className="h-3 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded-full overflow-hidden relative">
+                    <div className="relative h-3 rounded-full overflow-hidden mb-1">
+                      <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-400 to-green-500" />
                       <div
-                        className="absolute top-0 bottom-0 w-1 bg-black shadow-md transition-all duration-300"
-                        style={{ left: `calc(${100 - safeNumber(data?.social_sentiment, 54)}% - 2px)` }}
+                        className="absolute top-0 bottom-0 right-0 bg-gray-200"
+                        style={{ width: `${100 - safeNumber(data?.social_sentiment, 54)}%` }}
+                      />
+                      <div
+                        className="absolute top-0 bottom-0 w-1 bg-gray-800 rounded"
+                        style={{ left: `${safeNumber(data?.social_sentiment, 54)}%`, transform: "translateX(-50%)" }}
                       />
                     </div>
-                    {/* Existing code */}
+                    <div className="text-xs text-gray-500 mt-1">
+                      {getSentimentLabel(safeNumber(data?.social_sentiment, 54))}
+                    </div>
                   </div>
                 </ConditionalTooltip>
               </div>
-              {/* Existing code */}
             </div>
           </CardContent>
         </Card>
@@ -536,55 +580,8 @@ export function SocialSentiment() {
         <Card className="shadow-sm border-gray-200">
           <CardHeader className="bg-gray-50 border-b border-gray-200">
             <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-teal-600" />5 Component Sentiment Indicators
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-sm bg-white border shadow-lg">
-                    <p className="text-sm">Top 5 sentiment sources by weight and reliability.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4">
-            {fiveComponentIndicators.map((indicator, idx) => (
-              <SentimentIndicatorRow key={idx} indicator={indicator} />
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm border-gray-200">
-          <CardHeader className="bg-gray-50 border-b border-gray-200">
-            <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-teal-600" />
-              10 Component Sentiment Indicators
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-sm bg-white border shadow-lg">
-                    <p className="text-sm">All 10 sentiment data sources with real-time status.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4">
-            {tenComponentIndicators.map((indicator, idx) => (
-              <SentimentIndicatorRow key={idx} indicator={indicator} />
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm border-gray-200">
-          <CardHeader className="bg-gray-50 border-b border-gray-200">
-            <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-teal-600" />
-              Sentiment Heatmap
+              Macro Sentiment Indicators
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger>
@@ -678,6 +675,30 @@ export function SocialSentiment() {
                 })}
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm border-gray-200">
+          <CardHeader className="bg-gray-50 border-b border-gray-200">
+            <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-teal-600" />
+              Social Sentiment Indicators
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-sm bg-white border shadow-lg">
+                    <p className="text-sm">All sentiment data sources sorted alphabetically with real-time status.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            {uniqueIndicators.map((indicator, idx) => (
+              <SentimentIndicatorRow key={idx} indicator={indicator} />
+            ))}
           </CardContent>
         </Card>
 
