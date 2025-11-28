@@ -281,7 +281,7 @@ END OF AUDIT REPORT
                   Export Report
                 </Button>
               )}
-              <Button onClick={runFullAudit} disabled={loading} className="bg-green-600 hover:bg-green-700">
+              <Button onClick={runFullAudit} disabled={loading} className="bg-green-600 hover:bg-green-700 text-white">
                 {loading ? (
                   <>
                     <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
@@ -319,8 +319,8 @@ END OF AUDIT REPORT
               className={`${auditResult.verdict === "PASS" ? "bg-green-50 border-green-300" : auditResult.verdict === "CONDITIONAL PASS" ? "bg-yellow-50 border-yellow-300" : "bg-red-50 border-red-300"}`}
             >
               <CardContent className="p-4">
-                <div className="text-3xl font-bold text-center">{auditResult.verdict}</div>
-                <div className="text-sm text-center text-muted-foreground">Verdict</div>
+                <div className="text-3xl font-bold text-center text-slate-900">{auditResult.verdict}</div>
+                <div className="text-sm text-center text-slate-600">Verdict</div>
               </CardContent>
             </Card>
             <Card className="bg-green-50 border-green-200">
@@ -352,87 +352,96 @@ END OF AUDIT REPORT
           </div>
 
           {/* Audit Duration */}
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 text-sm text-slate-400">
             <Clock className="h-4 w-4" />
             Audit completed in {auditResult.duration}ms at {new Date(auditResult.timestamp).toLocaleString()}
           </div>
 
           {/* ANALYZE Tab Pages */}
-          <Card>
+          <Card className="bg-slate-800 border-slate-700">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-blue-600" />
+              <CardTitle className="flex items-center gap-2 text-white">
+                <BarChart3 className="h-5 w-5 text-blue-400" />
                 ANALYZE Tab ({analyzePages.length} pages)
               </CardTitle>
             </CardHeader>
             <CardContent>
               <Accordion type="multiple" className="space-y-2">
                 {analyzePages.map((page) => (
-                  <AccordionItem key={page.id} value={page.id} className="border rounded-lg px-4">
-                    <AccordionTrigger className="hover:no-underline">
+                  <AccordionItem
+                    key={page.id}
+                    value={page.id}
+                    className="border border-slate-600 rounded-lg px-4 bg-slate-700"
+                  >
+                    <AccordionTrigger className="hover:no-underline text-white">
                       <div className="flex items-center gap-3 w-full">
                         <Badge variant="outline" className={getCategoryColor(page.category)}>
                           {getCategoryIcon(page.category)}
                         </Badge>
-                        <span className="font-semibold">{page.name}</span>
-                        <span className="text-sm text-muted-foreground ml-auto mr-4">
+                        <span className="font-semibold text-white">{page.name}</span>
+                        <span className="text-sm text-slate-300 ml-auto mr-4">
                           {page.indicators.filter((i) => i.status === "live").length}/{page.indicators.length} live
                         </span>
                       </div>
                     </AccordionTrigger>
                     <AccordionContent>
                       <div className="space-y-4 pt-4">
-                        <p className="text-sm text-muted-foreground">{page.description}</p>
+                        <p className="text-sm text-slate-300">{page.description}</p>
                         {page.indicators.map((indicator, idx) => (
-                          <div key={idx} className="border rounded-lg p-4 bg-slate-50">
+                          <div key={idx} className="border border-slate-500 rounded-lg p-4 bg-slate-600">
                             <div className="flex items-start justify-between mb-3">
                               <div className="flex items-center gap-2">
                                 {getStatusLight(indicator.status)}
                                 {getStatusIcon(indicator.status)}
-                                <span className="font-semibold">{indicator.name}</span>
+                                <span className="font-semibold text-white">{indicator.name}</span>
                               </div>
                               {getStatusBadge(indicator.status)}
                             </div>
 
                             <div className="space-y-2 text-sm">
-                              <div className="bg-white p-3 rounded border">
-                                <div className="font-mono text-xs text-slate-700 mb-1">{indicator.formula}</div>
-                                <div className="text-slate-600">{indicator.formulaExplanation}</div>
+                              <div className="bg-slate-800 p-3 rounded border border-slate-500">
+                                <div className="font-mono text-xs text-green-400 mb-1">{indicator.formula}</div>
+                                <div className="text-slate-300">{indicator.formulaExplanation}</div>
                               </div>
 
                               {indicator.algorithm && (
                                 <div className="flex gap-2">
-                                  <span className="font-medium text-slate-700">Algorithm:</span>
-                                  <span className="text-slate-600">{indicator.algorithm}</span>
+                                  <span className="font-medium text-slate-200">Algorithm:</span>
+                                  <span className="text-slate-300">{indicator.algorithm}</span>
                                 </div>
                               )}
 
                               <div className="grid grid-cols-2 gap-4 mt-3">
                                 <div>
-                                  <span className="font-medium text-slate-700">Primary API:</span>
-                                  <div className="text-xs text-slate-600 mt-1">{indicator.primaryApi}</div>
+                                  <span className="font-medium text-slate-200">Primary API:</span>
+                                  <div className="text-xs text-cyan-400 mt-1">{indicator.primaryApi}</div>
                                 </div>
                                 <div>
-                                  <span className="font-medium text-slate-700">Current Source:</span>
-                                  <div className="text-xs text-slate-600 mt-1 font-semibold">
+                                  <span className="font-medium text-slate-200">Current Source:</span>
+                                  <div className="text-xs text-yellow-400 mt-1 font-semibold">
                                     {indicator.currentSource}
                                   </div>
                                 </div>
                               </div>
 
                               <div className="mt-2">
-                                <span className="font-medium text-slate-700">Fallback Chain:</span>
+                                <span className="font-medium text-slate-200">Fallback Chain:</span>
                                 <div className="flex flex-wrap gap-1 mt-1">
                                   {indicator.fallbackChain.map((fb, i) => (
-                                    <Badge key={i} variant="outline" className="text-xs">
+                                    <Badge
+                                      key={i}
+                                      variant="outline"
+                                      className="text-xs bg-slate-700 text-slate-200 border-slate-500"
+                                    >
                                       {i + 1}. {fb}
                                     </Badge>
                                   ))}
                                 </div>
                               </div>
 
-                              <div className="mt-2 p-2 bg-slate-100 rounded text-xs">
-                                <span className="font-medium">Status Reason:</span> {indicator.statusReason}
+                              <div className="mt-2 p-2 bg-slate-700 rounded text-xs border border-slate-500">
+                                <span className="font-medium text-slate-200">Status Reason:</span>{" "}
+                                <span className="text-slate-300">{indicator.statusReason}</span>
                               </div>
                             </div>
                           </div>
@@ -446,60 +455,79 @@ END OF AUDIT REPORT
           </Card>
 
           {/* SCAN Tab Pages */}
-          <Card>
+          <Card className="bg-slate-800 border-slate-700">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Search className="h-5 w-5 text-purple-600" />
+              <CardTitle className="flex items-center gap-2 text-white">
+                <Search className="h-5 w-5 text-purple-400" />
                 SCAN Tab ({scanPages.length} pages)
               </CardTitle>
             </CardHeader>
             <CardContent>
               <Accordion type="multiple" className="space-y-2">
                 {scanPages.map((page) => (
-                  <AccordionItem key={page.id} value={page.id} className="border rounded-lg px-4">
-                    <AccordionTrigger className="hover:no-underline">
+                  <AccordionItem
+                    key={page.id}
+                    value={page.id}
+                    className="border border-slate-600 rounded-lg px-4 bg-slate-700"
+                  >
+                    <AccordionTrigger className="hover:no-underline text-white">
                       <div className="flex items-center gap-3 w-full">
                         <Badge variant="outline" className={getCategoryColor(page.category)}>
                           {getCategoryIcon(page.category)}
                         </Badge>
-                        <span className="font-semibold">{page.name}</span>
-                        <span className="text-sm text-muted-foreground ml-auto mr-4">
+                        <span className="font-semibold text-white">{page.name}</span>
+                        <span className="text-sm text-slate-300 ml-auto mr-4">
                           {page.indicators.filter((i) => i.status === "live").length}/{page.indicators.length} live
                         </span>
                       </div>
                     </AccordionTrigger>
                     <AccordionContent>
                       <div className="space-y-4 pt-4">
-                        <p className="text-sm text-muted-foreground">{page.description}</p>
+                        <p className="text-sm text-slate-300">{page.description}</p>
                         {page.indicators.map((indicator, idx) => (
-                          <div key={idx} className="border rounded-lg p-4 bg-slate-50">
+                          <div key={idx} className="border border-slate-500 rounded-lg p-4 bg-slate-600">
                             <div className="flex items-start justify-between mb-3">
                               <div className="flex items-center gap-2">
                                 {getStatusLight(indicator.status)}
                                 {getStatusIcon(indicator.status)}
-                                <span className="font-semibold">{indicator.name}</span>
+                                <span className="font-semibold text-white">{indicator.name}</span>
                               </div>
                               {getStatusBadge(indicator.status)}
                             </div>
                             <div className="space-y-2 text-sm">
-                              <div className="bg-white p-3 rounded border">
-                                <div className="font-mono text-xs text-slate-700 mb-1">{indicator.formula}</div>
-                                <div className="text-slate-600">{indicator.formulaExplanation}</div>
+                              <div className="bg-slate-800 p-3 rounded border border-slate-500">
+                                <div className="font-mono text-xs text-green-400 mb-1">{indicator.formula}</div>
+                                <div className="text-slate-300">{indicator.formulaExplanation}</div>
                               </div>
                               <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                  <span className="font-medium text-slate-700">Primary API:</span>
-                                  <div className="text-xs text-slate-600 mt-1">{indicator.primaryApi}</div>
+                                  <span className="font-medium text-slate-200">Primary API:</span>
+                                  <div className="text-xs text-cyan-400 mt-1">{indicator.primaryApi}</div>
                                 </div>
                                 <div>
-                                  <span className="font-medium text-slate-700">Current Source:</span>
-                                  <div className="text-xs text-slate-600 mt-1 font-semibold">
+                                  <span className="font-medium text-slate-200">Current Source:</span>
+                                  <div className="text-xs text-yellow-400 mt-1 font-semibold">
                                     {indicator.currentSource}
                                   </div>
                                 </div>
                               </div>
-                              <div className="p-2 bg-slate-100 rounded text-xs">
-                                <span className="font-medium">Status:</span> {indicator.statusReason}
+                              <div className="mt-2">
+                                <span className="font-medium text-slate-200">Fallback Chain:</span>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {indicator.fallbackChain.map((fb, i) => (
+                                    <Badge
+                                      key={i}
+                                      variant="outline"
+                                      className="text-xs bg-slate-700 text-slate-200 border-slate-500"
+                                    >
+                                      {i + 1}. {fb}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="mt-2 p-2 bg-slate-700 rounded text-xs border border-slate-500">
+                                <span className="font-medium text-slate-200">Status Reason:</span>{" "}
+                                <span className="text-slate-300">{indicator.statusReason}</span>
                               </div>
                             </div>
                           </div>
@@ -513,48 +541,85 @@ END OF AUDIT REPORT
           </Card>
 
           {/* EXECUTE Tab Pages */}
-          <Card>
+          <Card className="bg-slate-800 border-slate-700">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calculator className="h-5 w-5 text-green-600" />
+              <CardTitle className="flex items-center gap-2 text-white">
+                <Calculator className="h-5 w-5 text-green-400" />
                 EXECUTE Tab ({executePages.length} pages)
               </CardTitle>
             </CardHeader>
             <CardContent>
               <Accordion type="multiple" className="space-y-2">
                 {executePages.map((page) => (
-                  <AccordionItem key={page.id} value={page.id} className="border rounded-lg px-4">
-                    <AccordionTrigger className="hover:no-underline">
+                  <AccordionItem
+                    key={page.id}
+                    value={page.id}
+                    className="border border-slate-600 rounded-lg px-4 bg-slate-700"
+                  >
+                    <AccordionTrigger className="hover:no-underline text-white">
                       <div className="flex items-center gap-3 w-full">
                         <Badge variant="outline" className={getCategoryColor(page.category)}>
                           {getCategoryIcon(page.category)}
                         </Badge>
-                        <span className="font-semibold">{page.name}</span>
-                        <span className="text-sm text-muted-foreground ml-auto mr-4">
+                        <span className="font-semibold text-white">{page.name}</span>
+                        <span className="text-sm text-slate-300 ml-auto mr-4">
                           {page.indicators.filter((i) => i.status === "live").length}/{page.indicators.length} live
                         </span>
                       </div>
                     </AccordionTrigger>
                     <AccordionContent>
                       <div className="space-y-4 pt-4">
-                        <p className="text-sm text-muted-foreground">{page.description}</p>
+                        <p className="text-sm text-slate-300">{page.description}</p>
                         {page.indicators.map((indicator, idx) => (
-                          <div key={idx} className="border rounded-lg p-4 bg-slate-50">
+                          <div key={idx} className="border border-slate-500 rounded-lg p-4 bg-slate-600">
                             <div className="flex items-start justify-between mb-3">
                               <div className="flex items-center gap-2">
                                 {getStatusLight(indicator.status)}
                                 {getStatusIcon(indicator.status)}
-                                <span className="font-semibold">{indicator.name}</span>
+                                <span className="font-semibold text-white">{indicator.name}</span>
                               </div>
                               {getStatusBadge(indicator.status)}
                             </div>
                             <div className="space-y-2 text-sm">
-                              <div className="bg-white p-3 rounded border">
-                                <div className="font-mono text-xs text-slate-700 mb-1">{indicator.formula}</div>
-                                <div className="text-slate-600">{indicator.formulaExplanation}</div>
+                              <div className="bg-slate-800 p-3 rounded border border-slate-500">
+                                <div className="font-mono text-xs text-green-400 mb-1">{indicator.formula}</div>
+                                <div className="text-slate-300">{indicator.formulaExplanation}</div>
                               </div>
-                              <div className="p-2 bg-slate-100 rounded text-xs">
-                                <span className="font-medium">Status:</span> {indicator.statusReason}
+                              {indicator.algorithm && (
+                                <div className="flex gap-2">
+                                  <span className="font-medium text-slate-200">Algorithm:</span>
+                                  <span className="text-slate-300">{indicator.algorithm}</span>
+                                </div>
+                              )}
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <span className="font-medium text-slate-200">Primary API:</span>
+                                  <div className="text-xs text-cyan-400 mt-1">{indicator.primaryApi}</div>
+                                </div>
+                                <div>
+                                  <span className="font-medium text-slate-200">Current Source:</span>
+                                  <div className="text-xs text-yellow-400 mt-1 font-semibold">
+                                    {indicator.currentSource}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="mt-2">
+                                <span className="font-medium text-slate-200">Fallback Chain:</span>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {indicator.fallbackChain.map((fb, i) => (
+                                    <Badge
+                                      key={i}
+                                      variant="outline"
+                                      className="text-xs bg-slate-700 text-slate-200 border-slate-500"
+                                    >
+                                      {i + 1}. {fb}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="mt-2 p-2 bg-slate-700 rounded text-xs border border-slate-500">
+                                <span className="font-medium text-slate-200">Status Reason:</span>{" "}
+                                <span className="text-slate-300">{indicator.statusReason}</span>
                               </div>
                             </div>
                           </div>
@@ -569,16 +634,19 @@ END OF AUDIT REPORT
         </>
       )}
 
-      {/* No Results State */}
+      {/* Empty State */}
       {!auditResult && !loading && (
-        <Card className="bg-slate-50">
-          <CardContent className="py-12 text-center">
-            <Zap className="h-16 w-16 mx-auto mb-4 text-slate-300" />
-            <h3 className="text-xl font-semibold text-slate-700 mb-2">Ready to Audit</h3>
-            <p className="text-slate-500 max-w-md mx-auto">
-              Click "Run Full Audit" to test every API, validate all formulas, and check data source availability across
-              the entire platform.
+        <Card className="bg-slate-800 border-slate-700">
+          <CardContent className="p-12 text-center">
+            <Zap className="h-16 w-16 mx-auto mb-4 text-yellow-400 opacity-50" />
+            <h3 className="text-xl font-semibold mb-2 text-white">No Audit Results</h3>
+            <p className="text-slate-400 mb-4">
+              Click "Run Full Audit" to scan all APIs, data sources, and algorithms across your entire system.
             </p>
+            <Button onClick={runFullAudit} className="bg-green-600 hover:bg-green-700 text-white">
+              <PlayCircle className="mr-2 h-4 w-4" />
+              Run Full Audit
+            </Button>
           </CardContent>
         </Card>
       )}
