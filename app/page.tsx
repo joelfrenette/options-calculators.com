@@ -19,6 +19,11 @@ import { JobsReportDashboard } from "@/components/jobs-report-dashboard"
 import { InsiderTradingDashboard } from "@/components/insider-trading-dashboard"
 import { OptionsStrategyToolbox } from "@/components/options-strategy-toolbox"
 import { ExitRulesDashboard } from "@/components/exit-rules-dashboard"
+import { CreditSpreadScanner } from "@/components/credit-spread-scanner"
+import { IronCondorScanner } from "@/components/iron-condor-scanner"
+import { WheelStrategyScreener } from "@/components/wheel-strategy-screener"
+import { HighIVWatchlist } from "@/components/high-iv-watchlist"
+import { EarningsPlaysScanner } from "@/components/earnings-plays-scanner"
 import { Menu, X, TrendingUp, Zap, Search } from "lucide-react"
 import Image from "next/image"
 
@@ -38,9 +43,11 @@ const ANALYZE_TABS = [
 
 const SCAN_TABS = [
   { id: "wheel-scanner", label: "Put Scanner" },
-  { id: "earnings-scanner", label: "Earnings Scanner" },
-  { id: "iv-scanner", label: "IV Scanner" },
-  { id: "unusual-activity", label: "Unusual Activity" },
+  { id: "credit-spread-scanner", label: "Credit Spreads" },
+  { id: "iron-condor-scanner", label: "Iron Condors" },
+  { id: "wheel-screener", label: "Wheel Screener" },
+  { id: "high-iv-watchlist", label: "High IV Watchlist" },
+  { id: "earnings-plays", label: "Earnings Plays" },
 ]
 
 const EXECUTE_TABS = [
@@ -102,30 +109,36 @@ export default function Home() {
         return <CpiInflationAnalysis />
       case "insiders":
         return <InsiderTradingDashboard />
+      // SCAN tabs
       case "wheel-scanner":
         return <WheelScanner />
-      case "earnings-scanner":
-        return <EarningsVolatilityCalculator />
-      case "iv-scanner":
-        return <WheelScanner />
-      case "unusual-activity":
-        return <WheelScanner />
+      case "credit-spread-scanner":
+        return <CreditSpreadScanner />
+      case "iron-condor-scanner":
+        return <IronCondorScanner />
+      case "wheel-screener":
+        return <WheelStrategyScreener />
+      case "high-iv-watchlist":
+        return <HighIVWatchlist />
+      case "earnings-plays":
+        return <EarningsPlaysScanner />
+      // EXECUTE tabs
       case "credit-spreads":
-        return <OptionsStrategyToolbox strategy="credit-spreads" />
+        return <OptionsStrategyToolbox initialStrategy="credit-spreads" />
       case "iron-condors":
-        return <OptionsStrategyToolbox strategy="iron-condors" />
+        return <OptionsStrategyToolbox initialStrategy="iron-condors" />
       case "calendar-spreads":
-        return <OptionsStrategyToolbox strategy="calendar-spreads" />
+        return <OptionsStrategyToolbox initialStrategy="calendar-spreads" />
       case "butterflies":
-        return <OptionsStrategyToolbox strategy="butterflies" />
+        return <OptionsStrategyToolbox initialStrategy="butterflies" />
       case "collars":
-        return <OptionsStrategyToolbox strategy="collars" />
+        return <OptionsStrategyToolbox initialStrategy="collars" />
       case "diagonals":
-        return <OptionsStrategyToolbox strategy="diagonals" />
+        return <OptionsStrategyToolbox initialStrategy="diagonals" />
       case "straddles-strangles":
-        return <OptionsStrategyToolbox strategy="straddles-strangles" />
+        return <OptionsStrategyToolbox initialStrategy="straddles-strangles" />
       case "wheel-strategy":
-        return <OptionsStrategyToolbox strategy="wheel" />
+        return <OptionsStrategyToolbox initialStrategy="wheel" />
       case "exit-rules":
         return <ExitRulesDashboard />
       case "earnings-iv-crusher":
