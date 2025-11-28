@@ -649,6 +649,13 @@ function EconomicAskAIDialog({ event, note }: { event: string; note: string }) {
   )
 }
 
+const RefreshButton = ({ onClick, isLoading }: { onClick: () => void; isLoading: boolean }) => (
+  <Button onClick={onClick} disabled={isLoading} className="bg-teal-600 hover:bg-teal-700 text-white">
+    <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+    Refresh
+  </Button>
+)
+
 export function EarningsEconomicCalendar() {
   const [refreshing, setRefreshing] = useState(false)
   const [selectedEarning, setSelectedEarning] = useState<(typeof earningsData)[0] | null>(null)
@@ -707,8 +714,20 @@ export function EarningsEconomicCalendar() {
 
   return (
     <div className="space-y-6">
+      {/* Hero Section - Now shared between both tabs */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-[#1E3A8A] mb-1">Upcoming Earnings This Week</h1>
+          <p className="text-blue-600/80 flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            {dateRange}
+          </p>
+        </div>
+        <RefreshButton onClick={handleRefresh} isLoading={refreshing} />
+      </div>
+
       <Tabs defaultValue="earnings" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-6">
+        <TabsList className="grid w-full grid-cols-2 mb-4">
           <TabsTrigger value="earnings" className="text-sm font-semibold">
             Upcoming Earnings Reports
           </TabsTrigger>
@@ -719,21 +738,6 @@ export function EarningsEconomicCalendar() {
 
         {/* Earnings Tab */}
         <TabsContent value="earnings" className="p-6 bg-blue-50/50 rounded-lg">
-          {/* Hero Section */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-            <div>
-              <h1 className="text-2xl font-bold text-[#1E3A8A] mb-1">Upcoming Earnings This Week</h1>
-              <p className="text-blue-600/80 flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                {dateRange}
-              </p>
-            </div>
-            <Button onClick={handleRefresh} disabled={refreshing} className="bg-teal-600 hover:bg-teal-700 text-white">
-              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
-          </div>
-
           {earningsData.length > 0 ? (
             <Card className="bg-white shadow-md overflow-hidden">
               <div className="overflow-x-auto">
@@ -819,21 +823,6 @@ export function EarningsEconomicCalendar() {
 
         {/* Economic Events Tab */}
         <TabsContent value="economic" className="p-6 bg-blue-50/50 rounded-lg">
-          {/* Hero Section */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-            <div>
-              <h1 className="text-2xl font-bold text-[#1E3A8A] mb-1">Key Economic Events This Week</h1>
-              <p className="text-blue-600/80 flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                {dateRange}
-              </p>
-            </div>
-            <Button onClick={handleRefresh} disabled={refreshing} className="bg-teal-600 hover:bg-teal-700 text-white">
-              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
-          </div>
-
           {/* Economic Events Table */}
           {economicData.length > 0 ? (
             <Card className="bg-white shadow-md overflow-hidden">
