@@ -113,6 +113,47 @@ export function JobsReportDashboard() {
         </div>
       </div>
 
+      <Card className="bg-white shadow-md border-0 mb-6">
+        <CardHeader>
+          <CardTitle className="text-[#1E3A8A] text-xl">UNRATE vs TRU Trend (2020-2025)</CardTitle>
+          <CardDescription className="text-gray-600">
+            Cooling labor market signals Fed caution on rate cuts
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="#6B7280" />
+                <YAxis domain={[0, 35]} tick={{ fontSize: 11 }} stroke="#6B7280" tickFormatter={(v) => `${v}%`} />
+                <RechartsTooltip
+                  contentStyle={{ backgroundColor: "white", border: "1px solid #E5E7EB", borderRadius: "8px" }}
+                  formatter={(value: number, name: string) => [`${value}%`, name === "unrate" ? "UNRATE" : "TRU"]}
+                />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="unrate"
+                  name="UNRATE (Official)"
+                  stroke="#1E3A8A"
+                  strokeWidth={2}
+                  dot={{ fill: "#1E3A8A", r: 3 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="tru"
+                  name="TRU (True Rate)"
+                  stroke="#0D9488"
+                  strokeWidth={2}
+                  dot={{ fill: "#0D9488", r: 3 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Row 1: UNRATE and TRU Cards */}
       <div className="grid md:grid-cols-2 gap-6 mb-6">
         {/* Official Unemployment Rate Card */}
@@ -210,49 +251,7 @@ export function JobsReportDashboard() {
         </Card>
       </div>
 
-      {/* Row 2: Trend Chart */}
-      <Card className="bg-white shadow-md border-0 mb-6">
-        <CardHeader>
-          <CardTitle className="text-[#1E3A8A] text-xl">UNRATE vs TRU Trend (2020-2025)</CardTitle>
-          <CardDescription className="text-gray-600">
-            Cooling labor market signals Fed caution on rate cuts
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="#6B7280" />
-                <YAxis domain={[0, 35]} tick={{ fontSize: 11 }} stroke="#6B7280" tickFormatter={(v) => `${v}%`} />
-                <RechartsTooltip
-                  contentStyle={{ backgroundColor: "white", border: "1px solid #E5E7EB", borderRadius: "8px" }}
-                  formatter={(value: number, name: string) => [`${value}%`, name === "unrate" ? "UNRATE" : "TRU"]}
-                />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="unrate"
-                  name="UNRATE (Official)"
-                  stroke="#1E3A8A"
-                  strokeWidth={2}
-                  dot={{ fill: "#1E3A8A", r: 3 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="tru"
-                  name="TRU (True Rate)"
-                  stroke="#0D9488"
-                  strokeWidth={2}
-                  dot={{ fill: "#0D9488", r: 3 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Row 3: Upcoming NFP Report */}
+      {/* Row 2: Upcoming NFP Report */}
       <div className="border-t-2 border-[#1E3A8A] pt-6 mb-6">
         <h2 className="text-2xl font-bold text-[#0D9488] mb-4">
           Upcoming Jobs Data: Dec 2025 NFP Report (Fri Dec 5, 8:30 AM ET)
@@ -289,7 +288,7 @@ export function JobsReportDashboard() {
         </Card>
       </div>
 
-      {/* Row 4: AI Insights Accordions */}
+      {/* Row 3: AI Insights Accordions */}
       <div className="border-t-2 border-[#1E3A8A] pt-6 mb-6">
         <h2 className="text-2xl font-bold text-[#1E3A8A] mb-1">AI Insights: Market Impact & Options Trading Tips</h2>
         <div className="w-24 h-1 bg-[#0D9488] mb-6"></div>
