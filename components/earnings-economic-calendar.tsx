@@ -80,22 +80,28 @@ const earningsData = [
   },
 ]
 
-// Sample economic events data
+// Static economic data
 const economicData = [
   {
     date: "Thu Nov 27",
     time: "All Day",
     event: "Thanksgiving Holiday",
+    agency: "NYSE",
     impact: "High",
     note: "US Markets Closed",
+    forecast: "—",
+    previous: "—",
     aiExplainer: "Markets closed. Low liquidity pre/post holiday. Avoid holding short-dated options through break.",
   },
   {
     date: "Fri Nov 28",
     time: "All Day",
     event: "Black Friday",
+    agency: "NYSE",
     impact: "High",
     note: "Shortened Session (1PM Close)",
+    forecast: "—",
+    previous: "—",
     aiExplainer:
       "Half-day session with thin volume. Retail sentiment indicator. Avoid new positions; wide spreads likely.",
   },
@@ -103,8 +109,11 @@ const economicData = [
     date: "Fri Nov 29",
     time: "8:30 AM ET",
     event: "PCE Price Index",
+    agency: "BEA",
     impact: "High",
     note: "Core MoM 0.2% est",
+    forecast: "0.2%",
+    previous: "0.3%",
     aiExplainer:
       "Fed's preferred inflation gauge. Hot print = hawkish Fed fears, bond yields up. Consider SPY straddles for vol.",
   },
@@ -112,16 +121,22 @@ const economicData = [
     date: "Mon Dec 1",
     time: "10:00 AM ET",
     event: "ISM Manufacturing PMI",
+    agency: "ISM",
     impact: "High",
     note: "Est. 47.5",
+    forecast: "47.5",
+    previous: "46.5",
     aiExplainer: "Below 50 = contraction. Watch XLI/XLB for sector plays. Iron condors if reading near consensus.",
   },
   {
     date: "Wed Dec 3",
     time: "8:15 AM ET",
     event: "ADP Employment Change",
+    agency: "ADP",
     impact: "Med",
     note: "Est. +150K",
+    forecast: "+150K",
+    previous: "+233K",
     aiExplainer: "NFP preview. Weak jobs = rate cut hopes = bullish tech. Consider QQQ call spreads if soft.",
   },
 ]
@@ -325,7 +340,6 @@ function InsightAccordion({ insights, type }: { insights: typeof earningsInsight
                     title: insight.title,
                     details: `${insight.summary} Key points: ${insight.watchPoints.join(", ")}. Trading tips: ${insight.tradingTips.join(", ")}`,
                   }}
-                  buttonClassName="bg-teal-600 hover:bg-teal-700 text-white w-full sm:w-auto"
                 />
               </div>
             </AccordionContent>
@@ -376,14 +390,10 @@ function AskAIDialog({ ticker, company }: { ticker: string; company: string }) {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button
-          size="sm"
-          variant="outline"
-          className="bg-teal-50 border-teal-200 text-teal-700 hover:bg-teal-100 hover:text-teal-800"
-        >
-          <MessageSquare className="h-3 w-3 mr-1" />
-          Ask AI
-        </Button>
+        <button className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center gap-1.5 shadow-md transition-all cursor-pointer">
+          <Sparkles className="h-3.5 w-3.5 text-white" />
+          <span className="text-white font-semibold text-xs">Ask AI</span>
+        </button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-hidden flex flex-col bg-white">
         <DialogHeader>
@@ -794,8 +804,6 @@ export function EarningsEconomicCalendar() {
                                 date: item.date,
                                 aiExplainer: item.aiExplainer,
                               }}
-                              buttonVariant="outline"
-                              buttonClassName="border-teal-500 text-teal-600 hover:bg-teal-50"
                             />
                           </td>
                         </tr>
@@ -837,67 +845,70 @@ export function EarningsEconomicCalendar() {
                         Event
                         <InfoTooltip content="Economic events can significantly impact market direction. High-impact events like FOMC decisions, CPI, and NFP often cause large moves in indices and rate-sensitive stocks. Plan your options positions around these dates." />
                       </th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Impact
-                        <InfoTooltip content="Impact rating indicates expected market volatility. HIGH impact events like Fed decisions can move SPY 1-3%. MEDIUM impact events typically cause 0.5-1% moves. LOW impact events usually have minimal market effect." />
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Agency
+                        <InfoTooltip content="The government agency or organization responsible for releasing this economic data. BEA = Bureau of Economic Analysis, BLS = Bureau of Labor Statistics, ISM = Institute for Supply Management, Fed = Federal Reserve." />
                       </th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Actual
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider min-w-[280px]">
+                        <div className="flex items-center gap-1">
+                          <Sparkles className="h-3 w-3 text-blue-500" />
+                          AI Explainer
+                          <InfoTooltip content="AI-generated summary of potential market impact and options trading implications for this economic event." />
+                        </div>
                       </th>
                       <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Forecast
-                      </th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Previous
                       </th>
                       <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  {/* Existing tbody code */}
                   <tbody className="divide-y divide-gray-100">
-                    {economicData.map(
-                      (
-                        event,
-                        index, // Changed to economicData
-                      ) => (
-                        <tr key={index} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-3">
-                            <div className="text-sm font-medium text-gray-900">{event.date}</div>
-                            <div className="text-xs text-gray-500 flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {event.time}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-900 font-medium">{event.event}</td>
-                          <td className="px-4 py-3 text-center">
-                            <ImpactBadge impact={event.impact} />
-                          </td>
-                          <td className="px-4 py-3 text-center text-sm text-gray-600">{event.actual || "—"}</td>
-                          <td className="px-4 py-3 text-center text-sm text-gray-600">{event.forecast || "—"}</td>
-                          <td className="px-4 py-3 text-center text-sm text-gray-600">{event.previous || "—"}</td>
-                          <td className="px-4 py-3 text-center">
-                            <RunScenarioInAIDialog
-                              context={{
-                                type: "economic",
-                                event: event.event,
-                                date: event.date,
-                                impact: event.impact,
-                                forecast: event.forecast,
-                                previous: event.previous,
-                              }}
-                              buttonVariant="outline"
-                              buttonClassName="border-amber-500 text-amber-600 hover:bg-amber-50"
-                            />
-                          </td>
-                        </tr>
-                      ),
-                    )}
+                    {economicData.map((event, index) => (
+                      <tr key={index} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="text-sm font-medium text-gray-900">{event.date}</div>
+                          <div className="text-xs text-gray-500 flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {event.time}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-blue-600 font-medium">{event.event}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600 font-medium">{event.agency}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600 max-w-[320px]">{event.aiExplainer}</td>
+                        <td className="px-4 py-3 text-center text-sm text-gray-600">{event.forecast || "—"}</td>
+                        <td className="px-4 py-3 text-center">
+                          <RunScenarioInAIDialog
+                            context={{
+                              type: "economic",
+                              event: event.event,
+                              date: event.date,
+                              impact: event.impact,
+                              forecast: event.forecast,
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
             </Card>
+
+            {/* AI Insights */}
+            <InsightAccordion insights={economicInsights} type="economic" />
+
+            {/* Footer Banner */}
+            <div className="mt-8 bg-amber-100/50 rounded-lg p-4 flex flex-col sm:flex-row items-center justify-between gap-3 border border-amber-200">
+              <p className="text-[#1E3A8A] text-sm font-medium text-center sm:text-left">
+                Plan your trades around market-moving events—use Options-Calculators.com for scenario analysis.
+              </p>
+              <div className="flex items-center gap-2 text-teal-600 font-semibold text-sm">
+                <TrendingUp className="h-4 w-4" />
+                OPTIONS-CALCULATORS.COM
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
       </div>

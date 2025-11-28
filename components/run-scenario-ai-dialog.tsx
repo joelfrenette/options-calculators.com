@@ -30,7 +30,7 @@ interface RunScenarioInAIDialogProps {
 export function RunScenarioInAIDialog({
   context,
   buttonVariant = "default",
-  buttonClassName = "bg-teal-600 hover:bg-teal-700 text-white",
+  buttonClassName = "px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center gap-1.5 shadow-md transition-all",
 }: RunScenarioInAIDialogProps) {
   const [question, setQuestion] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -148,10 +148,10 @@ export function RunScenarioInAIDialog({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant={buttonVariant} className={buttonClassName}>
-          <Sparkles className="h-4 w-4 mr-2" />
-          Run Scenario in AI
-        </Button>
+        <button className={buttonClassName}>
+          <Sparkles className="h-3.5 w-3.5 text-white" />
+          <span className="text-white font-semibold text-xs">Ask AI</span>
+        </button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-hidden flex flex-col bg-white">
         <DialogHeader>

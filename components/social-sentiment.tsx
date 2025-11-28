@@ -23,7 +23,6 @@ import {
   Activity,
   BarChart3,
   Sparkles,
-  MessageSquare,
   Send,
   ArrowUpRight,
   ArrowDownRight,
@@ -230,10 +229,10 @@ function AskAIDialog({ sentimentData }: { sentimentData: SentimentData }) {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2 bg-transparent">
-          <MessageSquare className="h-4 w-4" />
-          Ask AI
-        </Button>
+        <button className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center gap-1.5 shadow-md transition-all cursor-pointer">
+          <Sparkles className="h-3.5 w-3.5 text-white" />
+          <span className="text-white font-semibold text-xs">Ask AI</span>
+        </button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl bg-white">
         <DialogHeader>
