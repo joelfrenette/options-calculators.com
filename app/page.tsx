@@ -33,10 +33,10 @@ const ANALYZE_TABS = [
   { id: "risk-management", label: "CBOE VIX Volatility Index" },
   { id: "market-sentiment", label: "CNN's Fear & Greed" },
   { id: "panic-euphoria", label: "Citibank's Panic & Euphoria Index" },
-  { id: "social-sentiment", label: "Social Sentiment" },
+  { id: "social-sentiment", label: "Social Sentiment Index" },
   { id: "ccpi", label: "Crash & Corrections Prediction Index" },
-  { id: "fomc-predictions", label: "FOMC Fed Rate" },
-  { id: "cpi-inflation", label: "BLS CPI Inflation" },
+  { id: "fomc-predictions", label: "FOMC Fed Rate Forecaster" },
+  { id: "cpi-inflation", label: "BLS CPI Inflation Forecaster" },
   { id: "jobs", label: "BLS Jobs Rate" },
 ]
 

@@ -540,11 +540,14 @@ export function SocialSentiment() {
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-400 to-red-500" />
                       <div
                         className="absolute top-0 bottom-0 right-0 bg-gray-200"
-                        style={{ width: `${100 - safeNumber(data?.macro_sentiment, 47)}%` }}
+                        style={{ width: `${safeNumber(data?.macro_sentiment, 47)}%` }}
                       />
                       <div
                         className="absolute top-0 bottom-0 w-1 bg-gray-800 rounded"
-                        style={{ left: `${safeNumber(data?.macro_sentiment, 47)}%`, transform: "translateX(-50%)" }}
+                        style={{
+                          left: `${100 - safeNumber(data?.macro_sentiment, 47)}%`,
+                          transform: "translateX(-50%)",
+                        }}
                       />
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
@@ -564,11 +567,14 @@ export function SocialSentiment() {
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-400 to-red-500" />
                       <div
                         className="absolute top-0 bottom-0 right-0 bg-gray-200"
-                        style={{ width: `${100 - safeNumber(data?.social_sentiment, 54)}%` }}
+                        style={{ width: `${safeNumber(data?.social_sentiment, 54)}%` }}
                       />
                       <div
                         className="absolute top-0 bottom-0 w-1 bg-gray-800 rounded"
-                        style={{ left: `${safeNumber(data?.social_sentiment, 54)}%`, transform: "translateX(-50%)" }}
+                        style={{
+                          left: `${100 - safeNumber(data?.social_sentiment, 54)}%`,
+                          transform: "translateX(-50%)",
+                        }}
                       />
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
