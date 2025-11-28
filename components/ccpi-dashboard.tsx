@@ -525,7 +525,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">Comprehensive Crash Prediction Index (CCPI)</h2>
+            <h2 className="text-2xl font-bold tracking-tight">Crash &amp; Corrections Prediction Index (CCPI)</h2>
             <p className="text-muted-foreground">Real-time market crash risk assessment across 4 key dimensions</p>
             {data?.lastUpdated && (
               <p className="text-xs text-muted-foreground mt-1">
@@ -559,7 +559,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-2xl">CCPI: Crash & Correction Prediction Index</CardTitle>
+                <CardTitle className="text-2xl">Crash &amp; Corrections Prediction Index (CCPI)</CardTitle>
                 <CardDescription>AI-led market correction early warning oracle for options traders</CardDescription>
               </div>
               <Badge variant={zone.color === "red" ? "destructive" : "secondary"} className="text-lg px-4 py-2">
@@ -985,7 +985,6 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
           </CardContent>
         </Card>
 
-        {/* Four Pillars - Collapsible Breakdown */}
         <Accordion type="multiple" defaultValue={[]} className="space-y-4">
           {/* Pillar 1 - Momentum & Technical */}
           <AccordionItem value="pillar1" className="border rounded-lg px-4">
@@ -1633,7 +1632,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                             <TooltipTrigger asChild>
                               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-green-50 border-green-200">
+                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
                               <p className="font-semibold mb-1">Yield Curve (10Y-2Y) Spread</p>
                               <p className="text-sm">Difference between 10-year and 2-year Treasury yields.</p>
                               <ul className="text-sm mt-1 space-y-1">
@@ -1677,6 +1676,357 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
               </div>
             </AccordionContent>
           </AccordionItem>
+
+          {/* Pillar 2 - Risk Appetite & Volatility */}
+          <AccordionItem value="pillar2" className="border rounded-lg px-4">
+            <AccordionTrigger className="hover:no-underline py-10">
+              <div className="flex items-center justify-between w-full pr-4">
+                <div className="flex items-center gap-2">
+                  <TrendingDown className="h-5 w-5 text-orange-600" />
+                  <span className="text-lg font-semibold">Pillar 2 - Risk Appetite & Volatility</span>
+                  <span className="text-sm text-gray-600">Weight: 30% | 8 indicators</span>
+                </div>
+                <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.riskAppetite)}/100</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="space-y-6 pt-4">
+                {/* Put/Call Ratio */}
+                {data.indicators.putCallRatio !== undefined && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium flex items-center gap-1">
+                        Put/Call Ratio
+                        {tooltipsEnabled && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-orange-50 border-orange-200">
+                              <p className="font-semibold mb-1">Put/Call Ratio</p>
+                              <p className="text-sm">
+                                Measures the ratio of put options to call options traded. Indicates market hedging
+                                activity.
+                              </p>
+                              <ul className="text-sm mt-1 space-y-1">
+                                <li>
+                                  <strong>{"<"} 0.7:</strong> Extreme complacency, high crash risk
+                                </li>
+                                <li>
+                                  <strong>0.7 - 1.0:</strong> Normal hedging levels
+                                </li>
+                                <li>
+                                  <strong>{">"} 1.0:</strong> Elevated fear, potential bottom signal
+                                </li>
+                              </ul>
+                              <p className="text-xs mt-2">
+                                <strong>Options Impact:</strong> Low ratios signal complacency - consider buying puts.
+                                High ratios often precede rallies.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
+                      <span className="font-bold">{data.indicators.putCallRatio.toFixed(2)}</span>
+                    </div>
+                    <div className="relative w-full h-3 rounded-full overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                      <div
+                        className="absolute inset-0 bg-gray-200"
+                        style={{
+                          marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.putCallRatio - 0.5) / 1.0) * 100))}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-600">
+                      <span>Complacent: {"<"}0.7</span>
+                      <span>Normal: 0.8-1.0</span>
+                      <span>Fearful: {">"}1.0</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* AAII Bullish Sentiment */}
+                {data.indicators.aaiiBullish !== undefined && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium flex items-center gap-1">
+                        AAII Bullish Sentiment
+                        {tooltipsEnabled && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-orange-50 border-orange-200">
+                              <p className="font-semibold mb-1">AAII Bullish Sentiment</p>
+                              <p className="text-sm">
+                                Weekly survey of individual investors. Measures retail investor optimism.
+                              </p>
+                              <ul className="text-sm mt-1 space-y-1">
+                                <li>
+                                  <strong>{"<"} 25%:</strong> Extreme pessimism, contrarian buy signal
+                                </li>
+                                <li>
+                                  <strong>25-45%:</strong> Normal sentiment range
+                                </li>
+                                <li>
+                                  <strong>{">"} 50%:</strong> Euphoria, high crash risk
+                                </li>
+                              </ul>
+                              <p className="text-xs mt-2">
+                                <strong>Options Impact:</strong> High bullishness = sell premium. Low bullishness = buy
+                                calls on dips.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
+                      <span className="font-bold">{data.indicators.aaiiBullish.toFixed(1)}%</span>
+                    </div>
+                    <div className="relative w-full h-3 rounded-full overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                      <div
+                        className="absolute inset-0 bg-gray-200"
+                        style={{
+                          marginLeft: `${Math.min(100, Math.max(0, (data.indicators.aaiiBullish / 70) * 100))}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-600">
+                      <span>Pessimism: {"<"}25%</span>
+                      <span>Normal: 30-40%</span>
+                      <span>Euphoria: {">"}50%</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* AAII Bearish Sentiment */}
+                {data.indicators.aaiiBearish !== undefined && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium flex items-center gap-1">
+                        AAII Bearish Sentiment
+                        {tooltipsEnabled && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-orange-50 border-orange-200">
+                              <p className="font-semibold mb-1">AAII Bearish Sentiment</p>
+                              <p className="text-sm">
+                                Percentage of investors expecting stocks to fall over the next 6 months.
+                              </p>
+                              <ul className="text-sm mt-1 space-y-1">
+                                <li>
+                                  <strong>{">"} 50%:</strong> Extreme fear, contrarian buy signal
+                                </li>
+                                <li>
+                                  <strong>25-40%:</strong> Normal bearishness
+                                </li>
+                                <li>
+                                  <strong>{"<"} 20%:</strong> Complacency, caution warranted
+                                </li>
+                              </ul>
+                              <p className="text-xs mt-2">
+                                <strong>Options Impact:</strong> Extreme bearishness often marks bottoms - consider
+                                selling puts.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
+                      <span className="font-bold">{data.indicators.aaiiBearish.toFixed(1)}%</span>
+                    </div>
+                    <div className="relative w-full h-3 rounded-full overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                      <div
+                        className="absolute inset-0 bg-gray-200"
+                        style={{
+                          marginLeft: `${Math.min(100, Math.max(0, (data.indicators.aaiiBearish / 60) * 100))}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-600">
+                      <span>Complacent: {"<"}20%</span>
+                      <span>Normal: 25-35%</span>
+                      <span>Fear: {">"}50%</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* AAII Spread (Bull-Bear) */}
+                {data.indicators.aaiiSpread !== undefined && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium flex items-center gap-1">
+                        AAII Bull-Bear Spread
+                        {tooltipsEnabled && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-orange-50 border-orange-200">
+                              <p className="font-semibold mb-1">AAII Bull-Bear Spread</p>
+                              <p className="text-sm">
+                                Difference between bullish and bearish percentages. Net investor sentiment.
+                              </p>
+                              <ul className="text-sm mt-1 space-y-1">
+                                <li>
+                                  <strong>{">"} +20:</strong> Extreme optimism, potential top
+                                </li>
+                                <li>
+                                  <strong>-10 to +10:</strong> Neutral sentiment
+                                </li>
+                                <li>
+                                  <strong>{"<"} -20:</strong> Extreme pessimism, potential bottom
+                                </li>
+                              </ul>
+                              <p className="text-xs mt-2">
+                                <strong>Options Impact:</strong> Extreme readings are contrarian indicators.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
+                      <span
+                        className={`font-bold ${data.indicators.aaiiSpread > 0 ? "text-green-600" : "text-red-600"}`}
+                      >
+                        {data.indicators.aaiiSpread > 0 ? "+" : ""}
+                        {data.indicators.aaiiSpread.toFixed(1)}
+                      </span>
+                    </div>
+                    <div className="relative w-full h-3 rounded-full overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                      <div
+                        className="absolute inset-0 bg-gray-200"
+                        style={{
+                          marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.aaiiSpread + 40) / 80) * 100))}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-600">
+                      <span>Pessimistic: {"<"}-20</span>
+                      <span>Neutral: 0</span>
+                      <span>Euphoric: {">"}+20</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Fear & Greed Index */}
+                {data.indicators.fearGreedIndex !== undefined && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium flex items-center gap-1">
+                        CNN Fear & Greed Index
+                        {tooltipsEnabled && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-orange-50 border-orange-200">
+                              <p className="font-semibold mb-1">CNN Fear & Greed Index</p>
+                              <p className="text-sm">
+                                Composite of 7 market indicators measuring investor sentiment from 0 (extreme fear) to
+                                100 (extreme greed).
+                              </p>
+                              <ul className="text-sm mt-1 space-y-1">
+                                <li>
+                                  <strong>0-25:</strong> Extreme Fear - contrarian buy zone
+                                </li>
+                                <li>
+                                  <strong>26-50:</strong> Fear/Neutral
+                                </li>
+                                <li>
+                                  <strong>51-75:</strong> Greed
+                                </li>
+                                <li>
+                                  <strong>76-100:</strong> Extreme Greed - high crash risk
+                                </li>
+                              </ul>
+                              <p className="text-xs mt-2">
+                                <strong>Options Impact:</strong> Extreme greed = buy puts/reduce exposure. Extreme fear
+                                = sell puts.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
+                      <span className="font-bold">{data.indicators.fearGreedIndex}/100</span>
+                    </div>
+                    <div className="relative w-full h-3 rounded-full overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                      <div
+                        className="absolute inset-0 bg-gray-200"
+                        style={{
+                          marginLeft: `${Math.min(100, data.indicators.fearGreedIndex)}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-600">
+                      <span>Extreme Fear: 0-25</span>
+                      <span>Neutral: 45-55</span>
+                      <span>Extreme Greed: 75-100</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* High Yield Spread */}
+                {data.indicators.highYieldSpread !== undefined && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium flex items-center gap-1">
+                        High Yield Credit Spread
+                        {tooltipsEnabled && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-orange-50 border-orange-200">
+                              <p className="font-semibold mb-1">High Yield Credit Spread</p>
+                              <p className="text-sm">
+                                Difference between junk bond yields and Treasury yields. Measures credit risk appetite.
+                              </p>
+                              <ul className="text-sm mt-1 space-y-1">
+                                <li>
+                                  <strong>{"<"} 3%:</strong> Low risk perception, complacency
+                                </li>
+                                <li>
+                                  <strong>3-5%:</strong> Normal credit conditions
+                                </li>
+                                <li>
+                                  <strong>{">"} 5%:</strong> Credit stress, recession risk
+                                </li>
+                              </ul>
+                              <p className="text-xs mt-2">
+                                <strong>Options Impact:</strong> Widening spreads signal risk-off - reduce bullish
+                                positions.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
+                      <span className="font-bold">{data.indicators.highYieldSpread.toFixed(2)}%</span>
+                    </div>
+                    <div className="relative w-full h-3 rounded-full overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                      <div
+                        className="absolute inset-0 bg-gray-200"
+                        style={{
+                          marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.highYieldSpread - 2) / 6) * 100))}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-600">
+                      <span>Low Risk: {"<"}3%</span>
+                      <span>Normal: 3-5%</span>
+                      <span>Stress: {">"}6%</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+          {/* End of Pillar 2 */}
 
           {/* Pillar 3 - Valuation & Market Structure */}
           <AccordionItem value="pillar3" className="border rounded-lg px-4">
@@ -2372,7 +2722,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                             <TooltipContent className="max-w-xs bg-orange-50 border-orange-200">
                               <p className="font-semibold mb-1">Junk Bond Spread</p>
                               <p className="text-sm">
-                                Difference between yields on high-yield (junk) bonds and risk-free Treasuries.
+                                Difference between high-yield (junk) bonds and risk-free Treasuries.
                               </p>
                               <ul className="text-sm mt-1 space-y-1">
                                 <li>

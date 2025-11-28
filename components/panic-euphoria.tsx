@@ -1,10 +1,13 @@
 "use client"
 
+import type React from "react"
+
 import { TooltipContent } from "@/components/ui/tooltip"
 
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { RefreshButton } from "@/components/ui/refresh-button"
+import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import {
   Activity,
@@ -113,6 +116,8 @@ export function PanicEuphoria() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [showTooltips, setShowTooltips] = useState(true) // State for tooltips toggle
+  const [tooltipsEnabled, setTooltipsEnabled] = useState(true) // <-- UPDATE
 
   const fetchData = async () => {
     try {
@@ -368,691 +373,759 @@ export function PanicEuphoria() {
   const recommendations = getTradeRecommendations(data.overallScore, data.aboveMA)
   const allLevelGuidance = getAllLevelGuidance()
 
+  const ConditionalTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => {
+    if (!tooltipsEnabled) return <>{children}</>
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{children}</TooltipTrigger>
+        <TooltipContent className="max-w-xs">
+          <p className="text-sm">{content}</p>
+        </TooltipContent>
+      </Tooltip>
+    )
+  }
+
   return (
-    <div className="space-y-4">
-      <Card className="shadow-sm border-gray-200">
-        <CardHeader className="bg-gray-50 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-purple-600" />
-                Panic/Euphoria Historical Scale
-              </CardTitle>
-              <CardDescription className="text-sm text-gray-600 mt-1">
-                Visual representation of sentiment zones from extreme panic to extreme euphoria
-              </CardDescription>
-            </div>
-            <RefreshButton onClick={handleRefresh} loading={refreshing} />
-          </div>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <div className="space-y-6">
-            {/* Main sentiment scale */}
-            <div className="relative">
-              <div className="h-24 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded-lg shadow-inner" />
-
-              {/* Zone labels - repositioned for contrarian scale */}
-              <div className="absolute inset-0 flex items-center justify-between px-2 text-xs font-bold">
-                <div className="text-center text-white drop-shadow-lg">
-                  <div className="text-base">EXTREME</div>
-                  <div>PANIC</div>
-                  <div className="text-[10px] mt-1 text-green-100">≤ -0.45</div>
-                  <div className="text-[9px] text-green-200">BUY</div>
-                </div>
-                <div className="text-center text-gray-800 drop-shadow">
-                  <div>PANIC</div>
-                  <div className="text-[10px] mt-1">-0.17</div>
-                  <div className="text-[9px] text-green-700">Bullish</div>
-                </div>
-                <div className="text-center text-gray-800 drop-shadow">
-                  <div>NEUTRAL</div>
-                  <div className="text-[10px] mt-1">0.0</div>
-                </div>
-                <div className="text-center text-gray-800 drop-shadow">
-                  <div>EUPHORIA</div>
-                  <div className="text-[10px] mt-1">+0.41</div>
-                  <div className="text-[9px] text-red-700">Bearish</div>
-                </div>
-                <div className="text-center text-white drop-shadow-lg">
-                  <div className="text-base">EXTREME</div>
-                  <div>EUPHORIA</div>
-                  <div className="text-[10px] mt-1">≥ +0.70</div>
-                  <div className="text-[9px] text-red-200">SELL</div>
-                </div>
+    <TooltipProvider>
+      <div className="space-y-4">
+        <Card className="shadow-sm border-gray-200">
+          <CardHeader className="bg-gray-50 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-purple-600" />
+                  Panic/Euphoria Historical Scale
+                  {tooltipsEnabled && (
+                    <ConditionalTooltip content="The Citibank Panic/Euphoria Model is a contrarian indicator measuring extreme sentiment. For options traders: readings below -0.17 (panic) historically signal buying opportunities - consider selling puts or buying calls. Readings above +0.41 (euphoria) suggest caution - consider protective puts or bear call spreads. Extreme readings have 80%+ accuracy predicting reversals within 1 year.">
+                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </ConditionalTooltip>
+                  )}
+                </CardTitle>
+                <CardDescription className="text-sm text-gray-600 mt-1">
+                  Visual representation of sentiment zones from extreme panic to extreme euphoria
+                </CardDescription>
               </div>
+              <div className="flex items-center gap-3">
+                <TooltipsToggle enabled={tooltipsEnabled} onChange={setTooltipsEnabled} />
+                <RefreshButton onClick={handleRefresh} loading={refreshing} />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="space-y-6">
+              {/* Main sentiment scale */}
+              <div className="relative">
+                <div className="h-24 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded-lg shadow-inner" />
 
-              {/* Current level indicator */}
-              {data && (
-                <div
-                  className="absolute top-0 bottom-0 w-2 bg-black shadow-lg transition-all duration-500"
-                  style={{
-                    left: `calc(${((data.overallScore + 1) / 2) * 100}% - 4px)`,
-                  }}
-                >
-                  <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap">
-                    <div className="bg-black text-white px-4 py-2 rounded-lg shadow-xl">
-                      <div className="text-xs font-semibold">TODAY</div>
-                      <div className="text-2xl font-bold">
-                        {data.overallScore >= 0 ? "+" : ""}
-                        {data.overallScore.toFixed(3)}
-                      </div>
-                      <div className="text-xs text-center">{getScoreLabel(data.overallScore)}</div>
-                    </div>
-                    <div className="w-0 h-0 border-l-8 border-r-8 border-transparent border-t-black mx-auto" />
+                {/* Zone labels - repositioned for contrarian scale */}
+                <div className="absolute inset-0 flex items-center justify-between px-2 text-xs font-bold">
+                  <div className="text-center text-white drop-shadow-lg">
+                    <div className="text-base">EXTREME</div>
+                    <div>PANIC</div>
+                    <div className="text-[10px] mt-1 text-green-100">≤ -0.45</div>
+                    <div className="text-[9px] text-green-200">BUY</div>
+                  </div>
+                  <div className="text-center text-gray-800 drop-shadow">
+                    <div>PANIC</div>
+                    <div className="text-[10px] mt-1">-0.17</div>
+                    <div className="text-[9px] text-green-700">Bullish</div>
+                  </div>
+                  <div className="text-center text-gray-800 drop-shadow">
+                    <div>NEUTRAL</div>
+                    <div className="text-[10px] mt-1">0.0</div>
+                  </div>
+                  <div className="text-center text-gray-800 drop-shadow">
+                    <div>EUPHORIA</div>
+                    <div className="text-[10px] mt-1">+0.41</div>
+                    <div className="text-[9px] text-red-700">Bearish</div>
+                  </div>
+                  <div className="text-center text-white drop-shadow-lg">
+                    <div className="text-base">EXTREME</div>
+                    <div>EUPHORIA</div>
+                    <div className="text-[10px] mt-1">≥ +0.70</div>
+                    <div className="text-[9px] text-red-200">SELL</div>
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* Component breakdown horizontal bars */}
+                {/* Current level indicator */}
+                {data && (
+                  <div
+                    className="absolute top-0 bottom-0 w-2 bg-black shadow-lg transition-all duration-500"
+                    style={{
+                      left: `calc(${((data.overallScore + 1) / 2) * 100}% - 4px)`,
+                    }}
+                  >
+                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                      <div className="bg-black text-white px-4 py-2 rounded-lg shadow-xl">
+                        <div className="text-xs font-semibold">TODAY</div>
+                        <div className="text-2xl font-bold">
+                          {data.overallScore >= 0 ? "+" : ""}
+                          {data.overallScore.toFixed(3)}
+                        </div>
+                        <div className="text-xs text-center">{getScoreLabel(data.overallScore)}</div>
+                      </div>
+                      <div className="w-0 h-0 border-l-8 border-r-8 border-transparent border-t-black mx-auto" />
+                    </div>
+                  </div>
+                )}
+              </div>
 
-            {/* Historical context */}
-            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="font-bold text-blue-900 text-sm mb-2">Historical Reference Points</h4>
-              <div className="space-y-2 text-xs text-blue-800">
-                <div className="flex justify-between">
-                  <span>• 2009 Financial Crisis Bottom:</span>
-                  <span className="font-bold">-0.85 {`(\u003e95% gain rate)`}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>• 2020 COVID-19 March Low:</span>
-                  <span className="font-bold">-0.72 {`(\u003e95% gain rate)`}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>• 2021 Meme Stock Peak:</span>
-                  <span className="font-bold">+0.81 {`(\u003e80% drop rate)`}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>• 2024 AI Rally Peak:</span>
-                  <span className="font-bold">+0.73 {`(\u003e80% drop rate)`}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>• Nov 2025 (Latest Official Citi):</span>
-                  <span className="font-bold">+0.72 (Euphoria Territory)</span>
+              {/* Component breakdown horizontal bars */}
+
+              {/* Historical context */}
+              <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="font-bold text-blue-900 text-sm mb-2">Historical Reference Points</h4>
+                <div className="space-y-2 text-xs text-blue-800">
+                  <div className="flex justify-between">
+                    <span>• 2009 Financial Crisis Bottom:</span>
+                    <span className="font-bold">-0.85 {`(\u003e95% gain rate)`}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>• 2020 COVID-19 March Low:</span>
+                    <span className="font-bold">-0.72 {`(\u003e95% gain rate)`}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>• 2021 Meme Stock Peak:</span>
+                    <span className="font-bold">+0.81 {`(\u003e80% drop rate)`}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>• 2024 AI Rally Peak:</span>
+                    <span className="font-bold">+0.73 {`(\u003e80% drop rate)`}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>• Nov 2025 (Latest Official Citi):</span>
+                    <span className="font-bold">+0.72 (Euphoria Territory)</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      <Card className="shadow-sm border-gray-200">
-        <CardHeader className="bg-gray-50 border-b border-gray-200">
-          <CardTitle className="text-sm font-bold text-gray-900 flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-purple-600" />9 Levkovich Indicators (Citibank Model)
-          </CardTitle>
-          <CardDescription className="text-xs text-gray-600">
-            Live data from FINRA, FRED, Yahoo Finance, and AI estimates • Updated every 60 seconds
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pt-4 space-y-4">
-          {data && (
-            <>
-              <PanicIndicator
-                label="NYSE Short Interest"
-                value={Math.max(-1, Math.min(1, ((data.nyseShortInterest - 20) / 10) * -1))}
-                rawValue={`${data.nyseShortInterest}%`}
-                tooltip="NYSE Short Interest measures the percentage of shares sold short relative to total float. SOURCE: Derived from VIX volatility and market conditions. INTERPRETATION: High short interest (>25%) indicates extreme bearish positioning, which historically signals panic and is a contrarian BUY signal. Low short interest (<15%) suggests complacency/euphoria. Current range: 10-30%."
-              />
-              <PanicIndicator
-                label="Margin Debt"
-                value={(data.marginDebt - 700) / 150}
-                rawValue={`$${data.marginDebt}B`}
-                tooltip="Margin Debt tracks total borrowed money used for stock purchases. SOURCE: FINRA monthly margin statistics via FRED. INTERPRETATION: High margin debt (>$800B) indicates leveraged speculation and euphoria—investors are borrowing heavily to buy stocks, a warning sign. Low margin debt (<$600B) suggests fear/panic. Current range: $600-$850B."
-              />
-              <PanicIndicator
-                label="Nasdaq/NYSE Volume Ratio"
-                value={(data.volumeRatio - 1.0) / 0.5}
-                rawValue={`${data.volumeRatio.toFixed(2)}x`}
-                tooltip="Nasdaq/NYSE Volume Ratio compares trading volume between tech-heavy Nasdaq and value-oriented NYSE. SOURCE: Real-time exchange volume data. INTERPRETATION: High ratio (>1.3x) indicates speculative tech/growth trading—euphoria signal. Low ratio (<0.9x) suggests rotation to value/safety—defensive positioning. Current range: 0.8-1.5x."
-              />
-              <PanicIndicator
-                label="Investor Intelligence Survey"
-                value={(data.investorIntelligence - 50) / 20}
-                rawValue={`${data.investorIntelligence}% bulls`}
-                tooltip="Investor Intelligence Survey polls professional newsletter writers for their market outlook. SOURCE: Investor Intelligence weekly survey data. INTERPRETATION: High bullishness (>60%) is a contrarian SELL signal—when experts are too optimistic, markets often decline. Low bullishness (<40%) is a contrarian BUY signal. Current range: 30-70%."
-              />
-              <PanicIndicator
-                label="AAII Bullish Sentiment"
-                value={(data.aaiiBullish - 40) / 25}
-                rawValue={`${data.aaiiBullish}%`}
-                tooltip="AAII (American Association of Individual Investors) Bullish Sentiment measures retail investor optimism. SOURCE: Weekly AAII sentiment survey. INTERPRETATION: High bullishness (>55%) indicates retail euphoria—historically a contrarian SELL signal. Low bullishness (<25%) indicates panic—historically a BUY opportunity. Current range: 25-65%."
-              />
-              <PanicIndicator
-                label="Money Market Funds"
-                value={(6.0 - data.moneyMarketFunds) / 1.0}
-                rawValue={`$${data.moneyMarketFunds}T`}
-                tooltip="Money Market Fund Assets tracks cash sitting on the sidelines in low-risk money market accounts. SOURCE: Investment Company Institute (ICI) via FRED. INTERPRETATION: High cash levels (>$6T) indicate fear/caution—this is 'dry powder' that could fuel a rally (bullish). Low cash (<$5T) means investors are fully invested—euphoria/risk. Current range: $5-7T."
-              />
-              <PanicIndicator
-                label="Put/Call Ratio"
-                value={(1.0 - data.putCallRatio) / 0.3}
-                rawValue={`${data.putCallRatio.toFixed(2)}`}
-                tooltip="Put/Call Ratio measures hedging activity via options markets. SOURCE: Derived from VIX term structure and options flow data. INTERPRETATION: High ratio (>1.1) indicates heavy put buying/hedging—fear and panic, which is contrarian bullish. Low ratio (<0.8) indicates complacency—no one is hedging, euphoria signal. Current range: 0.8-1.3."
-              />
-              <PanicIndicator
-                label="Commodity Prices (CRB)"
-                value={(data.commodityPrices - 280) / 40}
-                rawValue={`${data.commodityPrices.toFixed(1)}`}
-                tooltip="CRB Commodity Index tracks a basket of raw materials including energy, metals, and agriculture. SOURCE: Live commodity futures data. INTERPRETATION: High prices (>300) indicate inflation/speculation—economic overheating and euphoria. Low prices (<260) suggest deflation fears/recession—panic territory. Current range: 250-320."
-              />
-              <PanicIndicator
-                label="Retail Gas Prices"
-                value={(3.25 - data.gasPrices) / 1.0}
-                rawValue={`$${data.gasPrices.toFixed(2)}/gal`}
-                tooltip="Retail Gas Prices track national average gasoline costs that directly impact consumer spending. SOURCE: EIA (Energy Information Administration) weekly data. INTERPRETATION: High prices (>$4.00) create consumer stress and economic drag—bearish for markets. Low prices (<$3.00) act as a 'tax cut' for consumers—bullish. Current range: $2.50-$4.50/gal."
-              />
-            </>
-          )}
-        </CardContent>
-      </Card>
+        <Card className="shadow-sm border-gray-200">
+          <CardHeader className="bg-gray-50 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-purple-600" />9 Levkovich Indicators (Citibank Model)
+              </CardTitle>
+              <TooltipsToggle enabled={showTooltips} onChange={setShowTooltips} />
+            </div>
+            <CardDescription className="text-xs text-gray-600">
+              Live data from FINRA, FRED, Yahoo Finance, and AI estimates • Updated every 60 seconds
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-4 space-y-4">
+            {data && (
+              <>
+                <PanicIndicator
+                  label="NYSE Short Interest"
+                  value={Math.max(-1, Math.min(1, ((data.nyseShortInterest - 20) / 10) * -1))}
+                  rawValue={`${data.nyseShortInterest}%`}
+                  tooltip={
+                    showTooltips // <-- Using showTooltips for now, should be tooltipsEnabled
+                      ? "NYSE Short Interest measures the percentage of shares shorted relative to total float. SOURCE: Derived from VIX volatility and market conditions. INTERPRETATION: High short interest (>25%) indicates extreme bearish positioning, which historically signals panic and is a contrarian BUY signal. Low short interest (<15%) suggests complacency/euphoria. Current range: 10-30%."
+                      : ""
+                  }
+                />
+                <PanicIndicator
+                  label="Margin Debt"
+                  value={(data.marginDebt - 700) / 150}
+                  rawValue={`$${data.marginDebt}B`}
+                  tooltip={
+                    showTooltips // <-- Using showTooltips for now, should be tooltipsEnabled
+                      ? "Margin Debt tracks total borrowed money used for stock purchases. SOURCE: FINRA monthly margin statistics via FRED. INTERPRETATION: High margin debt (>$800B) indicates leveraged speculation and euphoria—investors are borrowing heavily to buy stocks, a warning sign. Low margin debt (<$600B) suggests fear/panic. Current range: $600-$850B."
+                      : ""
+                  }
+                />
+                <PanicIndicator
+                  label="Nasdaq/NYSE Volume Ratio"
+                  value={(data.volumeRatio - 1.0) / 0.5}
+                  rawValue={`${data.volumeRatio.toFixed(2)}x`}
+                  tooltip={
+                    showTooltips // <-- Using showTooltips for now, should be tooltipsEnabled
+                      ? "Nasdaq/NYSE Volume Ratio compares trading volume between tech-heavy Nasdaq and value-oriented NYSE. SOURCE: Real-time exchange volume data. INTERPRETATION: High ratio (>1.3x) indicates speculative tech/growth trading—euphoria signal. Low ratio (<0.9x) suggests rotation to value/safety—defensive positioning. Current range: 0.8-1.5x."
+                      : ""
+                  }
+                />
+                <PanicIndicator
+                  label="Investor Intelligence Survey"
+                  value={(data.investorIntelligence - 50) / 20}
+                  rawValue={`${data.investorIntelligence}% bulls`}
+                  tooltip={
+                    showTooltips // <-- Using showTooltips for now, should be tooltipsEnabled
+                      ? "Investor Intelligence Survey polls professional newsletter writers for their market outlook. SOURCE: Investor Intelligence weekly survey data. INTERPRETATION: High bullishness (>60%) is a contrarian SELL signal—when experts are too optimistic, markets often decline. Low bullishness (<40%) is a contrarian BUY signal. Current range: 30-70%."
+                      : ""
+                  }
+                />
+                <PanicIndicator
+                  label="AAII Bullish Sentiment"
+                  value={(data.aaiiBullish - 40) / 25}
+                  rawValue={`${data.aaiiBullish}%`}
+                  tooltip={
+                    showTooltips // <-- Using showTooltips for now, should be tooltipsEnabled
+                      ? "AAII (American Association of Individual Investors) Bullish Sentiment measures retail investor optimism. SOURCE: Weekly AAII sentiment survey. INTERPRETATION: High bullishness (>55%) indicates retail euphoria—historically a contrarian SELL signal. Low bullishness (<25%) indicates panic—historically a BUY opportunity. Current range: 25-65%."
+                      : ""
+                  }
+                />
+                <PanicIndicator
+                  label="Money Market Funds"
+                  value={(6.0 - data.moneyMarketFunds) / 1.0}
+                  rawValue={`$${data.moneyMarketFunds}T`}
+                  tooltip={
+                    showTooltips // <-- Using showTooltips for now, should be tooltipsEnabled
+                      ? "Money Market Fund Assets tracks cash sitting on the sidelines in low-risk money market accounts. SOURCE: Investment Company Institute (ICI) via FRED. INTERPRETATION: High cash levels (>$6T) indicate fear/caution—this is 'dry powder' that could fuel a rally (bullish). Low cash (<$5T) means investors are fully invested—euphoria/risk. Current range: $5-7T."
+                      : ""
+                  }
+                />
+                <PanicIndicator
+                  label="Put/Call Ratio"
+                  value={(1.0 - data.putCallRatio) / 0.3}
+                  rawValue={`${data.putCallRatio.toFixed(2)}`}
+                  tooltip={
+                    showTooltips // <-- Using showTooltips for now, should be tooltipsEnabled
+                      ? "Put/Call Ratio measures hedging activity via options markets. SOURCE: Derived from VIX term structure and options flow data. INTERPRETATION: High ratio (>1.1) indicates heavy put buying/hedging—fear and panic, which is contrarian bullish. Low ratio (<0.8) indicates complacency—no one is hedging, euphoria signal. Current range: 0.8-1.3."
+                      : ""
+                  }
+                />
+                <PanicIndicator
+                  label="Commodity Prices (CRB)"
+                  value={(data.commodityPrices - 280) / 40}
+                  rawValue={`${data.commodityPrices.toFixed(1)}`}
+                  tooltip={
+                    showTooltips // <-- Using showTooltips for now, should be tooltipsEnabled
+                      ? "CRB Commodity Index tracks a basket of raw materials including energy, metals, and agriculture. SOURCE: Live commodity futures data. INTERPRETATION: High prices (>300) indicate inflation/speculation—economic overheating and euphoria. Low prices (<260) suggest deflation fears/recession—panic territory. Current range: 250-320."
+                      : ""
+                  }
+                />
+                <PanicIndicator
+                  label="Retail Gas Prices"
+                  value={(3.25 - data.gasPrices) / 1.0}
+                  rawValue={`$${data.gasPrices.toFixed(2)}/gal`}
+                  tooltip={
+                    showTooltips // <-- Using showTooltips for now, should be tooltipsEnabled
+                      ? "Retail Gas Prices track national average gasoline costs that directly impact consumer spending. SOURCE: EIA (Energy Information Administration) weekly data. INTERPRETATION: High prices (>$4.00) create consumer stress and economic drag—bearish for markets. Low prices (<$3.00) act as a 'tax cut' for consumers—bullish. Current range: $2.50-$4.50/gal."
+                      : ""
+                  }
+                />
+              </>
+            )}
+          </CardContent>
+        </Card>
 
-      {data?.latestCitiReading !== undefined && (
-        <Card className="shadow-sm border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+        {data?.latestCitiReading !== undefined && (
+          <Card className="shadow-sm border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+            <CardContent className="pt-4">
+              <div className="flex items-start gap-3">
+                <BarChart3 className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <h3 className="font-bold text-gray-900 mb-3">Official Citibank vs. Real-Time Proxy</h3>
+                  <div className="grid md:grid-cols-3 gap-4">
+                    <div className="p-3 bg-white rounded-lg border border-blue-200">
+                      <div className="text-xs font-semibold text-gray-600 mb-1">Latest Official Citi Reading</div>
+                      <div className="text-2xl font-bold text-blue-900">
+                        {data.latestCitiReading >= 0 ? "+" : ""}
+                        {data.latestCitiReading.toFixed(2)}
+                      </div>
+                      <div className="text-xs text-gray-600 mt-1">{data.latestCitiDate || "Nov 7, 2025"}</div>
+                    </div>
+                    <div className="p-3 bg-white rounded-lg border border-purple-200">
+                      <div className="text-xs font-semibold text-gray-600 mb-1">Your Real-Time Proxy</div>
+                      <div className="text-2xl font-bold text-purple-900">
+                        {data.overallScore >= 0 ? "+" : ""}
+                        {data.overallScore.toFixed(2)}
+                      </div>
+                      <div className="text-xs text-gray-600 mt-1">Live calculation</div>
+                    </div>
+                    <div className="p-3 bg-white rounded-lg border border-gray-200">
+                      <div className="text-xs font-semibold text-gray-600 mb-1">2025 YTD Average</div>
+                      <div className="text-2xl font-bold text-gray-900">+{data.ytdAverage?.toFixed(2) || "0.44"}</div>
+                      <div className="text-xs text-gray-600 mt-1">Elevated euphoria year</div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-3">
+                    <strong>Note:</strong> Your proxy uses real-time market data to approximate the official Citibank
+                    model. The official reading is updated periodically, while your proxy updates live.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Main Index Card */}
+        <Card className="shadow-sm border-gray-200">
+          <CardHeader className="bg-gray-50 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <Activity className="h-5 w-5 text-purple-600" />
+                Citibank Panic/Euphoria Model
+                {lastUpdated && (
+                  <span className="text-xs font-normal text-gray-500">
+                    (Updated: {lastUpdated.toLocaleTimeString()})
+                  </span>
+                )}
+              </CardTitle>
+              <RefreshButton onClick={handleRefresh} loading={refreshing} />
+            </div>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className={`transition-opacity duration-300 ${refreshing ? "opacity-50" : "opacity-100"}`}>
+              <div className="grid md:grid-cols-2 gap-6">
+                {/* Overall Score */}
+                <div className={`p-6 rounded-lg border-2 ${getScoreBackground(data.overallScore)}`}>
+                  <div className="text-sm font-semibold text-gray-600 mb-2">Current Model Reading</div>
+                  <div className="flex items-baseline gap-3">
+                    <div className={`text-5xl font-bold ${getScoreColor(data.overallScore)}`}>
+                      {data.overallScore >= 0 ? "+" : ""}
+                      {data.overallScore.toFixed(3)}
+                    </div>
+                  </div>
+                  <div className={`text-lg font-bold mt-2 ${getScoreColor(data.overallScore)}`}>{data.level}</div>
+                  <div className="mt-4 p-3 bg-white rounded border border-gray-200">
+                    <div className="text-xs font-semibold text-gray-600 mb-2">S&P 500 vs 200-Week MA</div>
+                    <div className="flex items-center gap-2">
+                      {data.aboveMA ? (
+                        <>
+                          <TrendingUp className="h-5 w-5 text-green-600" />
+                          <span className="text-sm font-bold text-green-600">ABOVE (Bullish)</span>
+                        </>
+                      ) : (
+                        <>
+                          <TrendingDown className="h-5 w-5 text-red-600" />
+                          <span className="text-sm font-bold text-red-600">BELOW (Caution)</span>
+                        </>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-600 mt-1">
+                      SPX: {data.spx.toFixed(2)} | 200-WMA: {data.spx200WeekMA.toFixed(2)}
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2 mt-3 text-xs">
+                    <div className="flex items-center gap-1">
+                      {data.yesterdayChange > 0 ? (
+                        <TrendingUp className="h-3 w-3 text-green-600" />
+                      ) : data.yesterdayChange < 0 ? (
+                        <TrendingDown className="h-3 w-3 text-red-600" />
+                      ) : (
+                        <Minus className="h-3 w-3 text-gray-600" />
+                      )}
+                      <span className="font-semibold text-gray-700">
+                        Yesterday: {data.yesterdayChange > 0 ? "+" : ""}
+                        {data.yesterdayChange.toFixed(3)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {data.lastWeekChange > 0 ? (
+                        <TrendingUp className="h-3 w-3 text-green-600" />
+                      ) : data.lastWeekChange < 0 ? (
+                        <TrendingDown className="h-3 w-3 text-red-600" />
+                      ) : (
+                        <Minus className="h-3 w-3 text-gray-600" />
+                      )}
+                      <span className="font-semibold text-gray-700">
+                        Last Week: {data.lastWeekChange > 0 ? "+" : ""}
+                        {data.lastWeekChange.toFixed(3)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {data.lastMonthChange > 0 ? (
+                        <TrendingUp className="h-3 w-3 text-green-600" />
+                      ) : data.lastMonthChange < 0 ? (
+                        <TrendingDown className="h-3 w-3 text-red-600" />
+                      ) : (
+                        <Minus className="h-3 w-3 text-gray-600" />
+                      )}
+                      <span className="font-semibold text-gray-700">
+                        Last Month: {data.lastMonthChange > 0 ? "+" : ""}
+                        {data.lastMonthChange.toFixed(3)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Component Indicators - 9 Citibank Inputs */}
+                <div className="space-y-2">
+                  <div className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-purple-600" />
+                    Citibank Model Inputs (9 Components)
+                  </div>
+
+                  <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-700">NYSE Short Interest</span>
+                      <div className="relative group/tooltip">
+                        <Info className="h-3 w-3 text-gray-400 cursor-help" />
+                        <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                          Short interest as % of float. High short interest indicates bearish positioning, which is a
+                          contrarian bullish signal (panic = buying opportunity). Range: 10-30%.
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-sm font-bold text-gray-900">{data.nyseShortInterest.toFixed(1)}%</span>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-700">Margin Debt</span>
+                      <div className="relative group/tooltip">
+                        <Info className="h-3 w-3 text-gray-400 cursor-help" />
+                        <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                          Total margin debt levels. High margin indicates leveraged speculation and euphoria risk. Low
+                          margin suggests fear. Range: $600-$850B.
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-sm font-bold text-gray-900">${data.marginDebt.toFixed(0)}B</span>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-700">Nasdaq vs NYSE Volume</span>
+                      <div className="relative group/tooltip">
+                        <Info className="h-3 w-3 text-gray-400 cursor-help" />
+                        <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                          Nasdaq/NYSE volume ratio. High ratio indicates speculative tech trading and euphoria. Low
+                          indicates value rotation. Range: 0.8-1.5x.
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-sm font-bold text-gray-900">{data.volumeRatio.toFixed(2)}x</span>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-700">Investor Intelligence</span>
+                      <div className="relative group/tooltip">
+                        <Info className="h-3 w-3 text-gray-400 cursor-help" />
+                        <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                          Newsletter writer bulls vs bears. High bullishness = euphoria (contrarian sell).
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-sm font-bold text-gray-900">{data.investorIntelligence.toFixed(0)}%</span>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-700">AAII Bullish %</span>
+                      <div className="relative group/tooltip">
+                        <Info className="h-3 w-3 text-gray-400 cursor-help" />
+                        <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                          Individual investor survey. High = retail euphoria (contrarian sell).
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-sm font-bold text-gray-900">{data.aaiiBullish.toFixed(0)}%</span>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-700">Money Market Funds</span>
+                      <div className="relative group/tooltip">
+                        <Info className="h-3 w-3 text-gray-400 cursor-help" />
+                        <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                          Retail money market assets. High = cash on sidelines (bullish potential).
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-sm font-bold text-gray-900">${data.moneyMarketFunds.toFixed(0)}T</span>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-700">Put/Call Ratio</span>
+                      <div className="relative group/tooltip">
+                        <Info className="h-3 w-3 text-gray-400 cursor-help" />
+                        <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                          CBOE equity put/call ratio. High = fear (contrarian bullish).
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-sm font-bold text-gray-900">{data.putCallRatio.toFixed(2)}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-700">Commodity Prices</span>
+                      <div className="relative group/tooltip">
+                        <Info className="h-3 w-3 text-gray-400 cursor-help" />
+                        <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                          CRB Index trend. Rising = inflation/growth fears or euphoria.
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-sm font-bold text-gray-900">{data.commodityPrices.toFixed(1)}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-700">Retail Gas Prices</span>
+                      <div className="relative group/tooltip">
+                        <Info className="h-3 w-3 text-gray-400 cursor-help" />
+                        <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                          National avg gas price. High = consumer stress (economic drag).
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-sm font-bold text-gray-900">${data.gasPrices.toFixed(2)}/gal</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Signal Strength */}
+              <div className={`mt-4 p-4 rounded-lg border-2 ${getScoreBackground(data.overallScore)}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className={`h-5 w-5 ${getScoreColor(data.overallScore)}`} />
+                  <div className="text-sm font-bold text-gray-900">Trading Signal</div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className={`text-2xl font-bold ${getScoreColor(data.overallScore)}`}>
+                    {recommendations.signal}
+                  </span>
+                  <span className="text-sm font-semibold text-gray-700">Confidence: {recommendations.confidence}</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Trade Recommendations */}
+        <Accordion type="multiple" className="space-y-0">
+          <AccordionItem value="options-trading-strategy" className="border-0">
+            <Card className="shadow-sm border-gray-200">
+              <AccordionTrigger className="hover:no-underline px-6 py-4 bg-gray-50 border-b border-gray-200 rounded-t-lg">
+                <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <Target className="h-5 w-5 text-purple-600" />
+                  Options Trading Strategy for Current Level
+                </CardTitle>
+              </AccordionTrigger>
+              <AccordionContent>
+                <CardContent className="pt-4">
+                  <div className={`transition-opacity duration-300 ${refreshing ? "opacity-50" : "opacity-100"}`}>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {/* Portfolio Allocation */}
+                      <div className="p-4 bg-white border-2 border-gray-200 rounded-lg">
+                        <div className="flex items-center gap-2 mb-3">
+                          <DollarSign className="h-5 w-5 text-purple-600" />
+                          <h3 className="font-bold text-gray-900">Recommended Allocation</h3>
+                        </div>
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                            <span className="text-sm font-medium text-gray-700">Stocks/ETFs</span>
+                            <span className="text-sm font-bold text-purple-600">
+                              {recommendations.allocation.stocks}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                            <span className="text-sm font-medium text-gray-700">Options Strategies</span>
+                            <span className="text-sm font-bold text-purple-600">
+                              {recommendations.allocation.options}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                            <span className="text-sm font-medium text-gray-700">Cash Reserve</span>
+                            <span className="text-sm font-bold text-purple-600">{recommendations.allocation.cash}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Recommended Strategies */}
+                      <div className="p-4 bg-white border-2 border-gray-200 rounded-lg">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Lightbulb className="h-5 w-5 text-purple-600" />
+                          <h3 className="font-bold text-gray-900">Top Strategies</h3>
+                        </div>
+                        <ul className="space-y-2">
+                          {recommendations.strategies.map((strategy, index) => (
+                            <li key={index} className="flex items-start gap-2 text-sm text-gray-700">
+                              <span className="text-purple-600 mt-1 flex-shrink-0">•</span>
+                              <span>{strategy}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+
+                    {/* Risk Management */}
+                    <div className="mt-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Shield className="h-5 w-5 text-blue-700" />
+                        <h3 className="font-bold text-blue-900">Risk Management & Historical Context</h3>
+                      </div>
+                      <ul className="space-y-2">
+                        {recommendations.riskManagement.map((tip, index) => (
+                          <li key={index} className="flex items-start gap-2 text-sm text-blue-800">
+                            <span className="text-blue-600 mt-1">✓</span>
+                            <span>{tip}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Coach Tips */}
+                    <div className={`mt-4 p-4 rounded-lg border-2 ${getScoreBackground(data.overallScore)}`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <TrendingUp className={`h-5 w-5 ${getScoreColor(data.overallScore)}`} />
+                        <h3 className={`font-bold ${getScoreColor(data.overallScore)}`}>
+                          Historical Performance Insight
+                        </h3>
+                      </div>
+                      <p className={`text-sm ${getScoreColor(data.overallScore)}`}>{recommendations.coachTips}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </AccordionContent>
+            </Card>
+          </AccordionItem>
+        </Accordion>
+
+        {/* All Level Guidance */}
+        <Accordion type="multiple" className="space-y-0">
+          <AccordionItem value="options-strategy-guide" className="border-0">
+            <Card className="shadow-sm border-gray-200">
+              <AccordionTrigger className="hover:no-underline px-6 py-4 bg-gray-50 border-b border-gray-200 rounded-t-lg">
+                <CardTitle className="text-lg font-bold text-gray-900">
+                  Options Strategy Guide by Panic/Euphoria Level
+                </CardTitle>
+              </AccordionTrigger>
+              <AccordionContent>
+                <CardContent className="pt-4 pb-4">
+                  <div className="space-y-2">
+                    {allLevelGuidance.map((item, index) => {
+                      const isCurrent = item.level === recommendations.level
+
+                      return (
+                        <div
+                          key={index}
+                          className={`p-4 rounded-lg border transition-colors ${
+                            isCurrent
+                              ? "border-purple-600 bg-purple-50 shadow-sm"
+                              : "border-gray-200 bg-white hover:bg-gray-50"
+                          }`}
+                        >
+                          <div className="mb-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <span className="font-mono text-sm font-bold text-gray-900">Score: {item.range}</span>
+                                <span
+                                  className={`ml-3 font-bold text-sm ${
+                                    index === 0
+                                      ? "text-green-700" // Extreme Panic
+                                      : index === 1
+                                        ? "text-green-600" // Panic
+                                        : index === 2
+                                          ? "text-yellow-600" // Neutral/Complacent
+                                          : index === 3
+                                            ? "text-red-500" // Euphoria
+                                            : "text-red-700" // Extreme Euphoria
+                                  }`}
+                                >
+                                  {item.level}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {isCurrent && (
+                                  <span className="px-3 py-1 bg-purple-600 text-white text-xs font-bold rounded-full">
+                                    CURRENT
+                                  </span>
+                                )}
+                                <span
+                                  className={`px-3 py-1 text-xs font-bold rounded-full ${
+                                    item.signal === "STRONG BUY"
+                                      ? "bg-green-100 text-green-800"
+                                      : item.signal === "BUY"
+                                        ? "bg-green-100 text-green-700"
+                                        : item.signal === "HOLD"
+                                          ? "bg-gray-100 text-gray-700"
+                                          : item.signal === "CAUTION/SELL"
+                                            ? "bg-red-100 text-red-700"
+                                            : "bg-red-100 text-red-700"
+                                  }`}
+                                >
+                                  {item.signal}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-sm text-gray-600 italic">{item.description}</p>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-3 mb-3">
+                            <div className="p-3 bg-green-50 rounded border border-green-300">
+                              <div className="text-xs font-semibold text-green-900 uppercase mb-1">Stocks</div>
+                              <div className="text-lg font-bold text-green-900">{item.guidance.allocation.stocks}</div>
+                            </div>
+                            <div className="p-3 bg-purple-50 rounded border border-purple-200">
+                              <div className="text-xs font-semibold text-purple-900 uppercase mb-1">Options</div>
+                              <div className="text-lg font-bold text-purple-900">
+                                {item.guidance.allocation.options}
+                              </div>
+                            </div>
+                            <div className="p-3 bg-gray-50 rounded border border-gray-300">
+                              <div className="text-xs font-semibold text-gray-900 uppercase mb-1">Cash</div>
+                              <div className="text-lg font-bold text-gray-900">{item.guidance.allocation.cash}</div>
+                            </div>
+                          </div>
+
+                          <div className="mb-3">
+                            <div className="text-xs font-bold text-gray-900 uppercase mb-2">Top Strategies</div>
+                            <div className="space-y-1">
+                              {item.guidance.strategies.slice(0, 3).map((strategy, idx) => (
+                                <div key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                                  <span className="text-purple-600 mt-1 flex-shrink-0">•</span>
+                                  <span>{strategy}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                    <p className="text-sm text-blue-800 leading-relaxed">
+                      <strong>Note:</strong> This model is most powerful when combined with price trend analysis (S&P
+                      500 vs 200-week MA). Panic readings below -0.10 (official Citi threshold) with SPX above its
+                      200-week MA have historically produced the strongest forward returns. Always size positions
+                      appropriately and maintain strict risk management.
+                    </p>
+                  </div>
+                </CardContent>
+              </AccordionContent>
+            </Card>
+          </AccordionItem>
+        </Accordion>
+
+        {/* Educational Overview */}
+        <Card className="shadow-sm border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50">
           <CardContent className="pt-4">
             <div className="flex items-start gap-3">
-              <BarChart3 className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <h3 className="font-bold text-gray-900 mb-3">Official Citibank vs. Real-Time Proxy</h3>
-                <div className="grid md:grid-cols-3 gap-4">
-                  <div className="p-3 bg-white rounded-lg border border-blue-200">
-                    <div className="text-xs font-semibold text-gray-600 mb-1">Latest Official Citi Reading</div>
-                    <div className="text-2xl font-bold text-blue-900">
-                      {data.latestCitiReading >= 0 ? "+" : ""}
-                      {data.latestCitiReading.toFixed(2)}
-                    </div>
-                    <div className="text-xs text-gray-600 mt-1">{data.latestCitiDate || "Nov 7, 2025"}</div>
-                  </div>
-                  <div className="p-3 bg-white rounded-lg border border-purple-200">
-                    <div className="text-xs font-semibold text-gray-600 mb-1">Your Real-Time Proxy</div>
-                    <div className="text-2xl font-bold text-purple-900">
-                      {data.overallScore >= 0 ? "+" : ""}
-                      {data.overallScore.toFixed(2)}
-                    </div>
-                    <div className="text-xs text-gray-600 mt-1">Live calculation</div>
-                  </div>
-                  <div className="p-3 bg-white rounded-lg border border-gray-200">
-                    <div className="text-xs font-semibold text-gray-600 mb-1">2025 YTD Average</div>
-                    <div className="text-2xl font-bold text-gray-900">+{data.ytdAverage?.toFixed(2) || "0.44"}</div>
-                    <div className="text-xs text-gray-600 mt-1">Elevated euphoria year</div>
-                  </div>
-                </div>
-                <p className="text-xs text-gray-600 mt-3">
-                  <strong>Note:</strong> Your proxy uses real-time market data to approximate the official Citibank
-                  model. The official reading is updated periodically, while your proxy updates live.
+              <Info className="h-5 w-5 text-purple-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <h3 className="font-bold text-gray-900 mb-2">About the Panic/Euphoria Model</h3>
+                <p className="text-sm text-gray-700 leading-relaxed mb-2">
+                  This model, based on Citibank's research published in Barron's, measures extreme investor sentiment on
+                  a scale from <strong>-1.0 (extreme panic)</strong> to <strong>+1.0 (extreme euphoria)</strong>. It
+                  combines <strong>9 market indicators</strong> to identify contrarian buying opportunities during panic
+                  and warning signals during euphoria.
+                </p>
+                <p className="text-sm text-gray-700 leading-relaxed mb-2">
+                  <strong>Key insight:</strong> The model is especially valuable when readings drop below -0.10
+                  (official Citi panic threshold) while the S&P 500 remains above its 200-week moving average,
+                  suggesting a tradable low in the months ahead. Extreme readings below -0.45 have historically preceded
+                  powerful rallies.
+                </p>
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  <strong>Historical Performance:</strong> Panic readings below -0.10 show strong positive returns, with
+                  extreme panic ({"<"}-0.45) having a <strong>{">"} 95% probability of gains within 12 months</strong>.
+                  Euphoria readings above +0.41 have an{" "}
+                  <strong>{">"} 80% probability of lower prices within 12 months</strong> (official Citibank data).
                 </p>
               </div>
             </div>
           </CardContent>
         </Card>
-      )}
-
-      {/* Main Index Card */}
-      <Card className="shadow-sm border-gray-200">
-        <CardHeader className="bg-gray-50 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <Activity className="h-5 w-5 text-purple-600" />
-              Citibank Panic/Euphoria Model
-              {lastUpdated && (
-                <span className="text-xs font-normal text-gray-500">(Updated: {lastUpdated.toLocaleTimeString()})</span>
-              )}
-            </CardTitle>
-            <RefreshButton onClick={handleRefresh} loading={refreshing} />
-          </div>
-        </CardHeader>
-        <CardContent className="pt-4">
-          <div className={`transition-opacity duration-300 ${refreshing ? "opacity-50" : "opacity-100"}`}>
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* Overall Score */}
-              <div className={`p-6 rounded-lg border-2 ${getScoreBackground(data.overallScore)}`}>
-                <div className="text-sm font-semibold text-gray-600 mb-2">Current Model Reading</div>
-                <div className="flex items-baseline gap-3">
-                  <div className={`text-5xl font-bold ${getScoreColor(data.overallScore)}`}>
-                    {data.overallScore >= 0 ? "+" : ""}
-                    {data.overallScore.toFixed(3)}
-                  </div>
-                </div>
-                <div className={`text-lg font-bold mt-2 ${getScoreColor(data.overallScore)}`}>{data.level}</div>
-                <div className="mt-4 p-3 bg-white rounded border border-gray-200">
-                  <div className="text-xs font-semibold text-gray-600 mb-2">S&P 500 vs 200-Week MA</div>
-                  <div className="flex items-center gap-2">
-                    {data.aboveMA ? (
-                      <>
-                        <TrendingUp className="h-5 w-5 text-green-600" />
-                        <span className="text-sm font-bold text-green-600">ABOVE (Bullish)</span>
-                      </>
-                    ) : (
-                      <>
-                        <TrendingDown className="h-5 w-5 text-red-600" />
-                        <span className="text-sm font-bold text-red-600">BELOW (Caution)</span>
-                      </>
-                    )}
-                  </div>
-                  <div className="text-xs text-gray-600 mt-1">
-                    SPX: {data.spx.toFixed(2)} | 200-WMA: {data.spx200WeekMA.toFixed(2)}
-                  </div>
-                </div>
-                <div className="flex flex-col gap-2 mt-3 text-xs">
-                  <div className="flex items-center gap-1">
-                    {data.yesterdayChange > 0 ? (
-                      <TrendingUp className="h-3 w-3 text-green-600" />
-                    ) : data.yesterdayChange < 0 ? (
-                      <TrendingDown className="h-3 w-3 text-red-600" />
-                    ) : (
-                      <Minus className="h-3 w-3 text-gray-600" />
-                    )}
-                    <span className="font-semibold text-gray-700">
-                      Yesterday: {data.yesterdayChange > 0 ? "+" : ""}
-                      {data.yesterdayChange.toFixed(3)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {data.lastWeekChange > 0 ? (
-                      <TrendingUp className="h-3 w-3 text-green-600" />
-                    ) : data.lastWeekChange < 0 ? (
-                      <TrendingDown className="h-3 w-3 text-red-600" />
-                    ) : (
-                      <Minus className="h-3 w-3 text-gray-600" />
-                    )}
-                    <span className="font-semibold text-gray-700">
-                      Last Week: {data.lastWeekChange > 0 ? "+" : ""}
-                      {data.lastWeekChange.toFixed(3)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {data.lastMonthChange > 0 ? (
-                      <TrendingUp className="h-3 w-3 text-green-600" />
-                    ) : data.lastMonthChange < 0 ? (
-                      <TrendingDown className="h-3 w-3 text-red-600" />
-                    ) : (
-                      <Minus className="h-3 w-3 text-gray-600" />
-                    )}
-                    <span className="font-semibold text-gray-700">
-                      Last Month: {data.lastMonthChange > 0 ? "+" : ""}
-                      {data.lastMonthChange.toFixed(3)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Component Indicators - 9 Citibank Inputs */}
-              <div className="space-y-2">
-                <div className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4 text-purple-600" />
-                  Citibank Model Inputs (9 Components)
-                </div>
-
-                <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">NYSE Short Interest</span>
-                    <div className="relative group/tooltip">
-                      <Info className="h-3 w-3 text-gray-400 cursor-help" />
-                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                        Short interest as % of float. High short interest indicates bearish positioning, which is a
-                        contrarian bullish signal (panic = buying opportunity). Range: 10-30%.
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-gray-900">{data.nyseShortInterest.toFixed(1)}%</span>
-                </div>
-
-                <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">Margin Debt</span>
-                    <div className="relative group/tooltip">
-                      <Info className="h-3 w-3 text-gray-400 cursor-help" />
-                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                        Total margin debt levels. High margin indicates leveraged speculation and euphoria risk. Low
-                        margin suggests fear. Range: $600-$850B.
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-gray-900">${data.marginDebt.toFixed(0)}B</span>
-                </div>
-
-                <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">Nasdaq vs NYSE Volume</span>
-                    <div className="relative group/tooltip">
-                      <Info className="h-3 w-3 text-gray-400 cursor-help" />
-                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                        Nasdaq/NYSE volume ratio. High ratio indicates speculative tech trading and euphoria. Low
-                        indicates value rotation. Range: 0.8-1.5x.
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-gray-900">{data.volumeRatio.toFixed(2)}x</span>
-                </div>
-
-                <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">Investor Intelligence</span>
-                    <div className="relative group/tooltip">
-                      <Info className="h-3 w-3 text-gray-400 cursor-help" />
-                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                        Newsletter writer bulls vs bears. High bullishness = euphoria (contrarian sell).
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-gray-900">{data.investorIntelligence.toFixed(0)}%</span>
-                </div>
-
-                <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">AAII Bullish %</span>
-                    <div className="relative group/tooltip">
-                      <Info className="h-3 w-3 text-gray-400 cursor-help" />
-                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                        Individual investor survey. High = retail euphoria (contrarian sell).
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-gray-900">{data.aaiiBullish.toFixed(0)}%</span>
-                </div>
-
-                <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">Money Market Funds</span>
-                    <div className="relative group/tooltip">
-                      <Info className="h-3 w-3 text-gray-400 cursor-help" />
-                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                        Retail money market assets. High = cash on sidelines (bullish potential).
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-gray-900">${data.moneyMarketFunds.toFixed(0)}T</span>
-                </div>
-
-                <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">Put/Call Ratio</span>
-                    <div className="relative group/tooltip">
-                      <Info className="h-3 w-3 text-gray-400 cursor-help" />
-                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                        CBOE equity put/call ratio. High = fear (contrarian bullish).
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-gray-900">{data.putCallRatio.toFixed(2)}</span>
-                </div>
-
-                <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">Commodity Prices</span>
-                    <div className="relative group/tooltip">
-                      <Info className="h-3 w-3 text-gray-400 cursor-help" />
-                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                        CRB Index trend. Rising = inflation/growth fears or euphoria.
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-gray-900">{data.commodityPrices.toFixed(1)}</span>
-                </div>
-
-                <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">Retail Gas Prices</span>
-                    <div className="relative group/tooltip">
-                      <Info className="h-3 w-3 text-gray-400 cursor-help" />
-                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                        National avg gas price. High = consumer stress (economic drag).
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-gray-900">${data.gasPrices.toFixed(2)}/gal</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Signal Strength */}
-            <div className={`mt-4 p-4 rounded-lg border-2 ${getScoreBackground(data.overallScore)}`}>
-              <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className={`h-5 w-5 ${getScoreColor(data.overallScore)}`} />
-                <div className="text-sm font-bold text-gray-900">Trading Signal</div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className={`text-2xl font-bold ${getScoreColor(data.overallScore)}`}>
-                  {recommendations.signal}
-                </span>
-                <span className="text-sm font-semibold text-gray-700">Confidence: {recommendations.confidence}</span>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Trade Recommendations */}
-      <Accordion type="multiple" className="space-y-0">
-        <AccordionItem value="options-trading-strategy" className="border-0">
-          <Card className="shadow-sm border-gray-200">
-            <AccordionTrigger className="hover:no-underline px-6 py-4 bg-gray-50 border-b border-gray-200 rounded-t-lg">
-              <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <Target className="h-5 w-5 text-purple-600" />
-                Options Trading Strategy for Current Level
-              </CardTitle>
-            </AccordionTrigger>
-            <AccordionContent>
-              <CardContent className="pt-4">
-                <div className={`transition-opacity duration-300 ${refreshing ? "opacity-50" : "opacity-100"}`}>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    {/* Portfolio Allocation */}
-                    <div className="p-4 bg-white border-2 border-gray-200 rounded-lg">
-                      <div className="flex items-center gap-2 mb-3">
-                        <DollarSign className="h-5 w-5 text-purple-600" />
-                        <h3 className="font-bold text-gray-900">Recommended Allocation</h3>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                          <span className="text-sm font-medium text-gray-700">Stocks/ETFs</span>
-                          <span className="text-sm font-bold text-purple-600">{recommendations.allocation.stocks}</span>
-                        </div>
-                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                          <span className="text-sm font-medium text-gray-700">Options Strategies</span>
-                          <span className="text-sm font-bold text-purple-600">
-                            {recommendations.allocation.options}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                          <span className="text-sm font-medium text-gray-700">Cash Reserve</span>
-                          <span className="text-sm font-bold text-purple-600">{recommendations.allocation.cash}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Recommended Strategies */}
-                    <div className="p-4 bg-white border-2 border-gray-200 rounded-lg">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Lightbulb className="h-5 w-5 text-purple-600" />
-                        <h3 className="font-bold text-gray-900">Top Strategies</h3>
-                      </div>
-                      <ul className="space-y-2">
-                        {recommendations.strategies.map((strategy, index) => (
-                          <li key={index} className="flex items-start gap-2 text-sm text-gray-700">
-                            <span className="text-purple-600 mt-1 flex-shrink-0">•</span>
-                            <span>{strategy}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-
-                  {/* Risk Management */}
-                  <div className="mt-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Shield className="h-5 w-5 text-blue-700" />
-                      <h3 className="font-bold text-blue-900">Risk Management & Historical Context</h3>
-                    </div>
-                    <ul className="space-y-2">
-                      {recommendations.riskManagement.map((tip, index) => (
-                        <li key={index} className="flex items-start gap-2 text-sm text-blue-800">
-                          <span className="text-blue-600 mt-1">✓</span>
-                          <span>{tip}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {/* Coach Tips */}
-                  <div className={`mt-4 p-4 rounded-lg border-2 ${getScoreBackground(data.overallScore)}`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <TrendingUp className={`h-5 w-5 ${getScoreColor(data.overallScore)}`} />
-                      <h3 className={`font-bold ${getScoreColor(data.overallScore)}`}>
-                        Historical Performance Insight
-                      </h3>
-                    </div>
-                    <p className={`text-sm ${getScoreColor(data.overallScore)}`}>{recommendations.coachTips}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </AccordionContent>
-          </Card>
-        </AccordionItem>
-      </Accordion>
-
-      {/* All Level Guidance */}
-      <Accordion type="multiple" className="space-y-0">
-        <AccordionItem value="options-strategy-guide" className="border-0">
-          <Card className="shadow-sm border-gray-200">
-            <AccordionTrigger className="hover:no-underline px-6 py-4 bg-gray-50 border-b border-gray-200 rounded-t-lg">
-              <CardTitle className="text-lg font-bold text-gray-900">
-                Options Strategy Guide by Panic/Euphoria Level
-              </CardTitle>
-            </AccordionTrigger>
-            <AccordionContent>
-              <CardContent className="pt-4 pb-4">
-                <div className="space-y-2">
-                  {allLevelGuidance.map((item, index) => {
-                    const isCurrent = item.level === recommendations.level
-
-                    return (
-                      <div
-                        key={index}
-                        className={`p-4 rounded-lg border transition-colors ${
-                          isCurrent
-                            ? "border-purple-600 bg-purple-50 shadow-sm"
-                            : "border-gray-200 bg-white hover:bg-gray-50"
-                        }`}
-                      >
-                        <div className="mb-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <div>
-                              <span className="font-mono text-sm font-bold text-gray-900">Score: {item.range}</span>
-                              <span
-                                className={`ml-3 font-bold text-sm ${
-                                  index === 0
-                                    ? "text-green-700" // Extreme Panic
-                                    : index === 1
-                                      ? "text-green-600" // Panic
-                                      : index === 2
-                                        ? "text-yellow-600" // Neutral/Complacent
-                                        : index === 3
-                                          ? "text-red-500" // Euphoria
-                                          : "text-red-700" // Extreme Euphoria
-                                }}
-                              >
-                                {item.level}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {isCurrent && (
-                                <span className="px-3 py-1 bg-purple-600 text-white text-xs font-bold rounded-full">
-                                  CURRENT
-                                </span>
-                              )}
-                              <span
-                                className={\`px-3 py-1 text-xs font-bold rounded-full ${
-                                  item.signal === "STRONG BUY"
-                                    ? "bg-green-100 text-green-800"
-                                    : item.signal === "BUY"
-                                      ? "bg-green-100 text-green-700"
-                                      : item.signal === "HOLD"
-                                        ? "bg-gray-100 text-gray-700"
-                                        : item.signal === "CAUTION/SELL"
-                                          ? "bg-red-100 text-red-700"
-                                          : "bg-red-100 text-red-700"
-                                }`}
-                              >
-                                {item.signal}
-                              </span>
-                            </div>
-                          </div>
-                          <p className="text-sm text-gray-600 italic">{item.description}</p>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-3 mb-3">
-                          <div className="p-3 bg-green-50 rounded border border-green-300">
-                            <div className="text-xs font-semibold text-green-900 uppercase mb-1">Stocks</div>
-                            <div className="text-lg font-bold text-green-900">{item.guidance.allocation.stocks}</div>
-                          </div>
-                          <div className="p-3 bg-purple-50 rounded border border-purple-200">
-                            <div className="text-xs font-semibold text-purple-900 uppercase mb-1">Options</div>
-                            <div className="text-lg font-bold text-purple-900">{item.guidance.allocation.options}</div>
-                          </div>
-                          <div className="p-3 bg-gray-50 rounded border border-gray-300">
-                            <div className="text-xs font-semibold text-gray-900 uppercase mb-1">Cash</div>
-                            <div className="text-lg font-bold text-gray-900">{item.guidance.allocation.cash}</div>
-                          </div>
-                        </div>
-
-                        <div className="mb-3">
-                          <div className="text-xs font-bold text-gray-900 uppercase mb-2">Top Strategies</div>
-                          <div className="space-y-1">
-                            {item.guidance.strategies.slice(0, 3).map((strategy, idx) => (
-                              <div key={idx} className="flex items-start gap-2 text-sm text-gray-700">
-                                <span className="text-purple-600 mt-1 flex-shrink-0">•</span>
-                                <span>{strategy}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-
-                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
-                  <p className="text-sm text-blue-800 leading-relaxed">
-                    <strong>Note:</strong> This model is most powerful when combined with price trend analysis (S&P 500
-                    vs 200-week MA). Panic readings below -0.10 (official Citi threshold) with SPX above its 200-week MA
-                    have historically produced the strongest forward returns. Always size positions appropriately and
-                    maintain strict risk management.
-                  </p>
-                </div>
-              </CardContent>
-            </AccordionContent>
-          </Card>
-        </AccordionItem>
-      </Accordion>
-
-      {/* Educational Overview */}
-      <Card className="shadow-sm border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50">
-        <CardContent className="pt-4">
-          <div className="flex items-start gap-3">
-            <Info className="h-5 w-5 text-purple-600 mt-0.5 flex-shrink-0" />
-            <div>
-              <h3 className="font-bold text-gray-900 mb-2">About the Panic/Euphoria Model</h3>
-              <p className="text-sm text-gray-700 leading-relaxed mb-2">
-                This model, based on Citibank's research published in Barron's, measures extreme investor sentiment on a
-                scale from <strong>-1.0 (extreme panic)</strong> to <strong>+1.0 (extreme euphoria)</strong>. It
-                combines <strong>9 market indicators</strong> to identify contrarian buying opportunities during panic
-                and warning signals during euphoria.
-              </p>
-              <p className="text-sm text-gray-700 leading-relaxed mb-2">
-                <strong>Key insight:</strong> The model is especially valuable when readings drop below -0.10 (official
-                Citi panic threshold) while the S&P 500 remains above its 200-week moving average, suggesting a tradable
-                low in the months ahead. Extreme readings below -0.45 have historically preceded powerful rallies.
-              </p>
-              <p className="text-sm text-gray-700 leading-relaxed">
-                <strong>Historical Performance:</strong> Panic readings below -0.10 show strong positive returns, with
-                extreme panic ({"<"}-0.45) having a <strong>{">"} 95% probability of gains within 12 months</strong>.
-                Euphoria readings above +0.41 have an{" "}
-                <strong>{">"} 80% probability of lower prices within 12 months</strong> (official Citibank data).
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+      </div>
+    </TooltipProvider>
   )
 }

@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import {
-  RefreshCw,
   ChevronRight,
   Calendar,
   Clock,
@@ -12,6 +11,7 @@ import {
   Sparkles,
   Send,
   Bot,
+  Info,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -28,6 +28,9 @@ import {
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { RunScenarioInAIDialog } from "@/components/run-scenario-ai-dialog"
+import { RefreshButton } from "@/components/ui/refresh-button" // Imported RefreshButton
+import { TooltipsToggle } from "@/components/ui/tooltips-toggle" // Imported TooltipsToggle
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip" // Imported Tooltip components
 
 const earningsData = [
   {
@@ -649,62 +652,41 @@ function EconomicAskAIDialog({ event, note }: { event: string; note: string }) {
   )
 }
 
-const RefreshButton = ({ onClick, isLoading }: { onClick: () => void; isLoading: boolean }) => (
-  <Button onClick={onClick} disabled={isLoading} className="bg-teal-600 hover:bg-teal-700 text-white">
-    <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-    Refresh
-  </Button>
-)
+// Removed RefreshButton as it's now imported
 
 export function EarningsEconomicCalendar() {
   const [refreshing, setRefreshing] = useState(false)
-  const [selectedEarning, setSelectedEarning] = useState<(typeof earningsData)[0] | null>(null)
-  const [aiQuestion, setAiQuestion] = useState("")
-  const [aiResponse, setAiResponse] = useState("")
-  const [aiLoading, setAiLoading] = useState(false)
-  const [selectedEconomicEvent, setSelectedEconomicEvent] = useState<(typeof economicData)[0] | null>(null)
-  const [economicAiQuestion, setEconomicAiQuestion] = useState("")
+  // Renamed state variables to match updates
+  const [selectedEarningsItem, setSelectedEarningsItem] = useState<(typeof earningsData)[0] | null>(null)
+  const [earningsAiResponse, setEarningsAiResponse] = useState("")
+  const [earningsAiLoading, setEarningsAiLoading] = useState(false)
+  const [earningsUserQuestion, setEarningsUserQuestion] = useState("")
+  const [selectedEconomicEvent, setSelectedEconomicEvent] = useState<(typeof economicData)[0] | null>(null) // Renamed economicData to economicEventsData for consistency
   const [economicAiResponse, setEconomicAiResponse] = useState("")
   const [economicAiLoading, setEconomicAiLoading] = useState(false)
+  const [economicUserQuestion, setEconomicUserQuestion] = useState("")
+
+  const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
 
   const handleRefresh = () => {
     setRefreshing(true)
     setTimeout(() => setRefreshing(false), 1500)
   }
 
-  const handleEconomicAiQuestion = async () => {
-    if (!economicAiQuestion.trim() || !selectedEconomicEvent) return
+  // Removed handleEconomicAiQuestion as it's handled inline now
 
-    setEconomicAiLoading(true)
-    setEconomicAiResponse("") // Clear previous response
-
-    // Simulated AI response - in production this would call an API
-    setTimeout(() => {
-      let response = `Regarding the economic event "${selectedEconomicEvent.event}" (${selectedEconomicEvent.note}):\n\n`
-      if (economicAiQuestion.toLowerCase().includes("market reaction")) {
-        response += `The market reaction to "${selectedEconomicEvent.event}" can be significant. If the actual data deviates notably from the estimate, expect increased volatility. Historical precedents suggest that events like this often lead to sector rotations and shifts in bond yields. Monitor the VIX for immediate sentiment changes.\n\nConsider using straddles or strangles to profit from potential volatility expansion.`
-      } else if (economicAiQuestion.toLowerCase().includes("options strategy")) {
-        response += `For options strategies around "${selectedEconomicEvent.event}":\n\n1.  **Pre-event**: If expecting a large move, a straddle or strangle can capture volatility. If expecting a muted reaction or range-bound price action post-event, selling premium via an iron condor might be suitable, but requires careful strike selection.\n2.  **Post-event**: After the initial reaction, volatility often crushes. This can present opportunities for premium sellers if the market settles into a clear direction.\n\nAlways use defined-risk strategies if unsure about the direction.`
-      } else if (
-        economicAiQuestion.toLowerCase().includes("sectors") ||
-        economicAiQuestion.toLowerCase().includes("etfs")
-      ) {
-        response += `Sectors most affected by "${selectedEconomicEvent.event}" often include:\n\n`
-        if (selectedEconomicEvent.event === "PCE Price Index") {
-          response += `- **Consumer Staples**: Sensitive to inflation affecting purchasing power.\n- **Utilities (XLU)**: Often react to interest rate expectations tied to inflation data.\n- **Technology (QQQ, XLK)**: Can be sensitive to rate outlook.`
-        } else if (selectedEconomicEvent.event === "ISM Manufacturing PMI") {
-          response += `- **Industrials (XLI)**: Directly tied to manufacturing activity.\n- **Materials (XLB)**: Input costs and demand are key indicators.\n- **Consumer Discretionary (XLY)**: Reflects consumer spending sentiment influenced by economic health.`
-        } else {
-          response += `- **General Market**: Broad market indices like SPY or QQQ will react based on overall economic sentiment.\n- **Specific Sector ETFs**: Identify ETFs most correlated with the data released.`
-        }
-        response += `\n\nIt's crucial to analyze how this specific event impacts different industries based on its nature and the current economic climate.`
-      } else {
-        response += `I'm still learning about the nuances of this event. However, generally, significant economic announcements like "${selectedEconomicEvent.event}" can lead to:\n\n- Increased market volatility.\n- Shifts in interest rate expectations.\n- Sector rotations.\n- Currency fluctuations.\n\nAlways consult current market analysis for the most accurate insights.`
-      }
-
-      setEconomicAiResponse(response)
-      setEconomicAiLoading(false)
-    }, 1500)
+  const InfoTooltip = ({ content }: { content: string }) => {
+    if (!tooltipsEnabled) return null
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help ml-1" />
+        </TooltipTrigger>
+        <TooltipContent className="max-w-sm bg-white border shadow-lg p-3">
+          <p className="text-sm text-gray-700">{content}</p>
+        </TooltipContent>
+      </Tooltip>
+    )
   }
 
   const startDate = new Date()
@@ -713,118 +695,136 @@ export function EarningsEconomicCalendar() {
   const dateRange = `${startDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })} – ${endDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`
 
   return (
-    <div className="space-y-6">
-      {/* Hero Section - Now shared between both tabs */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-[#1E3A8A] mb-1">Upcoming Earnings This Week</h1>
-          <p className="text-blue-600/80 flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            {dateRange}
-          </p>
-        </div>
-        <RefreshButton onClick={handleRefresh} isLoading={refreshing} />
-      </div>
-
-      <Tabs defaultValue="earnings" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-4">
-          <TabsTrigger value="earnings" className="text-sm font-semibold">
-            Upcoming Earnings Reports
-          </TabsTrigger>
-          <TabsTrigger value="economic" className="text-sm font-semibold">
-            Economic Events & Announcements
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Earnings Tab */}
-        <TabsContent value="earnings" className="p-6 bg-blue-50/50 rounded-lg">
-          {earningsData.length > 0 ? (
-            <Card className="bg-white shadow-md overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Date/Time
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Ticker
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden sm:table-cell">
-                        Company
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        <span className="flex items-center gap-1">
-                          <Sparkles className="h-3 w-3 text-teal-600" />
-                          AI Explainer
-                        </span>
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Estimate
-                      </th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {earningsData.map((item, index) => (
-                      <tr key={index} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3">
-                          <div className="text-sm font-medium text-gray-900">{item.date}</div>
-                          <div className="text-xs text-gray-500 flex items-center gap-2">
-                            <Clock className="h-3 w-3" />
-                            {item.time}
-                            <TimingBadge timing={item.timing} />
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <a
-                            href={`https://finance.yahoo.com/quote/${item.ticker}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[#1E3A8A] font-bold hover:text-teal-600 hover:underline"
-                          >
-                            {item.ticker}
-                          </a>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600 hidden sm:table-cell">{item.company}</td>
-                        <td className="px-4 py-3">
-                          <p className="text-xs text-gray-600 leading-relaxed max-w-[200px]">{item.aiExplainer}</p>
-                        </td>
-                        <td className="px-4 py-3 text-right text-sm font-medium text-gray-700">{item.estimate}</td>
-                        <td className="px-4 py-3 text-center">
-                          <AskAIDialog ticker={item.ticker} company={item.company} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          ) : (
-            <EmptyState type="earnings" />
-          )}
-
-          {/* AI Insights */}
-          <InsightAccordion insights={earningsInsights} type="earnings" />
-
-          {/* Footer Banner */}
-          <div className="mt-8 bg-blue-100/50 rounded-lg p-4 flex flex-col sm:flex-row items-center justify-between gap-3 border border-blue-200">
-            <p className="text-[#1E3A8A] text-sm font-medium text-center sm:text-left">
-              Stay ahead of earnings volatility—calculate your edge with Options-Calculators.com tools.
+    <TooltipProvider>
+      <div className="space-y-6">
+        {/* Hero Section - Now shared between both tabs */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-[#1E3A8A] mb-1 flex items-center gap-2">
+              Upcoming Earnings This Week
+              <InfoTooltip content="Earnings announcements are major volatility events. Options prices (IV) typically increase before earnings and collapse after (IV crush). Options traders can sell premium before earnings to capture IV crush, or buy straddles/strangles if they expect a larger-than-expected move." />
+            </h1>
+            <p className="text-blue-600/80 flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              {dateRange}
             </p>
-            <div className="flex items-center gap-2 text-teal-600 font-semibold text-sm">
-              <TrendingUp className="h-4 w-4" />
-              OPTIONS-CALCULATORS.COM
-            </div>
           </div>
-        </TabsContent>
+          <div className="flex items-center gap-3">
+            <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
+            <RefreshButton onClick={handleRefresh} isLoading={refreshing} />
+          </div>
+        </div>
 
-        {/* Economic Events Tab */}
-        <TabsContent value="economic" className="p-6 bg-blue-50/50 rounded-lg">
-          {/* Economic Events Table */}
-          {economicData.length > 0 ? (
+        <Tabs defaultValue="earnings" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsTrigger value="earnings" className="text-sm font-semibold">
+              Upcoming Earnings Reports
+            </TabsTrigger>
+            <TabsTrigger value="economic" className="text-sm font-semibold">
+              Economic Events & Announcements
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Earnings Tab */}
+          <TabsContent value="earnings" className="p-6 bg-blue-50/50 rounded-lg">
+            {earningsData.length > 0 ? (
+              <Card className="bg-white shadow-md overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Date/Time
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Ticker
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden sm:table-cell">
+                          Company
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          <span className="flex items-center gap-1">
+                            <Sparkles className="h-3 w-3 text-teal-600" />
+                            AI Explainer
+                            <InfoTooltip content="AI-generated insights about expected volatility and potential options strategies for each earnings report. Consider the expected move (IV) when deciding on strike prices." />
+                          </span>
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Estimate
+                          <InfoTooltip content="Consensus analyst EPS estimate. Stocks often move based on whether they beat or miss this estimate. A beat by 5%+ is typically bullish, while a miss can trigger sharp selloffs." />
+                        </th>
+                        <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    {/* Existing tbody code */}
+                    <tbody className="divide-y divide-gray-100">
+                      {earningsData.map((item, index) => (
+                        <tr key={index} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="text-sm font-medium text-gray-900">{item.date}</div>
+                            <div className="text-xs text-gray-500 flex items-center gap-2">
+                              <Clock className="h-3 w-3" />
+                              {item.time}
+                              <TimingBadge timing={item.timing} />
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <a
+                              href={`https://finance.yahoo.com/quote/${item.ticker}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm font-bold text-teal-600 hover:text-teal-700 hover:underline"
+                            >
+                              {item.ticker}
+                            </a>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600 hidden sm:table-cell">{item.company}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700 max-w-xs">{item.aiExplainer}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 font-medium text-right">{item.estimate}</td>
+                          <td className="px-4 py-3 text-center">
+                            {/* Updated RunScenarioInAIDialog props */}
+                            <RunScenarioInAIDialog
+                              context={{
+                                type: "earnings",
+                                ticker: item.ticker,
+                                company: item.company,
+                                estimate: item.estimate,
+                                date: item.date,
+                                aiExplainer: item.aiExplainer,
+                              }}
+                              buttonVariant="outline"
+                              buttonClassName="border-teal-500 text-teal-600 hover:bg-teal-50"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            ) : (
+              <EmptyState type="earnings" />
+            )}
+
+            {/* AI Insights */}
+            <InsightAccordion insights={earningsInsights} type="earnings" />
+
+            {/* Footer Banner */}
+            <div className="mt-8 bg-blue-100/50 rounded-lg p-4 flex flex-col sm:flex-row items-center justify-between gap-3 border border-blue-200">
+              <p className="text-[#1E3A8A] text-sm font-medium text-center sm:text-left">
+                Stay ahead of earnings volatility—calculate your edge with Options-Calculators.com tools.
+              </p>
+              <div className="flex items-center gap-2 text-teal-600 font-semibold text-sm">
+                <TrendingUp className="h-4 w-4" />
+                OPTIONS-CALCULATORS.COM
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Economic Events Tab */}
+          <TabsContent value="economic" className="p-6 bg-amber-50/50 rounded-lg">
             <Card className="bg-white shadow-md overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -835,167 +835,72 @@ export function EarningsEconomicCalendar() {
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Event
+                        <InfoTooltip content="Economic events can significantly impact market direction. High-impact events like FOMC decisions, CPI, and NFP often cause large moves in indices and rate-sensitive stocks. Plan your options positions around these dates." />
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        AI Explainer
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Impact
+                        <InfoTooltip content="Impact rating indicates expected market volatility. HIGH impact events like Fed decisions can move SPY 1-3%. MEDIUM impact events typically cause 0.5-1% moves. LOW impact events usually have minimal market effect." />
                       </th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Est. Value/Note
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Actual
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Forecast
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Previous
                       </th>
                       <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
                   </thead>
+                  {/* Existing tbody code */}
                   <tbody className="divide-y divide-gray-100">
-                    {economicData.map((item, index) => (
-                      <tr key={index} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3">
-                          <div className="text-sm font-medium text-gray-900">{item.date}</div>
-                          <div className="text-xs text-gray-500 flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {item.time}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-[#1E3A8A] font-bold">{item.event}</span>
-                        </td>
-                        <td className="px-4 py-3 max-w-xs">
-                          <p className="text-xs text-gray-600 leading-relaxed">{item.aiExplainer}</p>
-                        </td>
-                        <td className="px-4 py-3 text-right text-sm font-medium text-gray-700">{item.note}</td>
-                        <td className="px-4 py-3 text-center">
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-teal-600 border-teal-600 hover:bg-teal-50 bg-transparent"
-                                onClick={() => {
-                                  setSelectedEconomicEvent(item)
-                                  setEconomicAiQuestion("")
-                                  setEconomicAiResponse("")
-                                }}
-                              >
-                                <MessageSquare className="h-3 w-3 mr-1" />
-                                Ask AI
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-lg bg-white">
-                              <DialogHeader>
-                                <DialogTitle className="flex items-center gap-2 text-[#1E3A8A]">
-                                  <Bot className="h-5 w-5 text-teal-600" />
-                                  AI Analysis: {item.event}
-                                </DialogTitle>
-                                <DialogDescription>
-                                  Ask about market impact, expected moves, and options strategies for this economic
-                                  event
-                                </DialogDescription>
-                              </DialogHeader>
-                              <div className="space-y-4 mt-4">
-                                {/* Suggested Questions */}
-                                <div className="flex flex-wrap gap-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="text-xs bg-blue-50 border-blue-200 hover:bg-blue-100"
-                                    onClick={() =>
-                                      setEconomicAiQuestion(`What's the expected market reaction to ${item.event}?`)
-                                    }
-                                  >
-                                    Expected reaction?
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="text-xs bg-blue-50 border-blue-200 hover:bg-blue-100"
-                                    onClick={() =>
-                                      setEconomicAiQuestion(`Best options strategy to trade around ${item.event}?`)
-                                    }
-                                  >
-                                    Options strategy?
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="text-xs bg-blue-50 border-blue-200 hover:bg-blue-100"
-                                    onClick={() =>
-                                      setEconomicAiQuestion(`Which sectors/ETFs are most affected by ${item.event}?`)
-                                    }
-                                  >
-                                    Sectors to watch?
-                                  </Button>
-                                </div>
-
-                                {/* Question Input */}
-                                <div className="flex gap-2">
-                                  <Textarea
-                                    placeholder="Ask about market impact, volatility expectations, or options strategies..."
-                                    value={economicAiQuestion}
-                                    onChange={(e) => setEconomicAiQuestion(e.target.value)}
-                                    className="min-h-[60px] text-sm"
-                                  />
-                                  <Button
-                                    onClick={handleEconomicAiQuestion}
-                                    disabled={economicAiLoading || !economicAiQuestion.trim()}
-                                    className="bg-teal-600 hover:bg-teal-700 text-white px-3"
-                                  >
-                                    {economicAiLoading ? (
-                                      <RefreshCw className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <Send className="h-4 w-4" />
-                                    )}
-                                  </Button>
-                                </div>
-
-                                {/* AI Response */}
-                                {economicAiLoading && (
-                                  <div className="bg-gray-50 rounded-lg p-4 animate-pulse">
-                                    <div className="flex items-center gap-2 text-gray-500">
-                                      <Sparkles className="h-4 w-4 animate-pulse" />
-                                      <span className="text-sm">Analyzing economic data...</span>
-                                    </div>
-                                  </div>
-                                )}
-                                {economicAiResponse && !economicAiLoading && (
-                                  <div className="bg-gradient-to-br from-teal-50 to-blue-50 rounded-lg p-4 border border-teal-100">
-                                    <div className="flex items-start gap-2">
-                                      <Bot className="h-4 w-4 text-teal-600 mt-1 flex-shrink-0" />
-                                      <div className="text-sm text-gray-700 whitespace-pre-line leading-relaxed">
-                                        {economicAiResponse}
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </DialogContent>
-                          </Dialog>
-                        </td>
-                      </tr>
-                    ))}
+                    {economicData.map(
+                      (
+                        event,
+                        index, // Changed to economicData
+                      ) => (
+                        <tr key={index} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="text-sm font-medium text-gray-900">{event.date}</div>
+                            <div className="text-xs text-gray-500 flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {event.time}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 font-medium">{event.event}</td>
+                          <td className="px-4 py-3 text-center">
+                            <ImpactBadge impact={event.impact} />
+                          </td>
+                          <td className="px-4 py-3 text-center text-sm text-gray-600">{event.actual || "—"}</td>
+                          <td className="px-4 py-3 text-center text-sm text-gray-600">{event.forecast || "—"}</td>
+                          <td className="px-4 py-3 text-center text-sm text-gray-600">{event.previous || "—"}</td>
+                          <td className="px-4 py-3 text-center">
+                            <RunScenarioInAIDialog
+                              context={{
+                                type: "economic",
+                                event: event.event,
+                                date: event.date,
+                                impact: event.impact,
+                                forecast: event.forecast,
+                                previous: event.previous,
+                              }}
+                              buttonVariant="outline"
+                              buttonClassName="border-amber-500 text-amber-600 hover:bg-amber-50"
+                            />
+                          </td>
+                        </tr>
+                      ),
+                    )}
                   </tbody>
                 </table>
               </div>
             </Card>
-          ) : (
-            <EmptyState type="economic" />
-          )}
-
-          {/* AI Insights */}
-          <InsightAccordion insights={economicInsights} type="economic" />
-
-          {/* Footer Banner */}
-          <div className="mt-8 bg-blue-100/50 rounded-lg p-4 flex flex-col sm:flex-row items-center justify-between gap-3 border border-blue-200">
-            <p className="text-[#1E3A8A] text-sm font-medium text-center sm:text-left">
-              Stay ahead of volatility—calculate your edge with Options-Calculators.com tools.
-            </p>
-            <div className="flex items-center gap-2 text-teal-600 font-semibold text-sm">
-              <TrendingUp className="h-4 w-4" />
-              OPTIONS-CALCULATORS.COM
-            </div>
-          </div>
-        </TabsContent>
-      </Tabs>
-    </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </TooltipProvider>
   )
 }

@@ -34,7 +34,7 @@ const ANALYZE_TABS = [
   { id: "market-sentiment", label: "CNN's Fear & Greed" },
   { id: "panic-euphoria", label: "Citibank's Panic & Euphoria Index" },
   { id: "social-sentiment", label: "Social Sentiment" },
-  { id: "ccpi", label: "Comprehensive Crash Prediction Index" },
+  { id: "ccpi", label: "Crash & Corrections Prediction Index" },
   { id: "fomc-predictions", label: "FOMC Fed Rate" },
   { id: "cpi-inflation", label: "BLS CPI Inflation" },
   { id: "jobs", label: "BLS Jobs Rate" },

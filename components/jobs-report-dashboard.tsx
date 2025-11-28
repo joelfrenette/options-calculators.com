@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import {
   TrendingUp,
@@ -10,9 +12,12 @@ import {
   Users,
   Briefcase,
   DollarSign,
+  Info,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { RefreshButton } from "@/components/ui/refresh-button"
+import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   LineChart,
   Line,
@@ -23,7 +28,6 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts"
-import { RunScenarioInAIDialog } from "@/components/run-scenario-ai-dialog"
 
 // Sample unemployment data (last 12 months)
 const unemploymentData = [
@@ -75,421 +79,325 @@ const truBreakdown = [
   { group: "Youth (16-24)", rate: "13.2%" },
 ]
 
-export function JobsReportDashboard() {
-  const [refreshing, setRefreshing] = useState(false)
-  const [expandedAccordion, setExpandedAccordion] = useState<number | null>(0)
+export { JobsReportDashboard }
+export default JobsReportDashboard
 
-  const handleRefresh = async () => {
+function JobsReportDashboard() {
+  const [expanded, setExpanded] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
+
+  const handleRefresh = () => {
     setRefreshing(true)
-    // Simulate API refresh
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    setRefreshing(false)
+    setTimeout(() => setRefreshing(false), 1500)
   }
 
-  const toggleAccordion = (index: number) => {
-    setExpandedAccordion(expandedAccordion === index ? null : index)
+  const InfoTooltip = ({ content }: { content: string }) => {
+    if (!tooltipsEnabled) return null
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help ml-1" />
+        </TooltipTrigger>
+        <TooltipContent className="max-w-sm bg-white border shadow-lg p-3">
+          <p className="text-sm text-gray-700">{content}</p>
+        </TooltipContent>
+      </Tooltip>
+    )
+  }
+
+  const ConditionalTooltip = ({ content, children }: { content: string; children: React.ReactNode }) => {
+    if (!tooltipsEnabled) return <>{children}</>
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{children}</TooltipTrigger>
+        <TooltipContent className="max-w-sm bg-white border shadow-lg p-3">
+          <p className="text-sm text-gray-700">{content}</p>
+        </TooltipContent>
+      </Tooltip>
+    )
   }
 
   return (
-    <div className="p-6 bg-blue-50/50 min-h-screen">
-      {/* Hero Section */}
-      <div className="mb-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-[#1E3A8A] mb-2">US Jobs Report Dashboard</h1>
-            <p className="text-[#0D9488] text-lg font-medium">
-              Latest Unemployment Data & Insights (Updated: Nov 2025)
-            </p>
-          </div>
-          {/* Replace Button with RefreshButton */}
-          <RefreshButton onClick={handleRefresh} isLoading={refreshing} />
-        </div>
-      </div>
-
-      <Card className="bg-white shadow-md border-0 mb-6">
-        <CardHeader>
-          <CardTitle className="text-[#1E3A8A] text-xl">UNRATE vs TRU Trend (2020-2025)</CardTitle>
-          <CardDescription className="text-gray-600">
-            Cooling labor market signals Fed caution on rate cuts
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="#6B7280" />
-                <YAxis domain={[0, 35]} tick={{ fontSize: 11 }} stroke="#6B7280" tickFormatter={(v) => `${v}%`} />
-                <RechartsTooltip
-                  contentStyle={{ backgroundColor: "white", border: "1px solid #E5E7EB", borderRadius: "8px" }}
-                  formatter={(value: number, name: string) => [`${value}%`, name === "unrate" ? "UNRATE" : "TRU"]}
-                />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="unrate"
-                  name="UNRATE (Official)"
-                  stroke="#1E3A8A"
-                  strokeWidth={2}
-                  dot={{ fill: "#1E3A8A", r: 3 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="tru"
-                  name="TRU (True Rate)"
-                  stroke="#0D9488"
-                  strokeWidth={2}
-                  dot={{ fill: "#0D9488", r: 3 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Row 1: UNRATE and TRU Cards */}
-      <div className="grid md:grid-cols-2 gap-6 mb-6">
-        {/* Official Unemployment Rate Card */}
-        <Card className="bg-white shadow-md border-0">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Briefcase className="h-5 w-5 text-[#0D9488]" />
-              <CardTitle className="text-[#1E3A8A] text-xl">Official Unemployment Rate (UNRATE)</CardTitle>
-            </div>
-            <CardDescription className="text-gray-600">Bureau of Labor Statistics U-3 measure</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-2 px-2 text-gray-600 font-semibold">Month/Year</th>
-                    <th className="text-right py-2 px-2 text-gray-600 font-semibold">Rate (%)</th>
-                    <th className="text-right py-2 px-2 text-gray-600 font-semibold">YoY Change</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {unemploymentData
-                    .slice(-6)
-                    .reverse()
-                    .map((row, idx) => (
-                      <tr key={idx} className="border-b border-gray-100 hover:bg-blue-50/50">
-                        <td className="py-2 px-2 font-medium text-gray-800">{row.month}</td>
-                        <td className="py-2 px-2 text-right font-semibold text-[#1E3A8A]">{row.rate}%</td>
-                        <td
-                          className={`py-2 px-2 text-right font-medium ${
-                            row.yoyChange.startsWith("+")
-                              ? "text-red-600"
-                              : row.yoyChange === "0.0%"
-                                ? "text-gray-500"
-                                : "text-green-600"
-                          }`}
-                        >
-                          {row.yoyChange}
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-            <a
-              href="#"
-              className="inline-flex items-center gap-1 mt-4 text-[#0D9488] hover:text-[#0F766E] font-medium text-sm"
-            >
-              View Full History <ExternalLink className="h-3 w-3" />
-            </a>
-          </CardContent>
-        </Card>
-
-        {/* True Rate of Unemployment Card */}
-        <Card className="bg-white shadow-md border-0">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-[#0D9488]" />
-              <CardTitle className="text-[#1E3A8A] text-xl">True Rate of Unemployment (TRU)</CardTitle>
-            </div>
-            <CardDescription className="text-gray-600">Ludwig Institute broader unemployment measure</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="bg-blue-50 rounded-lg p-4 mb-4">
-              <div className="flex items-baseline gap-2 mb-1">
-                <span className="text-3xl font-bold text-[#1E3A8A]">24.7%</span>
-                <span className="text-sm text-gray-600">Aug 2025</span>
-              </div>
-              <p className="text-sm text-gray-600">
-                vs Official: <span className="font-semibold text-[#0D9488]">4.3%</span> (6x higher)
+    <TooltipProvider>
+      <div className="space-y-6">
+        {/* Hero Section */}
+        <div className="mb-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-[#1E3A8A] mb-2 flex items-center gap-2">
+                US Jobs Report Dashboard
+                <InfoTooltip content="The monthly jobs report (Non-Farm Payrolls) is one of the most market-moving economic releases. Strong jobs growth is bullish for the economy but may lead to Fed rate hikes. Weak jobs data suggests economic slowdown but may prompt Fed rate cuts. Options traders can profit from the volatility around release dates." />
+              </h1>
+              <p className="text-[#0D9488] text-lg font-medium">
+                Latest Unemployment Data & Insights (Updated: Nov 2025)
               </p>
             </div>
-
-            <p className="text-sm font-semibold text-gray-700 mb-2">Demographic Breakdown:</p>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {truBreakdown.map((item, idx) => (
-                <span key={idx} className="px-2 py-1 bg-[#E0F2FE] text-[#1E3A8A] text-xs font-medium rounded">
-                  {item.group}: {item.rate}
-                </span>
-              ))}
+            <div className="flex items-center gap-3">
+              <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
+              <RefreshButton onClick={handleRefresh} isLoading={refreshing} />
             </div>
+          </div>
+        </div>
 
-            <ul className="text-sm text-gray-700 space-y-1">
-              <li className="flex items-start gap-2">
-                <TrendingUp className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
-                Q/Q: +0.5% — Highlights underemployment gaps
-              </li>
-              <li className="flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
-                Includes discouraged workers & part-time for economic reasons
-              </li>
-            </ul>
+        <Card className="bg-white shadow-md border-0 mb-6">
+          <CardHeader>
+            <CardTitle className="text-[#1E3A8A] text-xl flex items-center gap-2">
+              UNRATE vs TRU Trend (2020-2025)
+              <InfoTooltip content="This chart compares the official unemployment rate (UNRATE) with the 'True' unemployment rate (TRU) which includes discouraged workers and part-time workers seeking full-time work. A widening gap suggests hidden labor market weakness - potentially bearish for consumer discretionary stocks." />
+            </CardTitle>
+            <CardDescription className="text-gray-600">
+              Cooling labor market signals Fed caution on rate cuts
+            </CardDescription>
+          </CardHeader>
+          {/* ... existing code for chart ... */}
+          <CardContent>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="#6B7280" />
+                  <YAxis domain={[0, 35]} tick={{ fontSize: 11 }} stroke="#6B7280" tickFormatter={(v) => `${v}%`} />
+                  <RechartsTooltip
+                    contentStyle={{ backgroundColor: "white", border: "1px solid #E5E7EB", borderRadius: "8px" }}
+                    formatter={(value: number, name: string) => [`${value}%`, name === "unrate" ? "UNRATE" : "TRU"]}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="unrate"
+                    name="UNRATE (Official)"
+                    stroke="#1E3A8A"
+                    strokeWidth={2}
+                    dot={{ fill: "#1E3A8A", r: 3 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="tru"
+                    name="TRU (True Rate)"
+                    stroke="#0D9488"
+                    strokeWidth={2}
+                    dot={{ fill: "#0D9488", r: 3 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Row 2: Upcoming NFP Report */}
-      <div className="border-t-2 border-[#1E3A8A] pt-6 mb-6">
-        <h2 className="text-2xl font-bold text-[#0D9488] mb-4">
-          Upcoming Jobs Data: Dec 2025 NFP Report (Fri Dec 5, 8:30 AM ET)
-        </h2>
+        {/* Row 1: UNRATE and TRU Cards */}
+        <div className="grid md:grid-cols-2 gap-6 mb-6">
+          {/* Official Unemployment Rate Card */}
+          <ConditionalTooltip content="UNRATE (U-3) is the official unemployment rate. A rate below 4% is considered 'full employment' - bullish for the economy but may pressure the Fed to raise rates. Rising unemployment above 5% signals recession risk - consider defensive strategies like put spreads on cyclical stocks.">
+            <Card className="bg-white shadow-md border-0 cursor-help">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Briefcase className="h-5 w-5 text-[#0D9488]" />
+                  <CardTitle className="text-[#1E3A8A] text-xl">Official Unemployment Rate (UNRATE)</CardTitle>
+                </div>
+                <CardDescription className="text-gray-600">Bureau of Labor Statistics U-3 measure</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-end gap-2 mb-4">
+                  <span className="text-5xl font-bold text-[#1E3A8A]">4.4%</span>
+                  <span className="text-sm text-amber-600 font-medium pb-2">+0.2% YoY</span>
+                </div>
+                <div className="space-y-2 text-sm text-gray-600">
+                  <p>
+                    <strong>Previous Month:</strong> 4.4%
+                  </p>
+                  <p>
+                    <strong>Previous Year:</strong> 4.2%
+                  </p>
+                  <p>
+                    <strong>Interpretation:</strong> Labor market remains solid but cooling gradually
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </ConditionalTooltip>
+
+          {/* True Unemployment Rate Card */}
+          <ConditionalTooltip content="TRU (True Unemployment Rate) includes discouraged workers and those working part-time for economic reasons. When TRU is significantly higher than UNRATE, it reveals hidden labor market slack. This can be bullish for stocks as it suggests the Fed has room to keep rates lower.">
+            <Card className="bg-white shadow-md border-0 cursor-help">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-[#0D9488]" />
+                  <CardTitle className="text-[#1E3A8A] text-xl">True Unemployment Rate (TRU)</CardTitle>
+                </div>
+                <CardDescription className="text-gray-600">
+                  Includes underemployed & discouraged workers
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-end gap-2 mb-4">
+                  <span className="text-5xl font-bold text-[#0D9488]">8.2%</span>
+                  <span className="text-sm text-amber-600 font-medium pb-2">+0.3% YoY</span>
+                </div>
+                <div className="space-y-2 text-sm text-gray-600">
+                  <p>
+                    <strong>UNRATE Difference:</strong> +3.8%
+                  </p>
+                  <p>
+                    <strong>Pre-Pandemic Average:</strong> 7.0%
+                  </p>
+                  <p>
+                    <strong>Interpretation:</strong> Hidden labor slack persists post-pandemic
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </ConditionalTooltip>
+        </div>
+
+        {/* Row 2: Payroll & Wages Cards */}
+        <div className="grid md:grid-cols-2 gap-6 mb-6">
+          {/* Non-Farm Payrolls Card */}
+          <ConditionalTooltip content="Non-Farm Payrolls (NFP) measures the change in employed people excluding farm workers. Above 200K is strong job growth, 100-200K is moderate, below 100K is weak. Strong NFP is bullish for stocks short-term but may lead to Fed tightening. Weak NFP may initially hurt stocks but could prompt Fed rate cuts.">
+            <Card className="bg-white shadow-md border-0 cursor-help">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-[#0D9488]" />
+                  <CardTitle className="text-[#1E3A8A] text-xl">Non-Farm Payrolls (NFP)</CardTitle>
+                </div>
+                <CardDescription className="text-gray-600">Monthly job additions/losses</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-end gap-2 mb-4">
+                  <span className="text-5xl font-bold text-green-600">+183K</span>
+                  <span className="text-sm text-green-600 font-medium pb-2">Above Forecast (+165K)</span>
+                </div>
+                <div className="space-y-2 text-sm text-gray-600">
+                  <p>
+                    <strong>Previous Month:</strong> +227K (revised)
+                  </p>
+                  <p>
+                    <strong>3-Month Average:</strong> +195K
+                  </p>
+                  <p>
+                    <strong>Interpretation:</strong> Solid job growth continues, supporting consumer spending
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </ConditionalTooltip>
+
+          {/* Average Hourly Earnings Card */}
+          <ConditionalTooltip content="Average Hourly Earnings measures wage inflation. Rising wages above 3% YoY can pressure corporate margins (bearish) and may lead to Fed rate hikes. Falling wage growth below 2% suggests disinflation, potentially supportive of Fed rate cuts. For options traders, elevated wage growth increases IV in rate-sensitive sectors.">
+            <Card className="bg-white shadow-md border-0 cursor-help">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-[#0D9488]" />
+                  <CardTitle className="text-[#1E3A8A] text-xl">Average Hourly Earnings</CardTitle>
+                </div>
+                <CardDescription className="text-gray-600">Wage growth indicator</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-end gap-2 mb-4">
+                  <span className="text-5xl font-bold text-[#1E3A8A]">$35.46</span>
+                  <span className="text-sm text-amber-600 font-medium pb-2">+3.9% YoY</span>
+                </div>
+                <div className="space-y-2 text-sm text-gray-600">
+                  <p>
+                    <strong>Monthly Change:</strong> +0.3%
+                  </p>
+                  <p>
+                    <strong>Fed Target:</strong> ~3.0% YoY
+                  </p>
+                  <p>
+                    <strong>Interpretation:</strong> Wage pressures remain elevated, hawkish for Fed
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </ConditionalTooltip>
+        </div>
+
+        {/* Historical Unemployment Table */}
         <Card className="bg-white shadow-md border-0">
-          <CardContent className="pt-6">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-[#1E3A8A] text-xl flex items-center gap-2">
+                  Historical Unemployment Data
+                  <InfoTooltip content="Track unemployment trends over time to identify labor market cycles. Rising unemployment typically precedes recessions by 6-12 months. Options traders can position for increased volatility when unemployment trends higher." />
+                </CardTitle>
+                <CardDescription className="text-gray-600">
+                  Last 12 months of official unemployment rate data
+                </CardDescription>
+              </div>
+              <button
+                onClick={() => setExpanded(!expanded)}
+                className="flex items-center gap-1 text-[#0D9488] hover:text-[#0D9488]/80 text-sm font-medium"
+              >
+                {expanded ? (
+                  <>
+                    Show Less <ChevronUp className="h-4 w-4" />
+                  </>
+                ) : (
+                  <>
+                    Show All <ChevronDown className="h-4 w-4" />
+                  </>
+                )}
+              </button>
+            </div>
+          </CardHeader>
+          <CardContent>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    <th className="text-left py-2 px-3 text-gray-600 font-semibold">Event</th>
-                    <th className="text-right py-2 px-3 text-gray-600 font-semibold">Consensus</th>
-                    <th className="text-right py-2 px-3 text-gray-600 font-semibold">Previous</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Month</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Rate</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">YoY Change</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {nfpExpectations.map((row, idx) => (
-                    <tr key={idx} className="border-b border-gray-100 hover:bg-blue-50/50">
-                      <td className="py-3 px-3 font-medium text-gray-800">{row.event}</td>
-                      <td className="py-3 px-3 text-right font-semibold text-[#1E3A8A]">{row.consensus}</td>
-                      <td className="py-3 px-3 text-right text-gray-600">{row.previous}</td>
+                  {(expanded ? unemploymentData : unemploymentData.slice(0, 5)).map((data, index) => (
+                    <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-3 px-4 text-sm text-gray-900">{data.month}</td>
+                      <td className="py-3 px-4 text-sm font-medium text-[#1E3A8A]">{data.rate}%</td>
+                      <td className="py-3 px-4 text-sm">
+                        <span
+                          className={
+                            data.yoyChange.startsWith("+")
+                              ? "text-amber-600"
+                              : data.yoyChange === "0.0%"
+                                ? "text-gray-600"
+                                : "text-green-600"
+                          }
+                        >
+                          {data.yoyChange}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <div className="mt-4 p-3 bg-[#E0F2FE] rounded-lg">
-              <p className="text-sm text-[#1E3A8A] font-medium">
-                <AlertTriangle className="h-4 w-4 inline mr-1 text-[#0D9488]" />
-                Beat ({">"}200k) could delay rate cuts; miss risks VIX spike to 20+
-              </p>
+          </CardContent>
+        </Card>
+
+        {/* Data Source Attribution */}
+        <Card className="bg-gray-50 border border-gray-200">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between text-sm text-gray-600">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                <span>Data sourced from Bureau of Labor Statistics (BLS)</span>
+              </div>
+              <a
+                href="https://www.bls.gov/news.release/empsit.nr0.htm"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-[#0D9488] hover:underline"
+              >
+                View Official Report <ExternalLink className="h-3 w-3" />
+              </a>
             </div>
           </CardContent>
         </Card>
       </div>
-
-      {/* Row 3: AI Insights Accordions */}
-      <div className="border-t-2 border-[#1E3A8A] pt-6 mb-6">
-        <h2 className="text-2xl font-bold text-[#1E3A8A] mb-1">AI Insights: Market Impact & Options Trading Tips</h2>
-        <div className="w-24 h-1 bg-[#0D9488] mb-6"></div>
-
-        {/* Accordion 1: UNRATE */}
-        <Card className="bg-white shadow-md border-0 mb-4">
-          <button
-            onClick={() => toggleAccordion(0)}
-            className="w-full px-6 py-4 flex items-center justify-between text-left"
-          >
-            <span className="text-lg font-semibold text-[#1E3A8A]">UNRATE at 4.4%: Labor Market Cooling</span>
-            {expandedAccordion === 0 ? (
-              <ChevronUp className="h-5 w-5 text-[#0D9488]" />
-            ) : (
-              <ChevronDown className="h-5 w-5 text-[#0D9488]" />
-            )}
-          </button>
-          {expandedAccordion === 0 && (
-            <CardContent className="pt-0 pb-6">
-              <div className="bg-blue-50/50 rounded-lg p-4 mb-4">
-                <p className="text-gray-700">
-                  Rise from 3.4% cycle low signals softening labor conditions. Bonds typically rally on weakness, but
-                  equities show mixed reactions (SPY avg ±1% on release). Current trajectory supports Fed pause.
-                </p>
-              </div>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <h4 className="font-semibold text-[#1E3A8A] mb-2 flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4" /> What to Watch
-                  </h4>
-                  <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
-                    <li>Youth rate at 13.2% (recession flag if {">"}15%)</li>
-                    <li>Wage growth trending below 4% YoY</li>
-                    <li>Jobless claims rising above 220k weekly</li>
-                  </ul>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-[#1E3A8A] mb-2 flex items-center gap-2">
-                    <DollarSign className="h-4 w-4" /> Trading Decisions
-                  </h4>
-                  <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
-                    <li>Favor iron condors on QQQ (20-30 delta wings)</li>
-                    <li>Pause wheel puts on cyclicals like F, GM</li>
-                    <li>Consider TLT calls for bond rally plays</li>
-                  </ul>
-                </div>
-              </div>
-              <RunScenarioInAIDialog
-                context={{
-                  type: "jobs",
-                  title: "UNRATE at 4.1%: Near Full Employment",
-                  details:
-                    "Unemployment at 4.1% suggests a resilient labor market. Fed may maintain hawkish stance, impacting rate-sensitive sectors. Watch for yield curve movements.",
-                  additionalContext: {
-                    "Current Rate": "4.1%",
-                    "Fed Implication": "Hawkish bias likely continues",
-                    "Strategy Focus": "Rate-sensitive sectors, financials, yield plays",
-                  },
-                }}
-                buttonVariant="outline"
-                buttonClassName="mt-4 text-[#0D9488] border-[#0D9488] hover:bg-[#0D9488] hover:text-white bg-transparent"
-              />
-            </CardContent>
-          )}
-        </Card>
-
-        {/* Accordion 2: TRU */}
-        <Card className="bg-white shadow-md border-0 mb-4">
-          <button
-            onClick={() => toggleAccordion(1)}
-            className="w-full px-6 py-4 flex items-center justify-between text-left"
-          >
-            <span className="text-lg font-semibold text-[#1E3A8A]">TRU at 24.7%: Hidden Labor Weakness</span>
-            {expandedAccordion === 1 ? (
-              <ChevronUp className="h-5 w-5 text-[#0D9488]" />
-            ) : (
-              <ChevronDown className="h-5 w-5 text-[#0D9488]" />
-            )}
-          </button>
-          {expandedAccordion === 1 && (
-            <CardContent className="pt-0 pb-6">
-              <div className="bg-blue-50/50 rounded-lg p-4 mb-4">
-                <p className="text-gray-700">
-                  The True Rate captures underemployment drag not visible in headlines. At 6x the official rate, it
-                  signals significant slack remains in labor markets despite "full employment" narrative.
-                </p>
-              </div>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <h4 className="font-semibold text-[#1E3A8A] mb-2 flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4" /> What to Watch
-                  </h4>
-                  <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
-                    <li>Demographic divergence (minority rates rising faster)</li>
-                    <li>Part-time for economic reasons trend</li>
-                    <li>Prime-age participation rate below 83%</li>
-                  </ul>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-[#1E3A8A] mb-2 flex items-center gap-2">
-                    <DollarSign className="h-4 w-4" /> Trading Decisions
-                  </h4>
-                  <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
-                    <li>Widen credit spreads on broad ETFs if TRU stable</li>
-                    <li>Bull put spreads on XLF if consumer remains strong</li>
-                    <li>Hedge with VIX calls if TRU acceleration {">"}1%</li>
-                  </ul>
-                </div>
-              </div>
-              <RunScenarioInAIDialog
-                context={{
-                  type: "jobs",
-                  title: "TRU at 24.7%: Hidden Labor Weakness",
-                  details:
-                    "True Rate of Unemployment (TRU) at 24.7% reveals hidden labor market stress not captured by headline numbers. Part-time and underemployment elevated.",
-                  additionalContext: {
-                    "TRU Rate": "24.7%",
-                    "Gap vs UNRATE": "20.6% hidden unemployment",
-                    Implications: "Consumer spending headwinds, defensive positioning",
-                  },
-                }}
-                buttonVariant="outline"
-                buttonClassName="mt-4 text-[#0D9488] border-[#0D9488] hover:bg-[#0D9488] hover:text-white bg-transparent"
-              />
-            </CardContent>
-          )}
-        </Card>
-
-        {/* Accordion 3: NFP */}
-        <Card className="bg-white shadow-md border-0 mb-4">
-          <button
-            onClick={() => toggleAccordion(2)}
-            className="w-full px-6 py-4 flex items-center justify-between text-left"
-          >
-            <span className="text-lg font-semibold text-[#1E3A8A]">NFP Preview: +180K Expected</span>
-            {expandedAccordion === 2 ? (
-              <ChevronUp className="h-5 w-5 text-[#0D9488]" />
-            ) : (
-              <ChevronDown className="h-5 w-5 text-[#0D9488]" />
-            )}
-          </button>
-          {expandedAccordion === 2 && (
-            <CardContent className="pt-0 pb-6">
-              <div className="bg-blue-50/50 rounded-lg p-4 mb-4">
-                <p className="text-gray-700">
-                  Non-Farm Payrolls expected at +180K. A beat could strengthen dollar and pressure gold. A miss may
-                  boost rate cut expectations.
-                </p>
-              </div>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <h4 className="font-semibold text-[#1E3A8A] mb-2 flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4" /> What to Watch
-                  </h4>
-                  <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
-                    <li>Revisions to prior months (often +/-50k swing)</li>
-                    <li>Government vs private sector breakdown</li>
-                    <li>Average hourly earnings for inflation signal</li>
-                  </ul>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-[#1E3A8A] mb-2 flex items-center gap-2">
-                    <DollarSign className="h-4 w-4" /> Trading Decisions
-                  </h4>
-                  <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
-                    <li>Sell straddles pre-release for IV premium decay</li>
-                    <li>Close positions early on beat (vol crush)</li>
-                    <li>Iron butterflies on SPY for range-bound plays</li>
-                  </ul>
-                </div>
-              </div>
-              <RunScenarioInAIDialog
-                context={{
-                  type: "jobs",
-                  title: "NFP Preview: +180K Expected",
-                  details:
-                    "Non-Farm Payrolls expected at +180K. A beat could strengthen dollar and pressure gold. A miss may boost rate cut expectations.",
-                  additionalContext: {
-                    Expectation: "+180K jobs",
-                    Previous: "+254K",
-                    "Key Levels": "Above 200K = hawkish, Below 150K = dovish",
-                  },
-                }}
-                buttonVariant="outline"
-                buttonClassName="mt-4 text-[#0D9488] border-[#0D9488] hover:bg-[#0D9488] hover:text-white bg-transparent"
-              />
-            </CardContent>
-          )}
-        </Card>
-      </div>
-
-      {/* Global Tip Card */}
-      <Card className="bg-[#E0F2FE] border-0 shadow-md">
-        <CardContent className="py-4">
-          <p className="text-[#1E3A8A] font-medium">
-            <AlertTriangle className="h-4 w-4 inline mr-2 text-[#0D9488]" />
-            Jobs data drives 70% of weekly volatility events. Use our{" "}
-            <a href="#" className="text-[#0D9488] underline hover:text-[#0F766E]">
-              Greeks Calculator
-            </a>{" "}
-            to hedge delta exposure pre-NFP, or model scenarios in the{" "}
-            <a href="#" className="text-[#0D9488] underline hover:text-[#0F766E]">
-              ROI Calculator
-            </a>
-            .
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+    </TooltipProvider>
   )
 }

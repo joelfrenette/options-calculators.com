@@ -1,10 +1,16 @@
 "use client"
 
+import type React from "react"
+
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { RefreshButton } from "@/components/ui/refresh-button"
+import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { Info } from "lucide-react"
+
 // import {
 //   Activity,
 //   TrendingUp,
@@ -425,12 +431,27 @@ export function MarketSentiment() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [fromCache, setFromCache] = useState(false)
   const [cacheTimestamp, setCacheTimestamp] = useState<string | null>(null)
+  const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
+  const [error, setError] = useState<string | null>(null) // Added error state
 
   // Define cache keys and version
   const CACHE_KEY = "market_sentiment_data"
   const CACHE_TIMESTAMP_KEY = "market_sentiment_timestamp"
   const CACHE_VERSION_KEY = "fearGreedCacheVersion"
   const CACHE_VERSION = "12.0" // Updated cache version for new caching behavior
+
+  // CHANGE: Helper component for conditional tooltip
+  const ConditionalTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => {
+    if (!tooltipsEnabled) return <>{children}</>
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{children}</TooltipTrigger>
+        <TooltipContent className="max-w-xs">
+          <p className="text-sm">{content}</p>
+        </TooltipContent>
+      </Tooltip>
+    )
+  }
 
   // Define components based on CNN's Fear & Greed Index indicators
   const components = [
@@ -783,6 +804,7 @@ export function MarketSentiment() {
       setLastUpdated(new Date())
     } catch (error) {
       console.error("[v0] Error fetching market sentiment data:", error)
+      setError(error instanceof Error ? error.message : "An unknown error occurred") // Set error message
       // Ensure loading is false even if there's an error
       setLoading(false)
     } finally {
@@ -1072,6 +1094,29 @@ export function MarketSentiment() {
     return <LoadingSpinner message="Loading Fear & Greed Index data..." />
   }
 
+  // CHANGE: Display error message if fetching fails
+  if (error) {
+    return (
+      <Card className="shadow-sm border-red-300 bg-red-50">
+        <CardContent className="pt-4">
+          <div className="flex items-start gap-3">
+            <InfoIcon className="h-5 w-5 text-red-600" />
+            <div>
+              <h3 className="font-bold text-red-900 mb-1">Error Loading Data</h3>
+              <p className="text-sm text-red-800 leading-relaxed">{error}</p>
+              <button
+                onClick={handleRefresh}
+                className="mt-3 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   if (!marketData) {
     return <LoadingSpinner message="Loading market data..." />
   }
@@ -1083,589 +1128,604 @@ export function MarketSentiment() {
   const safeSentimentData = Array.isArray(sentimentData) ? sentimentData : []
 
   return (
-    <div className="space-y-6">
-      {marketData?.usingFallback && (
-        <Card className="shadow-sm border-yellow-200 bg-yellow-50">
-          <CardContent className="pt-4">
-            <div className="flex items-start gap-3">
-              <InfoIcon />
+    <TooltipProvider>
+      <div className="space-y-6">
+        {marketData?.usingFallback && (
+          <Card className="shadow-sm border-yellow-200 bg-yellow-50">
+            <CardContent className="pt-4">
+              <div className="flex items-start gap-3">
+                <InfoIcon />
+                <div>
+                  <h3 className="font-bold text-yellow-900 mb-1">Using Calculated Values</h3>
+                  <p className="text-sm text-yellow-800 leading-relaxed">
+                    CNN's Fear & Greed Index is currently unavailable. We're using our own calculation based on real
+                    market data (VIX, S&P 500, bond spreads) with the same 7-indicator methodology. Values may differ
+                    slightly from CNN's official index but follow the same formula.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Fear & Greed Historical Scale - KEEP */}
+        <Card className="shadow-sm border-gray-200">
+          <CardHeader className="bg-gray-50 border-b border-gray-200">
+            <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-yellow-900 mb-1">Using Calculated Values</h3>
-                <p className="text-sm text-yellow-800 leading-relaxed">
-                  CNN's Fear & Greed Index is currently unavailable. We're using our own calculation based on real
-                  market data (VIX, S&P 500, bond spreads) with the same 7-indicator methodology. Values may differ
-                  slightly from CNN's official index but follow the same formula.
+                <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <BarChartIcon />
+                  Fear & Greed Historical Scale
+                  {tooltipsEnabled && (
+                    <ConditionalTooltip content="The Fear & Greed Index measures market sentiment from 0-100. For options traders: Extreme Fear (0-24) often signals buying opportunities - consider selling puts or buying calls. Extreme Greed (75-100) suggests caution - consider protective puts or reducing exposure. Contrarian traders use extremes to fade crowd sentiment.">
+                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </ConditionalTooltip>
+                  )}
+                </CardTitle>
+                <p className="text-sm text-gray-600 mt-1">
+                  Visual representation of sentiment zones from extreme greed to extreme fear
                 </p>
               </div>
+              <div className="flex items-center gap-3">
+                <TooltipsToggle enabled={tooltipsEnabled} onChange={setTooltipsEnabled} />
+                <RefreshButton onClick={handleRefresh} isLoading={refreshing} />
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="space-y-6">
+              <div className="relative">
+                <div className="h-24 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded-lg shadow-inner" />
 
-      {/* Fear & Greed Historical Scale - KEEP */}
-      <Card className="shadow-sm border-gray-200">
-        <CardHeader className="bg-gray-50 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <BarChartIcon />
-                Fear & Greed Historical Scale
-              </CardTitle>
-              <p className="text-sm text-gray-600 mt-1">
-                Visual representation of sentiment zones from extreme greed to extreme fear
-              </p>
-            </div>
-            <RefreshButton onClick={handleRefresh} isLoading={refreshing} />
-          </div>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <div className="space-y-6">
-            <div className="relative">
-              <div className="h-24 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded-lg shadow-inner" />
+                <div className="absolute inset-0 flex items-center justify-between px-2 text-xs font-bold">
+                  <div className="text-center text-white drop-shadow-lg">
+                    <div className="text-base">EXTREME</div>
+                    <div>GREED</div>
+                    <div className="text-[10px] mt-1">75-100</div>
+                  </div>
+                  <div className="text-center text-white drop-shadow-lg">
+                    <div>GREED</div>
+                    <div className="text-[10px] mt-1">56-74</div>
+                  </div>
+                  <div className="text-center text-gray-800 drop-shadow">
+                    <div>NEUTRAL</div>
+                    <div className="text-[10px] mt-1">45-55</div>
+                  </div>
+                  <div className="text-center text-white drop-shadow-lg">
+                    <div>FEAR</div>
+                    <div className="text-[10px] mt-1">25-44</div>
+                  </div>
+                  <div className="text-center text-white drop-shadow-lg">
+                    <div className="text-base">EXTREME</div>
+                    <div>FEAR</div>
+                    <div className="text-[10px] mt-1">0-24</div>
+                  </div>
+                </div>
 
-              <div className="absolute inset-0 flex items-center justify-between px-2 text-xs font-bold">
-                <div className="text-center text-white drop-shadow-lg">
-                  <div className="text-base">EXTREME</div>
-                  <div>GREED</div>
-                  <div className="text-[10px] mt-1">75-100</div>
-                </div>
-                <div className="text-center text-white drop-shadow-lg">
-                  <div>GREED</div>
-                  <div className="text-[10px] mt-1">56-74</div>
-                </div>
-                <div className="text-center text-gray-800 drop-shadow">
-                  <div>NEUTRAL</div>
-                  <div className="text-[10px] mt-1">45-55</div>
-                </div>
-                <div className="text-center text-white drop-shadow-lg">
-                  <div>FEAR</div>
-                  <div className="text-[10px] mt-1">25-44</div>
-                </div>
-                <div className="text-center text-white drop-shadow-lg">
-                  <div className="text-base">EXTREME</div>
-                  <div>FEAR</div>
-                  <div className="text-[10px] mt-1">0-24</div>
-                </div>
+                {marketData && (
+                  <div
+                    className="absolute top-0 bottom-0 w-2 bg-black shadow-lg transition-all duration-500"
+                    style={{ left: `calc(${100 - marketData.overallScore}% - 4px)` }}
+                  >
+                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                      <div className="bg-black text-white px-4 py-2 rounded-lg shadow-xl">
+                        <div className="text-xs font-semibold">TODAY</div>
+                        <div className="text-2xl font-bold">{marketData.overallScore.toFixed(0)}</div>
+                        <div className="text-xs text-center">{marketData.sentiment}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {marketData && (
-                <div
-                  className="absolute top-0 bottom-0 w-2 bg-black shadow-lg transition-all duration-500"
-                  style={{ left: `calc(${100 - marketData.overallScore}% - 4px)` }}
-                >
-                  <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap">
-                    <div className="bg-black text-white px-4 py-2 rounded-lg shadow-xl">
-                      <div className="text-xs font-semibold">TODAY</div>
-                      <div className="text-2xl font-bold">{marketData.overallScore.toFixed(0)}</div>
-                      <div className="text-xs text-center">{marketData.sentiment}</div>
+              {/* Score Calculation Methodology Display */}
+              {marketData.calculationDetails && (
+                <div className="col-span-full rounded-lg border-2 border-blue-100 bg-blue-50 p-4">
+                  <h3 className="mb-3 flex items-center gap-2 font-semibold text-blue-900">
+                    <InfoIcon />
+                    Score Calculation Methodology
+                  </h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <span className="font-semibold text-blue-900">Formula:</span>
+                        <p className="text-blue-800 font-mono text-xs mt-1">{marketData.calculationDetails.formula}</p>
+                      </div>
+                      <div>
+                        <span className="font-semibold text-blue-900">Weighting:</span>
+                        <p className="text-blue-800">{marketData.calculationDetails.weighting}</p>
+                      </div>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-blue-900">Methodology:</span>
+                      <p className="text-blue-800">{marketData.calculationDetails.methodology}</p>
+                    </div>
+                    {marketData.calculationDetails.individualScores && (
+                      <div className="mt-3 pt-3 border-t border-blue-200">
+                        <span className="font-semibold text-blue-900 block mb-2">Individual Indicator Scores:</span>
+                        <div className="grid grid-cols-2 gap-2 text-xs text-blue-800 font-mono">
+                          <div>I1 (Momentum): {marketData.calculationDetails.individualScores.i1_marketMomentum}</div>
+                          <div>I2 (Strength): {marketData.calculationDetails.individualScores.i2_stockStrength}</div>
+                          <div>I3 (Breadth): {marketData.calculationDetails.individualScores.i3_stockBreadth}</div>
+                          <div>I4 (Put/Call): {marketData.calculationDetails.individualScores.i4_putCallRatio}</div>
+                          <div>
+                            I5 (Volatility): {marketData.calculationDetails.individualScores.i5_marketVolatility}
+                          </div>
+                          <div>
+                            I6 (Safe Haven): {marketData.calculationDetails.individualScores.i6_safeHavenDemand}
+                          </div>
+                          <div>I7 (Junk Bonds): {marketData.calculationDetails.individualScores.i7_junkBondDemand}</div>
+                        </div>
+                      </div>
+                    )}
+                    <div className="mt-3 pt-3 border-t border-blue-200">
+                      <span className="font-semibold text-blue-900 block mb-1">Data Sources:</span>
+                      <p className="text-xs text-blue-700">
+                        {marketData.dataSourcesUsed?.primary} •
+                        {marketData.dataSourcesUsed?.nyseData
+                          ? ` NYSE via ${marketData.dataSourcesUsed.nyseData} • `
+                          : " "}
+                        All indicators collected independently and calculated in real-time
+                      </p>
                     </div>
                   </div>
                 </div>
               )}
-            </div>
 
-            {/* Score Calculation Methodology Display */}
-            {marketData.calculationDetails && (
-              <div className="col-span-full rounded-lg border-2 border-blue-100 bg-blue-50 p-4">
-                <h3 className="mb-3 flex items-center gap-2 font-semibold text-blue-900">
+              {/* Historical Reference Points */}
+              <div className="mt-8 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                <h4 className="text-xs font-bold text-gray-900 mb-3 flex items-center gap-2">
                   <InfoIcon />
-                  Score Calculation Methodology
-                </h3>
-                <div className="space-y-2 text-sm">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <span className="font-semibold text-blue-900">Formula:</span>
-                      <p className="text-blue-800 font-mono text-xs mt-1">{marketData.calculationDetails.formula}</p>
-                    </div>
-                    <div>
-                      <span className="font-semibold text-blue-900">Weighting:</span>
-                      <p className="text-blue-800">{marketData.calculationDetails.weighting}</p>
-                    </div>
+                  Historical Reference Points
+                </h4>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="font-semibold text-red-600">COVID-19 Crash (Mar 2020):</span>
+                    <span className="ml-1 text-gray-700">12 (Extreme Fear)</span>
                   </div>
                   <div>
-                    <span className="font-semibold text-blue-900">Methodology:</span>
-                    <p className="text-blue-800">{marketData.calculationDetails.methodology}</p>
+                    <span className="font-semibold text-green-600">Meme Stock Peak (Feb 2021):</span>
+                    <span className="ml-1 text-gray-700">89 (Extreme Greed)</span>
                   </div>
-                  {marketData.calculationDetails.individualScores && (
-                    <div className="mt-3 pt-3 border-t border-blue-200">
-                      <span className="font-semibold text-blue-900 block mb-2">Individual Indicator Scores:</span>
-                      <div className="grid grid-cols-2 gap-2 text-xs text-blue-800 font-mono">
-                        <div>I1 (Momentum): {marketData.calculationDetails.individualScores.i1_marketMomentum}</div>
-                        <div>I2 (Strength): {marketData.calculationDetails.individualScores.i2_stockStrength}</div>
-                        <div>I3 (Breadth): {marketData.calculationDetails.individualScores.i3_stockBreadth}</div>
-                        <div>I4 (Put/Call): {marketData.calculationDetails.individualScores.i4_putCallRatio}</div>
-                        <div>I5 (Volatility): {marketData.calculationDetails.individualScores.i5_marketVolatility}</div>
-                        <div>I6 (Safe Haven): {marketData.calculationDetails.individualScores.i6_safeHavenDemand}</div>
-                        <div>I7 (Junk Bonds): {marketData.calculationDetails.individualScores.i7_junkBondDemand}</div>
-                      </div>
-                    </div>
-                  )}
-                  <div className="mt-3 pt-3 border-t border-blue-200">
-                    <span className="font-semibold text-blue-900 block mb-1">Data Sources:</span>
-                    <p className="text-xs text-blue-700">
-                      {marketData.dataSourcesUsed?.primary} •
-                      {marketData.dataSourcesUsed?.nyseData
-                        ? ` NYSE via ${marketData.dataSourcesUsed.nyseData} • `
-                        : " "}
-                      All indicators collected independently and calculated in real-time
-                    </p>
+                  <div>
+                    <span className="font-semibold text-red-600">2022 Bear Market Low:</span>
+                    <span className="ml-1 text-gray-700">18 (Extreme Fear)</span>
                   </div>
-                </div>
-              </div>
-            )}
-
-            {/* Historical Reference Points */}
-            <div className="mt-8 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-              <h4 className="text-xs font-bold text-gray-900 mb-3 flex items-center gap-2">
-                <InfoIcon />
-                Historical Reference Points
-              </h4>
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div>
-                  <span className="font-semibold text-red-600">COVID-19 Crash (Mar 2020):</span>
-                  <span className="ml-1 text-gray-700">12 (Extreme Fear)</span>
-                </div>
-                <div>
-                  <span className="font-semibold text-green-600">Meme Stock Peak (Feb 2021):</span>
-                  <span className="ml-1 text-gray-700">89 (Extreme Greed)</span>
-                </div>
-                <div>
-                  <span className="font-semibold text-red-600">2022 Bear Market Low:</span>
-                  <span className="ml-1 text-gray-700">18 (Extreme Fear)</span>
-                </div>
-                <div>
-                  <span className="font-semibold text-green-600">AI Rally Peak (Jul 2024):</span>
-                  <span className="ml-1 text-gray-700">83 (Extreme Greed)</span>
+                  <div>
+                    <span className="font-semibold text-green-600">AI Rally Peak (Jul 2024):</span>
+                    <span className="ml-1 text-gray-700">83 (Extreme Greed)</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* 7 FEAR & GREED INDICATORS section with individual cards and charts */}
-      <div className="space-y-6">
-        <div className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <TrendingUpIcon className="h-6 w-6 text-primary" />7 FEAR & GREED INDICATORS
+        {/* 7 FEAR & GREED INDICATORS section with individual cards and charts */}
+        <div className="space-y-6">
+          <div className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <TrendingUpIcon className="h-6 w-6 text-primary" />7 FEAR & GREED INDICATORS
+          </div>
+
+          {cnnIndicatorCards.map((indicator, index) => {
+            const chartInfo = getChartDataForIndicator(indicator.name) // Use indicator.name to match tooltip keys
+            console.log(`[v0] Chart for ${indicator.name}:`, {
+              dataPoints: chartInfo.data.length,
+              datePoints: chartInfo.dates.length,
+              firstValue: chartInfo.data[0],
+              lastValue: chartInfo.data[chartInfo.data.length - 1],
+            })
+
+            return (
+              <Card key={index} className="bg-white border-gray-200">
+                <CardHeader className="bg-gray-50 border-b border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-base font-bold text-gray-900 mb-1">{indicator.name}</CardTitle>
+                      <CardDescription className="text-sm text-gray-600">{indicator.description}</CardDescription>
+                    </div>
+                    <div className={`px-3 py-1 rounded text-xs font-bold ${getSentimentColor(indicator.sentiment)}`}>
+                      {indicator.sentiment}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <MiniLineChart
+                      data={chartInfo.data}
+                      dates={chartInfo.dates}
+                      color="#2563eb"
+                      yAxisLabel={chartInfo.label}
+                    />
+
+                    {/* Explanation text */}
+                    <div className="flex items-center">
+                      <p className="text-sm text-gray-700 leading-relaxed">
+                        {componentTooltips[indicator.tooltipKey as keyof typeof componentTooltips].description}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
 
-        {cnnIndicatorCards.map((indicator, index) => {
-          const chartInfo = getChartDataForIndicator(indicator.name) // Use indicator.name to match tooltip keys
-          console.log(`[v0] Chart for ${indicator.name}:`, {
-            dataPoints: chartInfo.data.length,
-            datePoints: chartInfo.dates.length,
-            firstValue: chartInfo.data[0],
-            lastValue: chartInfo.data[chartInfo.data.length - 1],
-          })
-
-          return (
-            <Card key={index} className="bg-white border-gray-200">
-              <CardHeader className="bg-gray-50 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-base font-bold text-gray-900 mb-1">{indicator.name}</CardTitle>
-                    <CardDescription className="text-sm text-gray-600">{indicator.description}</CardDescription>
-                  </div>
-                  <div className={`px-3 py-1 rounded text-xs font-bold ${getSentimentColor(indicator.sentiment)}`}>
-                    {indicator.sentiment}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid md:grid-cols-2 gap-6">
-                  <MiniLineChart
-                    data={chartInfo.data}
-                    dates={chartInfo.dates}
-                    color="#2563eb"
-                    yAxisLabel={chartInfo.label}
-                  />
-
-                  {/* Explanation text */}
-                  <div className="flex items-center">
-                    <p className="text-sm text-gray-700 leading-relaxed">
-                      {componentTooltips[indicator.tooltipKey as keyof typeof componentTooltips].description}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
-
-      {/* Trade Recommendations accordion */}
-      <Accordion type="multiple" className="space-y-0">
-        <AccordionItem value="trade-recommendations" className="border-0">
-          <Card className="shadow-sm border-gray-200">
-            <AccordionTrigger className="hover:no-underline px-6 py-4 bg-gray-50 border-b border-gray-200 rounded-t-lg">
-              <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <TargetIcon className="h-5 w-5 text-primary" />
-                Trade Recommendations & Portfolio Guidance
-                {refreshing && (
-                  <span className="text-xs font-normal text-primary animate-pulse">(Recalculating...)</span>
-                )}
-              </CardTitle>
-            </AccordionTrigger>
-            <AccordionContent>
-              <CardContent className="pt-4">
-                <div className={`transition-opacity duration-300 ${refreshing ? "opacity-50" : "opacity-100"}`}>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    {/* Portfolio Allocation */}
-                    <div className="p-4 bg-white border-2 border-gray-200 rounded-lg">
-                      <div className="flex items-center gap-2 mb-3">
-                        <DollarSignIcon className="h-5 w-5 text-primary" />
-                        <h3 className="font-bold text-gray-900">Portfolio Allocation</h3>
+        {/* Trade Recommendations accordion */}
+        <Accordion type="multiple" className="space-y-0">
+          <AccordionItem value="trade-recommendations" className="border-0">
+            <Card className="shadow-sm border-gray-200">
+              <AccordionTrigger className="hover:no-underline px-6 py-4 bg-gray-50 border-b border-gray-200 rounded-t-lg">
+                <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <TargetIcon className="h-5 w-5 text-primary" />
+                  Trade Recommendations & Portfolio Guidance
+                  {refreshing && (
+                    <span className="text-xs font-normal text-primary animate-pulse">(Recalculating...)</span>
+                  )}
+                </CardTitle>
+              </AccordionTrigger>
+              <AccordionContent>
+                <CardContent className="pt-4">
+                  <div className={`transition-opacity duration-300 ${refreshing ? "opacity-50" : "opacity-100"}`}>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {/* Portfolio Allocation */}
+                      <div className="p-4 bg-white border-2 border-gray-200 rounded-lg">
+                        <div className="flex items-center gap-2 mb-3">
+                          <DollarSignIcon className="h-5 w-5 text-primary" />
+                          <h3 className="font-bold text-gray-900">Portfolio Allocation</h3>
+                        </div>
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                            <span className="text-sm font-medium text-gray-700">Cash on Hand</span>
+                            <span className="text-sm font-bold text-primary">{recommendations.cashAllocation}</span>
+                          </div>
+                          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                            <span className="text-sm font-medium text-gray-700">Market Exposure</span>
+                            <span className="text-sm font-bold text-primary">{recommendations.marketExposure}</span>
+                          </div>
+                          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                            <span className="text-sm font-medium text-gray-700">Position Size</span>
+                            <span className="text-sm font-bold text-primary">{recommendations.positionSize}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                          <span className="text-sm font-medium text-gray-700">Cash on Hand</span>
-                          <span className="text-sm font-bold text-primary">{recommendations.cashAllocation}</span>
+
+                      {/* Recommended Strategies */}
+                      <div className="p-4 bg-white border-2 border-gray-200 rounded-lg">
+                        <div className="flex items-center gap-2 mb-3">
+                          <LightbulbIcon className="h-5 w-5 text-primary" />
+                          <h3 className="font-bold text-gray-900">Recommended Strategies</h3>
                         </div>
-                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                          <span className="text-sm font-medium text-gray-700">Market Exposure</span>
-                          <span className="text-sm font-bold text-primary">{recommendations.marketExposure}</span>
-                        </div>
-                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                          <span className="text-sm font-medium text-gray-700">Position Size</span>
-                          <span className="text-sm font-bold text-primary">{recommendations.positionSize}</span>
-                        </div>
+                        <ul className="space-y-2">
+                          {recommendations.strategies.map((strategy, index) => (
+                            <li key={index} className="flex items-start gap-2 text-sm text-gray-700">
+                              <span className="text-primary mt-1 flex-shrink-0">•</span>
+                              <span>{strategy}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     </div>
 
-                    {/* Recommended Strategies */}
-                    <div className="p-4 bg-white border-2 border-gray-200 rounded-lg">
+                    {/* Risk Management */}
+                    <div className={`mt-4 p-4 rounded-lg border-2 ${getScoreBackground(marketData.overallScore)}`}>
                       <div className="flex items-center gap-2 mb-3">
-                        <LightbulbIcon className="h-5 w-5 text-primary" />
-                        <h3 className="font-bold text-gray-900">Recommended Strategies</h3>
+                        <ShieldIcon className="h-5 w-5 text-primary" />
+                        <h3 className={`font-bold ${getScoreColor(marketData.overallScore)}`}>
+                          Risk Management Guidelines
+                        </h3>
                       </div>
                       <ul className="space-y-2">
-                        {recommendations.strategies.map((strategy, index) => (
-                          <li key={index} className="flex items-start gap-2 text-sm text-gray-700">
-                            <span className="text-primary mt-1 flex-shrink-0">•</span>
-                            <span>{strategy}</span>
+                        {recommendations.riskManagement.map((tip, index) => (
+                          <li key={index} className="flex items-start gap-2 text-sm text-primary">
+                            <span className="text-primary mt-1">✓</span>
+                            <span>{tip}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
-                  </div>
 
-                  {/* Risk Management */}
-                  <div className={`mt-4 p-4 rounded-lg border-2 ${getScoreBackground(marketData.overallScore)}`}>
-                    <div className="flex items-center gap-2 mb-3">
-                      <ShieldIcon className="h-5 w-5 text-primary" />
-                      <h3 className={`font-bold ${getScoreColor(marketData.overallScore)}`}>
-                        Risk Management Guidelines
-                      </h3>
+                    {/* Coach Tips */}
+                    <div className={`mt-4 p-4 rounded-lg border-2 ${getScoreBackground(marketData.overallScore)}`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <TrendingUpIcon className={`h-5 w-5 ${getScoreColor(marketData.overallScore)}`} />
+                        <h3 className={`font-bold ${getScoreColor(marketData.overallScore)}`}>Expert Coach Insight</h3>
+                      </div>
+                      <p className={`text-sm ${getScoreColor(marketData.overallScore)}`}>{recommendations.coachTips}</p>
                     </div>
-                    <ul className="space-y-2">
-                      {recommendations.riskManagement.map((tip, index) => (
-                        <li key={index} className="flex items-start gap-2 text-sm text-primary">
-                          <span className="text-primary mt-1">✓</span>
-                          <span>{tip}</span>
-                        </li>
-                      ))}
-                    </ul>
                   </div>
+                </CardContent>
+              </AccordionContent>
+            </Card>
+          </AccordionItem>
+        </Accordion>
 
-                  {/* Coach Tips */}
-                  <div className={`mt-4 p-4 rounded-lg border-2 ${getScoreBackground(marketData.overallScore)}`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <TrendingUpIcon className={`h-5 w-5 ${getScoreColor(marketData.overallScore)}`} />
-                      <h3 className={`font-bold ${getScoreColor(marketData.overallScore)}`}>Expert Coach Insight</h3>
-                    </div>
-                    <p className={`text-sm ${getScoreColor(marketData.overallScore)}`}>{recommendations.coachTips}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </AccordionContent>
-          </Card>
-        </AccordionItem>
-      </Accordion>
+        <Accordion type="multiple" className="space-y-0">
+          <AccordionItem value="options-strategy-guide" className="border-0">
+            <Card className="shadow-sm border-gray-200">
+              <AccordionTrigger className="hover:no-underline px-6 py-4 bg-gray-50 border-b border-gray-200 rounded-t-lg">
+                <CardTitle className="text-lg font-bold text-gray-900">
+                  Options Strategy Guide by Fear & Greed Level
+                </CardTitle>
+              </AccordionTrigger>
+              <AccordionContent>
+                <CardContent className="pt-4 pb-4">
+                  <div className="space-y-2">
+                    {[
+                      {
+                        range: "0-24",
+                        level: "Extreme Fear",
+                        description: "Maximum buying opportunity - deploy capital aggressively",
+                        signal: "STRONG BUY",
+                        guidance: getTradeRecommendations(12),
+                        allocation: getPortfolioAllocation(12),
+                      },
+                      {
+                        range: "25-44",
+                        level: "Fear",
+                        description: "Good environment for premium sellers",
+                        signal: "BUY",
+                        guidance: getTradeRecommendations(34),
+                        allocation: getPortfolioAllocation(34),
+                      },
+                      {
+                        range: "45-55",
+                        level: "Neutral",
+                        description: "Market balanced - be selective",
+                        signal: "HOLD",
+                        guidance: getTradeRecommendations(50),
+                        allocation: getPortfolioAllocation(50),
+                      },
+                      {
+                        range: "56-74",
+                        level: "Greed",
+                        description: "Reduce exposure and build cash",
+                        signal: "CAUTION",
+                        guidance: getTradeRecommendations(65),
+                        allocation: getPortfolioAllocation(65),
+                      },
+                      {
+                        range: "75-100",
+                        level: "Extreme Greed",
+                        description: "High risk of correction - maximum defensive positioning",
+                        signal: "AVOID/SELL",
+                        guidance: getTradeRecommendations(87),
+                        allocation: getPortfolioAllocation(87),
+                      },
+                    ].map((item, index) => {
+                      const isCurrent =
+                        marketData.overallScore >= Number.parseInt(item.range.split("-")[0]) &&
+                        marketData.overallScore <= Number.parseInt(item.range.split("-")[1])
 
-      <Accordion type="multiple" className="space-y-0">
-        <AccordionItem value="options-strategy-guide" className="border-0">
-          <Card className="shadow-sm border-gray-200">
-            <AccordionTrigger className="hover:no-underline px-6 py-4 bg-gray-50 border-b border-gray-200 rounded-t-lg">
-              <CardTitle className="text-lg font-bold text-gray-900">
-                Options Strategy Guide by Fear & Greed Level
-              </CardTitle>
-            </AccordionTrigger>
-            <AccordionContent>
-              <CardContent className="pt-4 pb-4">
-                <div className="space-y-2">
-                  {[
-                    {
-                      range: "0-24",
-                      level: "Extreme Fear",
-                      description: "Maximum buying opportunity - deploy capital aggressively",
-                      signal: "STRONG BUY",
-                      guidance: getTradeRecommendations(12),
-                      allocation: getPortfolioAllocation(12),
-                    },
-                    {
-                      range: "25-44",
-                      level: "Fear",
-                      description: "Good environment for premium sellers",
-                      signal: "BUY",
-                      guidance: getTradeRecommendations(34),
-                      allocation: getPortfolioAllocation(34),
-                    },
-                    {
-                      range: "45-55",
-                      level: "Neutral",
-                      description: "Market balanced - be selective",
-                      signal: "HOLD",
-                      guidance: getTradeRecommendations(50),
-                      allocation: getPortfolioAllocation(50),
-                    },
-                    {
-                      range: "56-74",
-                      level: "Greed",
-                      description: "Reduce exposure and build cash",
-                      signal: "CAUTION",
-                      guidance: getTradeRecommendations(65),
-                      allocation: getPortfolioAllocation(65),
-                    },
-                    {
-                      range: "75-100",
-                      level: "Extreme Greed",
-                      description: "High risk of correction - maximum defensive positioning",
-                      signal: "AVOID/SELL",
-                      guidance: getTradeRecommendations(87),
-                      allocation: getPortfolioAllocation(87),
-                    },
-                  ].map((item, index) => {
-                    const isCurrent =
-                      marketData.overallScore >= Number.parseInt(item.range.split("-")[0]) &&
-                      marketData.overallScore <= Number.parseInt(item.range.split("-")[1])
-
-                    return (
-                      <div
-                        key={index}
-                        className={`p-4 rounded-lg border transition-colors ${
-                          isCurrent
-                            ? "border-green-500 bg-green-100 shadow-md ring-2 ring-green-300"
-                            : "border-gray-200 bg-white hover:bg-gray-50"
-                        }`}
-                      >
-                        <div className="mb-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <div>
-                              <span className="font-mono text-sm font-bold text-gray-900">Score {item.range}</span>
-                              <span
-                                className={`ml-3 font-bold text-sm ${
-                                  index === 0
-                                    ? "text-red-600" // Extreme Fear
-                                    : index === 1
-                                      ? "text-orange-500" // Fear
-                                      : index === 2
-                                        ? "text-yellow-600" // Neutral
-                                        : index === 3
-                                          ? "text-green-500" // Greed
-                                          : "text-green-600" // Extreme Greed
-                                }`}
-                              >
-                                {item.level}
-                              </span>
+                      return (
+                        <div
+                          key={index}
+                          className={`p-4 rounded-lg border transition-colors ${
+                            isCurrent
+                              ? "border-green-500 bg-green-100 shadow-md ring-2 ring-green-300"
+                              : "border-gray-200 bg-white hover:bg-gray-50"
+                          }`}
+                        >
+                          <div className="mb-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <span className="font-mono text-sm font-bold text-gray-900">Score {item.range}</span>
+                                <span
+                                  className={`ml-3 font-bold text-sm ${
+                                    index === 0
+                                      ? "text-red-600" // Extreme Fear
+                                      : index === 1
+                                        ? "text-orange-500" // Fear
+                                        : index === 2
+                                          ? "text-yellow-600" // Neutral
+                                          : index === 3
+                                            ? "text-green-500" // Greed
+                                            : "text-green-600" // Extreme Greed
+                                  }`}
+                                >
+                                  {item.level}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {isCurrent && (
+                                  <span className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-full">
+                                    CURRENT
+                                  </span>
+                                )}
+                                <span
+                                  className={`px-3 py-1 text-xs font-bold rounded-full ${
+                                    item.signal === "STRONG BUY"
+                                      ? "bg-green-100 text-green-800"
+                                      : item.signal === "BUY"
+                                        ? "bg-green-100 text-green-700"
+                                        : item.signal === "HOLD"
+                                          ? "bg-gray-100 text-gray-700"
+                                          : item.signal === "CAUTION"
+                                            ? "bg-orange-100 text-orange-700"
+                                            : "bg-red-100 text-red-700"
+                                  }`}
+                                >
+                                  {item.signal}
+                                </span>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <p className="text-sm text-gray-600 italic">{item.description}</p>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-3 mb-3">
+                            <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                              <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Cash</div>
+                              <div className="text-lg font-bold text-blue-900">{item.guidance.cashAllocation}</div>
+                            </div>
+                            <div className="p-3 bg-purple-50 rounded border border-purple-200">
+                              <div className="text-xs font-semibold text-purple-900 uppercase mb-1">Exposure</div>
+                              <div className="text-lg font-bold text-purple-900">{item.guidance.marketExposure}</div>
+                            </div>
+                            <div className="p-3 bg-orange-50 rounded border border-orange-200">
+                              <div className="text-xs font-semibold text-orange-900 uppercase mb-1">Position Size</div>
+                              <div className="text-sm font-bold text-orange-900">{item.guidance.positionSize}</div>
+                            </div>
+                          </div>
+
+                          <div className="mb-3">
+                            <div className="text-xs font-bold text-gray-900 uppercase mb-2">Top Strategies</div>
+                            <div className="space-y-1">
+                              {item.guidance.strategies.slice(0, 3).map((strategy, idx) => (
+                                <div key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                                  <span className="text-primary mt-1 flex-shrink-0">•</span>
+                                  <span>{strategy}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                    <p className="text-sm text-blue-800 leading-relaxed">
+                      <strong>Note:</strong> The Fear & Greed Index is most effective when extreme readings align with
+                      technical levels. Extreme fear (0-24) with strong support levels historically produces the best
+                      risk/reward for options sellers. Always maintain proper position sizing and risk management.
+                    </p>
+                  </div>
+                </CardContent>
+              </AccordionContent>
+            </Card>
+          </AccordionItem>
+        </Accordion>
+
+        {/* Portfolio Allocation accordion */}
+        <Accordion type="multiple" className="space-y-0">
+          <AccordionItem value="portfolio-allocation" className="border-0">
+            <Card className="shadow-sm border-gray-200">
+              <AccordionTrigger className="hover:no-underline px-6 py-4 bg-gray-50 border-b border-gray-200 rounded-t-lg">
+                <CardTitle className="text-lg font-bold text-gray-900">
+                  Portfolio Allocation by Fear & Greed Level
+                </CardTitle>
+              </AccordionTrigger>
+              <AccordionContent>
+                <CardContent className="pt-4 pb-4">
+                  <div className="space-y-2">
+                    {[
+                      { range: "0-24", level: "Extreme Greed", data: getPortfolioAllocation(12) },
+                      { range: "25-44", level: "Greed", data: getPortfolioAllocation(34) },
+                      { range: "45-55", level: "Neutral", data: getPortfolioAllocation(50) },
+                      { range: "56-74", level: "Fear", data: getPortfolioAllocation(65) },
+                      { range: "75-100", level: "Extreme Fear", data: getPortfolioAllocation(87) },
+                    ].map((item, index) => {
+                      const isCurrent =
+                        marketData.overallScore >= Number.parseInt(item.range.split("-")[0]) &&
+                        marketData.overallScore <= Number.parseInt(item.range.split("-")[1])
+
+                      return (
+                        <div
+                          key={index}
+                          className={`p-4 rounded-lg border transition-colors ${
+                            isCurrent
+                              ? "border-green-500 bg-green-100 shadow-md ring-2 ring-green-300"
+                              : "border-gray-200 bg-white hover:bg-gray-50"
+                          }`}
+                        >
+                          <div className="mb-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <span className="font-mono text-sm font-bold text-gray-900">Score {item.range}</span>
+                                <span
+                                  className={`ml-3 font-bold text-sm ${
+                                    index === 0
+                                      ? "text-green-600" // Extreme Greed
+                                      : index === 1
+                                        ? "text-green-500" // Greed
+                                        : index === 2
+                                          ? "text-yellow-600" // Neutral
+                                          : index === 3
+                                            ? "text-orange-500" // Fear
+                                            : "text-red-600" // Extreme Fear
+                                  }`}
+                                >
+                                  {item.level}
+                                </span>
+                              </div>
                               {isCurrent && (
                                 <span className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-full">
                                   CURRENT
                                 </span>
                               )}
-                              <span
-                                className={`px-3 py-1 text-xs font-bold rounded-full ${
-                                  item.signal === "STRONG BUY"
-                                    ? "bg-green-100 text-green-800"
-                                    : item.signal === "BUY"
-                                      ? "bg-green-100 text-green-700"
-                                      : item.signal === "HOLD"
-                                        ? "bg-gray-100 text-gray-700"
-                                        : item.signal === "CAUTION"
-                                          ? "bg-orange-100 text-orange-700"
-                                          : "bg-red-100 text-red-700"
-                                }`}
-                              >
-                                {item.signal}
-                              </span>
+                            </div>
+                            <p className="text-sm text-gray-600 italic">{item.data.description}</p>
+                          </div>
+
+                          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
+                            <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                              <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Stocks/ETFs</div>
+                              <div className="text-lg font-bold text-blue-900">{item.data.stocks}</div>
+                            </div>
+                            <div className="p-3 bg-purple-50 rounded border border-purple-200">
+                              <div className="text-xs font-semibold text-purple-900 uppercase mb-1">Options</div>
+                              <div className="text-lg font-bold text-purple-900">{item.data.options}</div>
+                            </div>
+                            <div className="p-3 bg-orange-50 rounded border border-orange-200">
+                              <div className="text-xs font-semibold text-orange-900 uppercase mb-1">BTC/Crypto</div>
+                              <div className="text-lg font-bold text-orange-900">{item.data.crypto}</div>
+                            </div>
+                            <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
+                              <div className="text-xs font-semibold text-yellow-900 uppercase mb-1">Gold/Silver</div>
+                              <div className="text-lg font-bold text-yellow-900">{item.data.gold}</div>
+                            </div>
+                            <div className="p-3 bg-gray-50 rounded border border-gray-300">
+                              <div className="text-xs font-semibold text-gray-900 uppercase mb-1">Cash Reserve</div>
+                              <div className="text-lg font-bold text-gray-900">{item.data.cash}</div>
                             </div>
                           </div>
-                          <p className="text-sm text-gray-600 italic">{item.description}</p>
-                        </div>
 
-                        <div className="grid grid-cols-3 gap-3 mb-3">
-                          <div className="p-3 bg-blue-50 rounded border border-blue-200">
-                            <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Cash</div>
-                            <div className="text-lg font-bold text-blue-900">{item.guidance.cashAllocation}</div>
-                          </div>
-                          <div className="p-3 bg-purple-50 rounded border border-purple-200">
-                            <div className="text-xs font-semibold text-purple-900 uppercase mb-1">Exposure</div>
-                            <div className="text-lg font-bold text-purple-900">{item.guidance.marketExposure}</div>
-                          </div>
-                          <div className="p-3 bg-orange-50 rounded border border-orange-200">
-                            <div className="text-xs font-semibold text-orange-900 uppercase mb-1">Position Size</div>
-                            <div className="text-sm font-bold text-orange-900">{item.guidance.positionSize}</div>
-                          </div>
-                        </div>
-
-                        <div className="mb-3">
-                          <div className="text-xs font-bold text-gray-900 uppercase mb-2">Top Strategies</div>
-                          <div className="space-y-1">
-                            {item.guidance.strategies.slice(0, 3).map((strategy, idx) => (
+                          <div className="space-y-2">
+                            {item.data.rationale.map((point, idx) => (
                               <div key={idx} className="flex items-start gap-2 text-sm text-gray-700">
                                 <span className="text-primary mt-1 flex-shrink-0">•</span>
-                                <span>{strategy}</span>
+                                <span>{point}</span>
                               </div>
                             ))}
                           </div>
                         </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                      )
+                    })}
+                  </div>
 
-                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
-                  <p className="text-sm text-blue-800 leading-relaxed">
-                    <strong>Note:</strong> The Fear & Greed Index is most effective when extreme readings align with
-                    technical levels. Extreme fear (0-24) with strong support levels historically produces the best
-                    risk/reward for options sellers. Always maintain proper position sizing and risk management.
-                  </p>
-                </div>
-              </CardContent>
-            </AccordionContent>
-          </Card>
-        </AccordionItem>
-      </Accordion>
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                    <p className="text-sm text-blue-800 leading-relaxed">
+                      <strong>Note:</strong> These allocations are guidelines based on historical market patterns.
+                      Always adjust based on your personal risk tolerance, time horizon, and financial goals. Consult
+                      with a financial advisor for personalized advice.
+                    </p>
+                  </div>
+                </CardContent>
+              </AccordionContent>
+            </Card>
+          </AccordionItem>
+        </Accordion>
 
-      {/* Portfolio Allocation accordion */}
-      <Accordion type="multiple" className="space-y-0">
-        <AccordionItem value="portfolio-allocation" className="border-0">
-          <Card className="shadow-sm border-gray-200">
-            <AccordionTrigger className="hover:no-underline px-6 py-4 bg-gray-50 border-b border-gray-200 rounded-t-lg">
-              <CardTitle className="text-lg font-bold text-gray-900">
-                Portfolio Allocation by Fear & Greed Level
-              </CardTitle>
-            </AccordionTrigger>
-            <AccordionContent>
-              <CardContent className="pt-4 pb-4">
-                <div className="space-y-2">
-                  {[
-                    { range: "0-24", level: "Extreme Greed", data: getPortfolioAllocation(12) },
-                    { range: "25-44", level: "Greed", data: getPortfolioAllocation(34) },
-                    { range: "45-55", level: "Neutral", data: getPortfolioAllocation(50) },
-                    { range: "56-74", level: "Fear", data: getPortfolioAllocation(65) },
-                    { range: "75-100", level: "Extreme Fear", data: getPortfolioAllocation(87) },
-                  ].map((item, index) => {
-                    const isCurrent =
-                      marketData.overallScore >= Number.parseInt(item.range.split("-")[0]) &&
-                      marketData.overallScore <= Number.parseInt(item.range.split("-")[1])
-
-                    return (
-                      <div
-                        key={index}
-                        className={`p-4 rounded-lg border transition-colors ${
-                          isCurrent
-                            ? "border-green-500 bg-green-100 shadow-md ring-2 ring-green-300"
-                            : "border-gray-200 bg-white hover:bg-gray-50"
-                        }`}
-                      >
-                        <div className="mb-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <div>
-                              <span className="font-mono text-sm font-bold text-gray-900">Score {item.range}</span>
-                              <span
-                                className={`ml-3 font-bold text-sm ${
-                                  index === 0
-                                    ? "text-green-600" // Extreme Greed
-                                    : index === 1
-                                      ? "text-green-500" // Greed
-                                      : index === 2
-                                        ? "text-yellow-600" // Neutral
-                                        : index === 3
-                                          ? "text-orange-500" // Fear
-                                          : "text-red-600" // Extreme Fear
-                                }`}
-                              >
-                                {item.level}
-                              </span>
-                            </div>
-                            {isCurrent && (
-                              <span className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-full">
-                                CURRENT
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-gray-600 italic">{item.data.description}</p>
-                        </div>
-
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
-                          <div className="p-3 bg-blue-50 rounded border border-blue-200">
-                            <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Stocks/ETFs</div>
-                            <div className="text-lg font-bold text-blue-900">{item.data.stocks}</div>
-                          </div>
-                          <div className="p-3 bg-purple-50 rounded border border-purple-200">
-                            <div className="text-xs font-semibold text-purple-900 uppercase mb-1">Options</div>
-                            <div className="text-lg font-bold text-purple-900">{item.data.options}</div>
-                          </div>
-                          <div className="p-3 bg-orange-50 rounded border border-orange-200">
-                            <div className="text-xs font-semibold text-orange-900 uppercase mb-1">BTC/Crypto</div>
-                            <div className="text-lg font-bold text-orange-900">{item.data.crypto}</div>
-                          </div>
-                          <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
-                            <div className="text-xs font-semibold text-yellow-900 uppercase mb-1">Gold/Silver</div>
-                            <div className="text-lg font-bold text-yellow-900">{item.data.gold}</div>
-                          </div>
-                          <div className="p-3 bg-gray-50 rounded border border-gray-300">
-                            <div className="text-xs font-semibold text-gray-900 uppercase mb-1">Cash Reserve</div>
-                            <div className="text-lg font-bold text-gray-900">{item.data.cash}</div>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          {item.data.rationale.map((point, idx) => (
-                            <div key={idx} className="flex items-start gap-2 text-sm text-gray-700">
-                              <span className="text-primary mt-1 flex-shrink-0">•</span>
-                              <span>{point}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-
-                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
-                  <p className="text-sm text-blue-800 leading-relaxed">
-                    <strong>Note:</strong> These allocations are guidelines based on historical market patterns. Always
-                    adjust based on your personal risk tolerance, time horizon, and financial goals. Consult with a
-                    financial advisor for personalized advice.
-                  </p>
-                </div>
-              </CardContent>
-            </AccordionContent>
-          </Card>
-        </AccordionItem>
-      </Accordion>
-
-      {/* About section */}
-      <Card className="shadow-sm border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10">
-        <CardContent className="pt-4">
-          <div className="flex items-start gap-3">
-            <InfoIcon className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-            <div>
-              <h3 className="font-bold text-gray-900 mb-2">About the Fear & Greed Index</h3>
-              <p className="text-sm text-gray-700 leading-relaxed">
-                This index quantifies investor emotions on a scale from 0 (extreme fear) to 100 (extreme greed). Based
-                on CNN's methodology, it combines <strong>7 equally-weighted market indicators</strong> with additional
-                options-specific metrics. Options pricing and activity are highly sensitive to sentiment—fear drives
-                higher put buying and volatility, while greed boosts call activity and risk-taking. Each indicator is
-                normalized to a 0-100 scale based on historical extremes, then averaged for the final score.
-              </p>
+        {/* About section */}
+        <Card className="shadow-sm border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10">
+          <CardContent className="pt-4">
+            <div className="flex items-start gap-3">
+              <InfoIcon className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+              <div>
+                <h3 className="font-bold text-gray-900 mb-2">About the Fear & Greed Index</h3>
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  This index quantifies investor emotions on a scale from 0 (extreme fear) to 100 (extreme greed). Based
+                  on CNN's methodology, it combines <strong>7 equally-weighted market indicators</strong> with
+                  additional options-specific metrics. Options pricing and activity are highly sensitive to
+                  sentiment—fear drives higher put buying and volatility, while greed boosts call activity and
+                  risk-taking. Each indicator is normalized to a 0-100 scale based on historical extremes, then averaged
+                  for the final score.
+                </p>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+          </CardContent>
+        </Card>
+      </div>
+    </TooltipProvider>
   )
 }
