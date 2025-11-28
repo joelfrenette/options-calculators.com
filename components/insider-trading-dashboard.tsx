@@ -160,7 +160,7 @@ const fallbackVolumeData = [
   { ticker: "LMT", buys: 0.18, sells: 0 },
 ]
 
-type SortField = "date" | "type" | "owner" | "ticker" | "shares" | "price" | "value" | "notes"
+type SortField = "date" | "owner" | "ticker" | "shares" | "price" | "value" | "notes"
 type SortDirection = "asc" | "desc" | null
 
 const InsiderTradingDashboard = () => {
@@ -388,12 +388,6 @@ const InsiderTradingDashboard = () => {
                       <div className="flex items-center">Date {getSortIcon("date")}</div>
                     </th>
                     <th
-                      className="text-left py-3 px-2 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 select-none min-w-[70px]"
-                      onClick={() => handleSort("type")}
-                    >
-                      <div className="flex items-center">Type {getSortIcon("type")}</div>
-                    </th>
-                    <th
                       className="text-left py-3 px-2 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 select-none"
                       onClick={() => handleSort("owner")}
                     >
@@ -437,7 +431,6 @@ const InsiderTradingDashboard = () => {
                       <td className="py-3 px-2 text-sm text-gray-700 font-medium whitespace-nowrap">
                         {formatDateDisplay(trade.date)}
                       </td>
-                      <td className="py-3 px-2 whitespace-nowrap">{getTypeBadge(trade.type)}</td>
                       <td className="py-3 px-2">
                         <div className="flex items-center gap-2">
                           {getCategoryIcon(trade.category)}

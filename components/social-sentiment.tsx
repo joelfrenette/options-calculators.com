@@ -1,10 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
+import { Progress } from "@/components/ui/progress"
 import {
   Dialog,
   DialogContent,
@@ -26,6 +27,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Minus,
+  Database,
 } from "lucide-react"
 
 interface SocialSentimentData {
@@ -321,73 +323,119 @@ export function SocialSentiment() {
   })
   const [loading, setLoading] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [loadingProgress, setLoadingProgress] = useState(0)
+  const [loadingSource, setLoadingSource] = useState("")
+  const [isFromCache, setIsFromCache] = useState(false)
 
-  const CACHE_KEY = "social_sentiment_cache_v5"
-  const CACHE_TIMESTAMP_KEY = "social_sentiment_cache_timestamp_v5"
+  const CACHE_KEY = "social_sentiment_cache_v6"
+  const CACHE_TIMESTAMP_KEY = "social_sentiment_cache_timestamp_v6"
 
-  const fetchSentiment = async () => {
+  const fetchSentiment = useCallback(async () => {
     setLoading(true)
+    setLoadingProgress(0)
+    setIsFromCache(false)
+
+    const sources = [
+      "Initializing...",
+      "Fetching Grok AI sentiment...",
+      "Fetching Google Trends...",
+      "Fetching AAII Survey...",
+      "Fetching CNN Fear & Greed...",
+      "Fetching StockTwits...",
+      "Fetching Finnhub News...",
+      "Fetching Reddit sentiment...",
+      "Fetching Yahoo Finance...",
+      "Generating AI summary...",
+      "Finalizing data...",
+    ]
+
+    let progress = 0
+    const progressInterval = setInterval(() => {
+      progress += Math.random() * 15
+      if (progress > 90) progress = 90
+      setLoadingProgress(Math.min(progress, 90))
+      const sourceIndex = Math.floor((progress / 100) * sources.length)
+      setLoadingSource(sources[Math.min(sourceIndex, sources.length - 1)])
+    }, 300)
+
     try {
-      console.log("[v0] Fetching social sentiment...")
       const response = await fetch("/api/social-sentiment")
+
+      clearInterval(progressInterval)
+      setLoadingProgress(95)
+      setLoadingSource("Processing results...")
+
       if (response.ok) {
         const result = await response.json()
         setData(result)
         setLastUpdated(new Date())
-        // Cache to localStorage
         localStorage.setItem(CACHE_KEY, JSON.stringify(result))
         localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString())
-        console.log("[v0] Social sentiment data loaded successfully")
+        setLoadingProgress(100)
+        setLoadingSource("Complete!")
       } else {
         console.error("[v0] Social sentiment API error:", response.status)
       }
     } catch (error) {
+      clearInterval(progressInterval)
       console.error("[v0] Error fetching social sentiment data:", error)
     } finally {
-      setLoading(false)
+      setTimeout(() => {
+        setLoading(false)
+        setLoadingProgress(0)
+        setLoadingSource("")
+      }, 500)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    // Check cache first
     const cached = localStorage.getItem(CACHE_KEY)
     const cacheTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY)
 
-    if (cached && cacheTimestamp) {
-      const age = Date.now() - Number.parseInt(cacheTimestamp)
-      const maxAge = 15 * 60 * 1000 // 15 minutes
-
-      if (age < maxAge) {
-        try {
-          setData(JSON.parse(cached))
-          setLastUpdated(new Date(Number.parseInt(cacheTimestamp)))
-          console.log("[v0] Loaded social sentiment from cache")
-          return
-        } catch {}
-      }
+    if (cached) {
+      try {
+        setData(JSON.parse(cached))
+        setLastUpdated(cacheTimestamp ? new Date(Number.parseInt(cacheTimestamp)) : null)
+        setIsFromCache(true)
+      } catch {}
     }
-
-    fetchSentiment()
   }, [])
 
   const handleRefresh = () => {
-    localStorage.removeItem(CACHE_KEY)
-    localStorage.removeItem(CACHE_TIMESTAMP_KEY)
     fetchSentiment()
   }
 
-  // Get 5 component indicators (top 5 by weight)
   const fiveComponentIndicators = (data.indicators || []).slice(0, 5)
-  // Get all 10 indicators
   const tenComponentIndicators = data.indicators || []
 
-  // Get index data for heatmap
   const indexData = (data.per_symbol || []).filter((s) => ["SPY", "QQQ", "IWM", "DIA"].includes(s.symbol))
 
   return (
     <TooltipProvider>
       <div className="space-y-6">
-        {/* Header with Refresh */}
+        {loading && (
+          <Card className="shadow-lg border-teal-200 bg-gradient-to-br from-teal-50 to-white">
+            <CardContent className="py-8">
+              <div className="flex flex-col items-center gap-4">
+                <div className="relative">
+                  <Loader2 className="h-12 w-12 text-teal-600 animate-spin" />
+                  <Database className="h-5 w-5 text-teal-700 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                </div>
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">Loading Sentiment Data</h3>
+                  <p className="text-sm text-teal-600 font-medium">{loadingSource}</p>
+                </div>
+                <div className="w-full max-w-md">
+                  <Progress value={loadingProgress} className="h-3" />
+                  <p className="text-xs text-gray-500 text-center mt-2">
+                    {Math.round(loadingProgress)}% - Fetching from {data.sources_total || 10} data sources
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="shadow-sm border-gray-200">
           <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
             <div className="flex items-center justify-between">
@@ -398,33 +446,41 @@ export function SocialSentiment() {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger>
-                        <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                        <Info className="h-4 w-4 text-gray-400 cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent className="max-w-sm bg-white border shadow-lg">
-                        <p className="font-semibold text-sm">Social Sentiment Scale</p>
-                        <p className="text-xs text-gray-600">
-                          Aggregated sentiment from {data.sources_available || 0} live sources including AI analysis,
-                          social media, and news sentiment.
+                        <p className="text-sm text-gray-700">
+                          Composite sentiment score derived from social media, news, and market indicators. Values range
+                          from 0 (Extreme Bearish) to 100 (Extreme Bullish).
                         </p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 </CardTitle>
-                <CardDescription className="mt-1">
-                  Visual representation of sentiment zones from bearish to bullish
-                </CardDescription>
+                <p className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                  {lastUpdated ? (
+                    <>
+                      Last updated: {lastUpdated.toLocaleString()}
+                      {isFromCache && (
+                        <span className="inline-flex items-center gap-1 text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded text-[10px] font-medium">
+                          <Database className="h-3 w-3" />
+                          Cached
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-amber-600">Click Refresh to load data</span>
+                  )}
+                </p>
               </div>
               <RefreshButton onRefresh={handleRefresh} isLoading={loading} />
             </div>
           </CardHeader>
           <CardContent className="pt-6">
-            {/* Main Sentiment Gauge - Fear & Greed Style */}
             <div className="space-y-6">
               <div className="relative">
-                {/* Tall Gradient Bar */}
                 <div className="h-24 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded-lg shadow-inner" />
 
-                {/* Zone Labels Overlay */}
                 <div className="absolute inset-0 flex items-center justify-between px-2 text-xs font-bold">
                   <div className="text-center text-white drop-shadow-lg">
                     <div className="text-base">EXTREME</div>
@@ -450,7 +506,6 @@ export function SocialSentiment() {
                   </div>
                 </div>
 
-                {/* Moving Indicator with Floating Score */}
                 {data && (
                   <div
                     className="absolute top-0 bottom-0 w-2 bg-black shadow-lg transition-all duration-500"
@@ -471,7 +526,6 @@ export function SocialSentiment() {
                 )}
               </div>
 
-              {/* Macro vs Social Split - Enhanced style */}
               <div className="grid grid-cols-2 gap-6 mt-8">
                 <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                   <div className="flex items-center justify-between mb-2">
@@ -512,7 +566,6 @@ export function SocialSentiment() {
           </CardContent>
         </Card>
 
-        {/* 5 Component Indicators */}
         <Card className="shadow-sm border-gray-200">
           <CardHeader className="bg-gray-50 border-b border-gray-200">
             <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -536,7 +589,6 @@ export function SocialSentiment() {
           </CardContent>
         </Card>
 
-        {/* 10 Component Indicators */}
         <Card className="shadow-sm border-gray-200">
           <CardHeader className="bg-gray-50 border-b border-gray-200">
             <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -561,7 +613,6 @@ export function SocialSentiment() {
           </CardContent>
         </Card>
 
-        {/* Sentiment Heatmap - Major Indices */}
         <Card className="shadow-sm border-gray-200">
           <CardHeader className="bg-gray-50 border-b border-gray-200">
             <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -663,7 +714,6 @@ export function SocialSentiment() {
           </CardContent>
         </Card>
 
-        {/* AI Executive Summary - Replaces Per-Symbol Social Sentiment */}
         <Card className="shadow-sm border-teal-200 bg-gradient-to-br from-teal-50 to-white">
           <CardHeader className="border-b border-teal-100">
             <div className="flex items-center justify-between">
@@ -691,7 +741,6 @@ export function SocialSentiment() {
             </div>
           </CardHeader>
           <CardContent className="pt-6 space-y-6">
-            {/* Summary */}
             <div className="space-y-2">
               <h4 className="text-sm font-bold text-teal-800 flex items-center gap-2">
                 <Activity className="h-4 w-4" />
@@ -705,7 +754,6 @@ export function SocialSentiment() {
               </p>
             </div>
 
-            {/* Weekly Outlook */}
             <div className="space-y-2 p-4 bg-white rounded-lg border border-teal-100">
               <h4 className="text-sm font-bold text-teal-800 flex items-center gap-2">
                 <TrendingUp className="h-4 w-4" />
@@ -721,7 +769,6 @@ export function SocialSentiment() {
               </p>
             </div>
 
-            {/* Recommended Strategies */}
             <div className="space-y-3">
               <h4 className="text-sm font-bold text-teal-800 flex items-center gap-2">
                 <BarChart3 className="h-4 w-4" />
@@ -746,7 +793,6 @@ export function SocialSentiment() {
               </div>
             </div>
 
-            {/* Data Quality */}
             <div className="flex items-center justify-between pt-4 border-t border-teal-100 text-xs text-gray-500">
               <span>
                 Data Quality: {data.data_quality || "MEDIUM"} ({data.sources_available || 0}/{data.sources_total || 10}{" "}
