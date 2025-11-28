@@ -170,7 +170,11 @@ function SentimentIndicatorRow({
         {isLive ? (
           <>
             <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-400 to-red-500" />
-            <div className="absolute top-0 bottom-0 right-0 bg-gray-200" style={{ width: `${100 - score}%` }} />
+            <div className="absolute top-0 bottom-0 right-0 bg-gray-200" style={{ width: `${score}%` }} />
+            <div
+              className="absolute top-0 bottom-0 w-1 bg-gray-800 rounded"
+              style={{ left: `${100 - score}%`, transform: "translateX(-50%)" }}
+            />
           </>
         ) : (
           <div className="absolute inset-0 bg-gray-200 opacity-80" />
@@ -642,13 +646,10 @@ export function SocialSentiment() {
 
                       <div className="relative h-3 bg-gray-100 rounded-full overflow-hidden mb-3">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-400 to-red-500" />
-                        <div
-                          className="absolute top-0 bottom-0 right-0 bg-gray-200"
-                          style={{ width: `${100 - score}%` }}
-                        />
+                        <div className="absolute top-0 bottom-0 right-0 bg-gray-200" style={{ width: `${score}%` }} />
                         <div
                           className="absolute top-0 bottom-0 w-1 bg-gray-800 rounded"
-                          style={{ left: `${score}%`, transform: "translateX(-50%)" }}
+                          style={{ left: `${100 - score}%`, transform: "translateX(-50%)" }}
                         />
                       </div>
 
