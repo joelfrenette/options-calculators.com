@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Slider } from "@/components/ui/slider"
-import { TrendingUp, Info, Loader2, BarChart3, Filter, AlertCircle, CheckCircle2 } from "lucide-react" // Added CircleDollarSign, AlertCircle, CheckCircle2, CheckCircle
-import React from "react" // Ensure React is imported
+import { TrendingUp, Info, Loader2, BarChart3, Filter, AlertCircle, CheckCircle2 } from "lucide-react"
+import React from "react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { RefreshButton } from "@/components/ui/refresh-button"
+import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 
 const CACHE_VERSION = "v1"
 
@@ -1678,8 +1680,8 @@ export function WheelScanner() {
             </CardTitle>
 
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Tooltips</span>
-              <button
+              {/* <span className="text-sm text-muted-foreground">Tooltips</span> */}
+              {/* <button
                 onClick={() => setTooltipsEnabled(!tooltipsEnabled)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                   tooltipsEnabled ? "bg-blue-600" : "bg-gray-300"
@@ -1691,7 +1693,10 @@ export function WheelScanner() {
                     tooltipsEnabled ? "translate-x-6" : "translate-x-1"
                   }`}
                 />
-              </button>
+              </button> */}
+              {/* CHANGE: Use TooltipsToggle and RefreshButton components */}
+              <TooltipsToggle enabled={tooltipsEnabled} setEnabled={setTooltipsEnabled} />
+              <RefreshButton onClick={() => {}} />
             </div>
           </div>
         </CardHeader>

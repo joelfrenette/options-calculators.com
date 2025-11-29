@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Info, TrendingUp, Activity } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { RefreshButton } from "@/components/ui/refresh-button"
+import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 
 // Black-Scholes Greeks calculations
 function normalCDF(x: number): number {
@@ -176,6 +178,7 @@ export function GreeksCalculator() {
   const [impliedVolatility, setImpliedVolatility] = useState("30")
   const [optionType, setOptionType] = useState<"call" | "put">("put")
   const [greeks, setGreeks] = useState<any>(null)
+  const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
 
   useEffect(() => {
     const stock = Number.parseFloat(stockPrice) || 0
@@ -192,11 +195,19 @@ export function GreeksCalculator() {
   return (
     <div className="space-y-4">
       <Card className="shadow-sm border-gray-200">
-        <CardHeader className="bg-gray-50 border-b border-gray-200">
+        <CardHeader className="bg-gray-50 border-b border-gray-200 flex items-center justify-between">
           <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
             <Activity className="h-5 w-5 text-primary" />
             Option Parameters
           </CardTitle>
+          <div className="flex items-center gap-2">
+            <RefreshButton
+              onClick={() => {
+                /* Refresh logic here */
+              }}
+            />
+            <TooltipsToggle enabled={tooltipsEnabled} onToggle={() => setTooltipsEnabled(!tooltipsEnabled)} />
+          </div>
         </CardHeader>
         <CardContent className="pt-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -266,106 +277,106 @@ export function GreeksCalculator() {
             <CardTitle className="text-lg font-bold text-gray-900">Calculated Greeks</CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
-            <TooltipProvider>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Delta */}
-                <div className={`p-4 rounded-lg border-2 ${getGreekColor("delta", greeks.delta, optionType)}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold">{GREEK_INFO.delta.name}</span>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <Info className="h-4 w-4" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p className="font-semibold mb-1">{GREEK_INFO.delta.description}</p>
-                        <p className="text-sm mb-1">{GREEK_INFO.delta.interpretation}</p>
-                        <p className="text-xs text-gray-500">{GREEK_INFO.delta.range}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <div className="text-3xl font-bold">{greeks.delta.toFixed(3)}</div>
-                  <div className="text-sm mt-1">~{Math.abs(greeks.delta * 100).toFixed(0)}% probability ITM</div>
+            {tooltipsEnabled && <TooltipProvider />}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Delta */}
+              <div className={`p-4 rounded-lg border-2 ${getGreekColor("delta", greeks.delta, optionType)}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold">{GREEK_INFO.delta.name}</span>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-4 w-4" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-semibold mb-1">{GREEK_INFO.delta.description}</p>
+                      <p className="text-sm mb-1">{GREEK_INFO.delta.interpretation}</p>
+                      <p className="text-xs text-gray-500">{GREEK_INFO.delta.range}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
+                <div className="text-3xl font-bold">{greeks.delta.toFixed(3)}</div>
+                <div className="text-sm mt-1">~{Math.abs(greeks.delta * 100).toFixed(0)}% probability ITM</div>
+              </div>
 
-                {/* Gamma */}
-                <div className={`p-4 rounded-lg border-2 ${getGreekColor("gamma", greeks.gamma, optionType)}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold">{GREEK_INFO.gamma.name}</span>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <Info className="h-4 w-4" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p className="font-semibold mb-1">{GREEK_INFO.gamma.description}</p>
-                        <p className="text-sm mb-1">{GREEK_INFO.gamma.interpretation}</p>
-                        <p className="text-xs text-gray-500">{GREEK_INFO.gamma.range}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <div className="text-3xl font-bold">{greeks.gamma.toFixed(4)}</div>
-                  <div className="text-sm mt-1">
-                    {greeks.gamma >= 0.05 ? "High risk" : greeks.gamma >= 0.02 ? "Moderate" : "Low risk"}
-                  </div>
+              {/* Gamma */}
+              <div className={`p-4 rounded-lg border-2 ${getGreekColor("gamma", greeks.gamma, optionType)}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold">{GREEK_INFO.gamma.name}</span>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-4 w-4" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-semibold mb-1">{GREEK_INFO.gamma.description}</p>
+                      <p className="text-sm mb-1">{GREEK_INFO.gamma.interpretation}</p>
+                      <p className="text-xs text-gray-500">{GREEK_INFO.gamma.range}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
-
-                {/* Theta */}
-                <div className={`p-4 rounded-lg border-2 ${getGreekColor("theta", greeks.theta, optionType)}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold">{GREEK_INFO.theta.name}</span>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <Info className="h-4 w-4" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p className="font-semibold mb-1">{GREEK_INFO.theta.description}</p>
-                        <p className="text-sm mb-1">{GREEK_INFO.theta.interpretation}</p>
-                        <p className="text-xs text-gray-500">{GREEK_INFO.theta.range}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <div className="text-3xl font-bold">{greeks.theta.toFixed(4)}</div>
-                  <div className="text-sm mt-1">${(greeks.theta * 100).toFixed(2)}/day per contract</div>
-                </div>
-
-                {/* Vega */}
-                <div className={`p-4 rounded-lg border-2 ${getGreekColor("vega", greeks.vega, optionType)}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold">{GREEK_INFO.vega.name}</span>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <Info className="h-4 w-4" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p className="font-semibold mb-1">{GREEK_INFO.vega.description}</p>
-                        <p className="text-sm mb-1">{GREEK_INFO.vega.interpretation}</p>
-                        <p className="text-xs text-gray-500">{GREEK_INFO.vega.range}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <div className="text-3xl font-bold">{greeks.vega.toFixed(4)}</div>
-                  <div className="text-sm mt-1">${(greeks.vega * 100).toFixed(2)} per 1% IV change</div>
-                </div>
-
-                {/* Rho */}
-                <div className="p-4 rounded-lg border-2 text-gray-600 bg-gray-50">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold">{GREEK_INFO.rho.name}</span>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <Info className="h-4 w-4" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p className="font-semibold mb-1">{GREEK_INFO.rho.description}</p>
-                        <p className="text-sm mb-1">{GREEK_INFO.rho.interpretation}</p>
-                        <p className="text-xs text-gray-500">{GREEK_INFO.rho.range}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <div className="text-3xl font-bold">{greeks.rho.toFixed(4)}</div>
-                  <div className="text-sm mt-1">${(greeks.rho * 100).toFixed(2)} per 1% rate change</div>
+                <div className="text-3xl font-bold">{greeks.gamma.toFixed(4)}</div>
+                <div className="text-sm mt-1">
+                  {greeks.gamma >= 0.05 ? "High risk" : greeks.gamma >= 0.02 ? "Moderate" : "Low risk"}
                 </div>
               </div>
-            </TooltipProvider>
+
+              {/* Theta */}
+              <div className={`p-4 rounded-lg border-2 ${getGreekColor("theta", greeks.theta, optionType)}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold">{GREEK_INFO.theta.name}</span>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-4 w-4" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-semibold mb-1">{GREEK_INFO.theta.description}</p>
+                      <p className="text-sm mb-1">{GREEK_INFO.theta.interpretation}</p>
+                      <p className="text-xs text-gray-500">{GREEK_INFO.theta.range}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <div className="text-3xl font-bold">{greeks.theta.toFixed(4)}</div>
+                <div className="text-sm mt-1">${(greeks.theta * 100).toFixed(2)}/day per contract</div>
+              </div>
+
+              {/* Vega */}
+              <div className={`p-4 rounded-lg border-2 ${getGreekColor("vega", greeks.vega, optionType)}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold">{GREEK_INFO.vega.name}</span>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-4 w-4" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-semibold mb-1">{GREEK_INFO.vega.description}</p>
+                      <p className="text-sm mb-1">{GREEK_INFO.vega.interpretation}</p>
+                      <p className="text-xs text-gray-500">{GREEK_INFO.vega.range}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <div className="text-3xl font-bold">{greeks.vega.toFixed(4)}</div>
+                <div className="text-sm mt-1">${(greeks.vega * 100).toFixed(2)} per 1% IV change</div>
+              </div>
+
+              {/* Rho */}
+              <div className="p-4 rounded-lg border-2 text-gray-600 bg-gray-50">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold">{GREEK_INFO.rho.name}</span>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-4 w-4" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-semibold mb-1">{GREEK_INFO.rho.description}</p>
+                      <p className="text-sm mb-1">{GREEK_INFO.rho.interpretation}</p>
+                      <p className="text-xs text-gray-500">{GREEK_INFO.rho.range}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <div className="text-3xl font-bold">{greeks.rho.toFixed(4)}</div>
+                <div className="text-sm mt-1">${(greeks.rho * 100).toFixed(2)} per 1% rate change</div>
+              </div>
+            </div>
+            {tooltipsEnabled && <TooltipProvider />}
           </CardContent>
         </Card>
       )}

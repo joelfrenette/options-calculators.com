@@ -1,23 +1,15 @@
 "use client"
+
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine, Area, ComposedChart } from "recharts"
-import { RunScenarioInAIDialog } from "@/components/run-scenario-ai-dialog"
-import {
-  TrendingUp,
-  DollarSign,
-  Target,
-  Clock,
-  Activity,
-  Shield,
-  Calculator,
-  Sparkles,
-  RefreshCw,
-  Loader2,
-} from "lucide-react"
+import { TrendingUp, Target, DollarSign, Clock, Loader2, Shield, BarChart2, Activity } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { ResponsiveContainer, ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, ReferenceLine } from "recharts"
+import { RefreshButton } from "@/components/ui/refresh-button"
+import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
+import { Calculator, RefreshCw } from "lucide-react" // Added imports for Calculator and RefreshCw
 
 // Strategy configurations
 const STRATEGIES = {
@@ -632,14 +624,10 @@ export function OptionsStrategyToolbox({ strategy }: OptionsStrategyToolboxProps
               </div>
               <p className="text-lg text-teal-700">{config.tagline}</p>
             </div>
-            <Button
-              onClick={handleRefreshSetups}
-              disabled={isScanning}
-              className="bg-white text-teal-700 border border-teal-300 hover:bg-teal-50 shadow-sm"
-            >
-              {isScanning ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-              {isScanning ? "Scanning..." : "Refresh"}
-            </Button>
+            <div className="flex items-center gap-2">
+              <RefreshButton onClick={handleRefreshSetups} disabled={isScanning} />
+              <TooltipsToggle />
+            </div>
           </div>
           {lastScanned && (
             <p className="text-xs text-teal-600 mt-2">Last scanned: {lastScanned.toLocaleTimeString()}</p>
@@ -817,21 +805,20 @@ export function OptionsStrategyToolbox({ strategy }: OptionsStrategyToolboxProps
                       <span className="ml-1 font-semibold text-blue-600">{setup.pop}</span>
                     </div>
                   </div>
-                  <RunScenarioInAIDialog
-                    context={{
-                      type: "strategy",
-                      title: `${setup.ticker} ${setup.setup}`,
-                      details: `${setup.setup} on ${setup.ticker}. Premium: ${setup.credit}, Probability of Profit: ${setup.pop}. Signal strength: ${setup.signal}.`,
-                      ticker: setup.ticker,
-                      additionalContext: {
-                        Strategy: setup.setup,
-                        Premium: setup.credit,
-                        POP: setup.pop,
-                        Signal: setup.signal,
-                      },
-                    }}
-                    buttonClassName="w-full text-white bg-[#0D9488] hover:bg-[#0F766E]"
-                  />
+                  {/* TooltipProvider added here */}
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Button className="w-full text-white bg-[#0D9488] hover:bg-[#0F766E]">Run Scenario</Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>
+                          {setup.setup} on {setup.ticker}. Premium: {setup.credit}, Probability of Profit: {setup.pop}.
+                          Signal strength: {setup.signal}.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </CardContent>
               </Card>
             ))}
@@ -843,28 +830,28 @@ export function OptionsStrategyToolbox({ strategy }: OptionsStrategyToolboxProps
           <div className="flex items-center gap-2 mb-4">
             <div className="h-1 w-8 bg-teal-500 rounded" />
             <h2 className="text-xl font-bold" style={{ color: "#1E3A8A" }}>
-              <Sparkles className="h-5 w-5 inline mr-2 text-teal-600" />
+              <BarChart2 className="h-5 w-5 inline mr-2 text-teal-600" />
               AI Trade Ideas & Adjustments This Week
             </h2>
           </div>
-          <Accordion type="single" collapsible className="space-y-3">
-            <AccordionItem value="outlook" className="border rounded-lg shadow-sm bg-white">
-              <AccordionTrigger className="px-4 py-3 hover:no-underline">
+          <div className="space-y-3">
+            <div className="border rounded-lg shadow-sm bg-white">
+              <div className="px-4 py-3 hover:no-underline">
                 <span className="font-semibold" style={{ color: "#1E3A8A" }}>
                   Market Outlook Impact
                 </span>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4">
+              </div>
+              <div className="px-4 pb-4">
                 <p className="text-gray-700 leading-relaxed">{config.insights.outlook}</p>
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="entry" className="border rounded-lg shadow-sm bg-white">
-              <AccordionTrigger className="px-4 py-3 hover:no-underline">
+              </div>
+            </div>
+            <div className="border rounded-lg shadow-sm bg-white">
+              <div className="px-4 py-3 hover:no-underline">
                 <span className="font-semibold" style={{ color: "#1E3A8A" }}>
                   Entry Rules I'm Using
                 </span>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4">
+              </div>
+              <div className="px-4 pb-4">
                 <ul className="space-y-2">
                   {config.insights.entryRules.map((rule, idx) => (
                     <li key={idx} className="flex items-start gap-2 text-gray-700">
@@ -873,15 +860,15 @@ export function OptionsStrategyToolbox({ strategy }: OptionsStrategyToolboxProps
                     </li>
                   ))}
                 </ul>
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="adjustments" className="border rounded-lg shadow-sm bg-white">
-              <AccordionTrigger className="px-4 py-3 hover:no-underline">
+              </div>
+            </div>
+            <div className="border rounded-lg shadow-sm bg-white">
+              <div className="px-4 py-3 hover:no-underline">
                 <span className="font-semibold" style={{ color: "#1E3A8A" }}>
                   Adjustment Triggers
                 </span>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4">
+              </div>
+              <div className="px-4 pb-4">
                 <ul className="space-y-2">
                   {config.insights.adjustments.map((adj, idx) => (
                     <li key={idx} className="flex items-start gap-2 text-gray-700">
@@ -890,9 +877,9 @@ export function OptionsStrategyToolbox({ strategy }: OptionsStrategyToolboxProps
                     </li>
                   ))}
                 </ul>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Bottom Banner */}

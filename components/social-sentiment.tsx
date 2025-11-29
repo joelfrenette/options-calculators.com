@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
+import { Badge } from "@/components/ui/badge"
 import {
   Info,
   TrendingUp,
@@ -68,6 +69,14 @@ interface SentimentData {
     twitter_sentiment?: number | null
     google_trends?: number | null
   }>
+}
+
+interface SentimentIndicator {
+  name: string
+  score: number
+  status: string
+  description: string
+  isLive: boolean
 }
 
 // Sentiment interpretation buckets
@@ -126,41 +135,18 @@ function SentimentPill({ value, label }: { value: number; label: string }) {
 }
 
 // Sentiment indicator row component
-function SentimentIndicatorRow({
-  indicator,
-}: {
-  indicator: {
-    name: string
-    score: number | null
-    status: string
-    description: string
-  }
-}) {
-  const isLive = indicator.status === "LIVE" && indicator.score !== null && indicator.score >= 0
-  const score = safeNumber(indicator.score, 50)
+function SentimentIndicatorRow({ indicator }: { indicator: SentimentIndicator }) {
+  const score = indicator.score ?? 0
+  const isLive = indicator.isLive
 
   return (
     <div className="py-3 border-b border-gray-100 last:border-0">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-gray-700">{indicator.name}</span>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger>
-                <Info className="h-3.5 w-3.5 text-gray-400 cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent className="max-w-sm bg-white border shadow-lg">
-                <p className="text-sm text-gray-700">{indicator.description}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <span
-            className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-              isLive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
-            }`}
-          >
-            {indicator.status}
-          </span>
+          <span className="text-sm font-medium text-gray-700">{indicator.name}</span>
+          <Badge variant={isLive ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
+            {isLive ? "LIVE" : "N/A"}
+          </Badge>
         </div>
         <span className={`text-sm font-bold ${isLive ? "text-gray-900" : "text-gray-400"}`}>
           {isLive ? Math.round(score) : "No data"}
@@ -170,10 +156,10 @@ function SentimentIndicatorRow({
         {isLive ? (
           <>
             <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-400 to-red-500" />
-            <div className="absolute top-0 bottom-0 right-0 bg-gray-200" style={{ width: `${100 - score}%` }} />
+            <div className="absolute top-0 bottom-0 right-0 bg-gray-200" style={{ width: `${score}%` }} />
             <div
               className="absolute top-0 bottom-0 w-1 bg-gray-800 rounded"
-              style={{ left: `${score}%`, transform: "translateX(-50%)" }}
+              style={{ left: `${100 - score}%`, transform: "translateX(-50%)" }}
             />
           </>
         ) : (

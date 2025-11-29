@@ -2,27 +2,13 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { TrendingUp, TrendingDown, Info, Loader2, Target, DollarSign, AlertTriangle, Filter } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
-import {
-  RefreshCw,
-  TrendingUp,
-  TrendingDown,
-  Target,
-  Zap,
-  Filter,
-  ArrowUpRight,
-  AlertTriangle,
-  CheckCircle2,
-  Info,
-  Loader2,
-  Wifi,
-  WifiOff,
-} from "lucide-react"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { RefreshButton } from "@/components/ui/refresh-button"
+import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 
 interface SpreadSetup {
   ticker: string
@@ -117,7 +103,7 @@ export function CreditSpreadScanner() {
       case "strong":
         return (
           <Badge className="bg-green-100 text-green-800 border-green-300">
-            <CheckCircle2 className="w-3 h-3 mr-1" />
+            <Loader2 className="w-3 h-3 mr-1" />
             Strong
           </Badge>
         )
@@ -131,7 +117,7 @@ export function CreditSpreadScanner() {
       default:
         return (
           <Badge className="bg-orange-100 text-orange-800 border-orange-300">
-            <Zap className="w-3 h-3 mr-1" />
+            <Filter className="w-3 h-3 mr-1" />
             Speculative
           </Badge>
         )
@@ -149,12 +135,12 @@ export function CreditSpreadScanner() {
                 Credit Spread Scanner
                 {isLiveData ? (
                   <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-300">
-                    <Wifi className="w-3 h-3 mr-1" />
+                    <TrendingUp className="w-3 h-3 mr-1" />
                     LIVE
                   </Badge>
                 ) : setups.length > 0 ? (
                   <Badge variant="outline" className="ml-2 bg-yellow-50 text-yellow-700 border-yellow-300">
-                    <WifiOff className="w-3 h-3 mr-1" />
+                    <TrendingDown className="w-3 h-3 mr-1" />
                     Cached
                   </Badge>
                 ) : null}
@@ -168,10 +154,10 @@ export function CreditSpreadScanner() {
                 )}
               </CardDescription>
             </div>
-            <Button onClick={handleRefresh} disabled={isLoading} size="sm">
-              {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-              {isLoading ? "Scanning..." : "Refresh"}
-            </Button>
+            <div className="flex items-center gap-2">
+              <RefreshButton onClick={handleRefresh} disabled={isLoading} />
+              <TooltipsToggle />
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -221,83 +207,79 @@ export function CreditSpreadScanner() {
             </div>
           )}
 
-          <Accordion type="single" collapsible className="space-y-2">
+          <div className="space-y-2">
             {filteredSetups.map((setup, idx) => (
-              <AccordionItem key={`${setup.ticker}-${setup.type}-${idx}`} value={`${setup.ticker}-${idx}`}>
-                <AccordionTrigger className="hover:no-underline">
-                  <div className="flex items-center justify-between w-full pr-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${setup.type === "bull-put" ? "bg-green-100" : "bg-red-100"}`}>
-                        {setup.type === "bull-put" ? (
-                          <TrendingUp className="w-4 h-4 text-green-600" />
-                        ) : (
-                          <TrendingDown className="w-4 h-4 text-red-600" />
-                        )}
-                      </div>
-                      <div className="text-left">
-                        <div className="font-semibold">{setup.ticker}</div>
-                        <div className="text-xs text-muted-foreground">{setup.company}</div>
-                      </div>
+              <div key={`${setup.ticker}-${setup.type}-${idx}`} className="border rounded-lg">
+                <div className="flex items-center justify-between p-4 hover:bg-slate-100">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${setup.type === "bull-put" ? "bg-green-100" : "bg-red-100"}`}>
+                      {setup.type === "bull-put" ? (
+                        <TrendingUp className="w-4 h-4 text-green-600" />
+                      ) : (
+                        <TrendingDown className="w-4 h-4 text-red-600" />
+                      )}
                     </div>
-                    <div className="flex items-center gap-4">
-                      {getSignalBadge(setup.signal)}
-                      <div className="text-right">
-                        <div className="font-semibold text-green-600">${setup.credit.toFixed(2)} credit</div>
-                        <div className="text-xs text-muted-foreground">{setup.probability}% prob</div>
-                      </div>
-                      <ArrowUpRight className="w-4 h-4 text-slate-400" />
+                    <div className="text-left">
+                      <div className="font-semibold">{setup.ticker}</div>
+                      <div className="text-xs text-muted-foreground">{setup.company}</div>
                     </div>
                   </div>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-lg">
-                    <div>
-                      <div className="text-xs text-muted-foreground">Strategy</div>
-                      <div className="font-medium capitalize">{setup.type.replace("-", " ")}</div>
+                  <div className="flex items-center gap-4">
+                    {getSignalBadge(setup.signal)}
+                    <div className="text-right">
+                      <div className="font-semibold text-green-600">${setup.credit.toFixed(2)} credit</div>
+                      <div className="text-xs text-muted-foreground">{setup.probability}% prob</div>
                     </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">Strikes</div>
-                      <div className="font-medium">
-                        ${setup.shortStrike} / ${setup.longStrike}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">Expiration</div>
-                      <div className="font-medium">
-                        {setup.expiration} ({setup.dte}d)
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">Max Loss</div>
-                      <div className="font-medium text-red-600">${setup.maxLoss.toFixed(2)}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">IV Rank</div>
-                      <div className="font-medium">{setup.ivRank}%</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">Delta</div>
-                      <div className="font-medium">{setup.delta.toFixed(2)}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">Risk/Reward</div>
-                      <div className="font-medium">{setup.riskReward}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">Data Source</div>
-                      <div className="font-medium text-xs">{setup.dataSource || "API"}</div>
+                    <DollarSign className="w-4 h-4 text-slate-400" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-lg">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Strategy</div>
+                    <div className="font-medium capitalize">{setup.type.replace("-", " ")}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Strikes</div>
+                    <div className="font-medium">
+                      ${setup.shortStrike} / ${setup.longStrike}
                     </div>
                   </div>
-                  <div className="mt-3 p-3 bg-blue-50 rounded-lg">
-                    <div className="flex items-start gap-2">
-                      <Info className="w-4 h-4 text-blue-500 mt-0.5" />
-                      <div className="text-sm text-blue-800">{setup.reason}</div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Expiration</div>
+                    <div className="font-medium">
+                      {setup.expiration} ({setup.dte}d)
                     </div>
                   </div>
-                </AccordionContent>
-              </AccordionItem>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Max Loss</div>
+                    <div className="font-medium text-red-600">${setup.maxLoss.toFixed(2)}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">IV Rank</div>
+                    <div className="font-medium">{setup.ivRank}%</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Delta</div>
+                    <div className="font-medium">{setup.delta.toFixed(2)}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Risk/Reward</div>
+                    <div className="font-medium">{setup.riskReward}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Data Source</div>
+                    <div className="font-medium text-xs">{setup.dataSource || "API"}</div>
+                  </div>
+                </div>
+                <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 text-blue-500 mt-0.5" />
+                    <div className="text-sm text-blue-800">{setup.reason}</div>
+                  </div>
+                </div>
+              </div>
             ))}
-          </Accordion>
+          </div>
 
           {setups.length > 0 && (
             <div className="mt-4 pt-4 border-t text-xs text-muted-foreground flex items-center justify-between">

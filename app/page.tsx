@@ -21,6 +21,7 @@ import { OptionsStrategyToolbox } from "@/components/options-strategy-toolbox"
 import { ExitRulesDashboard } from "@/components/exit-rules-dashboard"
 import { CreditSpreadScanner } from "@/components/credit-spread-scanner"
 import { IronCondorScanner } from "@/components/iron-condor-scanner"
+import { CalendarSpreadScanner } from "@/components/calendar-spread-scanner"
 import { WheelStrategyScreener } from "@/components/wheel-strategy-screener"
 import { HighIVWatchlist } from "@/components/high-iv-watchlist"
 import { EarningsPlaysScanner } from "@/components/earnings-plays-scanner"
@@ -43,6 +44,7 @@ const ANALYZE_TABS = [
 const SCAN_TABS = [
   { id: "insiders", label: "Insider Trading Scanner" },
   { id: "wheel-scanner", label: "Put Scanner" },
+  { id: "calendar-spread-scanner", label: "Calendar Spreads" },
   { id: "credit-spread-scanner", label: "Credit Spreads" },
   { id: "iron-condor-scanner", label: "Iron Condors" },
   { id: "wheel-screener", label: "Wheel Screener" },
@@ -112,6 +114,8 @@ export default function Home() {
       // SCAN tabs
       case "wheel-scanner":
         return <WheelScanner />
+      case "calendar-spread-scanner":
+        return <CalendarSpreadScanner />
       case "credit-spread-scanner":
         return <CreditSpreadScanner />
       case "iron-condor-scanner":
