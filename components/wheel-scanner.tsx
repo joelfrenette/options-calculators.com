@@ -1520,14 +1520,14 @@ export function WheelScanner() {
             return sortDirection === "asc" ? aVal - bVal : bVal - aVal
           }
 
-          if (sortColumn === "redDay") {
+          if (sortColumn === "redDay" || sortColumn === "uptrend") {
             const aBool = Boolean(aVal)
             const bBool = Boolean(bVal)
-            if (sortDirection === "asc") {
-              return Number(aBool) - Number(bBool)
-            } else {
-              return Number(bBool) - Number(aBool)
-            }
+            return sortDirection === "asc" ? Number(aBool) - Number(bBool) : Number(bBool) - Number(aBool)
+          }
+
+          if (typeof aVal === "string" && typeof bVal === "string") {
+            return sortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
           }
 
           return 0
@@ -2766,7 +2766,8 @@ export function WheelScanner() {
                 </CardTitle>
               </div>
               <span className="text-sm font-semibold text-green-700 bg-green-100 px-3 py-1 rounded-full">
-                {technicalResults.length} {technicalResults.length === 1 ? "stock" : "stocks"} passed
+                {technicalResults.length} {technicalResults.length === 1 ? "option meets" : "options meet"} all the
+                selection criteria
               </span>
             </div>
             <p className="text-sm text-green-700 mt-2">
@@ -2778,30 +2779,121 @@ export function WheelScanner() {
               <table className="w-full text-sm">
                 <thead className="bg-green-50 border-b border-green-200">
                   <tr>
-                    <th className="text-left p-3 font-semibold text-green-900">Ticker</th>
-                    <th className="text-right p-3 font-semibold text-green-900">Price</th>
-                    <th className="text-center p-3 font-semibold text-green-900">DTE</th>
-                    <th className="text-center p-3 font-semibold text-green-900">Expiry</th>
-                    <th className="text-center p-3 font-semibold text-green-900">Strike</th>
                     <th
-                      className="text-right p-3 font-semibold text-green-900 cursor-pointer"
+                      className="text-left p-3 font-semibold text-green-900 cursor-pointer hover:bg-green-100"
+                      onClick={() => handleSort("ticker" as keyof QualifyingStock)}
+                    >
+                      Ticker {sortColumn === "ticker" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-right p-3 font-semibold text-green-900 cursor-pointer hover:bg-green-100"
+                      onClick={() => handleSort("currentPrice" as keyof QualifyingStock)}
+                    >
+                      Price {sortColumn === "currentPrice" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-center p-3 font-semibold text-green-900 cursor-pointer hover:bg-green-100"
+                      onClick={() => handleSort("daysToExpiry" as keyof QualifyingStock)}
+                    >
+                      DTE {sortColumn === "daysToExpiry" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-center p-3 font-semibold text-green-900 cursor-pointer hover:bg-green-100"
+                      onClick={() => handleSort("expiryDate" as keyof QualifyingStock)}
+                    >
+                      Expiry {sortColumn === "expiryDate" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-center p-3 font-semibold text-green-900 cursor-pointer hover:bg-green-100"
+                      onClick={() => handleSort("putStrike" as keyof QualifyingStock)}
+                    >
+                      Strike {sortColumn === "putStrike" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-right p-3 font-semibold text-green-900 cursor-pointer hover:bg-green-100"
                       onClick={() => handleSort("premium")}
                     >
                       Premium {sortColumn === "premium" && (sortDirection === "asc" ? "↑" : "↓")}
                     </th>
-                    <th className="text-center p-3 font-semibold text-green-900">Delta</th>
-                    <th className="text-right p-3 font-semibold text-green-900">Yield %</th>
-                    <th className="text-right p-3 font-semibold text-green-900">Annual Yield %</th>
-                    <th className="text-center p-3 font-semibold text-green-900">Red Day</th>
-                    <th className="text-center p-3 font-semibold text-green-900">MACD</th>
-                    <th className="text-center p-3 font-semibold text-green-900">Bollinger</th>
-                    <th className="text-center p-3 font-semibold text-green-900">Golden Cross</th>
-                    <th className="text-center p-3 font-semibold text-green-900">Stochastic</th>
-                    <th className="text-center p-3 font-semibold text-green-900">ATR %</th>
-                    <th className="text-center p-3 font-semibold text-green-900">RSI (14)</th>
-                    <th className="text-right p-3 font-semibold text-green-900">50-SMA</th>
-                    <th className="text-right p-3 font-semibold text-green-900">100-SMA</th>
-                    <th className="text-right p-3 font-semibold text-green-900">200-SMA</th>
+                    <th
+                      className="text-center p-3 font-semibold text-green-900 cursor-pointer hover:bg-green-100"
+                      onClick={() => handleSort("delta" as keyof QualifyingStock)}
+                    >
+                      Delta {sortColumn === "delta" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-right p-3 font-semibold text-green-900 cursor-pointer hover:bg-green-100"
+                      onClick={() => handleSort("yield" as keyof QualifyingStock)}
+                    >
+                      Yield % {sortColumn === "yield" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-right p-3 font-semibold text-green-900 cursor-pointer hover:bg-green-100"
+                      onClick={() => handleSort("annualizedYield" as keyof QualifyingStock)}
+                    >
+                      Annual Yield % {sortColumn === "annualizedYield" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    {/* Reordered: Red Day, RSI, Bollinger, MACD, then rest */}
+                    <th
+                      className="text-center p-3 font-semibold text-green-900 cursor-pointer hover:bg-green-100"
+                      onClick={() => handleSort("redDay" as keyof QualifyingStock)}
+                    >
+                      Red Day {sortColumn === "redDay" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-center p-3 font-semibold text-green-900 cursor-pointer hover:bg-green-100"
+                      onClick={() => handleSort("rsi" as keyof QualifyingStock)}
+                    >
+                      RSI (14) {sortColumn === "rsi" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-center p-3 font-semibold text-green-900 cursor-pointer hover:bg-green-100"
+                      onClick={() => handleSort("bollingerPosition" as keyof QualifyingStock)}
+                    >
+                      Bollinger {sortColumn === "bollingerPosition" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-center p-3 font-semibold text-green-900 cursor-pointer hover:bg-green-100"
+                      onClick={() => handleSort("macdSignal" as keyof QualifyingStock)}
+                    >
+                      MACD {sortColumn === "macdSignal" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-center p-3 font-semibold text-green-900 cursor-pointer hover:bg-green-100"
+                      onClick={() => handleSort("uptrend" as keyof QualifyingStock)}
+                    >
+                      Golden Cross {sortColumn === "uptrend" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-center p-3 font-semibold text-green-900 cursor-pointer hover:bg-green-100"
+                      onClick={() => handleSort("stochastic" as keyof QualifyingStock)}
+                    >
+                      Stochastic {sortColumn === "stochastic" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-center p-3 font-semibold text-green-900 cursor-pointer hover:bg-green-100"
+                      onClick={() => handleSort("atrPercent" as keyof QualifyingStock)}
+                    >
+                      ATR % {sortColumn === "atrPercent" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-right p-3 font-semibold text-green-900 cursor-pointer hover:bg-green-100"
+                      onClick={() => handleSort("sma50" as keyof QualifyingStock)}
+                    >
+                      50-SMA {sortColumn === "sma50" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-right p-3 font-semibold text-green-900 cursor-pointer hover:bg-green-100"
+                      onClick={() => handleSort("sma100" as keyof QualifyingStock)}
+                    >
+                      100-SMA {sortColumn === "sma100" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-right p-3 font-semibold text-green-900 cursor-pointer hover:bg-green-100"
+                      onClick={() => handleSort("sma200" as keyof QualifyingStock)}
+                    >
+                      200-SMA {sortColumn === "sma200" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2850,7 +2942,7 @@ export function WheelScanner() {
                           )}
                         </td>
                         <td className="text-center p-3">
-                          {stock.macdSignal === "Bullish" ? (
+                          {stock.rsi !== undefined && stock.rsi < 40 ? (
                             <span className="text-green-600 font-bold text-lg">✓</span>
                           ) : (
                             <span className="text-red-600 font-bold text-lg">✗</span>
@@ -2858,6 +2950,13 @@ export function WheelScanner() {
                         </td>
                         <td className="text-center p-3">
                           {stock.bollingerPosition === "Below" || stock.bollingerPosition === "Lower Half" ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.macdSignal === "Bullish" ? (
                             <span className="text-green-600 font-bold text-lg">✓</span>
                           ) : (
                             <span className="text-red-600 font-bold text-lg">✗</span>
@@ -2879,13 +2978,6 @@ export function WheelScanner() {
                         </td>
                         <td className="text-center p-3">
                           {stock.atrPercent !== undefined && stock.atrPercent >= 2.5 && stock.atrPercent <= 6 ? (
-                            <span className="text-green-600 font-bold text-lg">✓</span>
-                          ) : (
-                            <span className="text-red-600 font-bold text-lg">✗</span>
-                          )}
-                        </td>
-                        <td className="text-center p-3">
-                          {stock.rsi !== undefined && stock.rsi < 40 ? (
                             <span className="text-green-600 font-bold text-lg">✓</span>
                           ) : (
                             <span className="text-red-600 font-bold text-lg">✗</span>
@@ -2928,7 +3020,7 @@ export function WheelScanner() {
         </Card>
       )}
 
-      {step >= 2 && !isScanningTechnicals && technicalResults.length === 0 && fundamentalResults.length > 0 && (
+      {step >= 3 && !isScanningTechnicals && technicalResults.length === 0 && fundamentalResults.length > 0 && (
         <Card className="mt-8 w-full max-w-7xl mx-auto border-2 border-yellow-500 bg-white">
           <CardHeader className="bg-gradient-to-r from-yellow-50 to-amber-50">
             <div className="flex items-center gap-2">
