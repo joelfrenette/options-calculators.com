@@ -1676,7 +1676,7 @@ export function WheelScanner() {
                 <circle cx="12" cy="12" r="6"></circle>
                 <circle cx="12" cy="12" r="2"></circle>
               </svg>
-              Put Selling Scanner
+              Sell Put Scanner
             </CardTitle>
 
             <div className="flex items-center gap-2">

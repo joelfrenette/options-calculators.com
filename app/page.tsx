@@ -46,7 +46,7 @@ const ANALYZE_TABS = [
 
 const SCAN_TABS = [
   { id: "insiders", label: "Insider Trading Scanner" },
-  { id: "wheel-scanner", label: "Put Scanner" },
+  { id: "wheel-scanner", label: "Sell Put Scanner" },
   { id: "calendar-spread-scanner", label: "Calendar Spreads" },
   { id: "credit-spread-scanner", label: "Credit Spreads" },
   { id: "iron-condor-scanner", label: "Iron Condors" },
