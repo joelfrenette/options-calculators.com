@@ -201,12 +201,12 @@ export function GreeksCalculator() {
             Option Parameters
           </CardTitle>
           <div className="flex items-center gap-2">
+            <TooltipsToggle enabled={tooltipsEnabled} onToggle={() => setTooltipsEnabled(!tooltipsEnabled)} />
             <RefreshButton
               onClick={() => {
                 /* Refresh logic here */
               }}
             />
-            <TooltipsToggle enabled={tooltipsEnabled} onToggle={() => setTooltipsEnabled(!tooltipsEnabled)} />
           </div>
         </CardHeader>
         <CardContent className="pt-4">

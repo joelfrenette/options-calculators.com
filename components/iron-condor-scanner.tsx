@@ -131,7 +131,7 @@ export function IronCondorScanner() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Layers className="w-5 h-5 text-purple-500" />
+                <Layers className="w-5 h-5 text-amber-500" />
                 Iron Condor Scanner
                 {isLiveData ? (
                   <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-300">
@@ -158,6 +158,17 @@ export function IronCondorScanner() {
               <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
               <RefreshButton onClick={handleRefresh} isLoading={isLoading} loadingText="Scanning..." />
             </div>
+          </div>
+
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-2">
+            <p className="text-sm text-amber-800">
+              <Info className="h-4 w-4 inline mr-1" />
+              <strong>Iron Condors</strong> profit when the stock price stays within a range between expiration. You
+              sell both a <strong>bull put spread</strong> (below current price) and a <strong>bear call spread</strong>{" "}
+              (above current price), collecting premium from both sides. Best for{" "}
+              <strong>high IV, range-bound stocks</strong> where you expect minimal movement. Maximum profit occurs if
+              the stock stays between your short strikes at expiration.
+            </p>
           </div>
         </CardHeader>
         <CardContent>

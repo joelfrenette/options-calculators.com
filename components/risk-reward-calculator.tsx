@@ -52,8 +52,8 @@ export function RiskRewardCalculator() {
             </CardTitle>
             {/* Header Actions */}
             <div className="flex gap-2">
-              <RefreshButton />
               <TooltipsToggle />
+              <RefreshButton />
             </div>
           </CardHeader>
           <CardContent className="pt-4">

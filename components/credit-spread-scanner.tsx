@@ -175,6 +175,17 @@ export function CreditSpreadScanner() {
               <RefreshButton onClick={handleRefresh} isLoading={isLoading} loadingText="Scanning..." />
             </div>
           </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-2">
+            <p className="text-sm text-blue-800">
+              <Info className="h-4 w-4 inline mr-1" />
+              <strong>Credit Spreads</strong> are defined-risk strategies where you collect premium upfront. A{" "}
+              <strong>Bull Put Spread</strong> profits when the stock stays above your short put strike (bullish bias).
+              A <strong>Bear Call Spread</strong> profits when the stock stays below your short call strike (bearish
+              bias). Best for <strong>high IV environments</strong> where you have a directional view. Your max profit
+              is the credit received; max loss is the width of strikes minus the credit.
+            </p>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-4 mb-6 p-4 bg-slate-50 rounded-lg">

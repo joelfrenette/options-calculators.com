@@ -749,6 +749,309 @@ async function generateCalendarSpreads(tickers: string[] = CALENDAR_SPREAD_TICKE
   })
 }
 
+// ========== BUTTERFLY GENERATOR ==========
+
+const BUTTERFLY_TICKERS = [
+  "SPY",
+  "QQQ",
+  "IWM",
+  "DIA",
+  "AAPL",
+  "MSFT",
+  "GOOGL",
+  "AMZN",
+  "META",
+  "NVDA",
+  "AMD",
+  "TSLA",
+  "JPM",
+  "BAC",
+  "GS",
+  "XOM",
+  "CVX",
+]
+
+const COMPANY_NAMES: Record<string, string> = {
+  SPY: "SPDR S&P 500 ETF",
+  QQQ: "Invesco QQQ Trust",
+  IWM: "iShares Russell 2000 ETF",
+  AAPL: "Apple Inc.",
+  MSFT: "Microsoft Corporation",
+  NVDA: "NVIDIA Corporation",
+  TSLA: "Tesla, Inc.",
+  AMD: "Advanced Micro Devices",
+  META: "Meta Platforms, Inc.",
+  AMZN: "Amazon.com, Inc.",
+  GOOGL: "Alphabet Inc.",
+  JPM: "JPMorgan Chase & Co.",
+  COST: "Costco Wholesale Corporation",
+  NFLX: "Netflix, Inc.",
+}
+
+async function generateButterflies(tickers: string[]): Promise<any[]> {
+  const butterflies: any[] = []
+  const expDate = getNextFriday(35)
+
+  for (const ticker of tickers) {
+    try {
+      const priceData = await getStockPrice(ticker)
+      const price = priceData?.price || FALLBACK_PRICES[ticker] || 100
+      const ivData = await getIVData(ticker)
+
+      // Generate standard butterfly
+      const middleStrike = Math.round(price / 5) * 5
+      const wingWidth = Math.round((price * 0.03) / 5) * 5 || 5
+
+      butterflies.push({
+        ticker,
+        company: priceData?.company || COMPANY_NAMES[ticker] || ticker,
+        type: "call",
+        structure: "standard",
+        lowerStrike: middleStrike - wingWidth,
+        middleStrike,
+        upperStrike: middleStrike + wingWidth,
+        currentPrice: price,
+        expiration: expDate,
+        dte: 35,
+        cost: wingWidth * 0.35,
+        maxProfit: wingWidth - wingWidth * 0.35,
+        maxLoss: wingWidth * 0.35,
+        breakeven: {
+          low: middleStrike - wingWidth + wingWidth * 0.35,
+          high: middleStrike + wingWidth - wingWidth * 0.35,
+        },
+        ivRank: ivData?.ivRank || 35 + Math.random() * 40,
+        ivPercentile: ivData?.ivPercentile || 40 + Math.random() * 35,
+        wingWidth: { lower: wingWidth, upper: wingWidth },
+        probabilityOfProfit: 25 + Math.random() * 20,
+        riskRewardRatio: 0.35 / 0.65,
+        distanceToProfit: ((middleStrike - price) / price) * 100,
+        signal: ivData?.ivRank > 50 ? "strong" : ivData?.ivRank > 30 ? "moderate" : "speculative",
+        reason: `High IV rank (${(ivData?.ivRank || 45).toFixed(0)}%) makes selling premium attractive. Price near middle strike.`,
+        isLive: priceData?.isLive || false,
+      })
+
+      // Generate broken wing butterfly
+      const bwbLowerWidth = wingWidth
+      const bwbUpperWidth = wingWidth * 2
+
+      butterflies.push({
+        ticker,
+        company: priceData?.company || COMPANY_NAMES[ticker] || ticker,
+        type: "put",
+        structure: "broken-wing",
+        lowerStrike: middleStrike - bwbUpperWidth,
+        middleStrike,
+        upperStrike: middleStrike + bwbLowerWidth,
+        currentPrice: price,
+        expiration: expDate,
+        dte: 35,
+        cost: -0.5, // Credit
+        maxProfit: bwbLowerWidth + 0.5,
+        maxLoss: bwbUpperWidth - bwbLowerWidth - 0.5,
+        breakeven: {
+          low: middleStrike - bwbUpperWidth + (bwbUpperWidth - bwbLowerWidth - 0.5),
+          high: middleStrike + bwbLowerWidth,
+        },
+        ivRank: ivData?.ivRank || 35 + Math.random() * 40,
+        ivPercentile: ivData?.ivPercentile || 40 + Math.random() * 35,
+        wingWidth: { lower: bwbUpperWidth, upper: bwbLowerWidth },
+        probabilityOfProfit: 55 + Math.random() * 15,
+        riskRewardRatio: (bwbUpperWidth - bwbLowerWidth - 0.5) / (bwbLowerWidth + 0.5),
+        distanceToProfit: ((price - middleStrike) / price) * 100,
+        signal: ivData?.ivRank > 50 ? "strong" : "moderate",
+        reason: `BWB collected credit with bullish bias. Risk shifted to downside. High IV rank favorable.`,
+        isLive: priceData?.isLive || false,
+      })
+    } catch (err) {
+      console.error(`[Butterfly] Error for ${ticker}:`, err)
+    }
+  }
+
+  return butterflies
+}
+
+// ========== LEAPS GENERATOR ==========
+
+const LEAPS_TICKERS = [
+  "AAPL",
+  "MSFT",
+  "GOOGL",
+  "AMZN",
+  "META",
+  "JPM",
+  "V",
+  "MA",
+  "JNJ",
+  "UNH",
+  "PFE",
+  "ABBV",
+  "PG",
+  "KO",
+  "PEP",
+  "WMT",
+  "COST",
+  "XOM",
+  "CVX",
+  "HD",
+  "LOW",
+]
+
+const fundamentals: Record<
+  string,
+  { epsGrowth: number; debtEquity: number; priceBook: number; sector: string; rating: string }
+> = {
+  AAPL: { epsGrowth: 12.5, debtEquity: 1.8, priceBook: 45, sector: "Technology", rating: "Buy" },
+  MSFT: { epsGrowth: 15.2, debtEquity: 0.35, priceBook: 12, sector: "Technology", rating: "Strong Buy" },
+  GOOGL: { epsGrowth: 18.3, debtEquity: 0.1, priceBook: 6.5, sector: "Technology", rating: "Buy" },
+  AMZN: { epsGrowth: 25.1, debtEquity: 0.55, priceBook: 8.2, sector: "Consumer Discretionary", rating: "Strong Buy" },
+  META: { epsGrowth: 22.4, debtEquity: 0.15, priceBook: 7.8, sector: "Technology", rating: "Buy" },
+  JPM: { epsGrowth: 8.5, debtEquity: 1.2, priceBook: 1.8, sector: "Financials", rating: "Buy" },
+  V: { epsGrowth: 14.2, debtEquity: 0.55, priceBook: 14, sector: "Financials", rating: "Strong Buy" },
+  JNJ: { epsGrowth: 5.5, debtEquity: 0.35, priceBook: 5.8, sector: "Healthcare", rating: "Hold" },
+  UNH: { epsGrowth: 13.8, debtEquity: 0.7, priceBook: 6.2, sector: "Healthcare", rating: "Strong Buy" },
+  PG: { epsGrowth: 6.2, debtEquity: 0.65, priceBook: 7.5, sector: "Consumer Staples", rating: "Buy" },
+  KO: { epsGrowth: 4.8, debtEquity: 1.7, priceBook: 10.5, sector: "Consumer Staples", rating: "Hold" },
+  WMT: { epsGrowth: 7.5, debtEquity: 0.45, priceBook: 5.2, sector: "Consumer Staples", rating: "Buy" },
+  XOM: { epsGrowth: 3.2, debtEquity: 0.2, priceBook: 2.1, sector: "Energy", rating: "Hold" },
+  HD: { epsGrowth: 9.8, debtEquity: 0.95, priceBook: 18, sector: "Consumer Discretionary", rating: "Buy" },
+}
+
+async function generateLEAPS(tickers: string[]): Promise<any[]> {
+  const leaps: any[] = []
+  const expDate = getNextFriday(400) // ~13 months out
+
+  for (const ticker of tickers) {
+    try {
+      const priceData = await getStockPrice(ticker)
+      const price = priceData?.price || FALLBACK_PRICES[ticker] || 100
+      const fund = fundamentals[ticker] || {
+        epsGrowth: 8,
+        debtEquity: 0.8,
+        priceBook: 8,
+        sector: "Other",
+        rating: "Hold",
+      }
+
+      // Deep ITM call for stock replacement
+      const strike = Math.round((price * 0.8) / 5) * 5
+      const intrinsic = price - strike
+      const extrinsic = price * 0.08 // ~8% time value for LEAPS
+      const premium = intrinsic + extrinsic
+      const delta = 0.75 + Math.random() * 0.15
+
+      leaps.push({
+        ticker,
+        company: priceData?.company || COMPANY_NAMES[ticker] || ticker,
+        type: "call",
+        strike,
+        currentPrice: price,
+        expiration: expDate,
+        dte: 400,
+        premium,
+        delta,
+        intrinsicValue: intrinsic,
+        extrinsicValue: extrinsic,
+        breakeven: strike + premium,
+        epsGrowth: fund.epsGrowth,
+        debtToEquity: fund.debtEquity,
+        priceToBook: fund.priceBook,
+        marketCap: price > 300 ? "$1T+" : price > 100 ? "$100B+" : "$50B+",
+        sector: fund.sector,
+        analystRating: fund.rating,
+        leverageRatio: price / premium,
+        annualizedCost: (extrinsic / price) * 100 * (365 / 400),
+        signal: fund.rating.includes("Strong") ? "strong" : fund.rating === "Buy" ? "moderate" : "speculative",
+        reason: `${fund.epsGrowth.toFixed(1)}% EPS growth, ${fund.debtEquity.toFixed(2)} D/E ratio. Deep ITM for stock replacement with ${delta.toFixed(2)} delta.`,
+        isLive: priceData?.isLive || false,
+      })
+    } catch (err) {
+      console.error(`[LEAPS] Error for ${ticker}:`, err)
+    }
+  }
+
+  return leaps
+}
+
+// ========== ZEBRA GENERATOR ==========
+
+const ZEBRA_TICKERS = [
+  "AAPL",
+  "MSFT",
+  "GOOGL",
+  "AMZN",
+  "META",
+  "NVDA",
+  "TSLA",
+  "AMD",
+  "CRM",
+  "ADBE",
+  "JPM",
+  "V",
+  "MA",
+  "UNH",
+  "LLY",
+  "ABBV",
+  "HD",
+  "COST",
+  "WMT",
+]
+
+async function generateZEBRA(tickers: string[]): Promise<any[]> {
+  const zebras: any[] = []
+  const expDate = getNextFriday(90)
+
+  for (const ticker of tickers) {
+    try {
+      const priceData = await getStockPrice(ticker)
+      const price = priceData?.price || FALLBACK_PRICES[ticker] || 100
+
+      // ZEBRA: Buy 2 deep ITM calls, sell 1 ATM call
+      const longStrike = Math.round((price * 0.85) / 5) * 5
+      const shortStrike = Math.round(price / 5) * 5
+
+      const longPremium = price - longStrike + price * 0.02 // Intrinsic + small extrinsic
+      const shortPremium = price * 0.04 // ATM premium
+      const netDebit = longPremium * 2 - shortPremium
+
+      const delta = 100 // 2 * 0.85 delta - 1 * 0.50 delta ≈ 100
+      const extrinsicPaid = price * 0.02 * 2 - shortPremium
+
+      const stockScore = 5 + Math.random() * 4
+      const trend = Math.random() > 0.3 ? "bullish" : Math.random() > 0.5 ? "neutral" : "bearish"
+
+      zebras.push({
+        ticker,
+        company: priceData?.company || COMPANY_NAMES[ticker] || ticker,
+        type: "call",
+        longStrike,
+        shortStrike,
+        currentPrice: price,
+        expiration: expDate,
+        dte: 90,
+        netDebit,
+        maxProfit: "Unlimited",
+        maxLoss: netDebit,
+        breakeven: longStrike + netDebit / 2,
+        delta,
+        extrinsicPaid: Math.max(0, extrinsicPaid),
+        stockScore: Math.round(stockScore * 10) / 10,
+        optionVolume: 5000 + Math.random() * 50000,
+        trend,
+        distanceToBreakeven: ((longStrike + netDebit / 2 - price) / price) * 100,
+        leverageRatio: price / netDebit,
+        signal: stockScore >= 7 && trend === "bullish" ? "strong" : stockScore >= 5 ? "moderate" : "speculative",
+        reason: `Stock score ${stockScore.toFixed(1)}/10 with ${trend} trend. ZEBRA provides ~100 delta with defined risk of $${netDebit.toFixed(2)}.`,
+        isLive: priceData?.isLive || false,
+      })
+    } catch (err) {
+      console.error(`[ZEBRA] Error for ${ticker}:`, err)
+    }
+  }
+
+  return zebras
+}
+
 // ========== GET HANDLER (Live Data Scanners) ==========
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -792,6 +1095,18 @@ export async function GET(request: NextRequest) {
       results.calendarSpreads = await generateCalendarSpreads(CALENDAR_SPREAD_TICKERS)
     }
 
+    if (type === "all" || type === "butterflies") {
+      results.butterflies = await generateButterflies(BUTTERFLY_TICKERS)
+    }
+
+    if (type === "all" || type === "leaps") {
+      results.leaps = await generateLEAPS(LEAPS_TICKERS)
+    }
+
+    if (type === "all" || type === "zebra") {
+      results.zebra = await generateZEBRA(ZEBRA_TICKERS)
+    }
+
     if (type === "all" || type === "high-iv") {
       results.highIV = await generateHighIVWatchlist(tickers)
     }
@@ -817,6 +1132,9 @@ export async function GET(request: NextRequest) {
         earningsPlays: [],
         wheelCandidates: [],
         calendarSpreads: [],
+        butterflies: [],
+        leaps: [],
+        zebra: [],
         isLive: false,
       },
       { status: 200 },

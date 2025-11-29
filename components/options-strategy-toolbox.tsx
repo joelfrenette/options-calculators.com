@@ -625,8 +625,8 @@ export function OptionsStrategyToolbox({ strategy }: OptionsStrategyToolboxProps
               <p className="text-lg text-teal-700">{config.tagline}</p>
             </div>
             <div className="flex items-center gap-2">
-              <RefreshButton onClick={handleRefreshSetups} disabled={isScanning} />
               <TooltipsToggle />
+              <RefreshButton onClick={handleRefreshSetups} disabled={isScanning} />
             </div>
           </div>
           {lastScanned && (

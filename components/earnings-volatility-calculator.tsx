@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { AlertTriangle, TrendingUp, Info } from "lucide-react"
 import { RefreshButton } from "@/components/ui/refresh-button"
-import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
+import { TooltipProvider } from "@/components/ui/tooltip"
 
 export function EarningsVolatilityCalculator() {
   const [ticker, setTicker] = useState("AAPL")
@@ -18,6 +19,7 @@ export function EarningsVolatilityCalculator() {
   const [atmPutPrice, setAtmPutPrice] = useState("5.25")
   const [callStrike, setCallStrike] = useState("")
   const [putStrike, setPutStrike] = useState("")
+  const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
 
   const price = Number.parseFloat(stockPrice) || 0
   const iv = Number.parseFloat(currentIV) || 0
@@ -76,7 +78,7 @@ export function EarningsVolatilityCalculator() {
   }
 
   return (
-    <TooltipProvider>
+    <TooltipProvider disabled={!tooltipsEnabled}>
       <div className="space-y-4">
         {/* Input Section */}
         <Card className="shadow-sm border-gray-200">
@@ -86,13 +88,8 @@ export function EarningsVolatilityCalculator() {
               Earnings Volatility Analysis
             </div>
             <div className="flex items-center gap-2">
+              <TooltipsToggle enabled={tooltipsEnabled} onToggle={() => setTooltipsEnabled(!tooltipsEnabled)} />
               <RefreshButton />
-              <Tooltip>
-                <TooltipTrigger>{/* TooltipsToggle */}</TooltipTrigger>
-                <TooltipContent>
-                  <p>Tooltip Content Here</p>
-                </TooltipContent>
-              </Tooltip>
             </div>
           </CardHeader>
           <CardContent className="pt-4">

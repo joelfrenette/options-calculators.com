@@ -25,6 +25,9 @@ import { CalendarSpreadScanner } from "@/components/calendar-spread-scanner"
 import { WheelStrategyScreener } from "@/components/wheel-strategy-screener"
 import { HighIVWatchlist } from "@/components/high-iv-watchlist"
 import { EarningsPlaysScanner } from "@/components/earnings-plays-scanner"
+import { ButterflyScanner } from "@/components/butterfly-scanner"
+import { LEAPSScanner } from "@/components/leaps-scanner"
+import { ZEBRAScanner } from "@/components/zebra-scanner"
 import { Menu, X, TrendingUp, Zap, Search } from "lucide-react"
 import Image from "next/image"
 
@@ -47,6 +50,9 @@ const SCAN_TABS = [
   { id: "calendar-spread-scanner", label: "Calendar Spreads" },
   { id: "credit-spread-scanner", label: "Credit Spreads" },
   { id: "iron-condor-scanner", label: "Iron Condors" },
+  { id: "butterfly-scanner", label: "Butterflies" },
+  { id: "leaps-scanner", label: "LEAPS" },
+  { id: "zebra-scanner", label: "ZEBRA" },
   { id: "wheel-screener", label: "Wheel Screener" },
   { id: "high-iv-watchlist", label: "High IV Watchlist" },
   { id: "earnings-plays", label: "Earnings Plays" },
@@ -120,6 +126,12 @@ export default function Home() {
         return <CreditSpreadScanner />
       case "iron-condor-scanner":
         return <IronCondorScanner />
+      case "butterfly-scanner":
+        return <ButterflyScanner />
+      case "leaps-scanner":
+        return <LEAPSScanner />
+      case "zebra-scanner":
+        return <ZEBRAScanner />
       case "wheel-screener":
         return <WheelStrategyScreener />
       case "high-iv-watchlist":

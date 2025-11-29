@@ -210,8 +210,8 @@ export function ExitRulesDashboard() {
             <h1 className="text-2xl font-bold">Exit Rules & Profit-Taking Triggers</h1>
           </div>
           <div className="flex items-center gap-2">
-            <RefreshButton />
             <TooltipsToggle />
+            <RefreshButton />
           </div>
         </div>
         <p className="text-slate-300 max-w-2xl">
