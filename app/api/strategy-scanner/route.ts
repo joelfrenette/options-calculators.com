@@ -1,9 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server"
 import Groq from "groq-sdk"
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-})
+let groq: any = null
+try {
+  groq = new Groq({
+    apiKey: process.env.GROQ_API_KEY,
+    dangerouslyAllowBrowser: true, // Add dangerouslyAllowBrowser option for v0 preview environment
+  })
+} catch (e) {
+  console.error("[Strategy Scanner] Failed to initialize Groq:", e)
+}
 
 const POLYGON_API_KEY = process.env.POLYGON_API_KEY
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY
@@ -84,7 +90,7 @@ async function getIVData(
 
     // Default IV estimates if no contracts found
     if (contracts.length === 0) {
-      const baseIV = ticker === "SPY" ? 15 : ticker === "QQQ" ? 20 : 35
+      const baseIV = ticker === "SPY" ? 15 : ticker === "QQQ" ? 20 : ticker === "IWM" ? 22 : 35
       return { ivRank: 35, currentIV: baseIV, historicalIV: baseIV * 0.85, isLive: false }
     }
 
@@ -853,6 +859,10 @@ Use realistic current prices for major ETFs and stocks:
 - TSLA: ~$350
 
 Return ONLY valid JSON, no other text.`
+
+    if (!groq) {
+      return NextResponse.json({ error: "Groq initialization failed" }, { status: 500 })
+    }
 
     const completion = await groq.chat.completions.create({
       model: "llama-3.3-70b-versatile",

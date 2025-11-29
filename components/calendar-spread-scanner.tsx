@@ -2,12 +2,10 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import {
-  RefreshCw,
   Calendar,
   Clock,
   Filter,
@@ -15,7 +13,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   Info,
-  Loader2,
   Wifi,
   WifiOff,
   TrendingUp,
@@ -24,6 +21,8 @@ import {
 } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { RefreshButton } from "@/components/ui/refresh-button"
+import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 
 interface CalendarSpreadSetup {
   ticker: string
@@ -53,22 +52,23 @@ interface CalendarSpreadSetup {
 }
 
 export function CalendarSpreadScanner() {
-  const [spreadType, setSpreadType] = useState<"all" | "call" | "put">("all")
-  const [maxBeta, setMaxBeta] = useState([1.0])
-  const [maxHV, setMaxHV] = useState([35])
-  const [minStability, setMinStability] = useState([70])
+  const [spreads, setSpreads] = useState<CalendarSpreadSetup[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [setups, setSetups] = useState<CalendarSpreadSetup[]>([])
-  const [isLiveData, setIsLiveData] = useState(false)
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [spreadType, setSpreadType] = useState<"all" | "call" | "put">("all")
+  const [maxBeta, setMaxBeta] = useState(1.0)
+  const [maxHV, setMaxHV] = useState(35)
+  const [minStability, setMinStability] = useState(70)
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
+  const [isLiveData, setIsLiveData] = useState(false)
+  const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
 
   useEffect(() => {
     const cached = localStorage.getItem("calendar-spread-scanner-cache")
     if (cached) {
       try {
         const { data, timestamp, isLive } = JSON.parse(cached)
-        setSetups(data)
+        setSpreads(data)
         setLastUpdated(timestamp)
         setIsLiveData(isLive)
       } catch {
@@ -77,11 +77,11 @@ export function CalendarSpreadScanner() {
     }
   }, [])
 
-  const filteredSetups = setups.filter((s) => {
+  const filteredSetups = spreads.filter((s) => {
     if (spreadType !== "all" && s.type !== spreadType) return false
-    if (s.beta > maxBeta[0]) return false
-    if (s.historicalVolatility > maxHV[0]) return false
-    if (s.priceStability < minStability[0]) return false
+    if (s.beta > maxBeta) return false
+    if (s.historicalVolatility > maxHV) return false
+    if (s.priceStability < minStability) return false
     return true
   })
 
@@ -109,7 +109,7 @@ export function CalendarSpreadScanner() {
 
       // Even if response wasn't ok, we might have data with empty arrays
       if (data.calendarSpreads && Array.isArray(data.calendarSpreads)) {
-        setSetups(data.calendarSpreads)
+        setSpreads(data.calendarSpreads)
         setIsLiveData(data.isLive || false)
         const timestamp = new Date().toISOString()
         setLastUpdated(timestamp)
@@ -128,7 +128,7 @@ export function CalendarSpreadScanner() {
         }
       } else {
         // Response ok but no data
-        setSetups([])
+        setSpreads([])
         setError("No data available. Try refreshing.")
       }
     } catch (err) {
@@ -176,7 +176,7 @@ export function CalendarSpreadScanner() {
   }
 
   return (
-    <TooltipProvider>
+    <TooltipProvider disabled={!tooltipsEnabled}>
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -189,7 +189,7 @@ export function CalendarSpreadScanner() {
                     <Wifi className="w-3 h-3 mr-1" />
                     LIVE
                   </Badge>
-                ) : setups.length > 0 ? (
+                ) : spreads.length > 0 ? (
                   <Badge variant="outline" className="ml-2 bg-yellow-50 text-yellow-700 border-yellow-300">
                     <WifiOff className="w-3 h-3 mr-1" />
                     Cached
@@ -205,10 +205,10 @@ export function CalendarSpreadScanner() {
                 )}
               </CardDescription>
             </div>
-            <Button onClick={handleRefresh} disabled={isLoading} size="sm">
-              {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-              {isLoading ? "Scanning..." : "Refresh"}
-            </Button>
+            <div className="flex items-center gap-3">
+              <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
+              <RefreshButton onClick={handleRefresh} isLoading={isLoading} loadingText="Scanning..." />
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -244,8 +244,15 @@ export function CalendarSpreadScanner() {
               <TooltipTrigger asChild>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-slate-600">Max Beta:</span>
-                  <Slider value={maxBeta} onValueChange={setMaxBeta} min={0.3} max={1.5} step={0.1} className="w-24" />
-                  <span className="text-sm font-medium w-8">{maxBeta[0].toFixed(1)}</span>
+                  <Slider
+                    value={[maxBeta]}
+                    onValueChange={(v) => setMaxBeta(v[0])}
+                    min={0.3}
+                    max={1.5}
+                    step={0.1}
+                    className="w-24"
+                  />
+                  <span className="text-sm font-medium w-8">{maxBeta.toFixed(1)}</span>
                 </div>
               </TooltipTrigger>
               <TooltipContent>Lower beta = less market correlation, more stable</TooltipContent>
@@ -254,8 +261,15 @@ export function CalendarSpreadScanner() {
               <TooltipTrigger asChild>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-slate-600">Max HV:</span>
-                  <Slider value={maxHV} onValueChange={setMaxHV} min={10} max={60} step={5} className="w-24" />
-                  <span className="text-sm font-medium w-8">{maxHV[0]}%</span>
+                  <Slider
+                    value={[maxHV]}
+                    onValueChange={(v) => setMaxHV(v[0])}
+                    min={10}
+                    max={60}
+                    step={5}
+                    className="w-24"
+                  />
+                  <span className="text-sm font-medium w-8">{maxHV}%</span>
                 </div>
               </TooltipTrigger>
               <TooltipContent>Historical Volatility - lower is better for calendars</TooltipContent>
@@ -265,14 +279,14 @@ export function CalendarSpreadScanner() {
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-slate-600">Min Stability:</span>
                   <Slider
-                    value={minStability}
-                    onValueChange={setMinStability}
+                    value={[minStability]}
+                    onValueChange={(v) => setMinStability(v[0])}
                     min={50}
                     max={95}
                     step={5}
                     className="w-24"
                   />
-                  <span className="text-sm font-medium w-8">{minStability[0]}%</span>
+                  <span className="text-sm font-medium w-8">{minStability}%</span>
                 </div>
               </TooltipTrigger>
               <TooltipContent>Price stability score - % time in trading range</TooltipContent>
@@ -303,7 +317,7 @@ export function CalendarSpreadScanner() {
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
           )}
 
-          {setups.length === 0 && !isLoading && (
+          {spreads.length === 0 && !isLoading && (
             <div className="text-center py-8 text-muted-foreground">
               <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
               <p>No calendar spread data loaded.</p>
@@ -424,11 +438,11 @@ export function CalendarSpreadScanner() {
             ))}
           </Accordion>
 
-          {setups.length > 0 && (
+          {spreads.length > 0 && (
             <div className="mt-4 pt-4 border-t text-xs text-muted-foreground flex items-center justify-between">
               <span>Ideal for: Stable blue-chips, utilities, consumer staples, low-beta ETFs</span>
               <span>
-                {filteredSetups.length} of {setups.length} setups shown
+                {filteredSetups.length} of {spreads.length} setups shown
               </span>
             </div>
           )}

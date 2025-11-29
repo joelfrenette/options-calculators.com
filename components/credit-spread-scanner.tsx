@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { TrendingUp, TrendingDown, Info, Loader2, Target, DollarSign, AlertTriangle, Filter } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
-import { TooltipProvider } from "@/components/ui/tooltip"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 
@@ -39,6 +39,7 @@ export function CreditSpreadScanner() {
   const [isLiveData, setIsLiveData] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
 
   useEffect(() => {
     const cached = localStorage.getItem("credit-spread-scanner-cache")
@@ -98,6 +99,20 @@ export function CreditSpreadScanner() {
     }
   }
 
+  const InfoTooltip = ({ content }: { content: string }) => {
+    if (!tooltipsEnabled) return null
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help ml-1 inline-block" />
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs bg-white border border-gray-200 shadow-lg p-3 z-50">
+          <p className="text-sm text-gray-700">{content}</p>
+        </TooltipContent>
+      </Tooltip>
+    )
+  }
+
   const getSignalBadge = (signal: string) => {
     switch (signal) {
       case "strong":
@@ -133,6 +148,7 @@ export function CreditSpreadScanner() {
               <CardTitle className="flex items-center gap-2">
                 <Target className="w-5 h-5 text-blue-500" />
                 Credit Spread Scanner
+                <InfoTooltip content="Credit spreads are defined-risk options strategies that collect premium by selling a higher-probability option and buying a further OTM option for protection. Bull put spreads profit when stock stays above the short strike; bear call spreads profit when stock stays below." />
                 {isLiveData ? (
                   <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-300">
                     <TrendingUp className="w-3 h-3 mr-1" />
@@ -155,8 +171,8 @@ export function CreditSpreadScanner() {
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              <RefreshButton onClick={handleRefresh} disabled={isLoading} />
-              <TooltipsToggle />
+              <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
+              <RefreshButton onClick={handleRefresh} isLoading={isLoading} loadingText="Scanning..." />
             </div>
           </div>
         </CardHeader>
@@ -178,6 +194,7 @@ export function CreditSpreadScanner() {
             </Select>
             <div className="flex items-center gap-2">
               <span className="text-sm text-slate-600">Min Prob:</span>
+              <InfoTooltip content="Minimum probability of profit (POP). Higher values (70%+) mean more conservative trades with smaller credits. Lower values offer larger credits but higher risk." />
               <Slider
                 value={minProbability}
                 onValueChange={setMinProbability}
@@ -190,6 +207,7 @@ export function CreditSpreadScanner() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-slate-600">Max DTE:</span>
+              <InfoTooltip content="Maximum Days to Expiration. Shorter DTE (7-21 days) offers faster theta decay but less time to be right. Longer DTE (30-45 days) provides more premium but ties up capital longer." />
               <Slider value={maxDte} onValueChange={setMaxDte} min={7} max={60} step={7} className="w-24" />
               <span className="text-sm font-medium w-8">{maxDte[0]}d</span>
             </div>
@@ -235,35 +253,56 @@ export function CreditSpreadScanner() {
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-lg">
                   <div>
-                    <div className="text-xs text-muted-foreground">Strategy</div>
+                    <div className="text-xs text-muted-foreground flex items-center">
+                      Strategy
+                      <InfoTooltip content="Bull Put: Bullish strategy - sell put, buy lower put. Bear Call: Bearish strategy - sell call, buy higher call." />
+                    </div>
                     <div className="font-medium capitalize">{setup.type.replace("-", " ")}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-muted-foreground">Strikes</div>
+                    <div className="text-xs text-muted-foreground flex items-center">
+                      Strikes
+                      <InfoTooltip content="Short strike (sold) / Long strike (bought). The width between strikes determines max loss." />
+                    </div>
                     <div className="font-medium">
                       ${setup.shortStrike} / ${setup.longStrike}
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs text-muted-foreground">Expiration</div>
+                    <div className="text-xs text-muted-foreground flex items-center">
+                      Expiration
+                      <InfoTooltip content="Option expiration date and days remaining. Theta decay accelerates in final 21 days." />
+                    </div>
                     <div className="font-medium">
                       {setup.expiration} ({setup.dte}d)
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs text-muted-foreground">Max Loss</div>
+                    <div className="text-xs text-muted-foreground flex items-center">
+                      Max Loss
+                      <InfoTooltip content="Maximum possible loss = (strike width - credit received) × 100. This is your defined risk." />
+                    </div>
                     <div className="font-medium text-red-600">${setup.maxLoss.toFixed(2)}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-muted-foreground">IV Rank</div>
+                    <div className="text-xs text-muted-foreground flex items-center">
+                      IV Rank
+                      <InfoTooltip content="Implied Volatility Rank shows current IV relative to the past year. High IV Rank (>50%) means options are expensive - good for selling premium." />
+                    </div>
                     <div className="font-medium">{setup.ivRank}%</div>
                   </div>
                   <div>
-                    <div className="text-xs text-muted-foreground">Delta</div>
+                    <div className="text-xs text-muted-foreground flex items-center">
+                      Delta
+                      <InfoTooltip content="Delta of the short strike. Lower delta (0.15-0.30) means higher probability of profit but smaller credit." />
+                    </div>
                     <div className="font-medium">{setup.delta.toFixed(2)}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-muted-foreground">Risk/Reward</div>
+                    <div className="text-xs text-muted-foreground flex items-center">
+                      Risk/Reward
+                      <InfoTooltip content="Ratio of max loss to max profit. Lower ratios (under 3:1) are more favorable for the trader." />
+                    </div>
                     <div className="font-medium">{setup.riskReward}</div>
                   </div>
                   <div>

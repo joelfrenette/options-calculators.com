@@ -2,22 +2,11 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Slider } from "@/components/ui/slider"
-import {
-  RefreshCw,
-  Layers,
-  Zap,
-  Filter,
-  ArrowUpRight,
-  AlertTriangle,
-  CheckCircle2,
-  Info,
-  Loader2,
-  Wifi,
-  WifiOff,
-} from "lucide-react"
+import { RefreshButton } from "@/components/ui/refresh-button"
+import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
+import { Layers, Zap, Filter, ArrowUpRight, AlertTriangle, CheckCircle2, Info, Wifi, WifiOff } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { TooltipProvider } from "@/components/ui/tooltip"
 
@@ -49,6 +38,7 @@ export function IronCondorScanner() {
   const [isLiveData, setIsLiveData] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
 
   useEffect(() => {
     const cached = localStorage.getItem("iron-condor-scanner-cache")
@@ -135,7 +125,7 @@ export function IronCondorScanner() {
   }
 
   return (
-    <TooltipProvider>
+    <TooltipProvider disabled={!tooltipsEnabled}>
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -164,10 +154,10 @@ export function IronCondorScanner() {
                 )}
               </CardDescription>
             </div>
-            <Button onClick={handleRefresh} disabled={isLoading} size="sm">
-              {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-              {isLoading ? "Scanning..." : "Refresh"}
-            </Button>
+            <div className="flex items-center gap-2">
+              <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
+              <RefreshButton onClick={handleRefresh} isLoading={isLoading} loadingText="Scanning..." />
+            </div>
           </div>
         </CardHeader>
         <CardContent>

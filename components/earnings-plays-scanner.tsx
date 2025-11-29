@@ -2,11 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
-  RefreshCw,
   Calendar,
   TrendingUp,
   TrendingDown,
@@ -17,12 +15,13 @@ import {
   CheckCircle2,
   Info,
   Target,
-  Loader2,
   Wifi,
   WifiOff,
 } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { TooltipProvider } from "@/components/ui/tooltip"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { RefreshButton } from "@/components/ui/refresh-button"
+import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 
 interface EarningsPlay {
   ticker: string
@@ -53,6 +52,7 @@ export function EarningsPlaysScanner() {
   const [isLiveData, setIsLiveData] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
 
   useEffect(() => {
     const cached = localStorage.getItem("earnings-plays-scanner-cache")
@@ -111,6 +111,20 @@ export function EarningsPlaysScanner() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const InfoTooltip = ({ content }: { content: string }) => {
+    if (!tooltipsEnabled) return null
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help ml-1 inline-block" />
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs bg-white border border-gray-200 shadow-lg p-3 z-50">
+          <p className="text-sm text-gray-700">{content}</p>
+        </TooltipContent>
+      </Tooltip>
+    )
   }
 
   const getSignalBadge = (signal: string) => {
@@ -185,6 +199,7 @@ export function EarningsPlaysScanner() {
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-blue-500" />
                 Earnings Plays Scanner
+                <InfoTooltip content="Earnings plays capitalize on the increased implied volatility (IV) around earnings announcements. Strategies include straddles/strangles (betting on big moves), iron condors (betting stock stays in range), and 0DTE plays (same-day expiration for maximum gamma)." />
                 {isLiveData ? (
                   <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-300">
                     <Wifi className="w-3 h-3 mr-1" />
@@ -206,10 +221,10 @@ export function EarningsPlaysScanner() {
                 )}
               </CardDescription>
             </div>
-            <Button onClick={handleRefresh} disabled={isLoading} size="sm">
-              {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-              {isLoading ? "Scanning..." : "Refresh"}
-            </Button>
+            <div className="flex items-center gap-2">
+              <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
+              <RefreshButton onClick={handleRefresh} isLoading={isLoading} loadingText="Scanning..." />
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -219,31 +234,37 @@ export function EarningsPlaysScanner() {
               <Filter className="w-4 h-4 text-slate-500" />
               <span className="text-sm font-medium">Filters:</span>
             </div>
-            <Select
-              value={strategyFilter}
-              onValueChange={(v: "all" | "straddle" | "strangle" | "iron-condor" | "0dte") => setStrategyFilter(v)}
-            >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Strategies</SelectItem>
-                <SelectItem value="straddle">Straddle</SelectItem>
-                <SelectItem value="strangle">Strangle</SelectItem>
-                <SelectItem value="iron-condor">Iron Condor</SelectItem>
-                <SelectItem value="0dte">0DTE</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={timeframe} onValueChange={(v: "week" | "2weeks" | "month") => setTimeframe(v)}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="week">This Week</SelectItem>
-                <SelectItem value="2weeks">Next 2 Weeks</SelectItem>
-                <SelectItem value="month">This Month</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-1">
+              <Select
+                value={strategyFilter}
+                onValueChange={(v: "all" | "straddle" | "strangle" | "iron-condor" | "0dte") => setStrategyFilter(v)}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Strategies</SelectItem>
+                  <SelectItem value="straddle">Straddle</SelectItem>
+                  <SelectItem value="strangle">Strangle</SelectItem>
+                  <SelectItem value="iron-condor">Iron Condor</SelectItem>
+                  <SelectItem value="0dte">0DTE</SelectItem>
+                </SelectContent>
+              </Select>
+              <InfoTooltip content="Straddle: Buy ATM call + put. Strangle: Buy OTM call + put (cheaper). Iron Condor: Sell OTM strangle, buy further OTM for protection. 0DTE: Same-day expiration trades." />
+            </div>
+            <div className="flex items-center gap-1">
+              <Select value={timeframe} onValueChange={(v: "week" | "2weeks" | "month") => setTimeframe(v)}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="week">This Week</SelectItem>
+                  <SelectItem value="2weeks">Next 2 Weeks</SelectItem>
+                  <SelectItem value="month">This Month</SelectItem>
+                </SelectContent>
+              </Select>
+              <InfoTooltip content="Filter earnings by time horizon. Closer earnings have higher IV but less time to adjust. Further out gives more planning time." />
+            </div>
           </div>
 
           {error && (
@@ -296,25 +317,40 @@ export function EarningsPlaysScanner() {
                       <div className="font-medium">${play.price.toFixed(2)}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground">Expected Move</div>
+                      <div className="text-xs text-muted-foreground flex items-center">
+                        Expected Move
+                        <InfoTooltip content="The market's implied move based on ATM straddle price. Stock is expected to move within this range ~68% of the time." />
+                      </div>
                       <div className="font-medium">
                         ±${play.expectedMove.toFixed(2)} ({play.expectedMovePercent.toFixed(1)}%)
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground">IV Rank</div>
+                      <div className="text-xs text-muted-foreground flex items-center">
+                        IV Rank
+                        <InfoTooltip content="Implied Volatility Rank (0-100%). Shows where current IV stands relative to the past year. High IV Rank means options are expensive - good for selling strategies." />
+                      </div>
                       <div className="font-medium">{play.ivRank}%</div>
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground">Historical Beat Rate</div>
+                      <div className="text-xs text-muted-foreground flex items-center">
+                        Historical Beat Rate
+                        <InfoTooltip content="Percentage of time this company has beaten earnings estimates. Higher beat rates may indicate bullish bias, but surprises still happen." />
+                      </div>
                       <div className="font-medium">{play.historicalBeat}%</div>
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground">Avg Post-Earnings Move</div>
+                      <div className="text-xs text-muted-foreground flex items-center">
+                        Avg Post-Earnings Move
+                        <InfoTooltip content="Average absolute percentage move in the stock price after past earnings announcements. Compare to expected move to find edge." />
+                      </div>
                       <div className="font-medium">{play.avgPostEarningsMove.toFixed(1)}%</div>
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground">ATM Straddle</div>
+                      <div className="text-xs text-muted-foreground flex items-center">
+                        ATM Straddle
+                        <InfoTooltip content="Cost of buying both an at-the-money call and put. This is the breakeven move the stock needs to make for a straddle buyer to profit." />
+                      </div>
                       <div className="font-medium">${play.straddlePrice.toFixed(2)}</div>
                     </div>
                     <div>

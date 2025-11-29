@@ -1,7 +1,5 @@
 "use client"
 
-export { TooltipProvider } from "@/components/ui/tooltip"
-
 interface TooltipsToggleProps {
   enabled: boolean
   onChange?: (enabled: boolean) => void

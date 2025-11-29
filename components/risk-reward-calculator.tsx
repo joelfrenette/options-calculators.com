@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { DollarSign, Calendar, TrendingUp, BarChart3 } from "lucide-react"
 import { RefreshButton } from "@/components/ui/refresh-button"
-import { TooltipsToggle, TooltipProvider } from "@/components/ui/tooltips-toggle"
+import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
+import { TooltipProvider } from "@/components/ui/tooltip"
 
 export function RiskRewardCalculator() {
   const [premium, setPremium] = useState<string>("500")
