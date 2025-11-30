@@ -75,11 +75,31 @@ export async function GET(request: Request) {
       const expiryDate = searchParams.get("expiry_date")
       const optionType = searchParams.get("option_type") || "put"
 
-      if (!ticker || !expiryDate) {
-        return Response.json({ error: "Missing ticker or expiry_date for options-chain" }, { status: 400 })
+      if (!ticker) {
+        return Response.json({ error: "Missing ticker for options-chain" }, { status: 400 })
       }
 
-      url = `https://api.polygon.io/v3/reference/options/contracts?underlying_ticker=${ticker}&contract_type=${optionType}&expiration_date=${expiryDate}&limit=250&apiKey=${apiKey}`
+      // If expiry_date provided, search for that exact date using gte/lte range
+      // Otherwise, search for next 30 days of expiries
+      let dateParams = ""
+      if (expiryDate) {
+        dateParams = `&expiration_date.gte=${expiryDate}&expiration_date.lte=${expiryDate}`
+      } else {
+        const today = new Date().toISOString().split("T")[0]
+        const thirtyDaysOut = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
+        dateParams = `&expiration_date.gte=${today}&expiration_date.lte=${thirtyDaysOut}`
+      }
+
+      url = `https://api.polygon.io/v3/reference/options/contracts?underlying_ticker=${ticker}&contract_type=${optionType}${dateParams}&limit=250&apiKey=${apiKey}`
+    } else if (endpoint === "options-expiries") {
+      if (!ticker) {
+        return Response.json({ error: "Missing ticker for options-expiries" }, { status: 400 })
+      }
+
+      const today = new Date().toISOString().split("T")[0]
+      const sixtyDaysOut = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
+
+      url = `https://api.polygon.io/v3/reference/options/contracts?underlying_ticker=${ticker}&expiration_date.gte=${today}&expiration_date.lte=${sixtyDaysOut}&limit=1000&apiKey=${apiKey}`
     } else if (endpoint === "aggregates") {
       const toDate = new Date().toISOString().split("T")[0]
       const fromDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]

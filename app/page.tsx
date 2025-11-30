@@ -22,9 +22,6 @@ import { ExitRulesDashboard } from "@/components/exit-rules-dashboard"
 import { CreditSpreadScanner } from "@/components/credit-spread-scanner"
 import { IronCondorScanner } from "@/components/iron-condor-scanner"
 import { CalendarSpreadScanner } from "@/components/calendar-spread-scanner"
-import { WheelStrategyScreener } from "@/components/wheel-strategy-screener"
-import { HighIVWatchlist } from "@/components/high-iv-watchlist"
-import { EarningsPlaysScanner } from "@/components/earnings-plays-scanner"
 import { ButterflyScanner } from "@/components/butterfly-scanner"
 import { LEAPSScanner } from "@/components/leaps-scanner"
 import { ZEBRAScanner } from "@/components/zebra-scanner"
@@ -53,9 +50,6 @@ const SCAN_TABS = [
   { id: "butterfly-scanner", label: "Butterflies" },
   { id: "leaps-scanner", label: "LEAPS" },
   { id: "zebra-scanner", label: "ZEBRA" },
-  { id: "wheel-screener", label: "Wheel Screener" },
-  { id: "high-iv-watchlist", label: "High IV Watchlist" },
-  { id: "earnings-plays", label: "Earnings Plays" },
 ]
 
 const EXECUTE_TABS = [
@@ -132,12 +126,6 @@ export default function Home() {
         return <LEAPSScanner />
       case "zebra-scanner":
         return <ZEBRAScanner />
-      case "wheel-screener":
-        return <WheelStrategyScreener />
-      case "high-iv-watchlist":
-        return <HighIVWatchlist />
-      case "earnings-plays":
-        return <EarningsPlaysScanner />
       // EXECUTE tabs
       case "credit-spreads":
         return <OptionsStrategyToolbox strategy="credit-spreads" />

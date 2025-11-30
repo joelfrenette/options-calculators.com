@@ -136,7 +136,7 @@ interface QualifyingStock {
   atr: number
   atrPercent: number
   putStrike: number
-  premium: number // This will be updated with real option premium
+  premium?: number // This will be updated with real option premium
   yield: number // This will be updated with real option yield
   delta: number
   deltaSource?: "polygon" | "calculated" | "estimated" // Track source of delta
@@ -510,7 +510,7 @@ export function WheelScanner() {
   const [maxROE, setMaxROE] = useState(20)
 
   // Step 3: Technical Analysis Filters
-  const [maxRSI, setMaxRSI] = useState([40]) // Changed from 50 to 40 - captures genuine oversold conditions
+  const [maxRSI, setMaxRSI] = useState([30]) // Changed from 40 to 30 - captures genuine oversold conditions
   const [maxStochastic, setMaxStochastic] = useState([25]) // Changed from 30 to 25 - extreme oversold with bounce probability
   const [minATR, setMinATR] = useState([2.5]) // Keep 2.5 - ensures sufficient premium/volatility
   const [maxATR, setMaxATR] = useState([6]) // Changed from 8 to 6 - high enough for premiums, low enough for safety
@@ -1121,7 +1121,7 @@ export function WheelScanner() {
     onProgress?: (current: number, total: number, ticker: string) => void,
   ): Promise<QualifyingStock[]> => {
     console.log("[v0] ================================================")
-    console.log("[v0] 📊 ENRICHING WITH OPTIONS DATA")
+    console.log("[v0] ENRICHING WITH OPTIONS DATA")
     console.log("[v0] ================================================")
 
     const enriched: QualifyingStock[] = []
@@ -1138,8 +1138,51 @@ export function WheelScanner() {
       }
 
       try {
-        for (const expiryDate of [nextFriday, followingFriday]) {
-          if (!expiryDate) continue // Skip if expiryDate is null or undefined
+        let availableExpiries: string[] = []
+
+        try {
+          const expiriesRes = await fetch(`/api/polygon-proxy?endpoint=options-expiries&ticker=${stock.ticker}`)
+          await delay(200)
+
+          if (expiriesRes.ok) {
+            const expiriesData = await expiriesRes.json()
+            const contracts = expiriesData.results || []
+
+            // Extract unique expiry dates from contracts
+            const expirySet = new Set<string>()
+            for (const contract of contracts) {
+              if (contract.expiration_date) {
+                expirySet.add(contract.expiration_date)
+              }
+            }
+            availableExpiries = Array.from(expirySet).sort()
+            console.log(
+              `[v0] ${stock.ticker} - Found ${availableExpiries.length} available expiry dates: ${availableExpiries.slice(0, 5).join(", ")}${availableExpiries.length > 5 ? "..." : ""}`,
+            )
+          }
+        } catch (expiriesError) {
+          console.error(`[v0] ${stock.ticker} - Error fetching expiries:`, expiriesError)
+        }
+
+        let expiryDatesToUse: string[] = []
+
+        if (availableExpiries.length > 0) {
+          // Find the 2 nearest expiries that are at least 2 days out
+          const today = new Date()
+          const minDate = new Date(today.getTime() + 2 * 24 * 60 * 60 * 1000) // At least 2 days out
+
+          const validExpiries = availableExpiries.filter((exp) => new Date(exp) >= minDate)
+          expiryDatesToUse = validExpiries.slice(0, 2) // Take first 2
+
+          console.log(`[v0] ${stock.ticker} - Using actual expiries: ${expiryDatesToUse.join(", ")}`)
+        } else {
+          // Fallback to calculated Fridays
+          expiryDatesToUse = [nextFriday, followingFriday].filter(Boolean)
+          console.log(`[v0] ${stock.ticker} - Using calculated Friday expiries: ${expiryDatesToUse.join(", ")}`)
+        }
+
+        for (const expiryDate of expiryDatesToUse) {
+          if (!expiryDate) continue
 
           const daysToExpiry = Math.max(
             0,
@@ -1150,35 +1193,72 @@ export function WheelScanner() {
             `[v0] ${stock.ticker} - Fetching options chain snapshot for expiry: ${expiryDate} (${daysToExpiry} days away)`,
           )
 
-          let chainSnapshotData
+          let contracts: any[] = []
+          let useEstimatedGreeks = false
+
+          // Try snapshot API first (has greeks and quotes)
           try {
             const chainSnapshotRes = await fetch(
               `/api/polygon-proxy?endpoint=options-chain-snapshot&ticker=${stock.ticker}&expiry_date=${expiryDate}&option_type=put`,
             )
-            await delay(300) // Slightly longer delay between chain snapshot calls
+            await delay(300)
 
-            if (!chainSnapshotRes.ok) {
-              console.error(
-                `[v0] ${stock.ticker} - Failed to fetch options chain snapshot for ${expiryDate}: HTTP ${chainSnapshotRes.status}`,
-              )
-              continue
+            if (chainSnapshotRes.ok) {
+              const chainSnapshotData = await chainSnapshotRes.json()
+              contracts = chainSnapshotData.results || []
+              console.log(`[v0] ${stock.ticker} - Snapshot API returned ${contracts.length} contracts`)
             }
-
-            chainSnapshotData = await chainSnapshotRes.json()
           } catch (fetchError) {
-            console.error(`[v0] ${stock.ticker} - Network error fetching options chain for ${expiryDate}:`, fetchError)
-            continue
+            console.error(`[v0] ${stock.ticker} - Snapshot API error:`, fetchError)
           }
 
-          const contracts = chainSnapshotData.results || []
+          if (contracts.length === 0 && availableExpiries.length > 0) {
+            console.log(
+              `[v0] ${stock.ticker} - Snapshot empty, using contracts from expiries API (market may be closed)`,
+            )
+            useEstimatedGreeks = true
 
-          console.log(`[v0] ${stock.ticker} - Found ${contracts.length} put contracts with data for ${expiryDate}`)
+            try {
+              // Fetch all contracts for this ticker and filter by expiry
+              const contractsRes = await fetch(
+                `/api/polygon-proxy?endpoint=options-chain&ticker=${stock.ticker}&expiry_date=${expiryDate}&option_type=put`,
+              )
+              await delay(300)
+
+              if (contractsRes.ok) {
+                const contractsData = await contractsRes.json()
+                const rawContracts = contractsData.results || []
+                console.log(
+                  `[v0] ${stock.ticker} - Contracts API returned ${rawContracts.length} contracts for ${expiryDate}`,
+                )
+
+                // Transform contracts API format to match snapshot format
+                contracts = rawContracts.map((c: any) => ({
+                  details: {
+                    strike_price: c.strike_price,
+                    ticker: c.ticker,
+                    expiration_date: c.expiration_date,
+                  },
+                  // These will be estimated since market is closed
+                  greeks: null,
+                  last_quote: null,
+                  last_trade: null,
+                  day: null,
+                }))
+              }
+            } catch (fallbackError) {
+              console.error(`[v0] ${stock.ticker} - Contracts API fallback error:`, fallbackError)
+            }
+          }
+
+          console.log(`[v0] ${stock.ticker} - Found ${contracts.length} put contracts for ${expiryDate}`)
 
           if (contracts.length === 0) {
             console.log(`[v0] ${stock.ticker} - No options found for ${expiryDate}`)
             continue
           }
 
+          // Filter to relevant strike range (85-100% of current price)
           const relevantContracts = contracts.filter((contract: any) => {
             const strikePrice = contract.details?.strike_price
             if (!strikePrice) return false
@@ -1196,43 +1276,76 @@ export function WheelScanner() {
           for (const snapshot of relevantContracts) {
             const strikePrice = snapshot.details?.strike_price
             const optionTicker = snapshot.details?.ticker
-            const delta = snapshot.greeks?.delta || null
 
             if (!strikePrice || !optionTicker) {
               continue
             }
 
-            if (!delta || delta > -0.25 || delta < -0.35) {
-              console.log(
-                `[v0] ${stock.ticker} - Skipping strike $${strikePrice}, delta ${delta?.toFixed(3)} outside range [-0.35, -0.25]`,
-              )
-              continue
-            }
-
+            let delta: number | null = null
             let bid: number | undefined
             let ask: number | undefined
             let premium: number | undefined
             let priceSource = ""
 
-            if (snapshot.last_quote?.bid_price && snapshot.last_quote?.ask_price) {
-              bid = snapshot.last_quote.bid_price
-              ask = snapshot.last_quote.ask_price
-              premium = (bid + ask) / 2
-              priceSource = "last_quote"
-            } else if (snapshot.last_trade?.price) {
-              premium = snapshot.last_trade.price
-              bid = premium * 0.995
-              ask = premium * 1.005
-              priceSource = "last_trade"
-            } else if (snapshot.day?.close) {
-              premium = snapshot.day.close
-              bid = premium
-              ask = premium
-              priceSource = "day_data"
+            if (useEstimatedGreeks) {
+              // Delta estimation based on moneyness (strike / stock price)
+              const moneyness = strikePrice / stock.currentPrice
+              // Simple delta estimation: OTM puts have delta between -0.5 and 0
+              // At-the-money (moneyness = 1.0) ≈ -0.5 delta
+              // 10% OTM (moneyness = 0.9) ≈ -0.25 delta
+              // 15% OTM (moneyness = 0.85) ≈ -0.15 delta
+              delta = -0.5 * Math.pow(moneyness, 3) // Simplified estimation
+
+              // Estimate premium based on typical option pricing
+              // Rule of thumb: ATM options ≈ 2-3% of stock price for weekly/bi-weekly
+              const timeValue = daysToExpiry / 365
+              const estimatedIV = 0.35 // Assume 35% IV as baseline
+              const atmPremiumPercent = estimatedIV * Math.sqrt(timeValue) * 0.4
+              const otmDiscount = Math.pow(moneyness, 2)
+              premium = stock.currentPrice * atmPremiumPercent * otmDiscount
+              bid = premium * 0.95
+              ask = premium * 1.05
+              priceSource = "estimated (market closed)"
+
+              console.log(
+                `[v0] ${stock.ticker} - Estimated: Strike=$${strikePrice.toFixed(2)}, Delta=${delta.toFixed(3)}, Premium=$${premium.toFixed(2)}`,
+              )
+            } else {
+              // Use actual data from snapshot
+              delta = snapshot.greeks?.delta || null
+
+              if (snapshot.last_quote?.bid_price && snapshot.last_quote?.ask_price) {
+                bid = snapshot.last_quote.bid_price
+                ask = snapshot.last_quote.ask_price
+                premium = (bid + ask) / 2
+                priceSource = "last_quote"
+              } else if (snapshot.last_trade?.price) {
+                premium = snapshot.last_trade.price
+                bid = premium * 0.995
+                ask = premium * 1.005
+                priceSource = "last_trade"
+              } else if (snapshot.day?.close) {
+                premium = snapshot.day.close
+                bid = premium
+                ask = premium
+                priceSource = "day_data"
+              }
+            }
+
+            const deltaMin = useEstimatedGreeks ? -0.45 : -0.35
+            const deltaMax = useEstimatedGreeks ? -0.15 : -0.25
+
+            if (!delta || delta > deltaMax || delta < deltaMin) {
+              if (!useEstimatedGreeks) {
+                console.log(
+                  `[v0] ${stock.ticker} - Skipping strike $${strikePrice}, delta ${delta?.toFixed(3)} outside range [${deltaMin}, ${deltaMax}]`,
+                )
+              }
+              continue
             }
 
             if (!premium || !bid || !ask) {
-              console.log(`[v0] ${stock.ticker} - No valid pricing for strike $${strikePrice} (bid=${bid}, ask=${ask})`)
+              console.log(`[v0] ${stock.ticker} - No valid pricing for strike $${strikePrice}`)
               continue
             }
 
@@ -1266,6 +1379,7 @@ export function WheelScanner() {
             continue
           }
 
+          // Sort by proximity to -0.30 delta
           optionsWithData.sort((a, b) => {
             const aDist = Math.abs((a.delta || 0) - -0.3)
             const bDist = Math.abs((b.delta || 0) - -0.3)
@@ -1350,17 +1464,36 @@ export function WheelScanner() {
         setTechnicalProgress(Math.round((current / total) * 100))
         setTechnicalCurrentTicker(ticker)
       })
-      setTechnicalResults(enrichedStocks)
+
+      const filteredStocks = enrichedStocks.filter((stock) => {
+        const criteria = checkTechnicalCriteria(stock)
+        const passesAll = Object.values(criteria).every(Boolean)
+        if (!passesAll) {
+          console.log(
+            `[v0] ${stock.ticker} (Strike: $${stock.putStrike?.toFixed(2)}) - FILTERED OUT:`,
+            Object.entries(criteria)
+              .filter(([_, v]) => !v)
+              .map(([k]) => k)
+              .join(", "),
+          )
+        }
+        return passesAll
+      })
 
       console.log(
-        `[v0] ✅ Step 3 Complete: ${enrichedStocks.length} stocks passed technical filters (and enriched with options data)`,
+        `[v0] Enriched: ${enrichedStocks.length} options, After filtering: ${filteredStocks.length} pass all criteria`,
+      )
+      setTechnicalResults(filteredStocks)
+
+      console.log(
+        `[v0] ✅ Step 3 Complete: ${filteredStocks.length} stocks passed technical filters (and enriched with options data)`,
       )
 
-      saveToCache(technicalCacheKey, enrichedStocks)
+      saveToCache(technicalCacheKey, filteredStocks)
       setCacheStatus(`Technical analysis completed and cached (valid until tomorrow 9:30 AM ET)`)
 
       setIsScanningTechnicals(false)
-      console.log(`[v0] 📊 Step 3 Complete! ${enrichedStocks.length} stocks passed technical analysis`)
+      console.log(`[v0] 📊 Step 3 Complete! ${filteredStocks.length} stocks passed technical analysis`)
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred during technical analysis")
       console.error("[v0] Technical analysis error:", err)
@@ -1535,7 +1668,7 @@ export function WheelScanner() {
       : [] // Initialize as empty array if no technical results
 
   // Sorting logic for relaxed results
-  const sortedRelaxedResults = [...(relaxedResults.length > 0 ? relaxedResults : fundamentalResults)].sort((a, b) => {
+  const sortedRelaxedResults = [...relaxedResults].sort((a, b) => {
     const aHasUpcomingEarnings = a.daysToEarnings !== undefined && a.daysToEarnings >= 0 && a.daysToEarnings <= 14
     const bHasUpcomingEarnings = b.daysToEarnings !== undefined && b.daysToEarnings >= 0 && b.daysToEarnings <= 14
 
@@ -1606,42 +1739,6 @@ export function WheelScanner() {
     }
   }
 
-  // Toggle function for showing relaxed results
-  const toggleRelaxedResults = React.useCallback(async () => {
-    if (!showRelaxedResults) {
-      console.log("[v0] 📊 Showing Step 4 results...")
-      if (!relaxedResultsEnriched && fundamentalResults.length > 0) {
-        console.log("[v0] 🔄 Enriching fundamental results with options data for Step 4...")
-
-        setIsEnrichingRelaxed(true)
-        setStep4Progress(0)
-        setStep4CurrentTicker("")
-
-        try {
-          const enrichedRelaxed = await enrichWithOptionsData(fundamentalResults, (current, total, ticker) => {
-            setStep4Progress(Math.round((current / total) * 100))
-            setStep4CurrentTicker(ticker)
-          })
-
-          setRelaxedResults(enrichedRelaxed)
-          setRelaxedResultsEnriched(true)
-          console.log("[v0] ✅ Step 4 enrichment complete:", enrichedRelaxed.length, "stock/expiry combinations")
-        } catch (error) {
-          console.error("[v0] Error enriching relaxed results:", error)
-          setRelaxedResults(fundamentalResults) // Fallback to unenriched data
-        } finally {
-          setIsEnrichingRelaxed(false)
-          setStep4Progress(0)
-          setStep4CurrentTicker("")
-        }
-      }
-      setStep(4)
-    } else {
-      setStep(3)
-    }
-    setShowRelaxedResults(!showRelaxedResults)
-  }, [showRelaxedResults, relaxedResultsEnriched, fundamentalResults])
-
   // Determine the current step based on state
   const currentStep =
     tickersToScan.trim().length === 0
@@ -1653,6 +1750,60 @@ export function WheelScanner() {
           : technicalResults.length > 0 || hasAttemptedTechnicalScan
             ? 4 // This means step 3 finished and produced results (or was attempted and not yet shown)
             : 3 // Default to step 3 if no results yet but attempted scan
+
+  const toggleRelaxedResults = () => {
+    setShowRelaxedResults((prev) => !prev)
+    if (!showRelaxedResults) {
+      setIsEnrichingRelaxed(true)
+      setStep4Progress(0)
+      setStep4CurrentTicker("")
+      setRelaxedResults([]) // Clear previous relaxed results
+
+      enrichWithOptionsData(fundamentalResults, (current, total, ticker) => {
+        setStep4Progress(Math.round((current / total) * 100))
+        setStep4CurrentTicker(ticker)
+      })
+        .then((enrichedResults) => {
+          console.log(`[v0] Step 4: Enrichment complete with ${enrichedResults.length} total options`)
+
+          // These are options that didn't make it to Step 3 strict results
+          const relaxedOptions = enrichedResults.filter((stock) => {
+            const criteria = checkTechnicalCriteria(stock)
+            const passesAll = Object.values(criteria).every(Boolean)
+            const passesSome = Object.values(criteria).some(Boolean)
+
+            // Relaxed = passes at least some criteria but NOT all (would have been in Step 3 otherwise)
+            // Also include options that pass none but have valid data (exploratory)
+            if (passesAll) {
+              console.log(
+                `[v0] ${stock.ticker} $${stock.putStrike} - Passes ALL criteria (already in Step 3, excluding from Step 4)`,
+              )
+              return false
+            }
+
+            // Count how many criteria pass
+            const passCount = Object.values(criteria).filter(Boolean).length
+            const totalCriteria = Object.values(criteria).length
+            console.log(
+              `[v0] ${stock.ticker} $${stock.putStrike} - Passes ${passCount}/${totalCriteria} criteria (included in relaxed)`,
+            )
+
+            return true // Include all options that don't pass ALL criteria
+          })
+
+          console.log(
+            `[v0] Step 4: ${relaxedOptions.length} options meet relaxed criteria (out of ${enrichedResults.length} total)`,
+          )
+          setRelaxedResults(relaxedOptions)
+          setIsEnrichingRelaxed(false)
+        })
+        .catch((error) => {
+          console.error("[v0] Error enriching relaxed results:", error)
+          setError("Failed to enrich relaxed criteria results.")
+          setIsEnrichingRelaxed(false)
+        })
+    }
+  }
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -1680,20 +1831,6 @@ export function WheelScanner() {
             </CardTitle>
 
             <div className="flex items-center gap-2">
-              {/* <span className="text-sm text-muted-foreground">Tooltips</span> */}
-              {/* <button
-                onClick={() => setTooltipsEnabled(!tooltipsEnabled)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  tooltipsEnabled ? "bg-blue-600" : "bg-gray-300"
-                }`}
-                aria-label="Toggle tooltips"
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    tooltipsEnabled ? "translate-x-6" : "translate-x-1"
-                  }`}
-                />
-              </button> */}
               {/* CHANGE: Use TooltipsToggle and RefreshButton components */}
               <TooltipsToggle enabled={tooltipsEnabled} setEnabled={setTooltipsEnabled} />
               <RefreshButton onClick={() => {}} />
@@ -2309,7 +2446,7 @@ export function WheelScanner() {
               <ul className="text-xs text-gray-700 space-y-1 list-disc list-inside">
                 <li>
                   <strong>
-                    RSI (14) {"<"} {maxRSI[0]}:
+                    RSI {"<"} {maxRSI[0]}:
                   </strong>{" "}
                   Oversold conditions, potential for bounce (medium-term pullback setup)
                 </li>
@@ -2844,7 +2981,7 @@ export function WheelScanner() {
                       className="text-center p-3 font-semibold text-green-900 cursor-pointer hover:bg-green-100"
                       onClick={() => handleSort("rsi" as keyof QualifyingStock)}
                     >
-                      RSI (14) {sortColumn === "rsi" && (sortDirection === "asc" ? "↑" : "↓")}
+                      RSI {"<"} {maxRSI[0]} {sortColumn === "rsi" && (sortDirection === "asc" ? "↑" : "↓")}
                     </th>
                     <th
                       className="text-center p-3 font-semibold text-green-900 cursor-pointer hover:bg-green-100"
@@ -3020,6 +3157,18 @@ export function WheelScanner() {
         </Card>
       )}
 
+      {/* CHANGE: Added Step 4 button when Step 3 has results (previously only showed when no results) */}
+      {step >= 3 && !isScanningTechnicals && technicalResults.length > 0 && !showRelaxedResults && (
+        <Button
+          onClick={toggleRelaxedResults}
+          className="mt-4 w-full max-w-7xl mx-auto h-12 text-base font-semibold bg-purple-600 hover:bg-purple-700 text-white"
+          disabled={isEnrichingRelaxed}
+        >
+          <Filter className="mr-2 h-5 w-5" />
+          View Relaxed Criteria Results (Step 4)
+        </Button>
+      )}
+
       {step >= 3 && !isScanningTechnicals && technicalResults.length === 0 && fundamentalResults.length > 0 && (
         <Card className="mt-8 w-full max-w-7xl mx-auto border-2 border-yellow-500 bg-white">
           <CardHeader className="bg-gradient-to-r from-yellow-50 to-amber-50">
@@ -3069,7 +3218,8 @@ export function WheelScanner() {
         </div>
       )}
 
-      {showRelaxedResults && (
+      {/* CHANGE: Only render Step 4 table when we have enriched relaxed results (not during loading or when empty) */}
+      {showRelaxedResults && !isEnrichingRelaxed && relaxedResults.length > 0 && (
         <Card className="mt-8 w-full max-w-7xl mx-auto shadow-xl border-2 border-purple-500">
           <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-purple-200">
             <div className="flex items-center justify-between">
@@ -3078,7 +3228,8 @@ export function WheelScanner() {
                 <CardTitle className="text-purple-900">Step 4: Relaxed Criteria Results</CardTitle>
               </div>
               <span className="text-sm font-semibold text-purple-700 bg-purple-100 px-3 py-1 rounded-full">
-                {sortedRelaxedResults.length} {sortedRelaxedResults.length === 1 ? "stock" : "stocks"} found
+                {sortedRelaxedResults.length} {sortedRelaxedResults.length === 1 ? "option meets" : "options meet"} the
+                relaxed criteria
               </span>
             </div>
             <p className="text-sm text-purple-700 mt-2">
@@ -3092,74 +3243,122 @@ export function WheelScanner() {
                 <thead className="bg-purple-50 border-b border-purple-200">
                   <tr>
                     <th
-                      className="text-left p-3 font-semibold text-purple-900"
+                      className="text-left p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
                       onClick={() => handleRelaxedSort("ticker")}
                     >
                       Ticker {relaxedSortColumn === "ticker" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
                     </th>
                     <th
-                      className="text-right p-3 font-semibold text-purple-900 cursor-pointer"
+                      className="text-right p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
                       onClick={() => handleRelaxedSort("currentPrice")}
                     >
                       Price {relaxedSortColumn === "currentPrice" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
                     </th>
                     <th
-                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer"
+                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
                       onClick={() => handleRelaxedSort("daysToExpiry")}
                     >
                       DTE {relaxedSortColumn === "daysToExpiry" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
                     </th>
-                    <th className="text-center p-3 font-semibold text-purple-900">Expiry</th>
                     <th
-                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer"
+                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
+                      onClick={() => handleRelaxedSort("expiryDate")}
+                    >
+                      Expiry {relaxedSortColumn === "expiryDate" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
                       onClick={() => handleRelaxedSort("putStrike")}
                     >
                       Strike {relaxedSortColumn === "putStrike" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
                     </th>
                     <th
-                      className="text-right p-3 font-semibold text-purple-900 cursor-pointer"
+                      className="text-right p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
                       onClick={() => handleRelaxedSort("premium")}
                     >
                       Premium {relaxedSortColumn === "premium" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
                     </th>
                     <th
-                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer"
+                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
                       onClick={() => handleRelaxedSort("delta")}
                     >
                       Delta {relaxedSortColumn === "delta" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
                     </th>
                     <th
-                      className="text-right p-3 font-semibold text-purple-900 cursor-pointer"
+                      className="text-right p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
                       onClick={() => handleRelaxedSort("yield")}
                     >
                       Yield % {relaxedSortColumn === "yield" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
                     </th>
-                    <th className="text-right p-3 font-semibold text-purple-900">Annual Yield %</th>
                     <th
-                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer"
+                      className="text-right p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
+                      onClick={() => handleRelaxedSort("annualizedYield")}
+                    >
+                      Annual Yield %{" "}
+                      {relaxedSortColumn === "annualizedYield" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
                       onClick={() => handleRelaxedSort("redDay")}
                     >
                       Red Day {relaxedSortColumn === "redDay" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
                     </th>
-                    <th className="text-center p-3 font-semibold text-purple-900">MACD</th>
-                    <th className="text-center p-3 font-semibold text-purple-900">Bollinger</th>
-                    <th className="text-center p-3 font-semibold text-purple-900">Golden Cross</th>
                     <th
-                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer"
+                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
+                      onClick={() => handleRelaxedSort("macdSignal")}
+                    >
+                      MACD {relaxedSortColumn === "macdSignal" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
+                      onClick={() => handleRelaxedSort("rsi")}
+                    >
+                      RSI {"<"} {maxRSI[0]}{" "}
+                      {relaxedSortColumn === "rsi" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
+                      onClick={() => handleRelaxedSort("bollingerPosition")}
+                    >
+                      Bollinger{" "}
+                      {relaxedSortColumn === "bollingerPosition" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
+                      onClick={() => handleRelaxedSort("uptrend")}
+                    >
+                      Golden Cross {relaxedSortColumn === "uptrend" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
                       onClick={() => handleRelaxedSort("stochastic")}
                     >
                       Stochastic {relaxedSortColumn === "stochastic" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
                     </th>
-                    <th className="text-center p-3 font-semibold text-purple-900">ATR %</th>
                     <th
-                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer"
-                      onClick={() => handleRelaxedSort("rsi")}
+                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
+                      onClick={() => handleRelaxedSort("atrPercent")}
                     >
-                      RSI (14) {relaxedSortColumn === "rsi" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
+                      ATR % {relaxedSortColumn === "atrPercent" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
                     </th>
-                    <th className="text-right p-3 font-semibold text-purple-900">50-SMA</th>
-                    <th className="text-right p-3 font-semibold text-purple-900">100-SMA</th>
-                    <th className="text-right p-3 font-semibold text-purple-900">200-SMA</th>
+                    <th
+                      className="text-right p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
+                      onClick={() => handleRelaxedSort("sma50")}
+                    >
+                      50-SMA {relaxedSortColumn === "sma50" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-right p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
+                      onClick={() => handleRelaxedSort("sma100")}
+                    >
+                      100-SMA {relaxedSortColumn === "sma100" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-right p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
+                      onClick={() => handleRelaxedSort("sma200")}
+                    >
+                      200-SMA {relaxedSortColumn === "sma200" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -3167,7 +3366,7 @@ export function WheelScanner() {
                     // Evaluate criteria for each stock to show which filters passed/failed
                     const criteria = evaluateCriteria(stock)
                     const passedCount = Object.values(criteria).filter(Boolean).length
-                    const totalCriteria = Object.keys(criteria).length
+                    const totalCriteria = Object.values(criteria).length
 
                     return (
                       <tr
@@ -3217,6 +3416,13 @@ export function WheelScanner() {
                           )}
                         </td>
                         <td className="text-center p-3">
+                          {stock.rsi !== undefined && stock.rsi < maxRSI[0] ? (
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-lg">✗</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
                           {stock.bollingerPosition === "Below" || stock.bollingerPosition === "Lower Half" ? (
                             <span className="text-green-600 font-bold text-lg">✓</span>
                           ) : (
@@ -3245,13 +3451,6 @@ export function WheelScanner() {
                           )}
                         </td>
                         <td className="text-center p-3">
-                          {stock.rsi !== undefined && stock.rsi < 40 ? (
-                            <span className="text-green-600 font-bold text-lg">✓</span>
-                          ) : (
-                            <span className="text-red-600 font-bold text-lg">✗</span>
-                          )}
-                        </td>
-                        <td className="text-center p-3">
                           {stock.sma50 !== undefined && stock.currentPrice < stock.sma50 ? (
                             <span className="text-green-600 font-bold text-lg">✓</span>
                           ) : (
@@ -3266,7 +3465,7 @@ export function WheelScanner() {
                           )}
                         </td>
                         <td className="text-center p-3">
-                          {stock.sma200 !== undefined && stock.currentPrice < stock.sma200 ? (
+                          {stock.sma200 !== undefined && stock.currentPrice > stock.sma200 ? (
                             <span className="text-green-600 font-bold text-lg">✓</span>
                           ) : (
                             <span className="text-red-600 font-bold text-lg">✗</span>
@@ -3279,6 +3478,30 @@ export function WheelScanner() {
               </table>
             </div>
             <p className="mt-4 text-sm text-purple-600">Review these opportunities and adjust filters as needed.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Add message when Step 4 enrichment completes but finds no options */}
+      {showRelaxedResults && !isEnrichingRelaxed && relaxedResults.length === 0 && (
+        <Card className="mt-8 w-full max-w-7xl mx-auto border-2 border-yellow-500 bg-white">
+          <CardHeader className="bg-gradient-to-r from-yellow-50 to-amber-50">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-yellow-600" />
+              <CardTitle className="text-yellow-900">Step 4: No Relaxed Options Found</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6">
+            <p className="text-gray-700 mb-4">
+              No options with valid pricing data were found for the {fundamentalResults.length} stocks that passed
+              fundamental criteria.
+            </p>
+            <p className="text-gray-600 text-sm">This could happen if:</p>
+            <ul className="list-disc list-inside text-sm text-gray-600 space-y-1 mt-2">
+              <li>The market is closed and options quotes are unavailable</li>
+              <li>No options match the delta range (0.25-0.35)</li>
+              <li>API rate limits were reached - try again in a few minutes</li>
+            </ul>
           </CardContent>
         </Card>
       )}
