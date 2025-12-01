@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { TooltipProvider } from "@/components/ui/tooltip"
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import {
   Target,
   TrendingUp,
@@ -169,6 +169,21 @@ const STRATEGY_EXIT_GUIDES = [
 
 export function ExitRulesDashboard() {
   const [activeStrategy, setActiveStrategy] = useState("Credit Spreads")
+  const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
+
+  const InfoTooltip = ({ content }: { content: string }) => {
+    if (!tooltipsEnabled) return null
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Info className="h-3.5 w-3.5 text-gray-400 cursor-help inline ml-1" />
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs bg-white text-gray-900 border shadow-lg p-3 z-50">
+          <p className="text-sm">{content}</p>
+        </TooltipContent>
+      </Tooltip>
+    )
+  }
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -204,25 +219,31 @@ export function ExitRulesDashboard() {
     <TooltipProvider>
       <div className="container mx-auto px-4 py-6 space-y-6">
         {/* Hero Section */}
-        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-xl p-6 text-white flex items-center justify-between">
-          <div className="flex items-center gap-3 mb-2">
-            <Target className="h-8 w-8 text-emerald-400" />
-            <h1 className="text-2xl font-bold">Exit Rules & Profit-Taking Triggers</h1>
+        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-xl p-6 text-white">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 mb-2">
+              <Target className="h-8 w-8 text-emerald-400" />
+              <h1 className="text-2xl font-bold">Exit Rules & Profit-Taking Triggers</h1>
+              <InfoTooltip content="This dashboard teaches you WHEN to close your options trades. Most traders lose money not because of bad entries, but because of poor exits. These rules help you lock in profits and cut losses before they become disasters." />
+            </div>
+            <div className="flex items-center gap-2">
+              <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
+              <RefreshButton />
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <TooltipsToggle />
-            <RefreshButton />
-          </div>
+          <p className="text-slate-300 max-w-2xl">
+            Systematic exit rules remove emotion from trading decisions. Define your exits before entering any trade.
+          </p>
         </div>
-        <p className="text-slate-300 max-w-2xl">
-          Systematic exit rules remove emotion from trading decisions. Define your exits before entering any trade.
-        </p>
+
+        {/* Key Metrics Cards with Tooltips */}
         <div className="flex flex-wrap gap-3 mt-4">
           <Card className="border-green-200 bg-green-50/50">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center gap-2 text-green-700">
                 <TrendingUp className="h-5 w-5" />
                 Profit Target
+                <InfoTooltip content="The price point where you close a winning trade to lock in gains. Taking profits at 50% of max profit has been shown to increase long-term win rates because you avoid giving back gains when the trade reverses." />
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -239,6 +260,7 @@ export function ExitRulesDashboard() {
               <CardTitle className="text-lg flex items-center gap-2 text-red-700">
                 <TrendingDown className="h-5 w-5" />
                 Stop Loss
+                <InfoTooltip content="The maximum loss you'll accept before closing a losing trade. The 2x credit rule means if you collected $100 in premium, you close if the loss reaches $200. This limits damage and preserves capital for future trades." />
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -255,6 +277,7 @@ export function ExitRulesDashboard() {
               <CardTitle className="text-lg flex items-center gap-2 text-blue-700">
                 <Clock className="h-5 w-5" />
                 Time Exit
+                <InfoTooltip content="Close positions at 21 Days to Expiration regardless of profit/loss. This is because 'gamma risk' increases dramatically in the final weeks - small price moves can cause huge P/L swings. It's better to exit early and redeploy capital." />
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -291,6 +314,7 @@ export function ExitRulesDashboard() {
                 <CardTitle className="flex items-center gap-2">
                   <DollarSign className="h-5 w-5 text-green-600" />
                   Profit-Taking Triggers
+                  <InfoTooltip content="These rules tell you when to CLOSE winning trades. The key insight: a bird in the hand is worth two in the bush. Taking profits early increases your overall win rate even if you occasionally miss bigger gains." />
                 </CardTitle>
                 <CardDescription>When to take profits and lock in gains</CardDescription>
               </CardHeader>
@@ -307,6 +331,21 @@ export function ExitRulesDashboard() {
                         <Badge variant="outline" className={getPriorityColor(rule.priority)}>
                           {rule.priority}
                         </Badge>
+                        {rule.id === "50-percent" && (
+                          <InfoTooltip content="When your trade has made 50% of its maximum possible profit, close it. Example: If max profit is $200, close when you've made $100. This locks in a win and frees capital for new trades." />
+                        )}
+                        {rule.id === "21-dte" && (
+                          <InfoTooltip content="With 21 days left until expiration, gamma (the rate delta changes) increases dramatically. Small stock moves cause big P/L swings. Close early to avoid this 'gamma roller coaster'." />
+                        )}
+                        {rule.id === "theta-decay" && (
+                          <InfoTooltip content="Time decay (theta) accelerates in the final 2 weeks. If you have a profit, lock it in before the increased gamma risk can take it away." />
+                        )}
+                        {rule.id === "iv-crush" && (
+                          <InfoTooltip content="After earnings or major events, implied volatility drops sharply (IV crush). If you sold premium, this is when you profit most - close immediately to capture the gains before anything else happens." />
+                        )}
+                        {rule.id === "technical-breakout" && (
+                          <InfoTooltip content="When a stock breaks through a major support or resistance level, it often continues in that direction. If this hurts your position, exit quickly before the move accelerates." />
+                        )}
                       </div>
                       <p className="text-sm text-muted-foreground mb-2">
                         <span className="font-medium text-foreground">Trigger:</span> {rule.trigger}
@@ -328,6 +367,7 @@ export function ExitRulesDashboard() {
                 <CardTitle className="flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5 text-red-600" />
                   Stop Loss & Risk Management
+                  <InfoTooltip content="These rules tell you when to CLOSE losing trades. The hardest part of trading is admitting you're wrong and cutting losses. These mechanical rules remove emotion and protect your capital for future opportunities." />
                 </CardTitle>
                 <CardDescription>When to cut losses and protect capital</CardDescription>
               </CardHeader>
@@ -344,6 +384,21 @@ export function ExitRulesDashboard() {
                         <Badge variant="outline" className={getPriorityColor(rule.priority)}>
                           {rule.priority}
                         </Badge>
+                        {rule.id === "2x-credit" && (
+                          <InfoTooltip content="If you collected $100 credit and are now losing $200, close immediately. This prevents a manageable loss from becoming a portfolio-destroying disaster. No exceptions - this is your absolute max pain point." />
+                        )}
+                        {rule.id === "breakeven-breach" && (
+                          <InfoTooltip content="Your breakeven is the price where you neither make nor lose money. Once the stock moves past this point, you're in losing territory. Evaluate quickly whether to close or adjust." />
+                        )}
+                        {rule.id === "short-strike-test" && (
+                          <InfoTooltip content="When the stock price gets within 1% of your short strike, the trade is in danger. This is your 'early warning system' - either roll the position to a safer strike or close and move on." />
+                        )}
+                        {rule.id === "delta-threshold" && (
+                          <InfoTooltip content="Delta measures how much your position moves with the stock. If delta gets too high (positive or negative), you have too much directional risk. Hedge by adding an opposing position or reduce size." />
+                        )}
+                        {rule.id === "portfolio-heat" && (
+                          <InfoTooltip content="No single position should be more than 5% of your total portfolio. If a trade grows too large (through paper gains or adding to it), trim it back to maintain proper diversification." />
+                        )}
                       </div>
                       <p className="text-sm text-muted-foreground mb-2">
                         <span className="font-medium text-foreground">Trigger:</span> {rule.trigger}
@@ -365,6 +420,7 @@ export function ExitRulesDashboard() {
                 <CardTitle className="flex items-center gap-2">
                   <Calculator className="h-5 w-5 text-purple-600" />
                   Exit Rules by Strategy
+                  <InfoTooltip content="Different strategies have different optimal exit points. These guidelines are based on backtested research showing the profit/loss targets that maximize long-term returns for each strategy type." />
                 </CardTitle>
                 <CardDescription>Strategy-specific exit guidelines</CardDescription>
               </CardHeader>
@@ -394,6 +450,7 @@ export function ExitRulesDashboard() {
                         <div className="flex items-center gap-2 mb-2">
                           <TrendingUp className="h-4 w-4 text-green-600" />
                           <span className="font-semibold text-green-700">Profit Target</span>
+                          <InfoTooltip content="Close the trade when you've captured this percentage of your maximum possible profit. Taking profits early improves win rate and frees capital for new opportunities." />
                         </div>
                         <p className="text-lg font-bold text-green-600">{selectedGuide.profitTarget}</p>
                       </div>
@@ -402,6 +459,7 @@ export function ExitRulesDashboard() {
                         <div className="flex items-center gap-2 mb-2">
                           <XCircle className="h-4 w-4 text-red-600" />
                           <span className="font-semibold text-red-700">Stop Loss</span>
+                          <InfoTooltip content="Close the trade if your loss reaches this level. Cutting losses quickly preserves capital and mental energy for winning trades." />
                         </div>
                         <p className="text-lg font-bold text-red-600">{selectedGuide.stopLoss}</p>
                       </div>
@@ -410,6 +468,7 @@ export function ExitRulesDashboard() {
                         <div className="flex items-center gap-2 mb-2">
                           <Clock className="h-4 w-4 text-blue-600" />
                           <span className="font-semibold text-blue-700">Time Exit</span>
+                          <InfoTooltip content="Close the trade by this time regardless of profit/loss. Time-based exits prevent gamma risk and avoid holding too long." />
                         </div>
                         <p className="text-lg font-bold text-blue-600">{selectedGuide.timeExit}</p>
                       </div>
@@ -419,6 +478,7 @@ export function ExitRulesDashboard() {
                       <div className="flex items-center gap-2 mb-3">
                         <AlertTriangle className="h-4 w-4 text-amber-600" />
                         <span className="font-semibold text-amber-700">Key Exit Triggers</span>
+                        <InfoTooltip content="Watch for these warning signs that indicate you should exit or adjust the trade immediately, even if you haven't hit your profit target or stop loss yet." />
                       </div>
                       <ul className="space-y-2">
                         {selectedGuide.keyTriggers.map((trigger, idx) => (
@@ -442,6 +502,7 @@ export function ExitRulesDashboard() {
             <CardTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-teal-600" />
               AI Insights: Exit Strategy Psychology
+              <InfoTooltip content="Understanding the psychological aspects of exiting trades is just as important as the mechanical rules. These insights help you overcome common mental barriers to proper trade management." />
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -487,69 +548,9 @@ export function ExitRulesDashboard() {
                   </div>
                 </AccordionContent>
               </AccordionItem>
-
-              <AccordionItem value="automation">
-                <AccordionTrigger className="text-left">Automating Your Exit Rules</AccordionTrigger>
-                <AccordionContent className="space-y-3 text-sm text-muted-foreground">
-                  <p>
-                    The best exit is one you don't have to think about. Set your exit orders immediately after entering
-                    a trade to remove emotion from the equation.
-                  </p>
-                  <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                    <p className="font-medium text-blue-700 mb-2">Automation Checklist:</p>
-                    <ul className="list-disc list-inside space-y-1 text-blue-600">
-                      <li>Set GTC limit orders at profit targets</li>
-                      <li>Use conditional orders for stop losses</li>
-                      <li>Create alerts at key price levels</li>
-                      <li>Review and adjust weekly</li>
-                    </ul>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-
-              <AccordionItem value="options-specific">
-                <AccordionTrigger className="text-left">Options-Specific Exit Considerations</AccordionTrigger>
-                <AccordionContent className="space-y-3 text-sm text-muted-foreground">
-                  <p>
-                    Options have unique characteristics that affect exit timing: theta decay accelerates, gamma risk
-                    increases near expiration, and IV changes can dramatically impact P/L.
-                  </p>
-                  <div className="bg-purple-50 p-3 rounded-lg border border-purple-200">
-                    <p className="font-medium text-purple-700 mb-2">Options Exit Factors:</p>
-                    <ul className="list-disc list-inside space-y-1 text-purple-600">
-                      <li>
-                        <strong>Theta:</strong> Time decay accelerates after 21 DTE
-                      </li>
-                      <li>
-                        <strong>Gamma:</strong> Risk spikes in final week—close early
-                      </li>
-                      <li>
-                        <strong>Vega:</strong> IV crush after events—exit quickly
-                      </li>
-                      <li>
-                        <strong>Liquidity:</strong> Wide spreads near expiry hurt exits
-                      </li>
-                    </ul>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
             </Accordion>
           </CardContent>
         </Card>
-
-        {/* Footer Tip */}
-        <div className="bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <Info className="h-5 w-5 text-teal-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-medium text-teal-800">Pro Tip: Write Your Exit Plan Before Entering</p>
-              <p className="text-sm text-teal-600 mt-1">
-                Before placing any trade, write down: (1) Your profit target, (2) Your stop loss, and (3) Your
-                time-based exit. If you can't define all three, don't enter the trade.
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
     </TooltipProvider>
   )

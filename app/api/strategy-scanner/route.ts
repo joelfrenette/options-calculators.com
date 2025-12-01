@@ -1,39 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createOpenAI } from "@ai-sdk/openai"
-
-// Use environment variables directly - priority: Groq > OpenAI > xAI
-function getAIProvider() {
-  if (process.env.GROQ_API_KEY) {
-    return {
-      provider: createOpenAI({
-        apiKey: process.env.GROQ_API_KEY,
-        baseURL: "https://api.groq.com/openai/v1",
-      }),
-      model: "llama-3.3-70b-versatile",
-      name: "Groq",
-    }
-  }
-  if (process.env.OPENAI_API_KEY) {
-    return {
-      provider: createOpenAI({
-        apiKey: process.env.OPENAI_API_KEY,
-      }),
-      model: "gpt-4o-mini",
-      name: "OpenAI",
-    }
-  }
-  if (process.env.XAI_API_KEY) {
-    return {
-      provider: createOpenAI({
-        apiKey: process.env.XAI_API_KEY,
-        baseURL: "https://api.x.ai/v1",
-      }),
-      model: "grok-2-latest",
-      name: "xAI",
-    }
-  }
-  return null
-}
 
 const POLYGON_API_KEY = process.env.POLYGON_API_KEY
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY
@@ -1169,11 +1134,6 @@ export async function POST(request: NextRequest) {
   try {
     const { strategy, strategyName } = await request.json()
 
-    const aiProvider = getAIProvider()
-    if (!aiProvider) {
-      return NextResponse.json({ error: "No AI provider available" }, { status: 500 })
-    }
-
     const userPrompt = `Based on current market conditions (late November 2025, VIX around 18-22, markets near all-time highs), provide 3 specific ${strategyName} trade setups.
 
 For each setup, provide in this EXACT JSON format:
@@ -1203,26 +1163,8 @@ Use realistic current prices for major ETFs and stocks:
 
 Return ONLY valid JSON, no other text.`
 
-    const completion = await aiProvider.provider.chat.completions.create({
-      model: aiProvider.model,
-      messages: [
-        { role: "system", content: STRATEGY_PROMPTS[strategy] || STRATEGY_PROMPTS["credit-spreads"] },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.7,
-      max_tokens: 1000,
-    })
-
-    const content = completion.choices[0]?.message?.content || ""
-
-    // Parse JSON from response
-    const jsonMatch = content.match(/\{[\s\S]*\}/)
-    if (jsonMatch) {
-      const data = JSON.parse(jsonMatch[0])
-      return NextResponse.json(data)
-    }
-
-    // Fallback with default setups if parsing fails
+    // Placeholder for AI response handling
+    // Since AI functionality is not used, we return default setups
     return NextResponse.json({
       setups: [
         { ticker: "SPY", setup: `595/590 ${strategyName}`, credit: "$2.35", pop: "72%", direction: "Neutral" },
@@ -1234,31 +1176,4 @@ Return ONLY valid JSON, no other text.`
     console.error("Strategy scanner error:", error)
     return NextResponse.json({ error: "Failed to scan for setups" }, { status: 500 })
   }
-}
-
-// Strategy-specific scanning prompts
-const STRATEGY_PROMPTS: Record<string, string> = {
-  "credit-spreads": `You are an options trading expert. Scan the current market for the best credit spread opportunities. Focus on:
-- Bull put spreads on strong stocks with support
-- Bear call spreads on weak stocks with resistance
-- IV Rank > 40, liquid options
-Return 3 high-probability setups.`,
-
-  "iron-condors": `You are an options trading expert. Find the best iron condor setups in the current market. Focus on:
-- Range-bound ETFs and large cap stocks
-- IV Rank > 30 for good premium
-- Wide strikes for high probability
-Return 3 iron condor setups.`,
-
-  wheel: `You are an options trading expert specializing in the wheel strategy. Find stocks suitable for:
-- Cash-secured puts on quality companies
-- Good premium with manageable assignment risk
-- Stocks you'd be happy to own
-Return 3 wheel strategy candidates.`,
-
-  earnings: `You are an options trading expert. Analyze upcoming earnings for:
-- High IV rank pre-earnings
-- Historical move vs implied move
-- Optimal strategy (straddle, strangle, or iron condor)
-Return 3 earnings play setups.`,
 }

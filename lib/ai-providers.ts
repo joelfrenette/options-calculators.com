@@ -23,7 +23,7 @@ const providerConfigs = [
     key: () => process.env.GROQ_API_KEY,
     create: () =>
       createOpenAI({
-        apiKey: process.env.GROQ_API_KEY!,
+        apiKey: process.env.GROQ_API_KEY || "",
         baseURL: "https://api.groq.com/openai/v1",
       }),
     model: "llama-3.3-70b-versatile",
@@ -32,14 +32,14 @@ const providerConfigs = [
     name: "openai" as const,
     displayName: "OpenAI (GPT-4o Mini)",
     key: () => process.env.OPENAI_API_KEY,
-    create: () => createOpenAI({ apiKey: process.env.OPENAI_API_KEY! }),
+    create: () => createOpenAI({ apiKey: process.env.OPENAI_API_KEY || "" }),
     model: "gpt-4o-mini",
   },
   {
     name: "google" as const,
     displayName: "Google (Gemini 2.0 Flash)",
     key: () => process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-    create: () => createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY! }),
+    create: () => createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || "" }),
     model: "gemini-2.0-flash-exp",
   },
   {
@@ -48,7 +48,7 @@ const providerConfigs = [
     key: () => process.env.XAI_API_KEY,
     create: () =>
       createOpenAI({
-        apiKey: process.env.XAI_API_KEY!,
+        apiKey: process.env.XAI_API_KEY || "",
         baseURL: "https://api.x.ai/v1",
       }),
     model: "grok-2-latest",
@@ -57,7 +57,7 @@ const providerConfigs = [
     name: "anthropic" as const,
     displayName: "Anthropic (Claude 3.5 Sonnet)",
     key: () => process.env.ANTHROPIC_API_KEY,
-    create: () => createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY! }),
+    create: () => createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "" }),
     model: "claude-3-5-sonnet-20241022",
   },
   {
@@ -66,7 +66,7 @@ const providerConfigs = [
     key: () => process.env.OPENROUTER_API_KEY,
     create: () =>
       createOpenAI({
-        apiKey: process.env.OPENROUTER_API_KEY!,
+        apiKey: process.env.OPENROUTER_API_KEY || "",
         baseURL: "https://openrouter.ai/api/v1",
       }),
     model: "meta-llama/llama-3.3-70b-instruct",
@@ -77,7 +77,7 @@ const providerConfigs = [
     key: () => process.env.PERPLEXITY_API_KEY,
     create: () =>
       createOpenAI({
-        apiKey: process.env.PERPLEXITY_API_KEY!,
+        apiKey: process.env.PERPLEXITY_API_KEY || "",
         baseURL: "https://api.perplexity.ai",
       }),
     model: "llama-3.1-sonar-large-128k-online",

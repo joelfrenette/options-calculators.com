@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label"
 import { AlertTriangle, TrendingUp, Info } from "lucide-react"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
-import { TooltipProvider } from "@/components/ui/tooltip"
+import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 export function EarningsVolatilityCalculator() {
   const [ticker, setTicker] = useState("AAPL")
@@ -77,8 +77,22 @@ export function EarningsVolatilityCalculator() {
     }
   }
 
+  const InfoTooltip = ({ content }: { content: string }) => {
+    if (!tooltipsEnabled) return null
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Info className="h-3.5 w-3.5 text-gray-400 cursor-help inline ml-1" />
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs bg-white text-gray-900 border shadow-lg p-3 z-50">
+          <p className="text-sm">{content}</p>
+        </TooltipContent>
+      </Tooltip>
+    )
+  }
+
   return (
-    <TooltipProvider disabled={!tooltipsEnabled}>
+    <TooltipProvider>
       <div className="space-y-4">
         {/* Input Section */}
         <Card className="shadow-sm border-gray-200">
@@ -86,6 +100,7 @@ export function EarningsVolatilityCalculator() {
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-primary" />
               Earnings Volatility Analysis
+              <InfoTooltip content="This calculator helps you understand how much a stock might move around earnings and whether options are overpriced. It shows the 'expected move' (how far the market thinks the stock will go) and 'IV crush risk' (how much option value you might lose after the announcement)." />
             </div>
             <div className="flex items-center gap-2">
               <TooltipsToggle enabled={tooltipsEnabled} onToggle={() => setTooltipsEnabled(!tooltipsEnabled)} />
@@ -96,8 +111,9 @@ export function EarningsVolatilityCalculator() {
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="ticker" className="text-sm font-semibold text-gray-700">
+                  <Label htmlFor="ticker" className="text-sm font-semibold text-gray-700 flex items-center">
                     Ticker Symbol
+                    <InfoTooltip content="Enter the stock symbol you're analyzing for earnings. Examples: AAPL, TSLA, NVDA" />
                   </Label>
                   <Input
                     id="ticker"
@@ -110,8 +126,9 @@ export function EarningsVolatilityCalculator() {
                 </div>
 
                 <div>
-                  <Label htmlFor="stockPrice" className="text-sm font-semibold text-gray-700">
+                  <Label htmlFor="stockPrice" className="text-sm font-semibold text-gray-700 flex items-center">
                     Current Stock Price ($)
+                    <InfoTooltip content="The current trading price of the stock. This is used to calculate breakeven points and expected move percentages." />
                   </Label>
                   <Input
                     id="stockPrice"
@@ -125,8 +142,9 @@ export function EarningsVolatilityCalculator() {
                 </div>
 
                 <div>
-                  <Label htmlFor="earningsDate" className="text-sm font-semibold text-gray-700">
+                  <Label htmlFor="earningsDate" className="text-sm font-semibold text-gray-700 flex items-center">
                     Earnings Date
+                    <InfoTooltip content="When the company reports earnings. Options lose most of their IV premium immediately after this date (IV crush)." />
                   </Label>
                   <Input
                     id="earningsDate"
@@ -138,8 +156,9 @@ export function EarningsVolatilityCalculator() {
                 </div>
 
                 <div>
-                  <Label htmlFor="currentIV" className="text-sm font-semibold text-gray-700">
+                  <Label htmlFor="currentIV" className="text-sm font-semibold text-gray-700 flex items-center">
                     Current IV (%)
+                    <InfoTooltip content="Current Implied Volatility - how expensive options are right now. Before earnings, IV typically spikes 20-50% above normal as traders price in the expected move." />
                   </Label>
                   <Input
                     id="currentIV"
@@ -153,8 +172,9 @@ export function EarningsVolatilityCalculator() {
                 </div>
 
                 <div>
-                  <Label htmlFor="historicalIV" className="text-sm font-semibold text-gray-700">
+                  <Label htmlFor="historicalIV" className="text-sm font-semibold text-gray-700 flex items-center">
                     Historical IV (%)
+                    <InfoTooltip content="The 'normal' IV level for this stock when there's no earnings event. After earnings, IV typically crashes back to this level within hours. The difference between Current IV and Historical IV is your 'crush risk'." />
                   </Label>
                   <Input
                     id="historicalIV"
@@ -170,8 +190,9 @@ export function EarningsVolatilityCalculator() {
 
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="atmCallPrice" className="text-sm font-semibold text-gray-700">
+                  <Label htmlFor="atmCallPrice" className="text-sm font-semibold text-gray-700 flex items-center">
                     ATM Call Price ($)
+                    <InfoTooltip content="Price of an at-the-money call option (strike = stock price). Combined with the put price, this tells us how big a move the market expects." />
                   </Label>
                   <Input
                     id="atmCallPrice"
@@ -185,8 +206,9 @@ export function EarningsVolatilityCalculator() {
                 </div>
 
                 <div>
-                  <Label htmlFor="atmPutPrice" className="text-sm font-semibold text-gray-700">
+                  <Label htmlFor="atmPutPrice" className="text-sm font-semibold text-gray-700 flex items-center">
                     ATM Put Price ($)
+                    <InfoTooltip content="Price of an at-the-money put option (strike = stock price). Combined with the call price, this tells us the expected move the market is pricing in." />
                   </Label>
                   <Input
                     id="atmPutPrice"
@@ -203,8 +225,9 @@ export function EarningsVolatilityCalculator() {
                   <p className="text-xs font-semibold text-gray-600 mb-2">For Strangle Calculation (Optional)</p>
                   <div className="space-y-3">
                     <div>
-                      <Label htmlFor="callStrike" className="text-sm font-semibold text-gray-700">
+                      <Label htmlFor="callStrike" className="text-sm font-semibold text-gray-700 flex items-center">
                         Call Strike ($)
+                        <InfoTooltip content="Enter the strike price for the call option. This is used to calculate the strangle breakeven points." />
                       </Label>
                       <Input
                         id="callStrike"
@@ -218,8 +241,9 @@ export function EarningsVolatilityCalculator() {
                     </div>
 
                     <div>
-                      <Label htmlFor="putStrike" className="text-sm font-semibold text-gray-700">
+                      <Label htmlFor="putStrike" className="text-sm font-semibold text-gray-700 flex items-center">
                         Put Strike ($)
+                        <InfoTooltip content="Enter the strike price for the put option. This is used to calculate the strangle breakeven points." />
                       </Label>
                       <Input
                         id="putStrike"
@@ -247,22 +271,32 @@ export function EarningsVolatilityCalculator() {
                 <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
                   <TrendingUp className="h-5 w-5 text-primary" />
                   Expected Move (Based on ATM Straddle)
+                  <InfoTooltip content="The 'expected move' is how far the market thinks the stock will move by expiration. It's calculated from the straddle price. If the stock moves MORE than this amount, buying options could be profitable. If it moves LESS, selling options wins." />
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
                 <div className="grid md:grid-cols-3 gap-4">
                   <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <p className="text-sm font-semibold text-gray-600 mb-1">Expected Move</p>
+                    <p className="text-sm font-semibold text-gray-600 mb-1 flex items-center justify-center">
+                      Expected Move
+                      <InfoTooltip content="The market's prediction of the stock's price range by expiration. The stock could move this much in either direction. Calculated as: (Call + Put Price) ÷ Stock Price × 100" />
+                    </p>
                     <p className="text-3xl font-bold text-blue-600">±{expectedMovePercent.toFixed(2)}%</p>
                     <p className="text-lg text-gray-600 mt-1">±${expectedMoveDollars.toFixed(2)}</p>
                   </div>
                   <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
-                    <p className="text-sm font-semibold text-gray-600 mb-1">Upper Target</p>
+                    <p className="text-sm font-semibold text-gray-600 mb-1 flex items-center justify-center">
+                      Upper Target
+                      <InfoTooltip content="If the stock rallies, this is where the market expects it could reach. To profit from buying calls, the stock needs to close ABOVE this price by expiration." />
+                    </p>
                     <p className="text-3xl font-bold text-green-600">${(price + expectedMoveDollars).toFixed(2)}</p>
                     <p className="text-sm text-gray-600 mt-1">+{expectedMovePercent.toFixed(2)}%</p>
                   </div>
                   <div className="text-center p-4 bg-red-50 rounded-lg border border-red-200">
-                    <p className="text-sm font-semibold text-gray-600 mb-1">Lower Target</p>
+                    <p className="text-sm font-semibold text-gray-600 mb-1 flex items-center justify-center">
+                      Lower Target
+                      <InfoTooltip content="If the stock drops, this is where the market expects it could fall to. To profit from buying puts, the stock needs to close BELOW this price by expiration." />
+                    </p>
                     <p className="text-3xl font-bold text-red-600">${(price - expectedMoveDollars).toFixed(2)}</p>
                     <p className="text-sm text-gray-600 mt-1">-{expectedMovePercent.toFixed(2)}%</p>
                   </div>
@@ -291,6 +325,7 @@ export function EarningsVolatilityCalculator() {
                   <span className="flex items-center gap-2">
                     <AlertTriangle className="h-5 w-5" />
                     IV Crush Risk Analysis
+                    <InfoTooltip content="IV Crush is when implied volatility drops sharply after an event like earnings. If you BUY options before earnings, you lose money from IV crush even if you're right about direction. Higher IV crush risk = more dangerous to buy options." />
                   </span>
                   <span className="text-2xl font-bold">{ivCrushLevel}</span>
                 </CardTitle>
@@ -298,19 +333,31 @@ export function EarningsVolatilityCalculator() {
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm font-semibold text-gray-600">Current IV</p>
+                    <p className="text-sm font-semibold text-gray-600 flex items-center">
+                      Current IV
+                      <InfoTooltip content="Today's implied volatility - elevated because of the upcoming earnings event. This is what you pay when buying options now." />
+                    </p>
                     <p className="text-2xl font-bold">{iv.toFixed(1)}%</p>
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-gray-600">Historical IV</p>
+                    <p className="text-sm font-semibold text-gray-600 flex items-center">
+                      Historical IV
+                      <InfoTooltip content="The 'normal' IV level for this stock. After earnings, IV typically crashes to this level within hours, destroying option value." />
+                    </p>
                     <p className="text-2xl font-bold">{hv.toFixed(1)}%</p>
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-gray-600">IV Premium</p>
+                    <p className="text-sm font-semibold text-gray-600 flex items-center">
+                      IV Premium
+                      <InfoTooltip content="How much 'extra' IV is priced in for earnings. This is the percentage above normal that you're paying. After earnings, this premium disappears immediately (IV crush)." />
+                    </p>
                     <p className="text-2xl font-bold">{ivCrushRisk.toFixed(1)}%</p>
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-gray-600">Days to Earnings</p>
+                    <p className="text-sm font-semibold text-gray-600 flex items-center">
+                      Days to Earnings
+                      <InfoTooltip content="How many days until the earnings announcement. IV typically builds leading up to earnings and collapses the moment results are announced." />
+                    </p>
                     <p className="text-2xl font-bold">{daysUntilEarnings > 0 ? daysUntilEarnings : "N/A"}</p>
                   </div>
                 </div>

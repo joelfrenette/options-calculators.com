@@ -1,9 +1,11 @@
-import { generateText } from 'ai'
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
+import { createGoogleGenerativeAI } from "@ai-sdk/google"
 
-const google = createGoogleGenerativeAI({
-  apiKey: process.env.GOOGLE_AI_API_KEY || 'gen-lang-client-0100065741'
-})
+// Function to get Google provider
+function getGoogleProvider() {
+  const apiKey = process.env.GOOGLE_AI_API_KEY
+  if (!apiKey) return null
+  return createGoogleGenerativeAI({ apiKey })
+}
 
 // All functions now return null immediately without making API calls
 // Uncomment the actual implementation below once Gemini quota is restored
@@ -11,8 +13,14 @@ const google = createGoogleGenerativeAI({
 export async function fetchMarketDataWithGemini(indicatorName: string, context?: string): Promise<number | null> {
   // DISABLED: Return null immediately to skip Gemini and use Grok fallback
   return null
-  
+
   /* DISABLED CODE - Uncomment when Gemini quota is restored
+  const google = getGoogleProvider()
+  if (!google) {
+    console.error('[v0] Google Gemini: API key not found')
+    return null
+  }
+  
   try {
     console.log(`[v0] Google Gemini: Fetching ${indicatorName}...`)
     

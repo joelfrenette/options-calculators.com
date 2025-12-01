@@ -37,14 +37,13 @@ interface CalendarSpreadSetup {
   debit: number
   maxProfit: number
   breakeven: { low: number; high: number }
-  // Calendar spread specific KPIs
   beta: number
   historicalVolatility: number
-  ivSkew: number // Front IV - Back IV (positive = favorable)
-  priceStability: number // % price stayed in range over 30 days
+  ivSkew: number
+  priceStability: number
   marketCap: string
-  daysNoEarnings: number // Days until next earnings
-  thetaAdvantage: number // Near theta / Far theta ratio
+  daysNoEarnings: number
+  thetaAdvantage: number
   signal: "strong" | "moderate" | "speculative"
   reason: string
   dataSource?: string
@@ -72,7 +71,7 @@ export function CalendarSpreadScanner() {
         setLastUpdated(timestamp)
         setIsLiveData(isLive)
       } catch {
-        // Invalid cache, will fetch fresh
+        // Invalid cache
       }
     }
   }, [])
@@ -93,7 +92,6 @@ export function CalendarSpreadScanner() {
       const response = await fetch("/api/strategy-scanner?type=calendar-spreads")
 
       if (!response.ok) {
-        // Try to get error message from response body
         const text = await response.text()
         console.error("[Calendar Spread Scanner] Server error:", response.status, text)
         throw new Error(`API returned ${response.status}`)
@@ -107,7 +105,6 @@ export function CalendarSpreadScanner() {
         throw new Error("Invalid response from server")
       }
 
-      // Even if response wasn't ok, we might have data with empty arrays
       if (data.calendarSpreads && Array.isArray(data.calendarSpreads)) {
         setSpreads(data.calendarSpreads)
         setIsLiveData(data.isLive || false)
@@ -127,7 +124,6 @@ export function CalendarSpreadScanner() {
           setError("No calendar spread candidates found. Try refreshing later.")
         }
       } else {
-        // Response ok but no data
         setSpreads([])
         setError("No data available. Try refreshing.")
       }
@@ -137,6 +133,20 @@ export function CalendarSpreadScanner() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const InfoTooltip = ({ content }: { content: string }) => {
+    if (!tooltipsEnabled) return null
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Info className="h-3.5 w-3.5 text-gray-400 cursor-help inline ml-1" />
+        </TooltipTrigger>
+        <TooltipContent className="max-w-sm bg-white text-gray-900 border shadow-lg p-3 z-50">
+          <p className="text-sm leading-relaxed">{content}</p>
+        </TooltipContent>
+      </Tooltip>
+    )
   }
 
   const getSignalBadge = (signal: string) => {
@@ -176,7 +186,7 @@ export function CalendarSpreadScanner() {
   }
 
   return (
-    <TooltipProvider disabled={!tooltipsEnabled}>
+    <TooltipProvider>
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -184,6 +194,7 @@ export function CalendarSpreadScanner() {
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-indigo-500" />
                 Calendar Spread Scanner
+                <InfoTooltip content="Finds stocks ideal for calendar spreads - a strategy where you sell a near-term option and buy a longer-term option at the same strike. You profit from the faster time decay of the front-month option while the back-month holds value." />
                 {isLiveData ? (
                   <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-300">
                     <Wifi className="w-3 h-3 mr-1" />
@@ -218,8 +229,9 @@ export function CalendarSpreadScanner() {
               <Info className="w-4 h-4 text-indigo-600 mt-0.5 flex-shrink-0" />
               <div className="text-sm text-indigo-800">
                 <strong>Calendar Spreads</strong> profit from time decay (theta) by selling near-term options and buying
-                longer-term options at the same strike. Best on <strong>stable, low-volatility stocks</strong> with
-                minimal price movement expected. Ideal when front-month IV is elevated relative to back-month.
+                longer-term options at the same strike. You profit from the faster time decay of the front-month option
+                while the back-month holds value. Best on <strong>stable, low-volatility stocks</strong> with minimal
+                price movement expected. Ideal when front-month IV is elevated relative to back-month.
               </div>
             </div>
           </div>
@@ -229,6 +241,7 @@ export function CalendarSpreadScanner() {
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-slate-500" />
               <span className="text-sm font-medium">Filters:</span>
+              <InfoTooltip content="Use these filters to narrow down calendar spread opportunities based on your risk tolerance and market view. Stricter filters (lower beta, lower HV, higher stability) show more conservative trades." />
             </div>
             <Select value={spreadType} onValueChange={(v: "all" | "call" | "put") => setSpreadType(v)}>
               <SelectTrigger className="w-[130px]">
@@ -240,57 +253,45 @@ export function CalendarSpreadScanner() {
                 <SelectItem value="put">Put Calendar</SelectItem>
               </SelectContent>
             </Select>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-600">Max Beta:</span>
-                  <Slider
-                    value={[maxBeta]}
-                    onValueChange={(v) => setMaxBeta(v[0])}
-                    min={0.3}
-                    max={1.5}
-                    step={0.1}
-                    className="w-24"
-                  />
-                  <span className="text-sm font-medium w-8">{maxBeta.toFixed(1)}</span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>Lower beta = less market correlation, more stable</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-600">Max HV:</span>
-                  <Slider
-                    value={[maxHV]}
-                    onValueChange={(v) => setMaxHV(v[0])}
-                    min={10}
-                    max={60}
-                    step={5}
-                    className="w-24"
-                  />
-                  <span className="text-sm font-medium w-8">{maxHV}%</span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>Historical Volatility - lower is better for calendars</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-600">Min Stability:</span>
-                  <Slider
-                    value={[minStability]}
-                    onValueChange={(v) => setMinStability(v[0])}
-                    min={50}
-                    max={95}
-                    step={5}
-                    className="w-24"
-                  />
-                  <span className="text-sm font-medium w-8">{minStability}%</span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>Price stability score - % time in trading range</TooltipContent>
-            </Tooltip>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-600">Max Beta:</span>
+              <InfoTooltip content="Beta measures how much a stock moves compared to the overall market. A beta of 1.0 means it moves exactly with the market. For calendar spreads, you want LOW beta stocks (under 0.8) because you need the stock to stay near your strike price. High beta stocks move too much and can blow through your breakeven points." />
+              <Slider
+                value={[maxBeta]}
+                onValueChange={(v) => setMaxBeta(v[0])}
+                min={0.3}
+                max={1.5}
+                step={0.1}
+                className="w-24"
+              />
+              <span className="text-sm font-medium w-8">{maxBeta.toFixed(1)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-600">Max HV:</span>
+              <InfoTooltip content="Historical Volatility (HV) shows how much the stock has actually moved in the past 30 days, expressed as a percentage. Lower HV (under 25%) means the stock has been calm and predictable. Calendar spreads need low-volatility stocks because you profit when the stock stays near your strike. High HV stocks are too unpredictable for this strategy." />
+              <Slider
+                value={[maxHV]}
+                onValueChange={(v) => setMaxHV(v[0])}
+                min={10}
+                max={60}
+                step={5}
+                className="w-24"
+              />
+              <span className="text-sm font-medium w-8">{maxHV}%</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-600">Min Stability:</span>
+              <InfoTooltip content="Price Stability Score measures what percentage of the last 30 days the stock stayed within a tight trading range. A score of 80% means the stock stayed put 80% of the time. Higher stability is BETTER for calendar spreads - you want boring, predictable stocks that don't make sudden moves. Look for 75% or higher." />
+              <Slider
+                value={[minStability]}
+                onValueChange={(v) => setMinStability(v[0])}
+                min={50}
+                max={95}
+                step={5}
+                className="w-24"
+              />
+              <span className="text-sm font-medium w-8">{minStability}%</span>
+            </div>
           </div>
 
           {/* Key Metrics Legend */}
@@ -298,18 +299,22 @@ export function CalendarSpreadScanner() {
             <div className="flex items-center gap-1 text-muted-foreground">
               <Activity className="w-3 h-3" />
               <span>Beta: Market correlation</span>
+              <InfoTooltip content="How the stock moves relative to the S&P 500. Beta of 0.5 means if the market drops 10%, this stock only drops about 5%. Lower beta = more stable = better for calendars." />
             </div>
             <div className="flex items-center gap-1 text-muted-foreground">
               <TrendingUp className="w-3 h-3" />
               <span>HV: Historical volatility</span>
+              <InfoTooltip content="The actual price swings the stock made recently. A 20% HV means the stock typically moves about 20% per year. Lower HV = calmer stock = better for this strategy." />
             </div>
             <div className="flex items-center gap-1 text-muted-foreground">
               <Shield className="w-3 h-3" />
               <span>Stability: Price range consistency</span>
+              <InfoTooltip content="How often the stock stays in a trading range. 85% means the stock was range-bound 85% of the last month. Higher = more predictable = higher chance your calendar spread profits." />
             </div>
             <div className="flex items-center gap-1 text-muted-foreground">
               <Clock className="w-3 h-3" />
               <span>IV Skew: Front vs back IV</span>
+              <InfoTooltip content="The difference in implied volatility between the option you're selling (front month) and buying (back month). POSITIVE skew is good - it means you're selling expensive options and buying cheaper ones, giving you an edge." />
             </div>
           </div>
 
@@ -357,49 +362,76 @@ export function CalendarSpreadScanner() {
                 <AccordionContent>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-lg">
                     <div>
-                      <div className="text-xs text-muted-foreground">Strategy</div>
+                      <div className="text-xs text-muted-foreground flex items-center">
+                        Strategy
+                        <InfoTooltip content="Call calendars are slightly bullish, put calendars are slightly bearish. Both profit most when the stock sits at the strike price at front-month expiration." />
+                      </div>
                       <div className="font-medium capitalize">{setup.type} Calendar</div>
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground">Strike</div>
+                      <div className="text-xs text-muted-foreground flex items-center">
+                        Strike
+                        <InfoTooltip content="The strike price for both options. Ideally close to current stock price (ATM). Max profit occurs if stock is exactly at this price when the front month expires." />
+                      </div>
                       <div className="font-medium">${setup.strike}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground">Current Price</div>
+                      <div className="text-xs text-muted-foreground flex items-center">
+                        Current Price
+                        <InfoTooltip content="Where the stock is trading now. Compare to the strike - closer is better for maximum profit potential." />
+                      </div>
                       <div className="font-medium">${setup.currentPrice.toFixed(2)}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground">Near Exp (Sell)</div>
+                      <div className="text-xs text-muted-foreground flex items-center">
+                        Near Exp (Sell)
+                        <InfoTooltip content="The front-month option you SELL. This is the one that decays faster. You keep the premium if it expires worthless near the strike." />
+                      </div>
                       <div className="font-medium">
                         {setup.nearExpiration} ({setup.nearDte}d)
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground">Far Exp (Buy)</div>
+                      <div className="text-xs text-muted-foreground flex items-center">
+                        Far Exp (Buy)
+                        <InfoTooltip content="The back-month option you BUY. This retains more value since it has more time left. You can sell it after the front month expires or continue selling more front-month options against it." />
+                      </div>
                       <div className="font-medium">
                         {setup.farExpiration} ({setup.farDte}d)
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground">Breakeven Range</div>
+                      <div className="text-xs text-muted-foreground flex items-center">
+                        Breakeven Range
+                        <InfoTooltip content="The stock price range where you make money. Wider is better - gives more room for the stock to move and still profit." />
+                      </div>
                       <div className="font-medium">
                         ${setup.breakeven.low.toFixed(0)} - ${setup.breakeven.high.toFixed(0)}
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground">Beta</div>
+                      <div className="text-xs text-muted-foreground flex items-center">
+                        Beta
+                        <InfoTooltip content="Stock's correlation to market moves. Lower beta = more stable = better for calendars." />
+                      </div>
                       <div className="font-medium">{setup.beta.toFixed(2)}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground">Historical Vol</div>
+                      <div className="text-xs text-muted-foreground flex items-center">
+                        Historical Vol
+                        <InfoTooltip content="How much the stock has actually moved recently. Lower HV stocks are more predictable and better for calendar spreads." />
+                      </div>
                       <div className="font-medium">{setup.historicalVolatility.toFixed(1)}%</div>
                     </div>
                   </div>
 
-                  {/* Calendar-specific KPIs */}
+                  {/* Calendar-specific KPIs with tooltips */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 mt-2 bg-indigo-50 rounded-lg">
                     <div>
-                      <div className="text-xs text-indigo-600 font-medium">IV Skew</div>
+                      <div className="text-xs text-indigo-600 font-medium flex items-center">
+                        IV Skew
+                        <InfoTooltip content="The difference between front-month IV and back-month IV. POSITIVE is favorable - it means you're selling more expensive options than you're buying. This 'volatility edge' increases your profit potential." />
+                      </div>
                       <div className={`font-medium ${setup.ivSkew > 0 ? "text-green-600" : "text-red-600"}`}>
                         {setup.ivSkew > 0 ? "+" : ""}
                         {setup.ivSkew.toFixed(1)}%
@@ -409,19 +441,28 @@ export function CalendarSpreadScanner() {
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs text-indigo-600 font-medium">Price Stability</div>
+                      <div className="text-xs text-indigo-600 font-medium flex items-center">
+                        Price Stability
+                        <InfoTooltip content="Percentage of time the stock stayed within a narrow trading range over the past 30 days. 80%+ is excellent - means the stock tends to stay put, which is exactly what calendars need." />
+                      </div>
                       <div className="font-medium">{setup.priceStability}%</div>
                       <div className="text-xs text-muted-foreground">30-day range</div>
                     </div>
                     <div>
-                      <div className="text-xs text-indigo-600 font-medium">Days to Earnings</div>
+                      <div className="text-xs text-indigo-600 font-medium flex items-center">
+                        Days to Earnings
+                        <InfoTooltip content="How many days until the company reports earnings. Avoid holding calendars through earnings - the big price moves can destroy the position. 45+ days is safe." />
+                      </div>
                       <div className="font-medium">{setup.daysNoEarnings > 90 ? "90+" : setup.daysNoEarnings}d</div>
                       <div className="text-xs text-muted-foreground">
                         {setup.daysNoEarnings > 45 ? "Safe" : "Watch out"}
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs text-indigo-600 font-medium">Theta Advantage</div>
+                      <div className="text-xs text-indigo-600 font-medium flex items-center">
+                        Theta Advantage
+                        <InfoTooltip content="How much faster the front-month decays compared to the back-month. 2.0x means the short option decays twice as fast - your edge from time decay. Higher is better." />
+                      </div>
                       <div className="font-medium">{setup.thetaAdvantage.toFixed(1)}x</div>
                       <div className="text-xs text-muted-foreground">Near/Far decay ratio</div>
                     </div>

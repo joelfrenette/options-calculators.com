@@ -1,49 +1,4 @@
 import { generateWithFallback } from "@/lib/ai-providers"
-import { createOpenAI } from "@ai-sdk/openai"
-
-// Use environment variables directly - priority: Groq > OpenAI > xAI > Google
-function getAIProvider() {
-  if (process.env.GROQ_API_KEY) {
-    return {
-      provider: createOpenAI({
-        apiKey: process.env.GROQ_API_KEY,
-        baseURL: "https://api.groq.com/openai/v1",
-      }),
-      model: "llama-3.3-70b-versatile",
-      name: "Groq",
-    }
-  }
-  if (process.env.OPENAI_API_KEY) {
-    return {
-      provider: createOpenAI({
-        apiKey: process.env.OPENAI_API_KEY,
-      }),
-      model: "gpt-4o-mini",
-      name: "OpenAI",
-    }
-  }
-  if (process.env.XAI_API_KEY) {
-    return {
-      provider: createOpenAI({
-        apiKey: process.env.XAI_API_KEY,
-        baseURL: "https://api.x.ai/v1",
-      }),
-      model: "grok-2-latest",
-      name: "xAI",
-    }
-  }
-  if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-    return {
-      provider: createOpenAI({
-        apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-        baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
-      }),
-      model: "gemini-2.0-flash-exp",
-      name: "Google",
-    }
-  }
-  return null
-}
 
 export async function POST(request: Request) {
   try {

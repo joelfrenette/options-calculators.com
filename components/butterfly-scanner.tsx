@@ -140,8 +140,8 @@ export function ButterflyScanner() {
         <TooltipTrigger asChild>
           <Info className="h-3.5 w-3.5 text-gray-400 cursor-help inline ml-1" />
         </TooltipTrigger>
-        <TooltipContent className="max-w-xs bg-white text-gray-900 border shadow-lg">
-          <p className="text-xs">{content}</p>
+        <TooltipContent className="max-w-sm bg-white text-gray-900 border shadow-lg p-3 z-50">
+          <p className="text-sm leading-relaxed">{content}</p>
         </TooltipContent>
       </Tooltip>
     )
@@ -212,7 +212,11 @@ export function ButterflyScanner() {
             <p className="text-gray-500 flex items-center">
               {setup.structure === "standard" ? "Debit" : "Credit"}
               <InfoTooltip
-                content={setup.structure === "standard" ? "Cost to enter the trade" : "Credit received (BWB)"}
+                content={
+                  setup.structure === "standard"
+                    ? "The upfront cost to enter this butterfly. This is your maximum risk - the most you can lose if the stock is far from your middle strike at expiration. A $2.00 debit means you pay $200 per contract."
+                    : "Broken Wing Butterflies are often entered for a CREDIT - you get paid to put on the trade! The tradeoff is that you have risk on one side. The credit reduces your cost basis and can make the trade profitable even if it doesn't hit the sweet spot."
+                }
               />
             </p>
             <p className={`font-semibold ${setup.structure === "broken-wing" ? "text-green-600" : ""}`}>
@@ -222,21 +226,21 @@ export function ButterflyScanner() {
           <div>
             <p className="text-gray-500 flex items-center">
               Max Profit
-              <InfoTooltip content="Maximum profit if price is at middle strike at expiration" />
+              <InfoTooltip content="Your maximum possible gain if the stock lands EXACTLY at the middle strike at expiration. Butterflies are like darts - you're aiming for a bullseye. The closer to the middle strike, the more you make. This is calculated as: (Wing Width - Debit Paid) × 100." />
             </p>
             <p className="font-semibold text-green-600">${setup.maxProfit.toFixed(2)}</p>
           </div>
           <div>
             <p className="text-gray-500 flex items-center">
               Max Loss
-              <InfoTooltip content="Maximum loss for this position" />
+              <InfoTooltip content="The most you can lose on this trade. For standard butterflies, this equals your debit paid - if the stock is far from your middle strike at expiration, your options expire worthless and you lose what you paid. For BWBs, max loss can be on the 'broken' side if the stock moves against you." />
             </p>
             <p className="font-semibold text-red-600">${setup.maxLoss.toFixed(2)}</p>
           </div>
           <div>
             <p className="text-gray-500 flex items-center">
               R:R Ratio
-              <InfoTooltip content="Risk-to-reward ratio (lower is better)" />
+              <InfoTooltip content="Risk-to-Reward Ratio. A ratio of 0.5:1 means you risk $0.50 to potentially make $1.00 - excellent odds! Lower ratios are better. Butterflies often have very attractive R:R because the max profit can be 3-10x the debit paid. The catch? You need to be right about where the stock lands." />
             </p>
             <p className="font-semibold">{setup.riskRewardRatio.toFixed(1)}:1</p>
           </div>
@@ -246,7 +250,7 @@ export function ButterflyScanner() {
           <div>
             <p className="text-gray-500 flex items-center">
               IV Rank
-              <InfoTooltip content="Current IV compared to past year (higher = more expensive options)" />
+              <InfoTooltip content="Shows if options are cheap or expensive compared to the past year. Since you're selling 2 middle options and buying 2 wings, higher IV Rank helps - the sold options bring in more credit, reducing your net cost. Look for 40%+ IV Rank for better entries." />
             </p>
             <p className={`font-semibold ${setup.ivRank >= 50 ? "text-green-600" : "text-gray-600"}`}>
               {setup.ivRank}%
@@ -255,21 +259,21 @@ export function ButterflyScanner() {
           <div>
             <p className="text-gray-500 flex items-center">
               POP
-              <InfoTooltip content="Probability of profit at expiration" />
+              <InfoTooltip content="Probability of Profit - your estimated chance of making any money on this trade. Butterflies typically have 20-35% POP because the stock needs to land in a specific zone. This is a LOTTERY TICKET strategy - low probability but high payout when it hits." />
             </p>
             <p className="font-semibold">{setup.probabilityOfProfit}%</p>
           </div>
           <div>
             <p className="text-gray-500 flex items-center">
               DTE
-              <InfoTooltip content="Days to expiration" />
+              <InfoTooltip content="Days to Expiration - how long until these options expire. More DTE = more time for the stock to move to your target, but also more time value you're paying for. Sweet spot is usually 30-45 days for butterflies." />
             </p>
             <p className="font-semibold">{setup.dte}d</p>
           </div>
           <div>
             <p className="text-gray-500 flex items-center">
               Distance
-              <InfoTooltip content="How far current price is from the profit zone" />
+              <InfoTooltip content="How far the stock currently is from your middle strike (profit target), as a percentage. 0% = already at target. +3% = stock needs to rise 3%. -2% = stock needs to fall 2%. Closer to zero = better starting position for your butterfly." />
             </p>
             <p className="font-semibold">{setup.distanceToProfit.toFixed(1)}%</p>
           </div>
@@ -337,6 +341,7 @@ export function ButterflyScanner() {
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-gray-500" />
               <span className="text-sm font-medium">Filters:</span>
+              <InfoTooltip content="Use these filters to find butterfly spreads matching your trading style. Standard butterflies are balanced bets on a specific price. Broken Wing Butterflies (BWB) add a directional bias and often can be entered for a credit instead of a debit." />
             </div>
 
             <Select value={butterflyType} onValueChange={(v: any) => setButterflyType(v)}>
@@ -363,6 +368,7 @@ export function ButterflyScanner() {
 
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600">Min IV Rank:</span>
+              <InfoTooltip content="Minimum IV Rank filters for options that are relatively expensive compared to the past year. For butterflies, higher IV Rank (40%+) is beneficial because you're selling 2 middle options - when IV is high, those sold options bring in more premium, reducing your net cost and improving your risk/reward." />
               <Slider
                 value={[minIVRank]}
                 onValueChange={([v]) => setMinIVRank(v)}
@@ -376,6 +382,7 @@ export function ButterflyScanner() {
 
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600">Max DTE:</span>
+              <InfoTooltip content="Maximum Days to Expiration. Butterflies need enough time for the stock to move to your target price (the middle strike), but not so much time that the trade ties up capital. 30-45 DTE is common. Shorter DTE means faster theta decay but less time to be right. Longer DTE costs more but gives more time." />
               <Slider
                 value={[maxDTE]}
                 onValueChange={([v]) => setMaxDTE(v)}
@@ -393,18 +400,22 @@ export function ButterflyScanner() {
             <div className="flex items-center gap-1">
               <Activity className="h-3 w-3 text-purple-500" />
               IV Rank: Implied volatility ranking
+              <InfoTooltip content="Compares current option prices to the past year. 0% = cheapest options have been all year. 100% = most expensive. Higher IV Rank means you get paid more for the options you sell in the butterfly." />
             </div>
             <div className="flex items-center gap-1">
               <Target className="h-3 w-3 text-blue-500" />
               POP: Probability of profit
+              <InfoTooltip content="Your estimated chance of making money. A 25% POP means roughly 1 in 4 similar trades would profit. Butterflies typically have lower POP (20-35%) because they need the stock to land near a specific price, but they offer high reward when they hit." />
             </div>
             <div className="flex items-center gap-1">
               <DollarSign className="h-3 w-3 text-green-500" />
               R:R: Risk to reward ratio
+              <InfoTooltip content="Risk-to-Reward Ratio shows how much you risk to potentially gain. A 1:3 ratio means for every $1 you risk, you could make $3. Butterflies often have great R:R ratios (1:5 or better) because max profit is high relative to the debit paid." />
             </div>
             <div className="flex items-center gap-1">
               <TrendingUp className="h-3 w-3 text-orange-500" />
               Distance: % to profit zone
+              <InfoTooltip content="How far the current stock price is from the middle strike (your profit target). Closer to 0% = stock is already near your target = higher chance of profit. Negative = stock needs to fall. Positive = stock needs to rise." />
             </div>
           </div>
 

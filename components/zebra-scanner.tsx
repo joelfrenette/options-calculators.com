@@ -137,8 +137,8 @@ export function ZEBRAScanner() {
         <TooltipTrigger asChild>
           <Info className="h-3.5 w-3.5 text-gray-400 cursor-help inline ml-1" />
         </TooltipTrigger>
-        <TooltipContent className="max-w-xs bg-white text-gray-900 border shadow-lg">
-          <p className="text-xs">{content}</p>
+        <TooltipContent className="max-w-sm bg-white text-gray-900 border shadow-lg p-3 z-50">
+          <p className="text-sm leading-relaxed">{content}</p>
         </TooltipContent>
       </Tooltip>
     )
@@ -215,6 +215,7 @@ export function ZEBRAScanner() {
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-gray-500" />
               <span className="text-sm font-medium">Filters:</span>
+              <InfoTooltip content="Filter ZEBRA setups by your market view and preferences. Call ZEBRAs are bullish (you profit when stock rises). Put ZEBRAs are bearish (you profit when stock falls). The breakeven distance filter helps you find setups where you're already close to profitability." />
             </div>
 
             <Select value={optionType} onValueChange={(v: any) => setOptionType(v)}>
@@ -241,6 +242,7 @@ export function ZEBRAScanner() {
 
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600">Min DTE:</span>
+              <InfoTooltip content="Minimum Days to Expiration. ZEBRAs work best with longer expirations (60+ days) because you need time for your directional thesis to play out. Shorter DTE = less time premium but also less room for the trade to work. Most ZEBRA traders use 60-120 day options." />
               <Slider
                 value={[minDTE]}
                 onValueChange={([v]) => setMinDTE(v)}
@@ -254,6 +256,7 @@ export function ZEBRAScanner() {
 
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600">Max B/E Dist:</span>
+              <InfoTooltip content="Maximum Breakeven Distance - how far the stock price is from your breakeven point. Smaller distance (under 3%) means you're already close to profitability - a small move in your favor starts making money. Larger distance means the stock has further to travel before you profit." />
               <Slider
                 value={[maxBreakevenDistance]}
                 onValueChange={([v]) => setMaxBreakevenDistance(v)}
@@ -271,18 +274,22 @@ export function ZEBRAScanner() {
             <div className="flex items-center gap-1">
               <Activity className="h-3 w-3 text-blue-500" />
               Delta: Position delta (~100 = stock-like)
+              <InfoTooltip content="Position Delta shows how the entire ZEBRA position moves with the stock. ~100 delta means it moves almost exactly like owning 100 shares of stock. The magic of ZEBRA is getting stock-like exposure while paying almost zero time premium." />
             </div>
             <div className="flex items-center gap-1">
               <DollarSign className="h-3 w-3 text-green-500" />
               Extrinsic: Time value paid (lower = better)
+              <InfoTooltip content="Extrinsic (time) value is what you pay above intrinsic value. In a ZEBRA, the goal is ZERO extrinsic - hence 'Zero Extrinsic Back Ratio.' The sold ATM option offsets the extrinsic of the 2 ITM options you buy. Under $1 extrinsic = excellent ZEBRA." />
             </div>
             <div className="flex items-center gap-1">
               <TrendingUp className="h-3 w-3 text-purple-500" />
               Stock Score: Fundamental strength
+              <InfoTooltip content="A composite score (1-10) measuring the stock's fundamental quality - revenue growth, earnings, balance sheet strength, analyst ratings. Higher scores = more confidence the stock will trend in your direction. Look for 7+ for high-conviction ZEBRAs." />
             </div>
             <div className="flex items-center gap-1">
               <Target className="h-3 w-3 text-orange-500" />
               B/E Dist: Distance to breakeven %
+              <InfoTooltip content="How far current price is from breakeven. Positive = stock needs to rise (for call ZEBRA). Negative = stock needs to fall. Under 3% = you're close to profiting already. This helps gauge how much the stock needs to move before you make money." />
             </div>
           </div>
 
@@ -359,28 +366,28 @@ export function ZEBRAScanner() {
                       <div>
                         <p className="text-gray-500 flex items-center">
                           Max Loss
-                          <InfoTooltip content="Maximum loss is limited to net debit paid" />
+                          <InfoTooltip content="The maximum you can lose is your net debit paid. Unlike buying stock (where you could theoretically lose everything), your risk is capped. This is the DEFINED RISK benefit of ZEBRA - you know your worst case before entering. Example: $1,500 max loss means that's the most you can ever lose on this trade." />
                         </p>
                         <p className="font-semibold text-red-600">${setup.maxLoss.toFixed(2)}</p>
                       </div>
                       <div>
                         <p className="text-gray-500 flex items-center">
                           Max Profit
-                          <InfoTooltip content="Profit potential as stock moves in your direction" />
+                          <InfoTooltip content="For call ZEBRAs, profit is theoretically unlimited as the stock rises (like owning stock). For put ZEBRAs, max profit is if stock goes to zero. In practice, think of it as: with ~100 delta, you make about $100 per contract for every $1 the stock moves in your favor." />
                         </p>
                         <p className="font-semibold text-green-600">{setup.maxProfit}</p>
                       </div>
                       <div>
                         <p className="text-gray-500 flex items-center">
                           Breakeven
-                          <InfoTooltip content="Stock price needed to break even" />
+                          <InfoTooltip content="The stock price where you start making money at expiration. For a call ZEBRA: roughly your lower strike + net debit paid per share. Above this price, every dollar the stock rises is approximately a dollar of profit for you (with ~100 delta)." />
                         </p>
                         <p className="font-semibold">${setup.breakeven.toFixed(2)}</p>
                       </div>
                       <div>
                         <p className="text-gray-500 flex items-center">
                           B/E Dist
-                          <InfoTooltip content="Distance from current price to breakeven" />
+                          <InfoTooltip content="Breakeven Distance shows how far the stock needs to move to reach profitability. +2.5% means the stock needs to rise 2.5% from current price. -1.5% means it needs to fall 1.5%. Closer to 0% = better entry point. Under 3% distance is generally favorable." />
                         </p>
                         <p
                           className={`font-semibold ${Math.abs(setup.distanceToBreakeven) < 3 ? "text-green-600" : ""}`}
@@ -392,7 +399,7 @@ export function ZEBRAScanner() {
                       <div>
                         <p className="text-gray-500 flex items-center">
                           DTE
-                          <InfoTooltip content="Days to expiration" />
+                          <InfoTooltip content="Days to Expiration - how long you have for your directional thesis to play out. ZEBRAs don't suffer much from time decay (because you paid almost zero extrinsic), so you can hold longer without theta burning you. 60-120 days is common for ZEBRAs." />
                         </p>
                         <p className="font-semibold">{setup.dte}d</p>
                       </div>
@@ -402,7 +409,7 @@ export function ZEBRAScanner() {
                       <div>
                         <p className="text-gray-500 flex items-center">
                           Extrinsic
-                          <InfoTooltip content="Time value paid - should be near zero for ZEBRA" />
+                          <InfoTooltip content="The total time premium paid for this ZEBRA position. The goal is near ZERO - that's what makes ZEBRA special. Under $1.00 is excellent. Under $0.50 is ideal. If extrinsic is high, the ZEBRA structure isn't working properly - look for a different setup." />
                         </p>
                         <p
                           className={`font-semibold ${setup.extrinsicPaid < 1 ? "text-green-600" : "text-yellow-600"}`}
@@ -413,7 +420,7 @@ export function ZEBRAScanner() {
                       <div>
                         <p className="text-gray-500 flex items-center">
                           Stock Score
-                          <InfoTooltip content="Fundamental + growth score (higher = better)" />
+                          <InfoTooltip content="Fundamental strength score from 1-10 based on revenue growth, earnings, margins, and analyst ratings. 7+ = strong company likely to trend. 5-6 = average. Under 5 = weak fundamentals. For directional bets like ZEBRA, you want fundamentally strong stocks (7+) moving in your direction." />
                         </p>
                         <p className={`font-semibold ${setup.stockScore >= 7 ? "text-green-600" : ""}`}>
                           {setup.stockScore}/10
@@ -422,14 +429,14 @@ export function ZEBRAScanner() {
                       <div>
                         <p className="text-gray-500 flex items-center">
                           Leverage
-                          <InfoTooltip content="Capital efficiency vs owning stock" />
+                          <InfoTooltip content="Capital efficiency vs buying stock outright. 2.5x leverage means you control $25,000 worth of stock exposure with $10,000 in capital. ZEBRA gives you stock-like returns with less capital at risk. Higher leverage = more capital efficient but requires getting direction right." />
                         </p>
                         <p className="font-semibold">{setup.leverageRatio.toFixed(1)}x</p>
                       </div>
                       <div>
                         <p className="text-gray-500 flex items-center">
                           Opt Volume
-                          <InfoTooltip content="Options volume for liquidity" />
+                          <InfoTooltip content="Options trading volume - higher is better for liquidity. 10K+ daily volume means tight bid-ask spreads and easy entry/exit. Low volume (<1K) can mean wide spreads and difficulty closing the position at a fair price. Stick to liquid options (5K+ volume)." />
                         </p>
                         <p className="font-semibold">{(setup.optionVolume / 1000).toFixed(0)}K</p>
                       </div>

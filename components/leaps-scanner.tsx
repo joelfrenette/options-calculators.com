@@ -143,8 +143,8 @@ export function LEAPSScanner() {
         <TooltipTrigger asChild>
           <Info className="h-3.5 w-3.5 text-gray-400 cursor-help inline ml-1" />
         </TooltipTrigger>
-        <TooltipContent className="max-w-xs bg-white text-gray-900 border shadow-lg">
-          <p className="text-xs">{content}</p>
+        <TooltipContent className="max-w-sm bg-white text-gray-900 border shadow-lg p-3 z-50">
+          <p className="text-sm leading-relaxed">{content}</p>
         </TooltipContent>
       </Tooltip>
     )
@@ -222,6 +222,7 @@ export function LEAPSScanner() {
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-gray-500" />
               <span className="text-sm font-medium">Filters:</span>
+              <InfoTooltip content="These filters help you find quality LEAPS candidates. Focus on companies with low debt, strong earnings growth, and high delta options. LEAPS are a long-term commitment - you want fundamentally solid companies that will grow over 1-2 years." />
             </div>
 
             <Select value={optionType} onValueChange={(v: any) => setOptionType(v)}>
@@ -237,6 +238,7 @@ export function LEAPSScanner() {
 
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600">Min DTE:</span>
+              <InfoTooltip content="Minimum Days to Expiration. LEAPS are defined as options with 1+ year until expiration. The longer the DTE, the more time you have for your thesis to play out - but you also pay more time premium. 365+ days is standard for LEAPS. Some traders go 500+ days for major positions." />
               <Slider
                 value={[minDTE]}
                 onValueChange={([v]) => setMinDTE(v)}
@@ -250,6 +252,7 @@ export function LEAPSScanner() {
 
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600">Max D/E:</span>
+              <InfoTooltip content="Maximum Debt-to-Equity ratio. This measures how much debt a company has compared to shareholder equity. Lower is safer - a D/E of 0.5 means the company has $0.50 of debt for every $1 of equity. For LEAPS, you want financially healthy companies (D/E under 1.0) that won't struggle if the economy slows." />
               <Slider
                 value={[maxDebtEquity]}
                 onValueChange={([v]) => setMaxDebtEquity(v)}
@@ -263,6 +266,7 @@ export function LEAPSScanner() {
 
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600">Min Delta:</span>
+              <InfoTooltip content="Minimum Delta for the LEAPS option. Delta tells you how much the option moves for every $1 the stock moves. A 0.70 delta call gains ~$70 when the stock rises $1 (per contract). For stock replacement, use deep ITM options with 0.70-0.85 delta - they move almost like stock but cost less capital." />
               <Slider
                 value={[minDelta]}
                 onValueChange={([v]) => setMinDelta(v)}
@@ -280,18 +284,22 @@ export function LEAPSScanner() {
             <div className="flex items-center gap-1">
               <TrendingUp className="h-3 w-3 text-green-500" />
               EPS Growth: 5-year earnings growth
+              <InfoTooltip content="Earnings Per Share growth over 5 years. A company growing EPS 15%+ annually is building real value. For LEAPS, you want companies that will be worth MORE in 1-2 years - consistent earnings growth is the best predictor of that." />
             </div>
             <div className="flex items-center gap-1">
               <Shield className="h-3 w-3 text-blue-500" />
               D/E: Debt-to-equity ratio
+              <InfoTooltip content="How much debt vs equity the company has. Under 0.5 = very conservative. Under 1.0 = healthy. Over 1.5 = higher risk. Avoid high-debt companies for LEAPS - they're more vulnerable to economic downturns and rising interest rates." />
             </div>
             <div className="flex items-center gap-1">
               <Activity className="h-3 w-3 text-purple-500" />
               Delta: Option sensitivity to stock
+              <InfoTooltip content="How much your option moves per $1 stock move. A 0.80 delta LEAP call moves $80 per contract when the stock rises $1. Deep ITM LEAPS (0.70+ delta) act like stock but cost 20-30% of buying shares outright - that's the leverage advantage." />
             </div>
             <div className="flex items-center gap-1">
               <Percent className="h-3 w-3 text-orange-500" />
               Ann. Cost: Yearly cost as % of stock
+              <InfoTooltip content="The annualized cost of the extrinsic (time) value as a percentage of the stock price. If a stock is $100 and you pay $5 in extrinsic for a 2-year LEAP, that's 2.5% per year. Lower is better - you're essentially paying 'rent' for the leverage." />
             </div>
           </div>
 
@@ -368,35 +376,35 @@ export function LEAPSScanner() {
                       <div>
                         <p className="text-gray-500 flex items-center">
                           Intrinsic
-                          <InfoTooltip content="Value if exercised today (stock price - strike)" />
+                          <InfoTooltip content="Intrinsic value is the 'real' value - what the option is worth if exercised immediately. For a call: Stock Price - Strike Price. If stock is $150 and strike is $120, intrinsic value is $30 ($3,000 per contract). This is the portion of the premium that's guaranteed value, not time premium." />
                         </p>
                         <p className="font-semibold text-green-600">${setup.intrinsicValue.toFixed(2)}</p>
                       </div>
                       <div>
                         <p className="text-gray-500 flex items-center">
                           Extrinsic
-                          <InfoTooltip content="Time value premium paid" />
+                          <InfoTooltip content="Extrinsic value is the 'time premium' - what you pay above intrinsic value for the privilege of controlling the stock with less capital. This portion decays over time (theta). For LEAPS, lower extrinsic is better. Deep ITM options have less extrinsic than ATM options." />
                         </p>
                         <p className="font-semibold">${setup.extrinsicValue.toFixed(2)}</p>
                       </div>
                       <div>
                         <p className="text-gray-500 flex items-center">
                           Breakeven
-                          <InfoTooltip content="Stock price needed to break even at expiration" />
+                          <InfoTooltip content="The stock price where you break even at expiration. For a call LEAP: Strike + Premium Paid. If you pay $35 for a $120 strike call, breakeven is $155. The stock must be above this price at expiration for you to profit (or you can sell the LEAP earlier if it gains value)." />
                         </p>
                         <p className="font-semibold">${setup.breakeven.toFixed(2)}</p>
                       </div>
                       <div>
                         <p className="text-gray-500 flex items-center">
                           Leverage
-                          <InfoTooltip content="Effective leverage ratio vs owning stock" />
+                          <InfoTooltip content="How much stock exposure you get per dollar invested compared to buying shares. 3x leverage means you control 3x more stock value than your investment. Example: $10,000 in LEAPS might give you exposure to $30,000 worth of stock. Higher leverage = more profit potential but also more risk if wrong." />
                         </p>
                         <p className="font-semibold">{setup.leverageRatio.toFixed(1)}x</p>
                       </div>
                       <div>
                         <p className="text-gray-500 flex items-center">
                           Ann. Cost
-                          <InfoTooltip content="Annualized cost of time value as % of stock price" />
+                          <InfoTooltip content="The yearly 'cost' of using LEAPS instead of stock, expressed as a percentage of the stock price. A 3% annual cost means you're paying 3% per year in time decay for the leverage benefit. Compare this to margin interest rates (6-8%) - LEAPS can be cheaper! Lower is better." />
                         </p>
                         <p className="font-semibold">{setup.annualizedCost.toFixed(1)}%</p>
                       </div>
@@ -406,7 +414,7 @@ export function LEAPSScanner() {
                       <div>
                         <p className="text-gray-500 flex items-center">
                           EPS Growth
-                          <InfoTooltip content="5-year earnings per share growth rate" />
+                          <InfoTooltip content="5-year Earnings Per Share growth rate. This shows if the company is actually making more money over time. 10%+ annual growth is solid. 15%+ is excellent. Negative growth is a red flag for LEAPS - you're betting the stock will be higher in 1-2 years, so you need a growing company." />
                         </p>
                         <p className={`font-semibold ${setup.epsGrowth >= 10 ? "text-green-600" : ""}`}>
                           {setup.epsGrowth > 0 ? "+" : ""}
@@ -416,7 +424,7 @@ export function LEAPSScanner() {
                       <div>
                         <p className="text-gray-500 flex items-center">
                           Debt/Equity
-                          <InfoTooltip content="Lower is better - indicates financial health" />
+                          <InfoTooltip content="Debt-to-Equity ratio measures financial health. Under 0.5 = very safe (green). 0.5-1.0 = normal. Over 1.5 = concerning (red). High-debt companies are riskier for LEAPS because they may struggle in recessions or if interest rates rise, hurting the stock price over your holding period." />
                         </p>
                         <p
                           className={`font-semibold ${setup.debtToEquity < 0.5 ? "text-green-600" : setup.debtToEquity > 1.5 ? "text-red-600" : ""}`}
@@ -427,14 +435,14 @@ export function LEAPSScanner() {
                       <div>
                         <p className="text-gray-500 flex items-center">
                           P/B Ratio
-                          <InfoTooltip content="Price-to-book ratio" />
+                          <InfoTooltip content="Price-to-Book ratio compares stock price to the company's net assets. A P/B of 3 means you're paying $3 for every $1 of book value. Lower P/B can indicate value (or problems). Higher P/B often means investors expect strong growth. For LEAPS, compare P/B to peers in the same industry." />
                         </p>
                         <p className="font-semibold">{setup.priceToBook.toFixed(1)}</p>
                       </div>
                       <div>
                         <p className="text-gray-500 flex items-center">
                           Market Cap
-                          <InfoTooltip content="Company market capitalization" />
+                          <InfoTooltip content="The total market value of the company (share price × shares outstanding). Larger market cap ($100B+) = more stable, less volatile. Smaller cap = more growth potential but more risk. For LEAPS, large caps are safer; mid-caps offer more upside if you're confident in your thesis." />
                         </p>
                         <p className="font-semibold">{setup.marketCap}</p>
                       </div>
