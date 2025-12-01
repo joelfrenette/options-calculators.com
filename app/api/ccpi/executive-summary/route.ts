@@ -1,10 +1,59 @@
 import { NextResponse } from "next/server"
-import { createXai } from "@ai-sdk/xai"
 import { generateText } from "ai"
+import { createOpenAI } from "@ai-sdk/openai"
+import { createAnthropic } from "@ai-sdk/anthropic"
+import { createGoogleGenerativeAI } from "@ai-sdk/google"
 
-const xai = createXai({
-  apiKey: process.env.XAI_API_KEY,
-})
+const providerConfigs = [
+  {
+    name: "Groq",
+    key: () => process.env.GROQ_API_KEY,
+    create: () =>
+      createOpenAI({
+        apiKey: process.env.GROQ_API_KEY!,
+        baseURL: "https://api.groq.com/openai/v1",
+      }),
+    model: "llama-3.3-70b-versatile",
+  },
+  {
+    name: "OpenAI",
+    key: () => process.env.OPENAI_API_KEY,
+    create: () => createOpenAI({ apiKey: process.env.OPENAI_API_KEY! }),
+    model: "gpt-4o-mini",
+  },
+  {
+    name: "Google",
+    key: () => process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+    create: () => createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY! }),
+    model: "gemini-2.0-flash-exp",
+  },
+  {
+    name: "xAI",
+    key: () => process.env.XAI_API_KEY,
+    create: () =>
+      createOpenAI({
+        apiKey: process.env.XAI_API_KEY!,
+        baseURL: "https://api.x.ai/v1",
+      }),
+    model: "grok-2-latest",
+  },
+  {
+    name: "Anthropic",
+    key: () => process.env.ANTHROPIC_API_KEY,
+    create: () => createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY! }),
+    model: "claude-3-5-sonnet-20241022",
+  },
+  {
+    name: "OpenRouter",
+    key: () => process.env.OPENROUTER_API_KEY,
+    create: () =>
+      createOpenAI({
+        apiKey: process.env.OPENROUTER_API_KEY!,
+        baseURL: "https://openrouter.ai/api/v1",
+      }),
+    model: "meta-llama/llama-3.3-70b-instruct",
+  },
+]
 
 export async function POST(request: Request) {
   try {
@@ -18,9 +67,7 @@ export async function POST(request: Request) {
     const regime = body.regime ?? { name: "Unknown", description: "Unknown" }
     const pillars = body.pillars ?? { momentum: 0, riskAppetite: 0, valuation: 0, macro: 0 }
 
-    const { text } = await generateText({
-      model: xai("grok-2-latest"),
-      prompt: `You are a professional financial analyst providing an executive summary for the CCPI (Comprehensive Crash & Correction Prediction Index).
+    const prompt = `You are a professional financial analyst providing an executive summary for the CCPI (Comprehensive Crash & Correction Prediction Index).
 
 ## CCPI METHODOLOGY CONTEXT:
 The CCPI is a proprietary market crash prediction index that aggregates 34 market indicators across 4 weighted pillars:
@@ -60,19 +107,42 @@ Write a comprehensive 2-3 sentence executive summary that:
 3. Identifies which pillar(s) are driving the score (highest scoring pillars = most concerning)
 4. Provides specific, actionable guidance for options traders based on this data
 
-Make it professional, data-driven, and immediately actionable for sophisticated traders. Focus on what the numbers mean and what traders should DO.`,
-      temperature: 0.7,
-      maxTokens: 300,
-      abortSignal: AbortSignal.timeout(30000),
-    })
+Make it professional, data-driven, and immediately actionable for sophisticated traders. Focus on what the numbers mean and what traders should DO.`
 
-    if (!text || text.trim().length === 0) {
-      throw new Error("Grok returned empty response")
+    let lastError: Error | null = null
+
+    for (const config of providerConfigs) {
+      if (!config.key()) continue
+
+      try {
+        console.log(`[AI] Trying ${config.name} for executive summary...`)
+        const provider = config.create()
+        const model = provider(config.model)
+
+        const { text } = await generateText({
+          model,
+          prompt,
+          temperature: 0.7,
+          maxTokens: 300,
+          abortSignal: AbortSignal.timeout(30000),
+        })
+
+        if (!text || text.trim().length === 0) {
+          throw new Error("AI returned empty response")
+        }
+
+        console.log(`[AI] Success with ${config.name}`)
+        return NextResponse.json({ summary: text.trim(), provider: config.name })
+      } catch (error) {
+        console.error(`[AI] ${config.name} failed:`, error instanceof Error ? error.message : error)
+        lastError = error instanceof Error ? error : new Error(String(error))
+        // Continue to next provider
+      }
     }
 
-    return NextResponse.json({ summary: text.trim() })
+    throw lastError || new Error("No AI providers available")
   } catch (error) {
-    console.error("[v0] Grok executive summary error:", error)
+    console.error("[AI] Executive summary error:", error)
 
     const fallbackMessage = "CCPI analysis is currently being generated. The market data has been successfully loaded."
 

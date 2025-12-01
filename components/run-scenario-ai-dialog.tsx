@@ -15,9 +15,20 @@ import { Sparkles, Bot, User, Send, Loader2, TrendingUp, Target, DollarSign, Ale
 
 interface ScenarioContext {
   type: "earnings" | "insider" | "jobs" | "strategy" | "economic"
-  title: string
-  details: string
+  // Core fields - at least one way to identify the scenario
+  title?: string
+  details?: string
+  // Earnings-specific fields
   ticker?: string
+  company?: string
+  estimate?: string
+  date?: string
+  aiExplainer?: string
+  // Economic-specific fields
+  event?: string
+  impact?: string
+  forecast?: string
+  // Generic additional context
   additionalContext?: Record<string, string>
 }
 
@@ -25,6 +36,58 @@ interface RunScenarioInAIDialogProps {
   context: ScenarioContext
   buttonVariant?: "default" | "outline"
   buttonClassName?: string
+}
+
+function getContextDisplay(context: ScenarioContext): { title: string; details: string } {
+  if (context.type === "earnings") {
+    const title =
+      context.title ||
+      (context.ticker && context.company
+        ? `${context.ticker} Earnings - ${context.company}`
+        : context.ticker || "Earnings Event")
+
+    const detailParts: string[] = []
+    if (context.company) detailParts.push(`Company: ${context.company}`)
+    if (context.date) detailParts.push(`Date: ${context.date}`)
+    if (context.estimate) detailParts.push(`EPS Estimate: ${context.estimate}`)
+    if (context.aiExplainer) detailParts.push(`\n\nAI Analysis: ${context.aiExplainer}`)
+
+    const details =
+      context.details || detailParts.join(" | ") || `Upcoming earnings report for ${context.ticker || "this stock"}`
+
+    return { title, details }
+  }
+
+  if (context.type === "economic") {
+    const title = context.title || context.event || "Economic Event"
+
+    const detailParts: string[] = []
+    if (context.event) detailParts.push(`Event: ${context.event}`)
+    if (context.date) detailParts.push(`Date: ${context.date}`)
+    if (context.impact) detailParts.push(`Expected Impact: ${context.impact}`)
+    if (context.forecast) detailParts.push(`Forecast: ${context.forecast}`)
+
+    const details = context.details || detailParts.join(" | ") || "Upcoming economic event"
+
+    return { title, details }
+  }
+
+  if (context.type === "insider") {
+    const title = context.title || (context.ticker ? `${context.ticker} Insider Activity` : "Insider Transaction")
+    const details = context.details || `Insider trading activity${context.ticker ? ` for ${context.ticker}` : ""}`
+    return { title, details }
+  }
+
+  if (context.type === "jobs") {
+    const title = context.title || "Jobs Report Analysis"
+    const details = context.details || "Employment data and market impact analysis"
+    return { title, details }
+  }
+
+  // Default/strategy type
+  const title = context.title || "Strategy Analysis"
+  const details = context.details || "Options trading strategy analysis"
+  return { title, details }
 }
 
 export function RunScenarioInAIDialog({
@@ -37,11 +100,13 @@ export function RunScenarioInAIDialog({
   const [conversation, setConversation] = useState<{ role: "user" | "ai"; message: string }[]>([])
   const [isOpen, setIsOpen] = useState(false)
 
+  const { title: contextTitle, details: contextDetails } = getContextDisplay(context)
+
   const getSuggestedQuestions = () => {
     switch (context.type) {
       case "earnings":
         return [
-          "What options strategies work best for this scenario?",
+          `What options strategies work best for ${context.ticker || "this"} earnings?`,
           "How should I size my position for this trade?",
           "What are the key risks I should watch for?",
           "When should I exit if the trade goes against me?",
@@ -62,7 +127,7 @@ export function RunScenarioInAIDialog({
         ]
       case "economic":
         return [
-          "How does this event typically impact options pricing?",
+          `How does ${context.event || "this event"} typically impact options pricing?`,
           "Best strategies to trade around this announcement?",
           "Which sectors are most affected by this data?",
           "Should I reduce position size ahead of this event?",
@@ -87,8 +152,14 @@ export function RunScenarioInAIDialog({
   const handleAskQuestion = async (q: string) => {
     if (!q.trim()) return
 
-    const fullQuestion = `Context: ${context.title}\n\nDetails: ${context.details}${
+    const fullQuestion = `Context: ${contextTitle}\n\nDetails: ${contextDetails}${
       context.ticker ? `\n\nTicker: ${context.ticker}` : ""
+    }${context.company ? `\nCompany: ${context.company}` : ""}${context.date ? `\nDate: ${context.date}` : ""}${
+      context.estimate ? `\nEPS Estimate: ${context.estimate}` : ""
+    }${context.aiExplainer ? `\nAI Analysis: ${context.aiExplainer}` : ""}${
+      context.event ? `\nEvent: ${context.event}` : ""
+    }${context.impact ? `\nImpact: ${context.impact}` : ""}${
+      context.forecast ? `\nForecast: ${context.forecast}` : ""
     }${
       context.additionalContext
         ? `\n\nAdditional Info:\n${Object.entries(context.additionalContext)
@@ -107,7 +178,11 @@ export function RunScenarioInAIDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           question: fullQuestion,
-          context: context,
+          context: {
+            ...context,
+            title: contextTitle,
+            details: contextDetails,
+          },
         }),
       })
 
@@ -116,22 +191,23 @@ export function RunScenarioInAIDialog({
         setConversation((prev) => [...prev, { role: "ai", message: data.analysis }])
       } else {
         // Fallback response
-        const fallbackResponse = generateFallbackResponse(q, context)
+        const fallbackResponse = generateFallbackResponse(q, context, contextTitle)
         setConversation((prev) => [...prev, { role: "ai", message: fallbackResponse }])
       }
     } catch {
-      const fallbackResponse = generateFallbackResponse(q, context)
+      const fallbackResponse = generateFallbackResponse(q, context, contextTitle)
       setConversation((prev) => [...prev, { role: "ai", message: fallbackResponse }])
     } finally {
       setIsLoading(false)
     }
   }
 
-  const generateFallbackResponse = (q: string, ctx: ScenarioContext): string => {
-    const baseAnalysis = `Based on the scenario "${ctx.title}":\n\n`
+  const generateFallbackResponse = (q: string, ctx: ScenarioContext, title: string): string => {
+    const baseAnalysis = `Based on the scenario "${title}":\n\n`
 
     if (ctx.type === "earnings") {
-      return `${baseAnalysis}**Options Strategy Recommendations:**\n\n• **If Bullish:** Consider bull put spreads 10-15% below current price. Target 65-70% probability of profit with 30-45 DTE.\n\n• **If Neutral:** Iron condors can capture elevated IV. Set wings outside expected move, targeting 2:1 reward/risk.\n\n• **If Bearish:** Bear call spreads above resistance with defined risk. Look for 60%+ POP.\n\n**Risk Management:**\n- Position size: 1-2% of portfolio max\n- Have an exit plan BEFORE earnings\n- Consider closing at 50% profit or 2x loss\n\n**Key Metrics to Watch:**\n- IV Rank/Percentile for premium levels\n- Expected Move vs historical moves\n- Put/Call skew for sentiment`
+      const tickerInfo = ctx.ticker ? ` for ${ctx.ticker}` : ""
+      return `${baseAnalysis}**Options Strategy Recommendations${tickerInfo}:**\n\n• **If Bullish:** Consider bull put spreads 10-15% below current price. Target 65-70% probability of profit with 30-45 DTE.\n\n• **If Neutral:** Iron condors can capture elevated IV. Set wings outside expected move, targeting 2:1 reward/risk.\n\n• **If Bearish:** Bear call spreads above resistance with defined risk. Look for 60%+ POP.\n\n**Risk Management:**\n- Position size: 1-2% of portfolio max\n- Have an exit plan BEFORE earnings\n- Consider closing at 50% profit or 2x loss\n\n**Key Metrics to Watch:**\n- IV Rank/Percentile for premium levels\n- Expected Move vs historical moves\n- Put/Call skew for sentiment${ctx.estimate ? `\n- EPS Estimate: ${ctx.estimate}` : ""}`
     }
 
     if (ctx.type === "insider") {
@@ -139,7 +215,8 @@ export function RunScenarioInAIDialog({
     }
 
     if (ctx.type === "jobs" || ctx.type === "economic") {
-      return `${baseAnalysis}**Economic Event Trading Framework:**\n\n• **Pre-Event:** Reduce position sizes, tighten stops\n• **During:** Avoid trading first 30 minutes post-release\n• **Post-Event:** Look for follow-through confirmation\n\n**Sector Rotations:**\n- Strong jobs: Cyclicals, financials, small caps\n- Weak jobs: Defensives, utilities, bonds (TLT)\n- Inflation concerns: Commodities, energy, TIPS\n\n**Options Considerations:**\n- IV typically elevated pre-event\n- Look for IV crush opportunities post-announcement\n- Calendar spreads can benefit from term structure`
+      const eventInfo = ctx.event ? ` (${ctx.event})` : ""
+      return `${baseAnalysis}**Economic Event Trading Framework${eventInfo}:**\n\n• **Pre-Event:** Reduce position sizes, tighten stops\n• **During:** Avoid trading first 30 minutes post-release\n• **Post-Event:** Look for follow-through confirmation\n\n**Sector Rotations:**\n- Strong jobs: Cyclicals, financials, small caps\n- Weak jobs: Defensives, utilities, bonds (TLT)\n- Inflation concerns: Commodities, energy, TIPS\n\n**Options Considerations:**\n- IV typically elevated pre-event\n- Look for IV crush opportunities post-announcement\n- Calendar spreads can benefit from term structure${ctx.forecast ? `\n\nForecast: ${ctx.forecast}` : ""}${ctx.impact ? `\nExpected Impact: ${ctx.impact}` : ""}`
     }
 
     return `${baseAnalysis}**Strategic Analysis:**\n\n1. **Entry Criteria:**\n   - Confirm directional bias with technical levels\n   - Check IV environment for strategy selection\n   - Size position based on max loss tolerance\n\n2. **Risk Management:**\n   - Define max loss before entry\n   - Set profit target (typically 50-75% of max profit)\n   - Have adjustment plan ready\n\n3. **Exit Rules:**\n   - Take profits at 50% of max profit\n   - Stop loss at 2x credit received\n   - Close at 21 DTE to avoid gamma risk\n\n**Next Steps:**\nReview the specific setup parameters and adjust based on your risk tolerance and account size.`
@@ -159,7 +236,7 @@ export function RunScenarioInAIDialog({
             <Sparkles className="h-5 w-5 text-teal-600" />
             AI Scenario Analysis
           </DialogTitle>
-          <DialogDescription>Analyze "{context.title}" for options trading insights</DialogDescription>
+          <DialogDescription>Analyze "{contextTitle}" for options trading insights</DialogDescription>
         </DialogHeader>
 
         {/* Context Summary */}
@@ -168,12 +245,33 @@ export function RunScenarioInAIDialog({
             <Target className="h-4 w-4 text-teal-600" />
             Scenario Context
           </h4>
-          <p className="text-sm text-gray-700">{context.details}</p>
+          <p className="text-sm text-gray-700">{contextDetails}</p>
           {context.ticker && (
             <div className="mt-2 flex items-center gap-2">
               <span className="bg-teal-100 text-teal-800 text-xs font-semibold px-2 py-1 rounded">
                 {context.ticker}
               </span>
+              {context.company && <span className="text-xs text-gray-600">{context.company}</span>}
+              {context.date && <span className="text-xs text-gray-500">• {context.date}</span>}
+            </div>
+          )}
+          {context.type === "economic" && context.event && (
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
+              <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-1 rounded">{context.event}</span>
+              {context.impact && (
+                <span
+                  className={`text-xs font-medium px-2 py-0.5 rounded ${
+                    context.impact === "High"
+                      ? "bg-red-100 text-red-700"
+                      : context.impact === "Medium"
+                        ? "bg-yellow-100 text-yellow-700"
+                        : "bg-gray-100 text-gray-700"
+                  }`}
+                >
+                  {context.impact} Impact
+                </span>
+              )}
+              {context.forecast && <span className="text-xs text-gray-600">Forecast: {context.forecast}</span>}
             </div>
           )}
         </div>

@@ -342,7 +342,7 @@ export function RiskCalculator() {
               <div>
                 <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
                   <BarChart3 className="h-5 w-5 text-primary" />
-                  VIX Volatility Historical Scale
+                  CBOE VIX Volatility Index
                   {tooltipsEnabled && (
                     <ConditionalTooltip content="This scale shows where current VIX falls relative to historical extremes. Green zones (low VIX) indicate market complacency - good for buying options. Red zones (high VIX) indicate fear - excellent for selling premium as volatility typically mean-reverts.">
                       <Info className="h-4 w-4 text-muted-foreground cursor-help" />

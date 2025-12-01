@@ -1,14 +1,38 @@
 import { type NextRequest, NextResponse } from "next/server"
-import Groq from "groq-sdk"
+import { createOpenAI } from "@ai-sdk/openai"
 
-let groq: any = null
-try {
-  groq = new Groq({
-    apiKey: process.env.GROQ_API_KEY,
-    dangerouslyAllowBrowser: true, // Add dangerouslyAllowBrowser option for v0 preview environment
-  })
-} catch (e) {
-  console.error("[Strategy Scanner] Failed to initialize Groq:", e)
+// Use environment variables directly - priority: Groq > OpenAI > xAI
+function getAIProvider() {
+  if (process.env.GROQ_API_KEY) {
+    return {
+      provider: createOpenAI({
+        apiKey: process.env.GROQ_API_KEY,
+        baseURL: "https://api.groq.com/openai/v1",
+      }),
+      model: "llama-3.3-70b-versatile",
+      name: "Groq",
+    }
+  }
+  if (process.env.OPENAI_API_KEY) {
+    return {
+      provider: createOpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      }),
+      model: "gpt-4o-mini",
+      name: "OpenAI",
+    }
+  }
+  if (process.env.XAI_API_KEY) {
+    return {
+      provider: createOpenAI({
+        apiKey: process.env.XAI_API_KEY,
+        baseURL: "https://api.x.ai/v1",
+      }),
+      model: "grok-2-latest",
+      name: "xAI",
+    }
+  }
+  return null
 }
 
 const POLYGON_API_KEY = process.env.POLYGON_API_KEY
@@ -754,8 +778,6 @@ async function generateCalendarSpreads(tickers: string[] = CALENDAR_SPREAD_TICKE
 const BUTTERFLY_TICKERS = [
   "SPY",
   "QQQ",
-  "IWM",
-  "DIA",
   "AAPL",
   "MSFT",
   "GOOGL",
@@ -1147,7 +1169,10 @@ export async function POST(request: NextRequest) {
   try {
     const { strategy, strategyName } = await request.json()
 
-    const systemPrompt = STRATEGY_PROMPTS[strategy] || STRATEGY_PROMPTS["credit-spreads"]
+    const aiProvider = getAIProvider()
+    if (!aiProvider) {
+      return NextResponse.json({ error: "No AI provider available" }, { status: 500 })
+    }
 
     const userPrompt = `Based on current market conditions (late November 2025, VIX around 18-22, markets near all-time highs), provide 3 specific ${strategyName} trade setups.
 
@@ -1178,14 +1203,10 @@ Use realistic current prices for major ETFs and stocks:
 
 Return ONLY valid JSON, no other text.`
 
-    if (!groq) {
-      return NextResponse.json({ error: "Groq initialization failed" }, { status: 500 })
-    }
-
-    const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+    const completion = await aiProvider.provider.chat.completions.create({
+      model: aiProvider.model,
       messages: [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: STRATEGY_PROMPTS[strategy] || STRATEGY_PROMPTS["credit-spreads"] },
         { role: "user", content: userPrompt },
       ],
       temperature: 0.7,

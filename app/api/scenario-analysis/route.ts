@@ -1,46 +1,98 @@
-import Groq from "groq-sdk"
+import { generateWithFallback } from "@/lib/ai-providers"
+import { createOpenAI } from "@ai-sdk/openai"
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-})
+// Use environment variables directly - priority: Groq > OpenAI > xAI > Google
+function getAIProvider() {
+  if (process.env.GROQ_API_KEY) {
+    return {
+      provider: createOpenAI({
+        apiKey: process.env.GROQ_API_KEY,
+        baseURL: "https://api.groq.com/openai/v1",
+      }),
+      model: "llama-3.3-70b-versatile",
+      name: "Groq",
+    }
+  }
+  if (process.env.OPENAI_API_KEY) {
+    return {
+      provider: createOpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      }),
+      model: "gpt-4o-mini",
+      name: "OpenAI",
+    }
+  }
+  if (process.env.XAI_API_KEY) {
+    return {
+      provider: createOpenAI({
+        apiKey: process.env.XAI_API_KEY,
+        baseURL: "https://api.x.ai/v1",
+      }),
+      model: "grok-2-latest",
+      name: "xAI",
+    }
+  }
+  if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    return {
+      provider: createOpenAI({
+        apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+        baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
+      }),
+      model: "gemini-2.0-flash-exp",
+      name: "Google",
+    }
+  }
+  return null
+}
 
 export async function POST(request: Request) {
   try {
     const { question, context } = await request.json()
 
-    const systemPrompt = `You are an expert options trading analyst. You help traders analyze market scenarios and develop trading strategies.
+    if (!question) {
+      return Response.json({ error: "Question is required" }, { status: 400 })
+    }
 
-Your expertise includes:
-- Options strategies (spreads, iron condors, straddles, wheel strategy, etc.)
-- Risk management and position sizing
-- Technical and fundamental analysis
-- Market sentiment and volatility analysis
-- Earnings and economic event trading
+    const systemPrompt = `You are an expert financial analyst specializing in options trading and market analysis.
+    
+You provide detailed, actionable scenario analysis based on market data and technical indicators.
+Be specific with numbers, probabilities, and timeframes.
+Format your response in clear sections with headers.`
 
-Guidelines:
-- Be specific and actionable in your recommendations
-- Always mention risk management considerations
-- Use bullet points and clear formatting
-- Reference specific strategies with entry/exit criteria
-- Include position sizing guidance (typically 1-3% of portfolio per trade)
-- Mention key metrics to watch (IV rank, delta, theta, etc.)
-- Keep responses focused and practical for retail options traders`
+    const userPrompt = `Based on the following market context, please analyze this scenario:
 
-    const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: question },
-      ],
+Question: ${question}
+
+Market Context:
+${context || "No additional context provided"}
+
+Please provide:
+1. **Direct Answer**: A clear, concise answer to the question
+2. **Key Factors**: The most important factors influencing this scenario
+3. **Probability Assessment**: Your estimated probability and confidence level
+4. **Risk Considerations**: Key risks to monitor
+5. **Actionable Recommendations**: Specific steps or strategies to consider`
+
+    const result = await generateWithFallback({
+      system: systemPrompt,
+      prompt: userPrompt,
       temperature: 0.7,
-      max_tokens: 1000,
+      maxTokens: 2000,
     })
 
-    const analysis = completion.choices[0]?.message?.content || "Unable to generate analysis."
-
-    return Response.json({ analysis })
+    return Response.json({
+      analysis: result.text,
+      provider: result.provider,
+      model: result.model,
+    })
   } catch (error) {
-    console.error("Scenario analysis error:", error)
-    return Response.json({ error: "Failed to analyze scenario" }, { status: 500 })
+    console.error("[AI] Scenario analysis error:", error instanceof Error ? error.message : error)
+    return Response.json(
+      {
+        error: "Failed to generate scenario analysis",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
   }
 }

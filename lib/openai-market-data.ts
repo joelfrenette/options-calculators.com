@@ -1,9 +1,26 @@
 import { generateText } from "ai"
+import { createOpenAI } from "@ai-sdk/openai"
+
+// Function to create OpenAI provider with direct API key
+function getOpenAIProvider() {
+  if (!process.env.OPENAI_API_KEY) {
+    return null
+  }
+  return createOpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  })
+}
 
 async function fetchMarketDataWithOpenAI(indicator: string, specificData = "Current value"): Promise<number | null> {
   try {
+    const openai = getOpenAIProvider()
+    if (!openai) {
+      console.log(`[v0] OpenAI: No API key available`)
+      return null
+    }
+
     const { text } = await generateText({
-      model: "openai/gpt-4o",
+      model: openai("gpt-4o-mini"),
       prompt: `You are a financial data expert. Provide ONLY the current numeric value for: ${indicator}.
       
 Specific requirement: ${specificData}

@@ -6,30 +6,19 @@ import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { Badge } from "@/components/ui/badge"
+import { RunScenarioInAIDialog } from "@/components/run-scenario-ai-dialog"
 import {
   Info,
   TrendingUp,
   Activity,
   BarChart3,
   Sparkles,
-  Send,
   ArrowUpRight,
   ArrowDownRight,
   Minus,
   Database,
-  Loader2,
 } from "lucide-react"
 
 interface SentimentData {
@@ -168,136 +157,6 @@ function SentimentIndicatorRow({ indicator }: { indicator: SentimentIndicator })
       </div>
       <p className="text-xs text-gray-500 mt-1">{indicator.description}</p>
     </div>
-  )
-}
-
-// Ask AI Dialog Component
-function AskAIDialog({ sentimentData }: { sentimentData: SentimentData }) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [question, setQuestion] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [response, setResponse] = useState("")
-
-  const suggestedQuestions = [
-    "How should I adjust my options positions based on current sentiment?",
-    "What sectors are showing the most bullish sentiment?",
-    "Is this a good time to sell premium?",
-    "What's the risk of a sentiment reversal?",
-  ]
-
-  const handleAskAI = async (q: string) => {
-    setIsLoading(true)
-    setQuestion(q)
-
-    try {
-      const res = await fetch("/api/scenario-analysis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          context: {
-            type: "sentiment",
-            title: "Social Sentiment Analysis",
-            details: `Current sentiment score: ${sentimentData.global_social_sentiment}/100 (${getSentimentLabel(sentimentData.global_social_sentiment)}). Macro sentiment: ${sentimentData.macro_sentiment}, Social sentiment: ${sentimentData.social_sentiment}. Data quality: ${sentimentData.data_quality} (${sentimentData.sources_available}/${sentimentData.sources_total} sources).`,
-          },
-          question: q,
-        }),
-      })
-
-      if (res.ok) {
-        const data = await res.json()
-        setResponse(data.response || data.analysis || "Unable to generate response.")
-      } else {
-        setResponse("I apologize, but I couldn't process your question. Please try again.")
-      }
-    } catch {
-      setResponse("An error occurred while processing your question.")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <button className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center gap-1.5 shadow-md transition-all cursor-pointer">
-          <Sparkles className="h-3.5 w-3.5 text-white" />
-          <span className="text-white font-semibold text-xs">Ask AI</span>
-        </button>
-      </DialogTrigger>
-      <DialogContent className="max-w-2xl bg-white">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-teal-600" />
-            Ask AI About Sentiment
-          </DialogTitle>
-          <DialogDescription>
-            Get AI-powered insights about how current social sentiment affects your options trading
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          {/* Suggested Questions */}
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-gray-700">Suggested questions:</p>
-            <div className="flex flex-wrap gap-2">
-              {suggestedQuestions.map((sq, i) => (
-                <Button
-                  key={i}
-                  variant="outline"
-                  size="sm"
-                  className="text-xs bg-transparent"
-                  onClick={() => handleAskAI(sq)}
-                  disabled={isLoading}
-                >
-                  {sq}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          {/* Custom Question */}
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-gray-700">Or ask your own question:</p>
-            <div className="flex gap-2">
-              <Textarea
-                placeholder="Type your question about sentiment and options trading..."
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                className="min-h-[80px]"
-              />
-            </div>
-            <Button
-              onClick={() => handleAskAI(question)}
-              disabled={isLoading || !question.trim()}
-              className="w-full bg-teal-600 hover:bg-teal-700"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4 mr-2" />
-                  Ask AI
-                </>
-              )}
-            </Button>
-          </div>
-
-          {/* Response */}
-          {response && (
-            <div className="p-4 bg-teal-50 rounded-lg border border-teal-200">
-              <p className="text-sm font-medium text-teal-800 mb-2 flex items-center gap-2">
-                <Sparkles className="h-4 w-4" />
-                AI Response
-              </p>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{response}</p>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
   )
 }
 
@@ -717,7 +576,13 @@ export function SocialSentiment() {
                   </TooltipProvider>
                 </CardTitle>
               </div>
-              <AskAIDialog sentimentData={data} />
+              <RunScenarioInAIDialog
+                context={{
+                  type: "sentiment",
+                  title: "Social Sentiment Analysis",
+                  details: `Current global sentiment score: ${data.global_social_sentiment}/100 (${getSentimentLabel(data.global_social_sentiment)}). Macro sentiment: ${data.macro_sentiment}/100. Social sentiment: ${data.social_sentiment}/100. Headline mood: ${data.headline_market_mood}/100. Data quality: ${data.data_quality || "N/A"} with ${data.sources_available || 0}/${data.sources_total || 0} sources available. ${data.global_social_sentiment >= 70 ? "Bullish conditions - consider selling puts or buying calls." : data.global_social_sentiment <= 30 ? "Bearish conditions - consider defensive strategies or puts." : "Neutral conditions - consider iron condors or strangles."}`,
+                }}
+              />
             </div>
           </CardHeader>
           <CardContent className="pt-6 space-y-6">

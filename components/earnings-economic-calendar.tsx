@@ -1,32 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import {
-  ChevronRight,
-  Calendar,
-  Clock,
-  TrendingUp,
-  AlertTriangle,
-  MessageSquare,
-  Sparkles,
-  Send,
-  Bot,
-  Info,
-} from "lucide-react"
+import { ChevronRight, Calendar, Clock, TrendingUp, AlertTriangle, Sparkles, Info } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
 import { RunScenarioInAIDialog } from "@/components/run-scenario-ai-dialog"
 import { RefreshButton } from "@/components/ui/refresh-button" // Imported RefreshButton
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle" // Imported TooltipsToggle
@@ -350,319 +330,7 @@ function InsightAccordion({ insights, type }: { insights: typeof earningsInsight
   )
 }
 
-function AskAIDialog({ ticker, company }: { ticker: string; company: string }) {
-  const [question, setQuestion] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [conversation, setConversation] = useState<{ role: "user" | "ai"; message: string }[]>([])
-
-  const suggestedQuestions = [
-    `What's the expected move for ${ticker} this earnings?`,
-    `Best options strategy for ${ticker} earnings play?`,
-    `Should I buy or sell premium on ${ticker}?`,
-    `What are the key risks for ${ticker} this quarter?`,
-  ]
-
-  const handleAskQuestion = async (q: string) => {
-    if (!q.trim()) return
-
-    setConversation((prev) => [...prev, { role: "user", message: q }])
-    setQuestion("")
-    setIsLoading(true)
-
-    // Simulated AI response - in production this would call an API
-    setTimeout(() => {
-      const responses: Record<string, string> = {
-        [suggestedQuestions[0]]: `Based on current options pricing, ${ticker} has an implied move of approximately 8-12% for this earnings report. The ATM straddle suggests the market expects significant volatility. Historical earnings moves have averaged 7% over the past 4 quarters.`,
-        [suggestedQuestions[1]]: `For ${ticker}, consider these strategies:\n\n• **Iron Condor** if you expect range-bound action (collect premium from elevated IV)\n• **Bull Put Spread** if bullish bias with defined risk\n• **Straddle** if expecting larger than expected move\n\nGiven current IV rank of 65%, premium selling strategies have an edge.`,
-        [suggestedQuestions[2]]: `With IV Rank at 65% for ${ticker}, **selling premium** has a statistical edge. Post-earnings IV crush typically benefits premium sellers. Consider selling puts if bullish or iron condors for neutral outlook.`,
-        [suggestedQuestions[3]]: `Key risks for ${ticker} this quarter:\n\n1. **Guidance miss** - Forward looking statements matter more than EPS beat\n2. **Macro headwinds** - Consumer spending concerns\n3. **Competition** - Market share erosion\n4. **Management changes** - Leadership commentary on strategy`,
-      }
-
-      const aiResponse =
-        responses[q] ||
-        `For ${ticker} (${company}), I'd recommend monitoring the following:\n\n• **IV Percentile**: Check if premium is elevated vs historical\n• **Expected Move**: Compare to historical earnings moves\n• **Support/Resistance**: Key technical levels for strike selection\n• **Sector Sentiment**: How peers have performed this quarter\n\nConsider starting with a defined-risk strategy like a vertical spread to limit exposure.`
-
-      setConversation((prev) => [...prev, { role: "ai", message: aiResponse }])
-      setIsLoading(false)
-    }, 1500)
-  }
-
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <button className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center gap-1.5 shadow-md transition-all cursor-pointer">
-          <Sparkles className="h-3.5 w-3.5 text-white" />
-          <span className="text-white font-semibold text-xs">Ask AI</span>
-        </button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-hidden flex flex-col bg-white">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-[#1E3A8A]">
-            <Sparkles className="h-5 w-5 text-teal-600" />
-            AI Earnings Assistant - {ticker}
-          </DialogTitle>
-          <DialogDescription>
-            Ask about {company}'s earnings outlook, options strategies, and trading decisions.
-          </DialogDescription>
-        </DialogHeader>
-
-        {/* Conversation Area */}
-        <div className="flex-1 overflow-y-auto min-h-[200px] max-h-[300px] space-y-4 p-4 bg-gray-50 rounded-lg">
-          {conversation.length === 0 ? (
-            <div className="text-center py-8">
-              <Bot className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500 text-sm">Ask me anything about {ticker}'s upcoming earnings!</p>
-            </div>
-          ) : (
-            conversation.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`max-w-[85%] rounded-lg p-3 ${
-                    msg.role === "user" ? "bg-teal-600 text-white" : "bg-white border border-gray-200 text-gray-700"
-                  }`}
-                >
-                  {msg.role === "ai" && (
-                    <div className="flex items-center gap-1 mb-2 text-teal-600 text-xs font-semibold">
-                      <Sparkles className="h-3 w-3" />
-                      AI Assistant
-                    </div>
-                  )}
-                  <p className="text-sm whitespace-pre-line">{msg.message}</p>
-                </div>
-              </div>
-            ))
-          )}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-white border border-gray-200 rounded-lg p-3">
-                <div className="flex items-center gap-2 text-gray-500">
-                  <div className="animate-pulse flex gap-1">
-                    <span
-                      className="w-2 h-2 bg-teal-400 rounded-full animate-bounce"
-                      style={{ animationDelay: "0ms" }}
-                    ></span>
-                    <span
-                      className="w-2 h-2 bg-teal-400 rounded-full animate-bounce"
-                      style={{ animationDelay: "150ms" }}
-                    ></span>
-                    <span
-                      className="w-2 h-2 bg-teal-400 rounded-full animate-bounce"
-                      style={{ animationDelay: "300ms" }}
-                    ></span>
-                  </div>
-                  <span className="text-xs">Analyzing {ticker}...</span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Suggested Questions */}
-        {conversation.length === 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase">Suggested Questions</p>
-            <div className="flex flex-wrap gap-2">
-              {suggestedQuestions.map((q, i) => (
-                <Button
-                  key={i}
-                  variant="outline"
-                  size="sm"
-                  className="text-xs bg-white hover:bg-teal-50 hover:border-teal-300"
-                  onClick={() => handleAskQuestion(q)}
-                >
-                  {q}
-                </Button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Input Area */}
-        <div className="flex gap-2 pt-2 border-t">
-          <Textarea
-            placeholder={`Ask about ${ticker}'s earnings, expected move, or options strategies...`}
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault()
-                handleAskQuestion(question)
-              }
-            }}
-            className="min-h-[60px] resize-none bg-white"
-          />
-          <Button
-            onClick={() => handleAskQuestion(question)}
-            disabled={!question.trim() || isLoading}
-            className="bg-teal-600 hover:bg-teal-700 text-white px-4"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function EconomicAskAIDialog({ event, note }: { event: string; note: string }) {
-  const [question, setQuestion] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [conversation, setConversation] = useState<{ role: "user" | "ai"; message: string }[]>([])
-
-  const suggestedQuestions = [
-    `What's the expected impact of ${event}?`,
-    `Best options strategy for ${event}?`,
-    `Should I adjust my positions around ${event}?`,
-    `What are the key risks for ${event}?`,
-  ]
-
-  const handleAskQuestion = async (q: string) => {
-    if (!q.trim()) return
-
-    setConversation((prev) => [...prev, { role: "user", message: q }])
-    setQuestion("")
-    setIsLoading(true)
-
-    // Simulated AI response - in production this would call an API
-    setTimeout(() => {
-      const responses: Record<string, string> = {
-        [suggestedQuestions[0]]: `The ${event} is expected to have a ${note} impact on the market. Monitor for any significant deviations from consensus.`,
-        [suggestedQuestions[1]]: `For ${event}, consider these strategies:\n\n• **Straddle/Strangle** to capture volatility expansion\n• **Iron Condor** after direction is established\n• **Risk Management**: Reduce position size around high-impact releases`,
-        [suggestedQuestions[2]]: `It's advisable to adjust your positions around ${event}. Consider scaling back short-dated options and reviewing sector ETFs most affected by this data point.`,
-        [suggestedQuestions[3]]: `Key risks for ${event}:\n\n1. **Market Reaction**: Significant moves may cause market turbulence\n2. **Sector Impact**: Certain sectors may be more sensitive to ${event}\n3. **Volatility Shift**: Watch for changes in VIX levels before and after the event`,
-      }
-
-      const aiResponse =
-        responses[q] ||
-        `For ${event}, I'd recommend monitoring the following:\n\n• **Market Impact**: Consider the ${note} impact and potential deviations from consensus\n• **Options Strategies**: Use straddles/strangles for volatility capture and iron condors for defined-risk plays\n• **Risk Management**: Be prepared for market turbulence and adjust positions accordingly`
-
-      setConversation((prev) => [...prev, { role: "ai", message: aiResponse }])
-      setIsLoading(false)
-    }, 1500)
-  }
-
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button
-          size="sm"
-          variant="outline"
-          className="bg-teal-50 border-teal-200 text-teal-700 hover:bg-teal-100 hover:text-teal-800"
-        >
-          <MessageSquare className="h-3 w-3 mr-1" />
-          Ask AI
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-hidden flex flex-col bg-white">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-[#1E3A8A]">
-            <Sparkles className="h-5 w-5 text-teal-600" />
-            AI Economic Assistant - {event}
-          </DialogTitle>
-          <DialogDescription>
-            Ask about the economic impact of {event}, options strategies, and trading decisions.
-          </DialogDescription>
-        </DialogHeader>
-
-        {/* Conversation Area */}
-        <div className="flex-1 overflow-y-auto min-h-[200px] max-h-[300px] space-y-4 p-4 bg-gray-50 rounded-lg">
-          {conversation.length === 0 ? (
-            <div className="text-center py-8">
-              <Bot className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500 text-sm">Ask me anything about the economic impact of {event}!</p>
-            </div>
-          ) : (
-            conversation.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`max-w-[85%] rounded-lg p-3 ${
-                    msg.role === "user" ? "bg-teal-600 text-white" : "bg-white border border-gray-200 text-gray-700"
-                  }`}
-                >
-                  {msg.role === "ai" && (
-                    <div className="flex items-center gap-1 mb-2 text-teal-600 text-xs font-semibold">
-                      <Sparkles className="h-3 w-3" />
-                      AI Assistant
-                    </div>
-                  )}
-                  <p className="text-sm whitespace-pre-line">{msg.message}</p>
-                </div>
-              </div>
-            ))
-          )}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-white border border-gray-200 rounded-lg p-3">
-                <div className="flex items-center gap-2 text-gray-500">
-                  <div className="animate-pulse flex gap-1">
-                    <span
-                      className="w-2 h-2 bg-teal-400 rounded-full animate-bounce"
-                      style={{ animationDelay: "0ms" }}
-                    ></span>
-                    <span
-                      className="w-2 h-2 bg-teal-400 rounded-full animate-bounce"
-                      style={{ animationDelay: "150ms" }}
-                    ></span>
-                    <span
-                      className="w-2 h-2 bg-teal-400 rounded-full animate-bounce"
-                      style={{ animationDelay: "300ms" }}
-                    ></span>
-                  </div>
-                  <span className="text-xs">Analyzing {event}...</span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Suggested Questions */}
-        {conversation.length === 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase">Suggested Questions</p>
-            <div className="flex flex-wrap gap-2">
-              {suggestedQuestions.map((q, i) => (
-                <Button
-                  key={i}
-                  variant="outline"
-                  size="sm"
-                  className="text-xs bg-white hover:bg-teal-50 hover:border-teal-300"
-                  onClick={() => handleAskQuestion(q)}
-                >
-                  {q}
-                </Button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Input Area */}
-        <div className="flex gap-2 pt-2 border-t">
-          <Textarea
-            placeholder={`Ask about the economic impact of ${event}, options strategies, or trading decisions...`}
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault()
-                handleAskQuestion(question)
-              }
-            }}
-            className="min-h-[60px] resize-none bg-white"
-          />
-          <Button
-            onClick={() => handleAskQuestion(question)}
-            disabled={!question.trim() || isLoading}
-            className="bg-teal-600 hover:bg-teal-700 text-white px-4"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// Removed RefreshButton as it's now imported
+// Removed AskAIDialog as it's now imported
 
 export function EarningsEconomicCalendar() {
   const [refreshing, setRefreshing] = useState(false)
@@ -803,6 +471,8 @@ export function EarningsEconomicCalendar() {
                                 estimate: item.estimate,
                                 date: item.date,
                                 aiExplainer: item.aiExplainer,
+                                title: `${item.ticker} Earnings - ${item.company}`,
+                                details: `Upcoming earnings report on ${item.date}. EPS Estimate: ${item.estimate}. ${item.aiExplainer || "Analyze this earnings event for options trading opportunities."}`,
                               }}
                             />
                           </td>
@@ -886,6 +556,8 @@ export function EarningsEconomicCalendar() {
                               date: event.date,
                               impact: event.impact,
                               forecast: event.forecast,
+                              title: `${event.event} - Economic Release`,
+                              details: `Economic event on ${event.date}. Impact: ${event.impact}. ${event.forecast ? `Forecast: ${event.forecast}.` : ""} ${event.aiExplainer || "Analyze this economic event for options trading implications."}`,
                             }}
                           />
                         </td>

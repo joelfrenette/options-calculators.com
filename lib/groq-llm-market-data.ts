@@ -1,12 +1,27 @@
-import { generateText } from 'ai'
+import { generateText } from "ai"
+import { createOpenAI } from "@ai-sdk/openai"
 
-async function fetchMarketDataWithGroqLLM(
-  indicator: string,
-  specificData: string = "Current value"
-): Promise<number | null> {
+// Create Groq provider with direct API key
+function getGroqProvider() {
+  if (!process.env.GROQ_API_KEY) {
+    return null
+  }
+  return createOpenAI({
+    apiKey: process.env.GROQ_API_KEY,
+    baseURL: "https://api.groq.com/openai/v1",
+  })
+}
+
+async function fetchMarketDataWithGroqLLM(indicator: string, specificData = "Current value"): Promise<number | null> {
   try {
+    const groq = getGroqProvider()
+    if (!groq) {
+      console.log(`[v0] Groq LLM: No API key available`)
+      return null
+    }
+
     const { text } = await generateText({
-      model: 'groq/llama-3.3-70b-versatile',
+      model: "llama-3.3-70b-versatile",
       prompt: `You are a financial data expert. Provide ONLY the current numeric value for: ${indicator}.
       
 Specific requirement: ${specificData}
@@ -21,21 +36,20 @@ Value:`,
       maxTokens: 50,
       temperature: 0.1,
     })
-    
-    const value = parseFloat(text.trim())
+
+    const value = Number.parseFloat(text.trim())
     if (!isNaN(value) && value > 0) {
       console.log(`[v0] Groq LLM: Successfully fetched ${indicator} = ${value}`)
       return value
     }
-    
+
     return null
   } catch (error) {
     // Check for rate limit errors
-    if (error instanceof Error && (
-      error.message.includes('429') || 
-      error.message.includes('rate') || 
-      error.message.includes('quota')
-    )) {
+    if (
+      error instanceof Error &&
+      (error.message.includes("429") || error.message.includes("rate") || error.message.includes("quota"))
+    ) {
       // Silently return null for rate limits
       return null
     }
@@ -47,17 +61,26 @@ Value:`,
 
 export async function fetchShillerCAPEWithGroqLLM(): Promise<number | null> {
   console.log(`[v0] Groq LLM: Fetching Shiller CAPE ratio...`)
-  return fetchMarketDataWithGroqLLM("Shiller CAPE ratio (cyclically adjusted price-to-earnings ratio for S&P 500)", "Current CAPE ratio value")
+  return fetchMarketDataWithGroqLLM(
+    "Shiller CAPE ratio (cyclically adjusted price-to-earnings ratio for S&P 500)",
+    "Current CAPE ratio value",
+  )
 }
 
 export async function fetchShortInterestWithGroqLLM(): Promise<number | null> {
   console.log(`[v0] Groq LLM: Fetching SPY short interest...`)
-  return fetchMarketDataWithGroqLLM("SPY ETF short interest ratio as percentage of float", "Current short interest percentage")
+  return fetchMarketDataWithGroqLLM(
+    "SPY ETF short interest ratio as percentage of float",
+    "Current short interest percentage",
+  )
 }
 
 export async function fetchMag7ConcentrationWithGroqLLM(): Promise<number | null> {
   console.log(`[v0] Groq LLM: Fetching Mag7 concentration...`)
-  return fetchMarketDataWithGroqLLM("Magnificent 7 stocks (AAPL, MSFT, GOOGL, AMZN, NVDA, TSLA, META) market cap as percentage of QQQ ETF", "Current percentage concentration")
+  return fetchMarketDataWithGroqLLM(
+    "Magnificent 7 stocks (AAPL, MSFT, GOOGL, AMZN, NVDA, TSLA, META) market cap as percentage of QQQ ETF",
+    "Current percentage concentration",
+  )
 }
 
 export async function fetchQQQPEWithGroqLLM(): Promise<number | null> {

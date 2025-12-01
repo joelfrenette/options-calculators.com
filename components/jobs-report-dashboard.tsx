@@ -16,8 +16,6 @@ import {
   Sparkles,
   Target,
   Calendar,
-  Send,
-  Loader2,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { RefreshButton } from "@/components/ui/refresh-button"
@@ -35,16 +33,7 @@ import {
   Area,
   ComposedChart,
 } from "recharts"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
+import { RunScenarioInAIDialog } from "@/components/run-scenario-ai-dialog"
 
 // Historical unemployment data (last 12 months) - UNRATE from BLS
 const unemploymentData = [
@@ -262,7 +251,13 @@ function JobsReportDashboard() {
                     Next Release: <span className="font-semibold text-[#1E3A8A]">{aiForecast.nextRelease}</span>
                   </span>
                 </div>
-                <AskAIForecastDialog />
+                <RunScenarioInAIDialog
+                  context={{
+                    type: "jobs_forecast",
+                    title: "BLS Jobs Rate Forecast Analysis",
+                    details: `Current UNRATE: 4.2%, U-6: 8.1%, NFP: +227K. AI Forecast: UNRATE ${aiForecast.unrateForecast}% (range: ${aiForecast.unrateRange}), U-6 ${aiForecast.u6Forecast}% (range: ${aiForecast.u6Range}), NFP ${aiForecast.nfpForecast} (range: ${aiForecast.nfpRange}). Model confidence: ${aiForecast.confidence}%. Key factors: ${aiForecast.keyFactors.join(", ")}. Trend: Employment data suggests ${Number.parseFloat(aiForecast.unrateForecast) > 4.2 ? "weakening" : "stable"} labor market conditions.`,
+                  }}
+                />
               </div>
             </div>
           </CardHeader>
@@ -587,7 +582,13 @@ function JobsReportDashboard() {
                 AI Trading Implications
                 <InfoTooltip content="AI-generated trading ideas based on employment forecast analysis. These are educational suggestions, not financial advice." />
               </CardTitle>
-              <AskAITradingDialog />
+              <RunScenarioInAIDialog
+                context={{
+                  type: "jobs_trading",
+                  title: "Employment-Based Trading Strategies",
+                  details: `Current market conditions based on employment data: UNRATE 4.2% (${Number.parseFloat(aiForecast.unrateForecast) > 4.2 ? "forecast rising" : "forecast stable/declining"}), U-6 8.1%, NFP +227K. Trading implications: ${aiForecast.tradingImplications.join(" | ")}. Key factors to watch: ${aiForecast.keyFactors.join(", ")}. Consider options strategies that benefit from ${Number.parseFloat(aiForecast.unrateForecast) > 4.2 ? "increased volatility and defensive positioning" : "stable conditions and premium selling"}.`,
+                }}
+              />
             </div>
           </CardHeader>
           <CardContent>
@@ -713,263 +714,5 @@ function JobsReportDashboard() {
         </Card>
       </div>
     </TooltipProvider>
-  )
-}
-
-function AskAIForecastDialog() {
-  const [isOpen, setIsOpen] = useState(false)
-  const [question, setQuestion] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [response, setResponse] = useState("")
-
-  const suggestedQuestions = [
-    "What do the current employment trends mean for Fed policy?",
-    "How should I position my options portfolio for the next jobs report?",
-    "What sectors benefit most from stable unemployment?",
-    "Is the labor market weakening enough to trigger rate cuts?",
-  ]
-
-  const handleAskAI = async (q: string) => {
-    setIsLoading(true)
-    setQuestion(q)
-
-    try {
-      const res = await fetch("/api/scenario-analysis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          context: {
-            type: "jobs_forecast",
-            title: "BLS Jobs Rate Forecast Analysis",
-            details: `Current UNRATE: 4.2%, U-6: 8.1%, NFP: +227K. AI Forecast: UNRATE ${aiForecast.unrateForecast}% (${aiForecast.unrateRange}), U-6 ${aiForecast.u6Forecast}% (${aiForecast.u6Range}), NFP ${aiForecast.nfpForecast} (${aiForecast.nfpRange}). Confidence: ${aiForecast.confidence}%. Key factors: ${aiForecast.keyFactors.join(", ")}.`,
-          },
-          question: q,
-        }),
-      })
-
-      if (res.ok) {
-        const data = await res.json()
-        setResponse(data.response || data.analysis || "Unable to generate response.")
-      } else {
-        setResponse("I apologize, but I couldn't process your question. Please try again.")
-      }
-    } catch {
-      setResponse("An error occurred while processing your question.")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <button className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center gap-1.5 shadow-md transition-all cursor-pointer">
-          <Sparkles className="h-3.5 w-3.5 text-white" />
-          <span className="text-white font-semibold text-xs">Ask AI</span>
-        </button>
-      </DialogTrigger>
-      <DialogContent className="max-w-2xl bg-white">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-purple-600" />
-            Ask AI About Jobs Forecast
-          </DialogTitle>
-          <DialogDescription>
-            Get AI-powered insights about employment trends and their impact on options trading
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          {/* Suggested Questions */}
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-gray-700">Suggested questions:</p>
-            <div className="flex flex-wrap gap-2">
-              {suggestedQuestions.map((sq, i) => (
-                <Button
-                  key={i}
-                  variant="outline"
-                  size="sm"
-                  className="text-xs bg-transparent"
-                  onClick={() => handleAskAI(sq)}
-                  disabled={isLoading}
-                >
-                  {sq}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          {/* Custom Question */}
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-gray-700">Or ask your own question:</p>
-            <div className="flex gap-2">
-              <Textarea
-                placeholder="Type your question about employment data and options trading..."
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                className="min-h-[80px]"
-              />
-            </div>
-            <Button
-              onClick={() => handleAskAI(question)}
-              disabled={isLoading || !question.trim()}
-              className="w-full bg-purple-600 hover:bg-purple-700"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4 mr-2" />
-                  Ask AI
-                </>
-              )}
-            </Button>
-          </div>
-
-          {/* Response */}
-          {response && (
-            <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-              <p className="text-sm font-medium text-purple-800 mb-2 flex items-center gap-2">
-                <Sparkles className="h-4 w-4" />
-                AI Response
-              </p>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{response}</p>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function AskAITradingDialog() {
-  const [isOpen, setIsOpen] = useState(false)
-  const [question, setQuestion] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [response, setResponse] = useState("")
-
-  const suggestedQuestions = [
-    "What options strategies work best before jobs reports?",
-    "Should I sell premium or buy directional ahead of NFP?",
-    "How does unemployment affect sector rotation?",
-    "What ETFs are most sensitive to employment data?",
-  ]
-
-  const handleAskAI = async (q: string) => {
-    setIsLoading(true)
-    setQuestion(q)
-
-    try {
-      const res = await fetch("/api/scenario-analysis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          context: {
-            type: "jobs_trading",
-            title: "Employment-Based Trading Strategy",
-            details: `Current market conditions: UNRATE 4.2%, U-6 8.1%, NFP +227K above forecast. Trading implications: ${aiForecast.tradingImplications.join(" | ")}. Key factors: ${aiForecast.keyFactors.join(", ")}.`,
-          },
-          question: q,
-        }),
-      })
-
-      if (res.ok) {
-        const data = await res.json()
-        setResponse(data.response || data.analysis || "Unable to generate response.")
-      } else {
-        setResponse("I apologize, but I couldn't process your question. Please try again.")
-      }
-    } catch {
-      setResponse("An error occurred while processing your question.")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <button className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center gap-1.5 shadow-md transition-all cursor-pointer">
-          <Sparkles className="h-3.5 w-3.5 text-white" />
-          <span className="text-white font-semibold text-xs">Ask AI</span>
-        </button>
-      </DialogTrigger>
-      <DialogContent className="max-w-2xl bg-white">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-green-600" />
-            Ask AI About Trading Strategies
-          </DialogTitle>
-          <DialogDescription>
-            Get AI-powered trading ideas based on employment data and market conditions
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          {/* Suggested Questions */}
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-gray-700">Suggested questions:</p>
-            <div className="flex flex-wrap gap-2">
-              {suggestedQuestions.map((sq, i) => (
-                <Button
-                  key={i}
-                  variant="outline"
-                  size="sm"
-                  className="text-xs bg-transparent"
-                  onClick={() => handleAskAI(sq)}
-                  disabled={isLoading}
-                >
-                  {sq}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          {/* Custom Question */}
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-gray-700">Or ask your own question:</p>
-            <div className="flex gap-2">
-              <Textarea
-                placeholder="Type your question about employment-based trading strategies..."
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                className="min-h-[80px]"
-              />
-            </div>
-            <Button
-              onClick={() => handleAskAI(question)}
-              disabled={isLoading || !question.trim()}
-              className="w-full bg-green-600 hover:bg-green-700"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4 mr-2" />
-                  Ask AI
-                </>
-              )}
-            </Button>
-          </div>
-
-          {/* Response */}
-          {response && (
-            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-              <p className="text-sm font-medium text-green-800 mb-2 flex items-center gap-2">
-                <Sparkles className="h-4 w-4" />
-                AI Response
-              </p>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{response}</p>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
   )
 }

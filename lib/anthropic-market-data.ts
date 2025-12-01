@@ -1,12 +1,26 @@
-import { generateText } from 'ai'
+import { generateText } from "ai"
+import { createAnthropic } from "@ai-sdk/anthropic"
 
-async function fetchMarketDataWithAnthropic(
-  indicator: string,
-  specificData: string = "Current value"
-): Promise<number | null> {
+// Function to create Anthropic provider with direct API key
+function getAnthropicProvider() {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return null
+  }
+  return createAnthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY,
+  })
+}
+
+async function fetchMarketDataWithAnthropic(indicator: string, specificData = "Current value"): Promise<number | null> {
   try {
+    const anthropic = getAnthropicProvider()
+    if (!anthropic) {
+      console.log(`[v0] Anthropic: No API key available`)
+      return null
+    }
+
     const { text } = await generateText({
-      model: 'anthropic/claude-3-5-sonnet-20241022',
+      model: anthropic("claude-3-5-sonnet-20241022"),
       prompt: `You are a financial data expert. Provide ONLY the current numeric value for: ${indicator}.
       
 Specific requirement: ${specificData}
@@ -21,21 +35,20 @@ Value:`,
       maxTokens: 50,
       temperature: 0.1,
     })
-    
-    const value = parseFloat(text.trim())
+
+    const value = Number.parseFloat(text.trim())
     if (!isNaN(value) && value > 0) {
       console.log(`[v0] Anthropic: Successfully fetched ${indicator} = ${value}`)
       return value
     }
-    
+
     return null
   } catch (error) {
     // Check for rate limit errors
-    if (error instanceof Error && (
-      error.message.includes('429') || 
-      error.message.includes('rate') || 
-      error.message.includes('quota')
-    )) {
+    if (
+      error instanceof Error &&
+      (error.message.includes("429") || error.message.includes("rate") || error.message.includes("quota"))
+    ) {
       // Silently return null for rate limits
       return null
     }
@@ -47,17 +60,26 @@ Value:`,
 
 export async function fetchShillerCAPEWithAnthropic(): Promise<number | null> {
   console.log(`[v0] Anthropic: Fetching Shiller CAPE ratio...`)
-  return fetchMarketDataWithAnthropic("Shiller CAPE ratio (cyclically adjusted price-to-earnings ratio for S&P 500)", "Current CAPE ratio value")
+  return fetchMarketDataWithAnthropic(
+    "Shiller CAPE ratio (cyclically adjusted price-to-earnings ratio for S&P 500)",
+    "Current CAPE ratio value",
+  )
 }
 
 export async function fetchShortInterestWithAnthropic(): Promise<number | null> {
   console.log(`[v0] Anthropic: Fetching SPY short interest...`)
-  return fetchMarketDataWithAnthropic("SPY ETF short interest ratio as percentage of float", "Current short interest percentage")
+  return fetchMarketDataWithAnthropic(
+    "SPY ETF short interest ratio as percentage of float",
+    "Current short interest percentage",
+  )
 }
 
 export async function fetchMag7ConcentrationWithAnthropic(): Promise<number | null> {
   console.log(`[v0] Anthropic: Fetching Mag7 concentration...`)
-  return fetchMarketDataWithAnthropic("Magnificent 7 stocks (AAPL, MSFT, GOOGL, AMZN, NVDA, TSLA, META) market cap as percentage of QQQ ETF", "Current percentage concentration")
+  return fetchMarketDataWithAnthropic(
+    "Magnificent 7 stocks (AAPL, MSFT, GOOGL, AMZN, NVDA, TSLA, META) market cap as percentage of QQQ ETF",
+    "Current percentage concentration",
+  )
 }
 
 export async function fetchQQQPEWithAnthropic(): Promise<number | null> {
