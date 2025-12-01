@@ -648,7 +648,7 @@ export function RiskCalculator() {
           </Card>
         )}
 
-        <Accordion type="single" collapsible defaultValue="">
+        <Accordion type="single" collapsible defaultValue="portfolio-allocation">
           <AccordionItem value="portfolio-allocation" className="border-0">
             <Card className="shadow-sm border-gray-200">
               <AccordionTrigger className="hover:no-underline [&[data-state=open]>div]:rounded-b-none">
@@ -775,8 +775,8 @@ export function RiskCalculator() {
           </AccordionItem>
         </Accordion>
 
-        <Accordion type="single" collapsible defaultValue="">
-          <AccordionItem value="cash-suggestions" className="border-0">
+        <Accordion type="single" collapsible defaultValue="options-hedging">
+          <AccordionItem value="options-hedging" className="border-0">
             <Card className="shadow-sm border-gray-200">
               <AccordionTrigger className="hover:no-underline [&[data-state=open]>div]:rounded-b-none">
                 <CardHeader className="bg-gray-50 border-b border-gray-200 w-full py-4">

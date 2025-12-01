@@ -985,7 +985,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
           </CardContent>
         </Card>
 
-        <Accordion type="multiple" defaultValue={[]} className="space-y-4">
+        <Accordion type="multiple" defaultValue={["pillar1", "pillar2", "pillar3", "pillar4"]} className="space-y-4">
           {/* Pillar 1 - Momentum & Technical */}
           <AccordionItem value="pillar1" className="border rounded-lg px-4">
             <AccordionTrigger className="hover:no-underline py-10">
@@ -2846,7 +2846,11 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
           </p>
         </div>
 
-        <Accordion type="multiple" className="space-y-4 mt-8">
+        <Accordion
+          type="multiple"
+          defaultValue={["portfolio-allocation", "options-strategy"]}
+          className="space-y-4 mt-8"
+        >
           {/* Portfolio Allocation by CCPI Crash Risk Level */}
           <AccordionItem value="portfolio-allocation" className="border-0">
             <Card className="shadow-sm border-gray-200">

@@ -116,8 +116,7 @@ export function PanicEuphoria() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
-  const [showTooltips, setShowTooltips] = useState(true) // State for tooltips toggle
-  const [tooltipsEnabled, setTooltipsEnabled] = useState(true) // <-- UPDATE
+  const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
 
   const fetchData = async () => {
     try {
@@ -508,7 +507,6 @@ export function PanicEuphoria() {
               <CardTitle className="text-sm font-bold text-gray-900 flex items-center gap-2">
                 <BarChart3 className="h-4 w-4 text-purple-600" />9 Levkovich Indicators (Citibank Model)
               </CardTitle>
-              <TooltipsToggle enabled={showTooltips} onChange={setShowTooltips} />
             </div>
             <CardDescription className="text-xs text-gray-600">
               Live data from FINRA, FRED, Yahoo Finance, and AI estimates • Updated every 60 seconds
@@ -522,7 +520,7 @@ export function PanicEuphoria() {
                   value={Math.max(-1, Math.min(1, ((data.nyseShortInterest - 20) / 10) * -1))}
                   rawValue={`${data.nyseShortInterest}%`}
                   tooltip={
-                    showTooltips // <-- Using showTooltips for now, should be tooltipsEnabled
+                    tooltipsEnabled
                       ? "NYSE Short Interest measures the percentage of shares shorted relative to total float. SOURCE: Derived from VIX volatility and market conditions. INTERPRETATION: High short interest (>25%) indicates extreme bearish positioning, which historically signals panic and is a contrarian BUY signal. Low short interest (<15%) suggests complacency/euphoria. Current range: 10-30%."
                       : ""
                   }
@@ -532,7 +530,7 @@ export function PanicEuphoria() {
                   value={(data.marginDebt - 700) / 150}
                   rawValue={`$${data.marginDebt}B`}
                   tooltip={
-                    showTooltips // <-- Using showTooltips for now, should be tooltipsEnabled
+                    tooltipsEnabled
                       ? "Margin Debt tracks total borrowed money used for stock purchases. SOURCE: FINRA monthly margin statistics via FRED. INTERPRETATION: High margin debt (>$800B) indicates leveraged speculation and euphoria—investors are borrowing heavily to buy stocks, a warning sign. Low margin debt (<$600B) suggests fear/panic. Current range: $600-$850B."
                       : ""
                   }
@@ -542,7 +540,7 @@ export function PanicEuphoria() {
                   value={(data.volumeRatio - 1.0) / 0.5}
                   rawValue={`${data.volumeRatio.toFixed(2)}x`}
                   tooltip={
-                    showTooltips // <-- Using showTooltips for now, should be tooltipsEnabled
+                    tooltipsEnabled
                       ? "Nasdaq/NYSE Volume Ratio compares trading volume between tech-heavy Nasdaq and value-oriented NYSE. SOURCE: Real-time exchange volume data. INTERPRETATION: High ratio (>1.3x) indicates speculative tech/growth trading—euphoria signal. Low ratio (<0.9x) suggests rotation to value/safety—defensive positioning. Current range: 0.8-1.5x."
                       : ""
                   }
@@ -552,7 +550,7 @@ export function PanicEuphoria() {
                   value={(data.investorIntelligence - 50) / 20}
                   rawValue={`${data.investorIntelligence}% bulls`}
                   tooltip={
-                    showTooltips // <-- Using showTooltips for now, should be tooltipsEnabled
+                    tooltipsEnabled
                       ? "Investor Intelligence Survey polls professional newsletter writers for their market outlook. SOURCE: Investor Intelligence weekly survey data. INTERPRETATION: High bullishness (>60%) is a contrarian SELL signal—when experts are too optimistic, markets often decline. Low bullishness (<40%) is a contrarian BUY signal. Current range: 30-70%."
                       : ""
                   }
@@ -562,7 +560,7 @@ export function PanicEuphoria() {
                   value={(data.aaiiBullish - 40) / 25}
                   rawValue={`${data.aaiiBullish}%`}
                   tooltip={
-                    showTooltips // <-- Using showTooltips for now, should be tooltipsEnabled
+                    tooltipsEnabled
                       ? "AAII (American Association of Individual Investors) Bullish Sentiment measures retail investor optimism. SOURCE: Weekly AAII sentiment survey. INTERPRETATION: High bullishness (>55%) indicates retail euphoria—historically a contrarian SELL signal. Low bullishness (<25%) indicates panic—historically a BUY opportunity. Current range: 25-65%."
                       : ""
                   }
@@ -572,7 +570,7 @@ export function PanicEuphoria() {
                   value={(6.0 - data.moneyMarketFunds) / 1.0}
                   rawValue={`$${data.moneyMarketFunds}T`}
                   tooltip={
-                    showTooltips // <-- Using showTooltips for now, should be tooltipsEnabled
+                    tooltipsEnabled
                       ? "Money Market Fund Assets tracks cash sitting on the sidelines in low-risk money market accounts. SOURCE: Investment Company Institute (ICI) via FRED. INTERPRETATION: High cash levels (>$6T) indicate fear/caution—this is 'dry powder' that could fuel a rally (bullish). Low cash (<$5T) means investors are fully invested—euphoria/risk. Current range: $5-7T."
                       : ""
                   }
@@ -582,7 +580,7 @@ export function PanicEuphoria() {
                   value={(1.0 - data.putCallRatio) / 0.3}
                   rawValue={`${data.putCallRatio.toFixed(2)}`}
                   tooltip={
-                    showTooltips // <-- Using showTooltips for now, should be tooltipsEnabled
+                    tooltipsEnabled
                       ? "Put/Call Ratio measures hedging activity via options markets. SOURCE: Derived from VIX term structure and options flow data. INTERPRETATION: High ratio (>1.1) indicates heavy put buying/hedging—fear and panic, which is contrarian bullish. Low ratio (<0.8) indicates complacency—no one is hedging, euphoria signal. Current range: 0.8-1.3."
                       : ""
                   }
@@ -592,7 +590,7 @@ export function PanicEuphoria() {
                   value={(data.commodityPrices - 280) / 40}
                   rawValue={`${data.commodityPrices.toFixed(1)}`}
                   tooltip={
-                    showTooltips // <-- Using showTooltips for now, should be tooltipsEnabled
+                    tooltipsEnabled
                       ? "CRB Commodity Index tracks a basket of raw materials including energy, metals, and agriculture. SOURCE: Live commodity futures data. INTERPRETATION: High prices (>300) indicate inflation/speculation—economic overheating and euphoria. Low prices (<260) suggest deflation fears/recession—panic territory. Current range: 250-320."
                       : ""
                   }
@@ -602,7 +600,7 @@ export function PanicEuphoria() {
                   value={(3.25 - data.gasPrices) / 1.0}
                   rawValue={`$${data.gasPrices.toFixed(2)}/gal`}
                   tooltip={
-                    showTooltips // <-- Using showTooltips for now, should be tooltipsEnabled
+                    tooltipsEnabled
                       ? "Retail Gas Prices track national average gasoline costs that directly impact consumer spending. SOURCE: EIA (Energy Information Administration) weekly data. INTERPRETATION: High prices (>$4.00) create consumer stress and economic drag—bearish for markets. Low prices (<$3.00) act as a 'tax cut' for consumers—bullish. Current range: $2.50-$4.50/gal."
                       : ""
                   }
@@ -612,45 +610,43 @@ export function PanicEuphoria() {
           </CardContent>
         </Card>
 
-        {data?.latestCitiReading !== undefined && (
-          <Card className="shadow-sm border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-            <CardContent className="pt-4">
-              <div className="flex items-start gap-3">
-                <BarChart3 className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div className="flex-1">
-                  <h3 className="font-bold text-gray-900 mb-3">Official Citibank vs. Real-Time Proxy</h3>
-                  <div className="grid md:grid-cols-3 gap-4">
-                    <div className="p-3 bg-white rounded-lg border border-blue-200">
-                      <div className="text-xs font-semibold text-gray-600 mb-1">Latest Official Citi Reading</div>
-                      <div className="text-2xl font-bold text-blue-900">
-                        {data.latestCitiReading >= 0 ? "+" : ""}
-                        {data.latestCitiReading.toFixed(2)}
-                      </div>
-                      <div className="text-xs text-gray-600 mt-1">{data.latestCitiDate || "Nov 7, 2025"}</div>
+        <Card className="shadow-sm border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+          <CardContent className="pt-4">
+            <div className="flex items-start gap-3">
+              <BarChart3 className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <h3 className="font-bold text-gray-900 mb-3">Official Citibank vs. Real-Time Proxy</h3>
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div className="p-3 bg-white rounded-lg border border-blue-200">
+                    <div className="text-xs font-semibold text-gray-600 mb-1">Latest Official Citi Reading</div>
+                    <div className="text-2xl font-bold text-blue-900">
+                      {data.latestCitiReading >= 0 ? "+" : ""}
+                      {data.latestCitiReading.toFixed(2)}
                     </div>
-                    <div className="p-3 bg-white rounded-lg border border-purple-200">
-                      <div className="text-xs font-semibold text-gray-600 mb-1">Your Real-Time Proxy</div>
-                      <div className="text-2xl font-bold text-purple-900">
-                        {data.overallScore >= 0 ? "+" : ""}
-                        {data.overallScore.toFixed(2)}
-                      </div>
-                      <div className="text-xs text-gray-600 mt-1">Live calculation</div>
-                    </div>
-                    <div className="p-3 bg-white rounded-lg border border-gray-200">
-                      <div className="text-xs font-semibold text-gray-600 mb-1">2025 YTD Average</div>
-                      <div className="text-2xl font-bold text-gray-900">+{data.ytdAverage?.toFixed(2) || "0.44"}</div>
-                      <div className="text-xs text-gray-600 mt-1">Elevated euphoria year</div>
-                    </div>
+                    <div className="text-xs text-gray-600 mt-1">{data.latestCitiDate || "Nov 7, 2025"}</div>
                   </div>
-                  <p className="text-xs text-gray-600 mt-3">
-                    <strong>Note:</strong> Your proxy uses real-time market data to approximate the official Citibank
-                    model. The official reading is updated periodically, while your proxy updates live.
-                  </p>
+                  <div className="p-3 bg-white rounded-lg border border-purple-200">
+                    <div className="text-xs font-semibold text-gray-600 mb-1">Your Real-Time Proxy</div>
+                    <div className="text-2xl font-bold text-purple-900">
+                      {data.overallScore >= 0 ? "+" : ""}
+                      {data.overallScore.toFixed(2)}
+                    </div>
+                    <div className="text-xs text-gray-600 mt-1">Live calculation</div>
+                  </div>
+                  <div className="p-3 bg-white rounded-lg border border-gray-200">
+                    <div className="text-xs font-semibold text-gray-600 mb-1">2025 YTD Average</div>
+                    <div className="text-2xl font-bold text-gray-900">+{data.ytdAverage?.toFixed(2) || "0.44"}</div>
+                    <div className="text-xs text-gray-600 mt-1">Elevated euphoria year</div>
+                  </div>
                 </div>
+                <p className="text-xs text-gray-600 mt-3">
+                  <strong>Note:</strong> Your proxy uses real-time market data to approximate the official Citibank
+                  model. The official reading is updated periodically, while your proxy updates live.
+                </p>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Main Index Card */}
         <Card className="shadow-sm border-gray-200">

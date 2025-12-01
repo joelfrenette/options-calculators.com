@@ -678,7 +678,7 @@ export function TrendAnalysis() {
         </Card>
 
         {/* Price Targets & Action Plan card */}
-        <Accordion type="single" collapsible defaultValue="">
+        <Accordion type="single" collapsible defaultValue="price-targets">
           <AccordionItem value="price-targets" className="border rounded-lg shadow-sm">
             <AccordionTrigger className="px-6 py-4 bg-gray-50 hover:bg-gray-100 rounded-t-lg border-b">
               <div className="text-left">
@@ -787,73 +787,127 @@ export function TrendAnalysis() {
           </AccordionItem>
         </Accordion>
 
-        {/* SPY Options Strategy Recommendation in collapsible accordion */}
-        <Accordion type="single" collapsible defaultValue="">
-          <AccordionItem value="strategy-recommendation" className="border rounded-lg shadow-sm">
+        {/* Support & Resistance Levels */}
+        <Accordion type="single" collapsible defaultValue="support-resistance">
+          <AccordionItem value="support-resistance" className="border rounded-lg shadow-sm">
             <AccordionTrigger className="px-6 py-4 bg-gray-50 hover:bg-gray-100 rounded-t-lg border-b">
               <div className="text-left">
                 <h3 className="text-lg font-bold text-gray-900">
-                  {selectedItem.name} - Options Strategy Recommendation
+                  {selectedItem.name} - Key Support & Resistance Levels
                 </h3>
-                <p className="text-sm text-gray-600 mt-1">Click to view detailed options strategy for current trend</p>
+                <p className="text-sm text-gray-600 mt-1">View historical and dynamic support/resistance zones</p>
               </div>
             </AccordionTrigger>
             <AccordionContent className="px-6 py-6">
-              <div className="space-y-4">
-                <div
-                  className={`border-2 rounded-lg p-4 ${selectedItem.trend === "Bullish" ? "bg-green-50 border-green-200" : selectedItem.trend === "Bearish" ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-200"}`}
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-bold text-lg">{strategy.name}</h3>
-                    <span
-                      className={`px-3 py-1 rounded-full text-sm font-semibold ${selectedItem.trendStrength === "Strong" ? "bg-green-100 text-green-700" : selectedItem.trendStrength === "Moderate" ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-700"}`}
-                    >
-                      {selectedItem.trendStrength} Signal
-                    </span>
-                  </div>
-                  <p className="text-gray-700 leading-relaxed mb-4">{strategy.description}</p>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-                    <div className="bg-white/50 p-3 rounded border">
-                      <p className="font-semibold text-gray-700 mb-1">Entry Point</p>
-                      <p className="text-gray-900">${(selectedItem.currentPrice ?? 0).toFixed(2)}</p>
-                    </div>
-                    <div className="bg-white/50 p-3 rounded border">
-                      <p className="font-semibold text-gray-700 mb-1">Target Exit</p>
-                      <p className="text-gray-900">${(selectedItem.priceTarget1Month ?? 0).toFixed(2)}</p>
-                    </div>
-                    <div className="bg-white/50 p-3 rounded border">
-                      <p className="font-semibold text-gray-700 mb-1">Stop Loss</p>
-                      <p className="text-gray-900">${(selectedItem.stopLoss ?? 0).toFixed(2)}</p>
-                    </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <p className="text-sm text-gray-600 mb-1">Primary Support</p>
+                  <p className="text-xl font-bold text-gray-900">${(selectedItem.support ?? 0).toFixed(2)}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Crucial level for maintaining bullish sentiment. A break below may signal further downside.
+                  </p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <p className="text-sm text-gray-600 mb-1">Primary Resistance</p>
+                  <p className="text-xl font-bold text-gray-900">${(selectedItem.resistance ?? 0).toFixed(2)}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Key level where selling pressure may increase. A decisive break above could fuel a rally.
+                  </p>
+                </div>
+                <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                  <p className="text-sm font-semibold text-orange-700 mb-1">Potential Volatility Spike</p>
+                  <p className="text-xl font-bold text-orange-700">${(selectedItem.atr ?? 0).toFixed(2)}</p>
+                  <p className="text-xs text-orange-600 mt-1">
+                    Average True Range (ATR) indicates typical daily price movement. Higher ATR suggests higher
+                    volatility.
+                  </p>
+                </div>
+              </div>
+              {selectedItem.allSupport && selectedItem.allSupport.length > 0 && (
+                <div className="mt-6 pt-4 border-t">
+                  <h4 className="text-md font-bold text-gray-900 mb-3">All Support Levels</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedItem.allSupport.map((level, index) => (
+                      <span
+                        key={index}
+                        className="inline-flex items-center rounded-md bg-green-100 px-3 py-1 text-sm font-medium text-green-800"
+                      >
+                        ${level.toFixed(2)}
+                      </span>
+                    ))}
                   </div>
                 </div>
-
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                  <h4 className="font-semibold text-orange-900 mb-2 flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4" />
-                    Risk Management for {selectedItem.name}
-                  </h4>
-                  <ul className="text-orange-800 text-sm space-y-1 leading-relaxed">
-                    <li>• Set stop loss at ${(selectedItem.stopLoss ?? 0).toFixed(2)} to limit downside risk</li>
-                    <li>
-                      • Monitor momentum strength (currently ${(selectedItem.momentumStrength ?? 0).toFixed(0)}/100)
-                    </li>
-                    <li>
-                      • Watch for volume changes - current ratio is {(selectedItem.volumeRatio ?? 0).toFixed(2)}x
-                      average
-                    </li>
-                    <li>• Adjust position if trend confidence drops below 60%</li>
-                    {selectedTicker === "SPX" && <li>• Remember: SPX is cash-settled with no assignment risk</li>}
-                    {selectedTicker === "QQQ" && <li>• QQQ has higher volatility - use wider stop losses</li>}
-                  </ul>
+              )}
+              {selectedItem.allResistance && selectedItem.allResistance.length > 0 && (
+                <div className="mt-6 pt-4 border-t">
+                  <h4 className="text-md font-bold text-gray-900 mb-3">All Resistance Levels</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedItem.allResistance.map((level, index) => (
+                      <span
+                        key={index}
+                        className="inline-flex items-center rounded-md bg-red-100 px-3 py-1 text-sm font-medium text-red-800"
+                      >
+                        ${level.toFixed(2)}
+                      </span>
+                    ))}
+                  </div>
                 </div>
+              )}
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
 
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <p className="text-xs text-gray-600 leading-relaxed">
-                    <strong>Disclaimer:</strong> This analysis is based on technical indicators and historical data. It
-                    is not financial advice. All trading involves substantial risk of loss. Past performance does not
-                    guarantee future results. Always conduct your own research and consider consulting with a licensed
-                    financial advisor before making trading decisions.
+        {/* Trading Signals card */}
+        <Accordion type="single" collapsible defaultValue="trading-signals">
+          <AccordionItem value="trading-signals" className="border rounded-lg shadow-sm">
+            <AccordionTrigger className="px-6 py-4 bg-gray-50 hover:bg-gray-100 rounded-t-lg border-b">
+              <div className="text-left">
+                <h3 className="text-lg font-bold text-gray-900">{selectedItem.name} - Trading Signals</h3>
+                <p className="text-sm text-gray-600 mt-1">Click to view key technical indicators and signals</p>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-6 py-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <p className="text-sm text-gray-600 mb-1">Trend Direction</p>
+                  <p className={`text-xl font-bold ${getTrendColor(selectedItem.trend)}`}>
+                    {selectedItem.trend} ({selectedItem.trendConfidence.toFixed(0)}% Confident)
+                  </p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <p className="text-sm text-gray-600 mb-1">Momentum Strength</p>
+                  <p className={`text-xl font-bold ${getMomentumColor(selectedItem.momentumStrength)}`}>
+                    {selectedItem.momentumStrength.toFixed(0)}/100
+                  </p>
+                </div>
+              </div>
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <p className="text-sm text-gray-600 mb-1">20-Day MA</p>
+                  <p className="text-xl font-bold text-gray-900">${selectedItem.ma20.toFixed(2)}</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <p className="text-sm text-gray-600 mb-1">50-Day MA</p>
+                  <p className="text-xl font-bold text-gray-900">${selectedItem.ma50.toFixed(2)}</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <p className="text-sm text-gray-600 mb-1">200-Day MA</p>
+                  <p className="text-xl font-bold text-gray-900">${selectedItem.ma200.toFixed(2)}</p>
+                </div>
+              </div>
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <p className="text-sm text-gray-600 mb-1">RSI (Relative Strength Index)</p>
+                  <p className="text-xl font-bold text-gray-900">{selectedItem.rsi.toFixed(0)}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {selectedItem.rsi > 70 ? "Overbought" : selectedItem.rsi < 30 ? "Oversold" : "Neutral"}
+                  </p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <p className="text-sm text-gray-600 mb-1">MACD</p>
+                  <p className="text-xl font-bold text-gray-900">{selectedItem.macd.toFixed(2)}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {selectedItem.macdHistogram > 0 ? "Bullish momentum" : "Bearish momentum"}
                   </p>
                 </div>
               </div>
@@ -1009,6 +1063,80 @@ export function TrendAnalysis() {
                   exposure.
                 </AlertDescription>
               </Alert>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+
+        {/* SPY Options Strategy Recommendation in collapsible accordion */}
+        <Accordion type="single" collapsible defaultValue="">
+          <AccordionItem value="strategy-recommendation" className="border rounded-lg shadow-sm">
+            <AccordionTrigger className="px-6 py-4 bg-gray-50 hover:bg-gray-100 rounded-t-lg border-b">
+              <div className="text-left">
+                <h3 className="text-lg font-bold text-gray-900">
+                  {selectedItem.name} - Options Strategy Recommendation
+                </h3>
+                <p className="text-sm text-gray-600 mt-1">Click to view detailed options strategy for current trend</p>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-6 py-6">
+              <div className="space-y-4">
+                <div
+                  className={`border-2 rounded-lg p-4 ${selectedItem.trend === "Bullish" ? "bg-green-50 border-green-200" : selectedItem.trend === "Bearish" ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-200"}`}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-bold text-lg">{strategy.name}</h3>
+                    <span
+                      className={`px-3 py-1 rounded-full text-sm font-semibold ${selectedItem.trendStrength === "Strong" ? "bg-green-100 text-green-700" : selectedItem.trendStrength === "Moderate" ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-700"}`}
+                    >
+                      {selectedItem.trendStrength} Signal
+                    </span>
+                  </div>
+                  <p className="text-gray-700 leading-relaxed mb-4">{strategy.description}</p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                    <div className="bg-white/50 p-3 rounded border">
+                      <p className="font-semibold text-gray-700 mb-1">Entry Point</p>
+                      <p className="text-gray-900">${(selectedItem.currentPrice ?? 0).toFixed(2)}</p>
+                    </div>
+                    <div className="bg-white/50 p-3 rounded border">
+                      <p className="font-semibold text-gray-700 mb-1">Target Exit</p>
+                      <p className="text-gray-900">${(selectedItem.priceTarget1Month ?? 0).toFixed(2)}</p>
+                    </div>
+                    <div className="bg-white/50 p-3 rounded border">
+                      <p className="font-semibold text-gray-700 mb-1">Stop Loss</p>
+                      <p className="text-gray-900">${(selectedItem.stopLoss ?? 0).toFixed(2)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-orange-900 mb-2 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Risk Management for {selectedItem.name}
+                  </h4>
+                  <ul className="text-orange-800 text-sm space-y-1 leading-relaxed">
+                    <li>• Set stop loss at ${(selectedItem.stopLoss ?? 0).toFixed(2)} to limit downside risk</li>
+                    <li>
+                      • Monitor momentum strength (currently ${(selectedItem.momentumStrength ?? 0).toFixed(0)}/100)
+                    </li>
+                    <li>
+                      • Watch for volume changes - current ratio is {(selectedItem.volumeRatio ?? 0).toFixed(2)}x
+                      average
+                    </li>
+                    <li>• Adjust position if trend confidence drops below 60%</li>
+                    {selectedTicker === "SPX" && <li>• Remember: SPX is cash-settled with no assignment risk</li>}
+                    {selectedTicker === "QQQ" && <li>• QQQ has higher volatility - use wider stop losses</li>}
+                  </ul>
+                </div>
+
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <p className="text-xs text-gray-600 leading-relaxed">
+                    <strong>Disclaimer:</strong> This analysis is based on technical indicators and historical data. It
+                    is not financial advice. All trading involves substantial risk of loss. Past performance does not
+                    guarantee future results. Always conduct your own research and consider consulting with a licensed
+                    financial advisor before making trading decisions.
+                  </p>
+                </div>
+              </div>
             </AccordionContent>
           </AccordionItem>
         </Accordion>

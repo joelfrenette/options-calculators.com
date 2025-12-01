@@ -1,7 +1,6 @@
 import { generateText } from "ai"
 import { createOpenAI } from "@ai-sdk/openai"
 
-// Create Groq provider with direct API key
 function getGroqProvider() {
   if (!process.env.GROQ_API_KEY) {
     return null
@@ -20,8 +19,9 @@ async function fetchMarketDataWithGroqLLM(indicator: string, specificData = "Cur
       return null
     }
 
+    // Use groq("model") instead of just "model" string
     const { text } = await generateText({
-      model: "llama-3.3-70b-versatile",
+      model: groq("llama-3.3-70b-versatile"),
       prompt: `You are a financial data expert. Provide ONLY the current numeric value for: ${indicator}.
       
 Specific requirement: ${specificData}

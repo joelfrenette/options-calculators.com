@@ -1352,7 +1352,7 @@ export function MarketSentiment() {
         </div>
 
         {/* Trade Recommendations accordion */}
-        <Accordion type="multiple" className="space-y-0">
+        <Accordion type="multiple" defaultValue={["trade-recommendations"]} className="space-y-0">
           <AccordionItem value="trade-recommendations" className="border-0">
             <Card className="shadow-sm border-gray-200">
               <AccordionTrigger className="hover:no-underline px-6 py-4 bg-gray-50 border-b border-gray-200 rounded-t-lg">
@@ -1440,265 +1440,135 @@ export function MarketSentiment() {
           </AccordionItem>
         </Accordion>
 
-        <Accordion type="multiple" className="space-y-0">
-          <AccordionItem value="options-strategy-guide" className="border-0">
+        {/* Sector Analysis accordion */}
+        <Accordion type="multiple" defaultValue={["sector-analysis"]} className="space-y-0">
+          <AccordionItem value="sector-analysis" className="border-0">
             <Card className="shadow-sm border-gray-200">
               <AccordionTrigger className="hover:no-underline px-6 py-4 bg-gray-50 border-b border-gray-200 rounded-t-lg">
-                <CardTitle className="text-lg font-bold text-gray-900">
-                  Options Strategy Guide by Fear & Greed Level
+                <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <BarChartIcon className="h-5 w-5 text-primary" />
+                  Sector Analysis
                 </CardTitle>
               </AccordionTrigger>
               <AccordionContent>
-                <CardContent className="pt-4 pb-4">
-                  <div className="space-y-2">
-                    {[
-                      {
-                        range: "0-24",
-                        level: "Extreme Fear",
-                        description: "Maximum buying opportunity - deploy capital aggressively",
-                        signal: "STRONG BUY",
-                        guidance: getTradeRecommendations(12),
-                        allocation: getPortfolioAllocation(12),
-                      },
-                      {
-                        range: "25-44",
-                        level: "Fear",
-                        description: "Good environment for premium sellers",
-                        signal: "BUY",
-                        guidance: getTradeRecommendations(34),
-                        allocation: getPortfolioAllocation(34),
-                      },
-                      {
-                        range: "45-55",
-                        level: "Neutral",
-                        description: "Market balanced - be selective",
-                        signal: "HOLD",
-                        guidance: getTradeRecommendations(50),
-                        allocation: getPortfolioAllocation(50),
-                      },
-                      {
-                        range: "56-74",
-                        level: "Greed",
-                        description: "Reduce exposure and build cash",
-                        signal: "CAUTION",
-                        guidance: getTradeRecommendations(65),
-                        allocation: getPortfolioAllocation(65),
-                      },
-                      {
-                        range: "75-100",
-                        level: "Extreme Greed",
-                        description: "High risk of correction - maximum defensive positioning",
-                        signal: "AVOID/SELL",
-                        guidance: getTradeRecommendations(87),
-                        allocation: getPortfolioAllocation(87),
-                      },
-                    ].map((item, index) => {
-                      const isCurrent =
-                        marketData.overallScore >= Number.parseInt(item.range.split("-")[0]) &&
-                        marketData.overallScore <= Number.parseInt(item.range.split("-")[1])
-
-                      return (
-                        <div
-                          key={index}
-                          className={`p-4 rounded-lg border transition-colors ${
-                            isCurrent
-                              ? "border-green-500 bg-green-100 shadow-md ring-2 ring-green-300"
-                              : "border-gray-200 bg-white hover:bg-gray-50"
-                          }`}
-                        >
-                          <div className="mb-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <div>
-                                <span className="font-mono text-sm font-bold text-gray-900">Score {item.range}</span>
-                                <span
-                                  className={`ml-3 font-bold text-sm ${
-                                    index === 0
-                                      ? "text-red-600" // Extreme Fear
-                                      : index === 1
-                                        ? "text-orange-500" // Fear
-                                        : index === 2
-                                          ? "text-yellow-600" // Neutral
-                                          : index === 3
-                                            ? "text-green-500" // Greed
-                                            : "text-green-600" // Extreme Greed
-                                  }`}
+                <CardContent className="pt-4">
+                  {safeSentimentData.length > 0 ? (
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {safeSentimentData.map((item, index) => (
+                        <Card key={index} className="shadow-sm border-gray-200 bg-white">
+                          <CardHeader className="bg-gray-50 border-b border-gray-200">
+                            <CardTitle className="text-base font-bold text-gray-900 flex items-center justify-between">
+                              {item.sector}
+                              <span className="text-xs font-normal text-gray-600">{item.ticker}</span>
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="flex flex-col items-center justify-center py-4">
+                              <div className="relative h-20 w-20">
+                                <svg className="h-full w-full" viewBox="0 0 100 100" fill="none">
+                                  <circle cx="50" cy="50" r="50" fill="url(#gradient-sentiment)" />
+                                  <defs>
+                                    <linearGradient id="gradient-sentiment" x1="0%" y1="0%" x2="100%" y2="0%">
+                                      <stop offset="0%" style={{ stopColor: "#EF4444", stopOpacity: 1 }} />
+                                      <stop offset="50%" style={{ stopColor: "#F59E0B", stopOpacity: 1 }} />
+                                      <stop offset="100%" style={{ stopColor: "#22C55E", stopOpacity: 1 }} />
+                                    </linearGradient>
+                                  </defs>
+                                </svg>
+                                <div
+                                  className="absolute inset-0 flex items-center justify-center rounded-full text-xs font-bold text-white shadow-inner"
+                                  style={{
+                                    transform: `rotate(${(100 - item.netSentiment) * 1.8}deg)`,
+                                  }}
                                 >
-                                  {item.level}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {isCurrent && (
-                                  <span className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-full">
-                                    CURRENT
-                                  </span>
-                                )}
-                                <span
-                                  className={`px-3 py-1 text-xs font-bold rounded-full ${
-                                    item.signal === "STRONG BUY"
-                                      ? "bg-green-100 text-green-800"
-                                      : item.signal === "BUY"
-                                        ? "bg-green-100 text-green-700"
-                                        : item.signal === "HOLD"
-                                          ? "bg-gray-100 text-gray-700"
-                                          : item.signal === "CAUTION"
-                                            ? "bg-orange-100 text-orange-700"
-                                            : "bg-red-100 text-red-700"
-                                  }`}
-                                >
-                                  {item.signal}
-                                </span>
-                              </div>
-                            </div>
-                            <p className="text-sm text-gray-600 italic">{item.description}</p>
-                          </div>
-
-                          <div className="grid grid-cols-3 gap-3 mb-3">
-                            <div className="p-3 bg-blue-50 rounded border border-blue-200">
-                              <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Cash</div>
-                              <div className="text-lg font-bold text-blue-900">{item.guidance.cashAllocation}</div>
-                            </div>
-                            <div className="p-3 bg-purple-50 rounded border border-purple-200">
-                              <div className="text-xs font-semibold text-purple-900 uppercase mb-1">Exposure</div>
-                              <div className="text-lg font-bold text-purple-900">{item.guidance.marketExposure}</div>
-                            </div>
-                            <div className="p-3 bg-orange-50 rounded border border-orange-200">
-                              <div className="text-xs font-semibold text-orange-900 uppercase mb-1">Position Size</div>
-                              <div className="text-sm font-bold text-orange-900">{item.guidance.positionSize}</div>
-                            </div>
-                          </div>
-
-                          <div className="mb-3">
-                            <div className="text-xs font-bold text-gray-900 uppercase mb-2">Top Strategies</div>
-                            <div className="space-y-1">
-                              {item.guidance.strategies.slice(0, 3).map((strategy, idx) => (
-                                <div key={idx} className="flex items-start gap-2 text-sm text-gray-700">
-                                  <span className="text-primary mt-1 flex-shrink-0">•</span>
-                                  <span>{strategy}</span>
+                                  <div
+                                    className="absolute bottom-0 w-1 h-1/2 origin-bottom"
+                                    style={{
+                                      background:
+                                        "linear-gradient(to top, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 100%)",
+                                    }}
+                                  />
                                 </div>
-                              ))}
+                              </div>
+                              <div className="mt-3 text-center">
+                                <p className="text-lg font-bold text-gray-900">{item.netSentiment.toFixed(0)}</p>
+                                <p className="text-xs font-semibold text-gray-600 uppercase">
+                                  {getIndicatorSentiment(item.netSentiment)}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
-                    <p className="text-sm text-blue-800 leading-relaxed">
-                      <strong>Note:</strong> The Fear & Greed Index is most effective when extreme readings align with
-                      technical levels. Extreme fear (0-24) with strong support levels historically produces the best
-                      risk/reward for options sellers. Always maintain proper position sizing and risk management.
-                    </p>
-                  </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center text-gray-500 py-8">Sector sentiment data not available.</div>
+                  )}
                 </CardContent>
               </AccordionContent>
             </Card>
           </AccordionItem>
         </Accordion>
 
-        {/* Portfolio Allocation accordion */}
-        <Accordion type="multiple" className="space-y-0">
-          <AccordionItem value="portfolio-allocation" className="border-0">
+        {/* Volatility Products accordion */}
+        <Accordion type="multiple" defaultValue={["volatility-products"]} className="space-y-0">
+          <AccordionItem value="volatility-products" className="border-0">
             <Card className="shadow-sm border-gray-200">
               <AccordionTrigger className="hover:no-underline px-6 py-4 bg-gray-50 border-b border-gray-200 rounded-t-lg">
-                <CardTitle className="text-lg font-bold text-gray-900">
-                  Portfolio Allocation by Fear & Greed Level
+                <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <ActivityIcon className="h-5 w-5 text-primary" />
+                  Volatility Products Analysis
                 </CardTitle>
               </AccordionTrigger>
               <AccordionContent>
-                <CardContent className="pt-4 pb-4">
-                  <div className="space-y-2">
-                    {[
-                      { range: "0-24", level: "Extreme Greed", data: getPortfolioAllocation(12) },
-                      { range: "25-44", level: "Greed", data: getPortfolioAllocation(34) },
-                      { range: "45-55", level: "Neutral", data: getPortfolioAllocation(50) },
-                      { range: "56-74", level: "Fear", data: getPortfolioAllocation(65) },
-                      { range: "75-100", level: "Extreme Fear", data: getPortfolioAllocation(87) },
-                    ].map((item, index) => {
-                      const isCurrent =
-                        marketData.overallScore >= Number.parseInt(item.range.split("-")[0]) &&
-                        marketData.overallScore <= Number.parseInt(item.range.split("-")[1])
-
-                      return (
-                        <div
-                          key={index}
-                          className={`p-4 rounded-lg border transition-colors ${
-                            isCurrent
-                              ? "border-green-500 bg-green-100 shadow-md ring-2 ring-green-300"
-                              : "border-gray-200 bg-white hover:bg-gray-50"
-                          }`}
-                        >
-                          <div className="mb-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <div>
-                                <span className="font-mono text-sm font-bold text-gray-900">Score {item.range}</span>
-                                <span
-                                  className={`ml-3 font-bold text-sm ${
-                                    index === 0
-                                      ? "text-green-600" // Extreme Greed
-                                      : index === 1
-                                        ? "text-green-500" // Greed
-                                        : index === 2
-                                          ? "text-yellow-600" // Neutral
-                                          : index === 3
-                                            ? "text-orange-500" // Fear
-                                            : "text-red-600" // Extreme Fear
-                                  }`}
-                                >
-                                  {item.level}
-                                </span>
-                              </div>
-                              {isCurrent && (
-                                <span className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-full">
-                                  CURRENT
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-sm text-gray-600 italic">{item.data.description}</p>
+                <CardContent className="pt-4">
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {/* VIX Section */}
+                    <div>
+                      <h4 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
+                        <InfoIcon className="h-5 w-5 text-primary" />
+                        VIX (Volatility Index)
+                      </h4>
+                      <div className="p-4 bg-white border-2 border-gray-200 rounded-lg">
+                        <p className="text-sm text-gray-700 leading-relaxed mb-4">
+                          The VIX, or CBOE Volatility Index, measures the stock market's expectation of volatility over
+                          the next 30 days, derived from S&P 500 index options. It is often called the "fear index".
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="p-3 bg-gray-50 rounded border border-gray-200">
+                            <div className="text-xs font-semibold text-gray-700 uppercase mb-1">Current VIX</div>
+                            <div className="text-lg font-bold text-gray-900">{marketData.vix?.toFixed(2) ?? "N/A"}</div>
                           </div>
-
-                          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
-                            <div className="p-3 bg-blue-50 rounded border border-blue-200">
-                              <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Stocks/ETFs</div>
-                              <div className="text-lg font-bold text-blue-900">{item.data.stocks}</div>
+                          <div className="p-3 bg-gray-50 rounded border border-gray-200">
+                            <div className="text-xs font-semibold text-gray-700 uppercase mb-1">50-Day MA</div>
+                            <div className="text-lg font-bold text-gray-900">
+                              {marketData.vixVs50DayMA !== undefined
+                                ? (marketData.vixVs50DayMA * 50 + marketData.vix).toFixed(2)
+                                : "N/A"}
                             </div>
-                            <div className="p-3 bg-purple-50 rounded border border-purple-200">
-                              <div className="text-xs font-semibold text-purple-900 uppercase mb-1">Options</div>
-                              <div className="text-lg font-bold text-purple-900">{item.data.options}</div>
-                            </div>
-                            <div className="p-3 bg-orange-50 rounded border border-orange-200">
-                              <div className="text-xs font-semibold text-orange-900 uppercase mb-1">BTC/Crypto</div>
-                              <div className="text-lg font-bold text-orange-900">{item.data.crypto}</div>
-                            </div>
-                            <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
-                              <div className="text-xs font-semibold text-yellow-900 uppercase mb-1">Gold/Silver</div>
-                              <div className="text-lg font-bold text-yellow-900">{item.data.gold}</div>
-                            </div>
-                            <div className="p-3 bg-gray-50 rounded border border-gray-300">
-                              <div className="text-xs font-semibold text-gray-900 uppercase mb-1">Cash Reserve</div>
-                              <div className="text-lg font-bold text-gray-900">{item.data.cash}</div>
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            {item.data.rationale.map((point, idx) => (
-                              <div key={idx} className="flex items-start gap-2 text-sm text-gray-700">
-                                <span className="text-primary mt-1 flex-shrink-0">•</span>
-                                <span>{point}</span>
-                              </div>
-                            ))}
                           </div>
                         </div>
-                      )
-                    })}
-                  </div>
+                      </div>
+                    </div>
 
-                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
-                    <p className="text-sm text-blue-800 leading-relaxed">
-                      <strong>Note:</strong> These allocations are guidelines based on historical market patterns.
-                      Always adjust based on your personal risk tolerance, time horizon, and financial goals. Consult
-                      with a financial advisor for personalized advice.
-                    </p>
+                    {/* VIX Term Structure Section */}
+                    <div>
+                      <h4 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
+                        <BarChartIcon className="h-5 w-5 text-primary" />
+                        VIX Term Structure
+                      </h4>
+                      <div className="p-4 bg-white border-2 border-gray-200 rounded-lg">
+                        <p className="text-sm text-gray-700 leading-relaxed mb-4">
+                          The VIX term structure refers to the shape of the VIX futures curve, indicating market
+                          expectations about future volatility.
+                        </p>
+                        <div className="flex items-center justify-center py-3">
+                          <span className="text-lg font-bold text-gray-900">
+                            {marketData.vixTermStructure ?? "N/A"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </AccordionContent>

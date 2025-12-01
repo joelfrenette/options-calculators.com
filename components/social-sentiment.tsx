@@ -580,7 +580,7 @@ export function SocialSentiment() {
                 context={{
                   type: "sentiment",
                   title: "Social Sentiment Analysis",
-                  details: `Current global sentiment score: ${data.global_social_sentiment}/100 (${getSentimentLabel(data.global_social_sentiment)}). Macro sentiment: ${data.macro_sentiment}/100. Social sentiment: ${data.social_sentiment}/100. Headline mood: ${data.headline_market_mood}/100. Data quality: ${data.data_quality || "N/A"} with ${data.sources_available || 0}/${data.sources_total || 0} sources available. ${data.global_social_sentiment >= 70 ? "Bullish conditions - consider selling puts or buying calls." : data.global_social_sentiment <= 30 ? "Bearish conditions - consider defensive strategies or puts." : "Neutral conditions - consider iron condors or strangles."}`,
+                  details: `Current global sentiment score: ${data?.global_social_sentiment ?? 50}/100 (${getSentimentLabel(data?.global_social_sentiment ?? 50)}). Macro sentiment: ${data?.macro_sentiment ?? 50}/100. Social sentiment: ${data?.social_sentiment ?? 50}/100. Headline mood: ${data?.headline_market_mood ?? 50}/100. Data quality: ${data?.data_quality || "N/A"} with ${data?.sources_available || 0}/${data?.sources_total || 0} sources available. ${(data?.global_social_sentiment ?? 50) >= 70 ? "Bullish conditions - consider selling puts or buying calls." : (data?.global_social_sentiment ?? 50) <= 30 ? "Bearish conditions - consider defensive strategies or puts." : "Neutral conditions - consider iron condors or strangles."}`,
                 }}
               />
             </div>
@@ -593,9 +593,9 @@ export function SocialSentiment() {
               </h4>
               <p className="text-sm text-gray-700 leading-relaxed">
                 {data?.executive_summary ||
-                  `Social sentiment is currently at ${data?.global_social_sentiment}/100 (${getSentimentLabel(
-                    data?.global_social_sentiment || 50,
-                  )}). ${getSentimentInterpretation(data?.global_social_sentiment || 50)}`}
+                  `Social sentiment is currently at ${data?.global_social_sentiment ?? 50}/100 (${getSentimentLabel(
+                    data?.global_social_sentiment ?? 50,
+                  )}). ${getSentimentInterpretation(data?.global_social_sentiment ?? 50)}`}
               </p>
             </div>
 

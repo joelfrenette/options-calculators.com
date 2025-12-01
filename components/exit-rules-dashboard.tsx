@@ -445,7 +445,11 @@ export function ExitRulesDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Accordion type="single" collapsible className="w-full">
+            <Accordion
+              type="multiple"
+              defaultValue={["psychology", "scaling", "automation", "options-specific"]}
+              className="w-full"
+            >
               <AccordionItem value="psychology">
                 <AccordionTrigger className="text-left">Why Traders Fail to Exit Properly</AccordionTrigger>
                 <AccordionContent className="space-y-3 text-sm text-muted-foreground">

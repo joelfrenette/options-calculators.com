@@ -1135,7 +1135,7 @@ export function FomcPredictions() {
 
         {/* Wrapped strategies card in Accordion with default collapsed state */}
         {optionsStrategies.length > 0 && (
-          <Accordion type="single" collapsible defaultValue="">
+          <Accordion type="single" collapsible defaultValue="strategies">
             <AccordionItem value="strategies" className="border-none">
               <Card className="shadow-lg border-2 border-primary">
                 <AccordionTrigger className="hover:no-underline">

@@ -463,7 +463,7 @@ const InsiderTradingDashboard = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Accordion type="single" collapsible className="w-full">
+            <Accordion type="multiple" defaultValue={["tech-selling", "congress", "strategy"]} className="w-full">
               <AccordionItem value="tech-selling">
                 <AccordionTrigger className="text-[#1E3A8A] hover:no-underline">
                   <div className="flex items-center gap-2">
