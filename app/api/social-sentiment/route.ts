@@ -11,7 +11,7 @@ const API_VERSION = "5.0.0"
  * 10 DATA SOURCES (all functional):
  *
  * 1. Grok AI (xAI) - Real-time market sentiment analysis
- * 2. SerpAPI Google Trends - Fear vs greed search interest comparison
+ * 2. Serper Google Search - Fear vs greed search interest comparison
  * 3. AAII Investor Survey - Weekly individual investor sentiment
  * 4. CNN Fear & Greed - Official index
  * 5. StockTwits API - Symbol-specific sentiment
@@ -90,58 +90,76 @@ Be conservative - most days are 45-55.`,
   }
 }
 
-// ========== SOURCE 2: GOOGLE TRENDS ==========
+// ========== SOURCE 2: GOOGLE TRENDS (via Serper) ==========
 async function getGoogleTrendsScore(): Promise<{ score: number; source: string }> {
-  if (!process.env.SERPAPI_KEY) {
-    console.log("[v0] Source 2 (Trends): SerpAPI key not available")
+  if (!process.env.SERPER_API_KEY) {
+    console.log("[v0] Source 2 (Trends): Serper API key not available")
     return { score: -1, source: "unavailable" }
   }
 
   try {
-    console.log("[v0] Source 2: Fetching Google Trends sentiment...")
+    console.log("[v0] Source 2: Fetching Google search sentiment via Serper...")
 
-    // Compare bullish vs bearish search terms
-    const bullTerms = ["stock market buy", "bull market", "stocks to buy"]
-    const bearTerms = ["stock market crash", "bear market", "recession"]
+    // Compare bullish vs bearish search results using Serper's Google Search
+    const bullTerms = ["stock market buy signal", "bull market 2025", "stocks to buy now"]
+    const bearTerms = ["stock market crash warning", "bear market 2025", "recession coming"]
 
-    const allTerms = [...bullTerms, ...bearTerms].join(",")
-    const url = `https://serpapi.com/search.json?engine=google_trends&q=${encodeURIComponent(allTerms)}&date=now%207-d&api_key=${process.env.SERPAPI_KEY}`
+    // Fetch bullish sentiment
+    const bullResponse = await fetch("https://google.serper.dev/search", {
+      method: "POST",
+      headers: {
+        "X-API-KEY": process.env.SERPER_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        q: bullTerms.join(" OR "),
+        num: 10,
+        gl: "us",
+        hl: "en",
+      }),
+      signal: AbortSignal.timeout(10000),
+    })
 
-    const response = await fetch(url, { signal: AbortSignal.timeout(10000) })
+    // Fetch bearish sentiment
+    const bearResponse = await fetch("https://google.serper.dev/search", {
+      method: "POST",
+      headers: {
+        "X-API-KEY": process.env.SERPER_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        q: bearTerms.join(" OR "),
+        num: 10,
+        gl: "us",
+        hl: "en",
+      }),
+      signal: AbortSignal.timeout(10000),
+    })
 
-    if (!response.ok) {
-      // Fallback to neutral
-      console.log("[v0] Source 2 (Trends) API error, using fallback")
-      return { score: 55, source: "trends_fallback" }
+    if (!bullResponse.ok || !bearResponse.ok) {
+      console.log("[v0] Source 2 (Serper) API error, using fallback")
+      return { score: 55, source: "serper_fallback" }
     }
 
-    const data = await response.json()
+    const bullData = await bullResponse.json()
+    const bearData = await bearResponse.json()
 
-    // Parse interest over time
-    let bullishInterest = 0
-    let bearishInterest = 0
+    // Count results and analyze sentiment
+    const bullResults = bullData.organic?.length || 0
+    const bearResults = bearData.organic?.length || 0
+    const totalResults = bullResults + bearResults
 
-    if (data.interest_over_time?.timeline_data) {
-      for (const point of data.interest_over_time.timeline_data.slice(-7)) {
-        point.values?.forEach((v: { query: string; value: string }, idx: number) => {
-          const val = Number.parseInt(v.value) || 0
-          if (idx < 3) bullishInterest += val
-          else bearishInterest += val
-        })
-      }
+    if (totalResults > 0) {
+      // More bullish results = higher score
+      const score = Math.round((bullResults / totalResults) * 100)
+      console.log(`[v0] ✓ Source 2 (Serper): ${score}/100 (bull: ${bullResults}, bear: ${bearResults})`)
+      return { score: Math.max(20, Math.min(80, score)), source: "serper_search" }
     }
 
-    const total = bullishInterest + bearishInterest
-    if (total > 0) {
-      const score = Math.round((bullishInterest / total) * 100)
-      console.log(`[v0] ✓ Source 2 (Trends): ${score}/100`)
-      return { score: Math.max(20, Math.min(80, score)), source: "google_trends" }
-    }
-
-    return { score: 55, source: "trends_neutral" }
+    return { score: 55, source: "serper_neutral" }
   } catch (error) {
-    console.log("[v0] Source 2 (Trends) error:", error instanceof Error ? error.message : "Unknown")
-    return { score: 55, source: "trends_fallback" }
+    console.log("[v0] Source 2 (Serper) error:", error instanceof Error ? error.message : "Unknown")
+    return { score: 55, source: "serper_fallback" }
   }
 }
 
@@ -867,7 +885,7 @@ export async function GET() {
         score: trendsResult.score,
         source: trendsResult.source,
         status: trendsResult.score >= 0 ? "LIVE" : "UNAVAILABLE",
-        description: "Fear vs greed search terms via SerpAPI",
+        description: "Fear vs greed search terms via Serper",
         weight: 0.12,
       },
       {

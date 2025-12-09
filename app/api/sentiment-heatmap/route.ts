@@ -1,4 +1,25 @@
 import { NextResponse } from "next/server"
+import { generateText } from "ai"
+
+async function generateWithFallback(prompt: string, systemPrompt: string): Promise<string | null> {
+  const models = ["openai/gpt-4o-mini", "anthropic/claude-3-haiku-20240307"]
+
+  for (const model of models) {
+    try {
+      const { text } = await generateText({
+        model,
+        system: systemPrompt,
+        prompt,
+        temperature: 0.3,
+      })
+      return text
+    } catch (error) {
+      console.log(`[v0] Model ${model} failed, trying next...`)
+      continue
+    }
+  }
+  return null
+}
 
 async function analyzeSentimentWithAI(
   ticker: string,
@@ -10,14 +31,9 @@ async function analyzeSentimentWithAI(
   volume: number
 }> {
   try {
-    const xaiApiKey = process.env.XAI_API_KEY || process.env.GROK_XAI_API_KEY
+    const systemPrompt =
+      "You are a financial sentiment analyst specializing in social media analysis. Provide accurate, data-driven sentiment scores based on recent market discussions. Always respond with valid JSON only."
 
-    if (!xaiApiKey) {
-      console.log("[v0] No XAI API key found, falling back to neutral sentiment")
-      return { bullishScore: 50, bearishScore: 50, netSentiment: 0, volume: 0 }
-    }
-
-    // Use Grok to analyze current market sentiment for this ticker
     const prompt = `Analyze the current social media and market sentiment for ${tickerName} (${ticker}) based on recent discussions on Reddit (r/wallstreetbets, r/stocks, r/investing), Twitter/X financial community, and general market news from the past 24 hours.
 
 Provide a JSON response with:
@@ -26,38 +42,16 @@ Provide a JSON response with:
 - estimatedMentions: approximate number of mentions in past 24h
 - keyThemes: brief summary of main sentiment drivers
 
-Be realistic and data-driven. If there's limited discussion, reflect that with moderate scores around 40-60.`
+Be realistic and data-driven. If there's limited discussion, reflect that with moderate scores around 40-60.
 
-    const response = await fetch("https://api.x.ai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${xaiApiKey}`,
-      },
-      body: JSON.stringify({
-        model: "grok-3",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a financial sentiment analyst specializing in social media analysis. Provide accurate, data-driven sentiment scores based on recent market discussions.",
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        temperature: 0.3,
-      }),
-    })
+Respond with JSON only, no markdown.`
 
-    if (!response.ok) {
-      console.error("[v0] Grok API error:", response.statusText)
+    const content = await generateWithFallback(prompt, systemPrompt)
+
+    if (!content) {
+      console.log("[v0] All AI models failed, using neutral sentiment")
       return { bullishScore: 50, bearishScore: 50, netSentiment: 0, volume: 0 }
     }
-
-    const data = await response.json()
-    const content = data.choices?.[0]?.message?.content
 
     // Parse JSON from response
     const jsonMatch = content.match(/\{[\s\S]*\}/)

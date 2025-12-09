@@ -1,225 +1,61 @@
 "use client"
 
-import { useState } from "react"
-import { ChevronRight, Calendar, Clock, TrendingUp, AlertTriangle, Sparkles, Info } from "lucide-react"
+import { useState, useEffect, useCallback } from "react"
+import { ChevronRight, Calendar, Clock, TrendingUp, AlertTriangle, Sparkles, Info, Loader2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { RunScenarioInAIDialog } from "@/components/run-scenario-ai-dialog"
-import { RefreshButton } from "@/components/ui/refresh-button" // Imported RefreshButton
-import { TooltipsToggle } from "@/components/ui/tooltips-toggle" // Imported TooltipsToggle
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip" // Imported Tooltip components
+import { RefreshButton } from "@/components/ui/refresh-button"
+import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
-const earningsData = [
-  {
-    date: "Thu Nov 27",
-    time: "4:05 PM ET",
-    timing: "AMC",
-    ticker: "PTON",
-    company: "Peloton Interactive",
-    aiExplainer: "Turnaround play with high IV. Options pricing ~12% expected move. Watch subscription metrics.",
-    estimate: "EPS $0.02",
-  },
-  {
-    date: "Fri Nov 28",
-    time: "4:10 PM ET",
-    timing: "AMC",
-    ticker: "WRB",
-    company: "W.R. Berkley Corp",
-    aiExplainer: "Insurance sector steady. Low IV environment. Consider selling puts at support.",
-    estimate: "EPS $1.03",
-  },
-  {
-    date: "Mon Dec 1",
-    time: "7:00 AM ET",
-    timing: "BMO",
-    ticker: "ZS",
-    company: "Zscaler Inc",
-    aiExplainer: "Cybersecurity leader with elevated IV. Premium selling opportunity pre-earnings.",
-    estimate: "EPS $0.63",
-  },
-  {
-    date: "Tue Dec 2",
-    time: "4:15 PM ET",
-    timing: "AMC",
-    ticker: "CRM",
-    company: "Salesforce Inc",
-    aiExplainer: "AI narrative strong. Watch guidance vs consensus. Bull put spreads at key support.",
-    estimate: "EPS $2.44",
-  },
-  {
-    date: "Wed Dec 3",
-    time: "6:30 AM ET",
-    timing: "BMO",
-    ticker: "DLTR",
-    company: "Dollar Tree Inc",
-    aiExplainer: "Retail sector focus. Holiday shopping outlook key. Moderate IV, directional bias.",
-    estimate: "EPS $1.07",
-  },
-]
+// Types for dynamic data
+interface EarningsEvent {
+  date: string
+  time: string
+  timing: string
+  ticker: string
+  company: string
+  aiExplainer: string
+  estimate: string
+}
 
-// Static economic data
-const economicData = [
-  {
-    date: "Thu Nov 27",
-    time: "All Day",
-    event: "Thanksgiving Holiday",
-    agency: "NYSE",
-    impact: "High",
-    note: "US Markets Closed",
-    forecast: "—",
-    previous: "—",
-    aiExplainer: "Markets closed. Low liquidity pre/post holiday. Avoid holding short-dated options through break.",
-  },
-  {
-    date: "Fri Nov 28",
-    time: "All Day",
-    event: "Black Friday",
-    agency: "NYSE",
-    impact: "High",
-    note: "Shortened Session (1PM Close)",
-    forecast: "—",
-    previous: "—",
-    aiExplainer:
-      "Half-day session with thin volume. Retail sentiment indicator. Avoid new positions; wide spreads likely.",
-  },
-  {
-    date: "Fri Nov 29",
-    time: "8:30 AM ET",
-    event: "PCE Price Index",
-    agency: "BEA",
-    impact: "High",
-    note: "Core MoM 0.2% est",
-    forecast: "0.2%",
-    previous: "0.3%",
-    aiExplainer:
-      "Fed's preferred inflation gauge. Hot print = hawkish Fed fears, bond yields up. Consider SPY straddles for vol.",
-  },
-  {
-    date: "Mon Dec 1",
-    time: "10:00 AM ET",
-    event: "ISM Manufacturing PMI",
-    agency: "ISM",
-    impact: "High",
-    note: "Est. 47.5",
-    forecast: "47.5",
-    previous: "46.5",
-    aiExplainer: "Below 50 = contraction. Watch XLI/XLB for sector plays. Iron condors if reading near consensus.",
-  },
-  {
-    date: "Wed Dec 3",
-    time: "8:15 AM ET",
-    event: "ADP Employment Change",
-    agency: "ADP",
-    impact: "Med",
-    note: "Est. +150K",
-    forecast: "+150K",
-    previous: "+233K",
-    aiExplainer: "NFP preview. Weak jobs = rate cut hopes = bullish tech. Consider QQQ call spreads if soft.",
-  },
-]
+interface EconomicEvent {
+  date: string
+  time: string
+  event: string
+  agency: string
+  impact: string
+  note: string
+  forecast: string
+  previous: string
+  aiExplainer: string
+}
 
-// AI insights for earnings
-const earningsInsights = [
-  {
-    id: "holiday-impact",
-    title: "Holiday Week Trading Dynamics",
-    summary:
-      "Thanksgiving week typically sees reduced volume and tighter ranges. Light earnings calendar this week means less event-driven volatility, but expect post-holiday momentum shifts.",
-    watchPoints: [
-      "Post-holiday volume spikes on Monday",
-      "VIX historically drops during holiday weeks",
-      "Retail sector focus with Black Friday data",
-    ],
-    tradingTips: [
-      "Consider tightening stops due to low liquidity",
-      "Wait for Monday confirmation before new positions",
-      "Use the quiet period to review and adjust existing spreads",
-    ],
-  },
-  {
-    id: "pton-outlook",
-    title: "PTON Earnings Preview",
-    summary:
-      "Peloton reports after market close Thursday. The stock has been volatile with turnaround efforts. Options are pricing in a 12% expected move.",
-    watchPoints: [
-      "Subscription growth metrics",
-      "Connected Fitness hardware sales",
-      "CEO commentary on profitability timeline",
-    ],
-    tradingTips: [
-      "High IV presents iron condor opportunity if expecting range-bound outcome",
-      "Consider selling puts at support if bullish on turnaround",
-      "Wait for post-earnings IV crush before directional plays",
-    ],
-  },
-  {
-    id: "tech-earnings",
-    title: "Tech Sector Earnings (CRM, ZS)",
-    summary:
-      "Enterprise software earnings continue next week with Salesforce and Zscaler. AI narrative remains strong but valuations are stretched.",
-    watchPoints: [
-      "AI-related revenue growth commentary",
-      "Enterprise spending outlook for 2026",
-      "Guidance vs. consensus estimates",
-    ],
-    tradingTips: [
-      "Sell premium into elevated IV before announcements",
-      "Consider bull put spreads on CRM at key support levels",
-      "ZS has higher IV rank - better premium selling opportunity",
-    ],
-  },
-]
+interface AIInsight {
+  id: string
+  title: string
+  summary: string
+  watchPoints: string[]
+  tradingTips: string[]
+}
 
-// AI insights for economic events
-const economicInsights = [
-  {
-    id: "pce-inflation",
-    title: "PCE Price Index Impact",
-    summary:
-      "The Fed's preferred inflation gauge releases Friday. A reading above 0.3% MoM could reignite rate hike fears, while 0.1% or below would be bullish for risk assets.",
-    watchPoints: ["Core PCE vs headline divergence", "Services inflation stickiness", "Housing component trends"],
-    tradingTips: [
-      "Position for volatility spike Friday morning",
-      "SPY straddles may be attractive given binary outcome",
-      "Wait for dust to settle before selling premium",
-    ],
-  },
-  {
-    id: "ism-manufacturing",
-    title: "ISM Manufacturing PMI",
-    summary:
-      "Manufacturing has been contracting (below 50) for months. A surprise above 50 could signal economic resilience and push yields higher.",
-    watchPoints: [
-      "New orders sub-index for forward guidance",
-      "Employment component for labor market health",
-      "Prices paid for inflation signals",
-    ],
-    tradingTips: [
-      "Industrial sector ETFs (XLI) may see movement",
-      "Consider pairs trades: long industrials/short utilities on strong reading",
-      "Bond market reaction could drive equity rotation",
-    ],
-  },
-  {
-    id: "market-closure",
-    title: "Holiday Market Schedule",
-    summary:
-      "Thanksgiving closure means Thursday is dark, Friday is shortened (1PM close). Plan your trades accordingly - no adjustments possible Thursday.",
-    watchPoints: [
-      "Elevated theta decay over long weekend",
-      "Gap risk from international markets",
-      "Low liquidity Friday morning",
-    ],
-    tradingTips: [
-      "Close or adjust positions by Wednesday if concerned",
-      "Sell premium Wednesday to capture holiday theta",
-      "Avoid holding short-dated options through the break",
-    ],
-  },
-]
+interface CalendarData {
+  success: boolean
+  dateRange: string
+  lastUpdated: string
+  dataSources: {
+    earnings: string
+    economic: string
+  }
+  earnings: EarningsEvent[]
+  economic: EconomicEvent[]
+  earningsInsights: AIInsight[]
+  economicInsights: AIInsight[]
+}
 
 function ImpactBadge({ impact }: { impact: string }) {
   const colors = {
@@ -257,7 +93,21 @@ function EmptyState({ type }: { type: "earnings" | "economic" }) {
   )
 }
 
-function InsightAccordion({ insights, type }: { insights: typeof earningsInsights; type: string }) {
+function LoadingState() {
+  return (
+    <Card className="bg-white shadow-md">
+      <CardContent className="py-12 text-center">
+        <Loader2 className="h-12 w-12 text-teal-500 mx-auto mb-4 animate-spin" />
+        <p className="text-lg text-gray-600 mb-2">Loading calendar data...</p>
+        <p className="text-sm text-gray-500">Fetching live earnings and economic events with AI analysis</p>
+      </CardContent>
+    </Card>
+  )
+}
+
+function InsightAccordion({ insights, type }: { insights: AIInsight[]; type: string }) {
+  if (!insights || insights.length === 0) return null
+
   return (
     <div className="mt-8">
       <div className="border-t border-gray-200 pt-6 mb-4">
@@ -290,7 +140,7 @@ function InsightAccordion({ insights, type }: { insights: typeof earningsInsight
                     What to Watch:
                   </h4>
                   <ul className="text-sm text-gray-600 space-y-1">
-                    {insight.watchPoints.map((point, i) => (
+                    {insight.watchPoints?.map((point, i) => (
                       <li key={i} className="flex items-start gap-2">
                         <span className="text-teal-500 mt-1">•</span>
                         {point}
@@ -305,7 +155,7 @@ function InsightAccordion({ insights, type }: { insights: typeof earningsInsight
                     Trading Decisions:
                   </h4>
                   <ul className="text-sm text-gray-600 space-y-1">
-                    {insight.tradingTips.map((tip, i) => (
+                    {insight.tradingTips?.map((tip, i) => (
                       <li key={i} className="flex items-start gap-2">
                         <span className="text-teal-500 mt-1">•</span>
                         {tip}
@@ -318,7 +168,7 @@ function InsightAccordion({ insights, type }: { insights: typeof earningsInsight
                   context={{
                     type: "earnings",
                     title: insight.title,
-                    details: `${insight.summary} Key points: ${insight.watchPoints.join(", ")}. Trading tips: ${insight.tradingTips.join(", ")}`,
+                    details: `${insight.summary} Key points: ${insight.watchPoints?.join(", ")}. Trading tips: ${insight.tradingTips?.join(", ")}`,
                   }}
                 />
               </div>
@@ -330,28 +180,53 @@ function InsightAccordion({ insights, type }: { insights: typeof earningsInsight
   )
 }
 
-// Removed AskAIDialog as it's now imported
+// Helper function to sort by date ascending (soonest first)
+const sortByDateAscending = <T extends { date: string }>(items: T[]): T[] => {
+  return [...items].sort((a, b) => {
+    const dateA = new Date(a.date)
+    const dateB = new Date(b.date)
+    return dateA.getTime() - dateB.getTime()
+  })
+}
 
 export function EarningsEconomicCalendar() {
+  const [data, setData] = useState<CalendarData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
-  // Renamed state variables to match updates
-  const [selectedEarningsItem, setSelectedEarningsItem] = useState<(typeof earningsData)[0] | null>(null)
-  const [earningsAiResponse, setEarningsAiResponse] = useState("")
-  const [earningsAiLoading, setEarningsAiLoading] = useState(false)
-  const [earningsUserQuestion, setEarningsUserQuestion] = useState("")
-  const [selectedEconomicEvent, setSelectedEconomicEvent] = useState<(typeof economicData)[0] | null>(null) // Renamed economicData to economicEventsData for consistency
-  const [economicAiResponse, setEconomicAiResponse] = useState("")
-  const [economicAiLoading, setEconomicAiLoading] = useState(false)
-  const [economicUserQuestion, setEconomicUserQuestion] = useState("")
-
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
 
-  const handleRefresh = () => {
-    setRefreshing(true)
-    setTimeout(() => setRefreshing(false), 1500)
-  }
+  const fetchCalendarData = useCallback(async () => {
+    try {
+      setError(null)
+      const res = await fetch("/api/earnings-calendar", {
+        cache: "no-store",
+      })
 
-  // Removed handleEconomicAiQuestion as it's handled inline now
+      if (!res.ok) {
+        throw new Error("Failed to fetch calendar data")
+      }
+
+      const calendarData = await res.json()
+      setData(calendarData)
+    } catch (err) {
+      console.error("[v0] Calendar fetch error:", err)
+      setError("Unable to load calendar data. Please try again.")
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }, [])
+
+  // Initial load
+  useEffect(() => {
+    fetchCalendarData()
+  }, [fetchCalendarData])
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true)
+    fetchCalendarData()
+  }, [fetchCalendarData])
 
   const InfoTooltip = ({ content }: { content: string }) => {
     if (!tooltipsEnabled) return null
@@ -367,15 +242,25 @@ export function EarningsEconomicCalendar() {
     )
   }
 
-  const startDate = new Date()
-  const endDate = new Date()
-  endDate.setDate(endDate.getDate() + 7)
-  const dateRange = `${startDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })} – ${endDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`
+  const dateRange = data?.dateRange || "Loading..."
+  const lastUpdated = data?.lastUpdated
+    ? new Date(data.lastUpdated).toLocaleString("en-US", {
+        month: "numeric",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      })
+    : ""
+
+  const sortedEarnings = data ? sortByDateAscending(data.earnings) : []
+  const sortedEconomic = data ? sortByDateAscending(data.economic) : []
 
   return (
     <TooltipProvider>
       <div className="space-y-6">
-        {/* Hero Section - Now shared between both tabs */}
+        {/* Hero Section */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-[#1E3A8A] mb-1 flex items-center gap-2">
@@ -385,13 +270,30 @@ export function EarningsEconomicCalendar() {
             <p className="text-blue-600/80 flex items-center gap-2">
               <Calendar className="h-4 w-4" />
               {dateRange}
+              {lastUpdated && <span className="text-xs text-gray-500 ml-2">(Updated: {lastUpdated})</span>}
             </p>
+            {data?.dataSources && (
+              <p className="text-xs text-gray-500 mt-1">
+                Sources: Earnings via {data.dataSources.earnings || "N/A"}, Economic via{" "}
+                {data.dataSources.economic || "N/A"}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
             <RefreshButton onClick={handleRefresh} isLoading={refreshing} />
           </div>
         </div>
+
+        {/* Error state */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+            {error}
+            <Button variant="outline" size="sm" className="ml-4 bg-transparent" onClick={handleRefresh}>
+              Retry
+            </Button>
+          </div>
+        )}
 
         <Tabs defaultValue="earnings" className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-4">
@@ -405,10 +307,12 @@ export function EarningsEconomicCalendar() {
 
           {/* Earnings Tab */}
           <TabsContent value="earnings" className="p-6 bg-blue-50/50 rounded-lg">
-            {earningsData.length > 0 ? (
+            {loading ? (
+              <LoadingState />
+            ) : sortedEarnings.length > 0 ? (
               <Card className="bg-white shadow-md overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50 border-b border-gray-200">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
@@ -436,9 +340,8 @@ export function EarningsEconomicCalendar() {
                         </th>
                       </tr>
                     </thead>
-                    {/* Existing tbody code */}
-                    <tbody className="divide-y divide-gray-100">
-                      {earningsData.map((item, index) => (
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {sortedEarnings.map((item, index) => (
                         <tr key={index} className="hover:bg-gray-50 transition-colors">
                           <td className="px-4 py-3">
                             <div className="text-sm font-medium text-gray-900">{item.date}</div>
@@ -462,14 +365,12 @@ export function EarningsEconomicCalendar() {
                           <td className="px-4 py-3 text-sm text-gray-700 max-w-xs">{item.aiExplainer}</td>
                           <td className="px-4 py-3 text-sm text-gray-900 font-medium text-right">{item.estimate}</td>
                           <td className="px-4 py-3 text-center">
-                            {/* Updated RunScenarioInAIDialog props */}
                             <RunScenarioInAIDialog
                               context={{
                                 type: "earnings",
                                 ticker: item.ticker,
                                 company: item.company,
                                 estimate: item.estimate,
-                                date: item.date,
                                 aiExplainer: item.aiExplainer,
                                 title: `${item.ticker} Earnings - ${item.company}`,
                                 details: `Upcoming earnings report on ${item.date}. EPS Estimate: ${item.estimate}. ${item.aiExplainer || "Analyze this earnings event for options trading opportunities."}`,
@@ -487,7 +388,9 @@ export function EarningsEconomicCalendar() {
             )}
 
             {/* AI Insights */}
-            <InsightAccordion insights={earningsInsights} type="earnings" />
+            {!loading && data?.earningsInsights && (
+              <InsightAccordion insights={data.earningsInsights} type="earnings" />
+            )}
 
             {/* Footer Banner */}
             <div className="mt-8 bg-blue-100/50 rounded-lg p-4 flex flex-col sm:flex-row items-center justify-between gap-3 border border-blue-200">
@@ -503,73 +406,82 @@ export function EarningsEconomicCalendar() {
 
           {/* Economic Events Tab */}
           <TabsContent value="economic" className="p-6 bg-amber-50/50 rounded-lg">
-            <Card className="bg-white shadow-md overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Date/Time
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Event
-                        <InfoTooltip content="Economic events can significantly impact market direction. High-impact events like FOMC decisions, CPI, and NFP often cause large moves in indices and rate-sensitive stocks. Plan your options positions around these dates." />
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Agency
-                        <InfoTooltip content="The government agency or organization responsible for releasing this economic data. BEA = Bureau of Economic Analysis, BLS = Bureau of Labor Statistics, ISM = Institute for Supply Management, Fed = Federal Reserve." />
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider min-w-[280px]">
-                        <div className="flex items-center gap-1">
-                          <Sparkles className="h-3 w-3 text-blue-500" />
-                          AI Explainer
-                          <InfoTooltip content="AI-generated summary of potential market impact and options trading implications for this economic event." />
-                        </div>
-                      </th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Forecast
-                      </th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {economicData.map((event, index) => (
-                      <tr key={index} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3">
-                          <div className="text-sm font-medium text-gray-900">{event.date}</div>
-                          <div className="text-xs text-gray-500 flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {event.time}
+            {loading ? (
+              <LoadingState />
+            ) : sortedEconomic.length > 0 ? (
+              <Card className="bg-white shadow-md overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Date/Time
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Event
+                          <InfoTooltip content="Economic events can significantly impact market direction. High-impact events like FOMC decisions, CPI, and NFP often cause large moves in indices and rate-sensitive stocks. Plan your options positions around these dates." />
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Impact
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider min-w-[280px]">
+                          <div className="flex items-center gap-1">
+                            <Sparkles className="h-3 w-3 text-blue-500" />
+                            AI Explainer
+                            <InfoTooltip content="AI-generated summary of potential market impact and options trading implications for this economic event." />
                           </div>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-blue-600 font-medium">{event.event}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600 font-medium">{event.agency}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600 max-w-[320px]">{event.aiExplainer}</td>
-                        <td className="px-4 py-3 text-center text-sm text-gray-600">{event.forecast || "—"}</td>
-                        <td className="px-4 py-3 text-center">
-                          <RunScenarioInAIDialog
-                            context={{
-                              type: "economic",
-                              event: event.event,
-                              date: event.date,
-                              impact: event.impact,
-                              forecast: event.forecast,
-                              title: `${event.event} - Economic Release`,
-                              details: `Economic event on ${event.date}. Impact: ${event.impact}. ${event.forecast ? `Forecast: ${event.forecast}.` : ""} ${event.aiExplainer || "Analyze this economic event for options trading implications."}`,
-                            }}
-                          />
-                        </td>
+                        </th>
+                        <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Forecast
+                        </th>
+                        <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Actions
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {sortedEconomic.map((event, index) => (
+                        <tr key={index} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="text-sm font-medium text-gray-900">{event.date}</div>
+                            <div className="text-xs text-gray-500 flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {event.time}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-blue-600 font-medium">{event.event}</td>
+                          <td className="px-4 py-3">
+                            <ImpactBadge impact={event.impact} />
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600 max-w-[320px]">{event.aiExplainer}</td>
+                          <td className="px-4 py-3 text-center text-sm text-gray-600">{event.forecast || "—"}</td>
+                          <td className="px-4 py-3 text-center">
+                            <RunScenarioInAIDialog
+                              context={{
+                                type: "economic",
+                                event: event.event,
+                                date: event.date,
+                                impact: event.impact,
+                                forecast: event.forecast,
+                                title: `${event.event} - Economic Release`,
+                                details: `Economic event on ${event.date}. Impact: ${event.impact}. ${event.forecast ? `Forecast: ${event.forecast}.` : ""} ${event.aiExplainer || "Analyze this economic event for options trading implications."}`,
+                              }}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            ) : (
+              <EmptyState type="economic" />
+            )}
 
             {/* AI Insights */}
-            <InsightAccordion insights={economicInsights} type="economic" />
+            {!loading && data?.economicInsights && (
+              <InsightAccordion insights={data.economicInsights} type="economic" />
+            )}
 
             {/* Footer Banner */}
             <div className="mt-8 bg-amber-100/50 rounded-lg p-4 flex flex-col sm:flex-row items-center justify-between gap-3 border border-amber-200">

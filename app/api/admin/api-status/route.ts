@@ -80,12 +80,12 @@ export async function GET() {
       usedIn: ["Social Sentiment Score", "Fear & Greed Index", "Market Sentiment"],
     },
     {
-      name: "SerpAPI",
-      key: process.env.SERPAPI_KEY,
+      name: "Serper",
+      key: process.env.SERPER_API_KEY,
       testUrl: null,
-      endpoint: "https://serpapi.com/search.json",
-      purpose: "Google Trends data for sentiment analysis",
-      usedIn: ["Social Sentiment Score"],
+      endpoint: "https://google.serper.dev/search",
+      purpose: "Google Search data for sentiment analysis and stock news",
+      usedIn: ["Social Sentiment Score", "Stock News"],
     },
     {
       name: "Grok (xAI)",

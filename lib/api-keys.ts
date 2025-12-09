@@ -12,7 +12,7 @@ export interface ApiKeyConfig {
   FRED_API_KEY?: string
   APIFY_API_TOKEN?: string
   RESEND_API_KEY?: string
-  SERPAPI_KEY?: string
+  SERPER_API_KEY?: string
 }
 
 // Removed crypto and fs dependencies that don't work in Edge runtime
@@ -37,6 +37,6 @@ export function getConfiguredKeys(): Record<keyof ApiKeyConfig, boolean> {
     FRED_API_KEY: !!process.env.FRED_API_KEY,
     APIFY_API_TOKEN: !!process.env.APIFY_API_TOKEN,
     RESEND_API_KEY: !!process.env.RESEND_API_KEY,
-    SERPAPI_KEY: !!process.env.SERPAPI_KEY,
+    SERPER_API_KEY: !!process.env.SERPER_API_KEY,
   }
 }
