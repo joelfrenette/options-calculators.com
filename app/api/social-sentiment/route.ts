@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { generateText } from "ai"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
@@ -24,68 +25,39 @@ const API_VERSION = "5.0.0"
 
 // ========== SOURCE 1: GROK AI (xAI) ==========
 async function getGrokSentiment(): Promise<{ score: number; source: string; summary: string }> {
-  const apiKey = process.env.XAI_API_KEY || process.env.GROK_XAI_API_KEY
-  if (!apiKey) {
-    console.log("[v0] Source 1 (Grok): API key not available")
-    return { score: -1, source: "unavailable", summary: "" }
-  }
-
   try {
     console.log("[v0] Source 1: Fetching Grok AI sentiment...")
 
-    const response = await fetch("https://api.x.ai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "grok-3-latest",
-        messages: [
-          {
-            role: "system",
-            content: `You are a financial sentiment analyst. Analyze current stock market sentiment.
+    const { text } = await generateText({
+      model: "openai/gpt-4o-mini",
+      prompt: `You are a financial sentiment analyst. Analyze current stock market sentiment based on your knowledge of recent market conditions.
 
 RESPOND WITH ONLY A JSON OBJECT:
 {"score": <0-100>, "sentiment": "<bearish/neutral/bullish>", "summary": "<one sentence about today's market mood>"}
 
 Scoring: 0-25=Extreme Fear, 26-45=Bearish, 46-55=Neutral, 56-75=Bullish, 76-100=Extreme Greed
-Be conservative - most days are 45-55.`,
-          },
-          {
-            role: "user",
-            content:
-              "Based on your knowledge of recent market conditions, what is the current sentiment for the S&P 500 and stock market overall?",
-          },
-        ],
-        temperature: 0.2,
-        max_tokens: 150,
-      }),
-      signal: AbortSignal.timeout(15000),
+Be conservative - most days are 45-55.
+
+Based on your knowledge of recent market conditions, what is the current sentiment for the S&P 500 and stock market overall?`,
+      maxTokens: 150,
+      temperature: 0.2,
     })
 
-    if (!response.ok) {
-      console.log("[v0] Source 1 (Grok) HTTP error:", response.status)
-      return { score: -1, source: "api_error", summary: "" }
-    }
-
-    const data = await response.json()
-    const content = data.choices?.[0]?.message?.content?.trim() || ""
-    console.log("[v0] Grok raw:", content.substring(0, 200))
+    console.log("[v0] AI Sentiment raw:", text.substring(0, 200))
 
     try {
-      const jsonMatch = content.match(/\{[\s\S]*?\}/)
+      const jsonMatch = text.match(/\{[\s\S]*?\}/)
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0])
         const score = Math.max(0, Math.min(100, Number(parsed.score) || 50))
-        console.log(`[v0] ✓ Source 1 (Grok): ${score}/100`)
-        return { score, source: "grok_ai", summary: parsed.summary || "" }
+        console.log(`[v0] ✓ Source 1 (AI Sentiment): ${score}/100`)
+        return { score, source: "ai_sentiment", summary: parsed.summary || "" }
       }
     } catch {}
 
     return { score: -1, source: "parse_error", summary: "" }
   } catch (error) {
-    console.log("[v0] Source 1 (Grok) error:", error instanceof Error ? error.message : "Unknown")
+    console.log("[v0] Source 1 (AI Sentiment) error:", error instanceof Error ? error.message : "Unknown")
     return { score: -1, source: "error", summary: "" }
   }
 }

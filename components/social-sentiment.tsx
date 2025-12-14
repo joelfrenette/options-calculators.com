@@ -144,12 +144,9 @@ function SentimentIndicatorRow({ indicator }: { indicator: SentimentIndicator })
       <div className="relative h-2.5 bg-gray-100 rounded-full overflow-hidden">
         {isLive ? (
           <>
-            <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-400 to-red-500" />
-            <div className="absolute top-0 bottom-0 right-0 bg-gray-200" style={{ width: `${score}%` }} />
-            <div
-              className="absolute top-0 bottom-0 w-1 bg-gray-800 rounded"
-              style={{ left: `${100 - score}%`, transform: "translateX(-50%)" }}
-            />
+            <div className="absolute inset-y-0 left-0 bg-green-500" />
+            <div className="absolute inset-y-0 right-0 bg-red-500" />
+            <div className="absolute inset-y-0 bg-yellow-400" style={{ width: `${score}%` }} />
           </>
         ) : (
           <div className="absolute inset-0 bg-gray-200 opacity-80" />
@@ -276,9 +273,20 @@ export function SocialSentiment() {
   }
 
   const allIndicators = data?.indicators || []
-  const uniqueIndicators = Array.from(new Map(allIndicators.map((ind) => [ind.name, ind])).values()).sort((a, b) =>
-    a.name.localeCompare(b.name),
-  )
+  const uniqueIndicators: SentimentIndicator[] = Array.from(
+    new Map(
+      allIndicators.map((ind) => [
+        ind.name,
+        {
+          name: ind.name,
+          score: ind.score ?? 0,
+          status: ind.status,
+          description: ind.description,
+          isLive: ind.status === "LIVE" && ind.score !== null && ind.score >= 0,
+        },
+      ]),
+    ).values(),
+  ).sort((a, b) => a.name.localeCompare(b.name))
 
   const indexData = (data?.per_symbol || []).filter((s) => ["SPY", "QQQ", "IWM", "DIA"].includes(s.symbol))
 
