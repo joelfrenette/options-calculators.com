@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server"
 
+// Always fetch fresh-ish data but cache for 1 hour at the fetch layer
+export const dynamic = "force-dynamic"
+
+const SEC_USER_AGENT = "options-calculators.com insider-tracker contact@options-calculators.com"
+
 function formatDate(dateInput: unknown): string {
   if (!dateInput || typeof dateInput !== "string") {
     return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })
@@ -8,20 +13,13 @@ function formatDate(dateInput: unknown): string {
   const dateStr = dateInput.trim()
 
   try {
-    // Handle various date formats
     let date: Date
-    if (dateStr.includes("-")) {
-      // ISO format: 2025-11-24
-      date = new Date(dateStr)
-    } else if (dateStr.includes("/")) {
-      // US format: 11/24/2025
+    if (dateStr.includes("-") || dateStr.includes("/")) {
       date = new Date(dateStr)
     } else {
-      // Already formatted or unknown
       return dateStr
     }
 
-    // Validate date
     if (isNaN(date.getTime())) {
       return dateStr
     }
@@ -55,128 +53,202 @@ function parseValueToMillions(valueStr: string): number {
   return num / 1000000
 }
 
-// Finnhub API for insider transactions
+// Normalize a raw ISO/string date to YYYY-MM-DD for sorting
+function toSortableDate(dateInput: unknown): number {
+  if (!dateInput || typeof dateInput !== "string") return 0
+  const t = new Date(dateInput).getTime()
+  return isNaN(t) ? 0 : t
+}
+
+// ---------------------------------------------------------------------------
+// SOURCE 1: Finnhub — structured SEC Form 4 corporate insider transactions
+// ---------------------------------------------------------------------------
 async function fetchFinnhubInsiderTransactions() {
   const apiKey = process.env.FINNHUB_API_KEY
   if (!apiKey) {
     console.log("[v0] No Finnhub API key available")
-    return null
+    return []
   }
 
   try {
-    const tickers = ["AAPL", "NVDA", "MSFT", "META", "GOOGL", "AMZN", "TSLA"]
+    const tickers = ["AAPL", "NVDA", "MSFT", "META", "GOOGL", "AMZN", "TSLA", "AMD", "NFLX", "JPM"]
     const allTransactions: any[] = []
 
-    for (const ticker of tickers.slice(0, 3)) {
-      const response = await fetch(
-        `https://finnhub.io/api/v1/stock/insider-transactions?symbol=${ticker}&token=${apiKey}`,
-        { next: { revalidate: 3600 } },
-      )
-
-      if (response.ok) {
+    // Run requests in parallel for speed
+    const results = await Promise.allSettled(
+      tickers.map(async (ticker) => {
+        const response = await fetch(
+          `https://finnhub.io/api/v1/stock/insider-transactions?symbol=${ticker}&token=${apiKey}`,
+          { next: { revalidate: 3600 } },
+        )
+        if (!response.ok) return [] as any[]
         const data = await response.json()
         if (data.data && Array.isArray(data.data)) {
-          allTransactions.push(
-            ...data.data.slice(0, 3).map((t: any) => ({
-              ...t,
-              ticker,
-            })),
-          )
+          return data.data.slice(0, 4).map((t: any) => ({ ...t, ticker }))
         }
+        return [] as any[]
+      }),
+    )
+
+    for (const r of results) {
+      if (r.status === "fulfilled" && Array.isArray(r.value)) {
+        allTransactions.push(...r.value)
       }
     }
 
+    console.log(`[v0] Finnhub returned ${allTransactions.length} insider transactions`)
     return allTransactions
   } catch (error) {
     console.error("[v0] Finnhub insider fetch error:", error)
-    return null
+    return []
   }
 }
 
-// Congressional data
+// ---------------------------------------------------------------------------
+// SOURCE 2: SEC EDGAR — official "latest Form 4 filings" atom feed (free)
+// Gives us the most recent filers even when structured share data is absent.
+// ---------------------------------------------------------------------------
+async function fetchSecEdgarForm4() {
+  try {
+    const response = await fetch(
+      "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=4&company=&dateb=&owner=include&count=40&output=atom",
+      {
+        headers: {
+          "User-Agent": SEC_USER_AGENT,
+          Accept: "application/atom+xml",
+        },
+        next: { revalidate: 3600 },
+      },
+    )
+
+    if (!response.ok) {
+      console.log(`[v0] SEC EDGAR returned status ${response.status}`)
+      return []
+    }
+
+    const xml = await response.text()
+    const entries: any[] = []
+
+    // Lightweight XML parsing of <entry> blocks
+    const entryMatches = xml.match(/<entry>[\s\S]*?<\/entry>/g) || []
+    for (const entry of entryMatches.slice(0, 15)) {
+      const titleMatch = entry.match(/<title>([\s\S]*?)<\/title>/)
+      const updatedMatch = entry.match(/<updated>([\s\S]*?)<\/updated>/)
+
+      const rawTitle = titleMatch ? titleMatch[1].trim() : ""
+      const updated = updatedMatch ? updatedMatch[1].trim() : ""
+
+      // Titles look like: "4 - DOE JOHN (0001234567) (Reporting)"
+      const cleanTitle = rawTitle.replace(/^4\s*-\s*/, "").replace(/\(\d+\)\s*\(.*?\)\s*$/, "").trim()
+      if (!cleanTitle) continue
+
+      entries.push({
+        owner: cleanTitle,
+        date: updated ? updated.split("T")[0] : "",
+      })
+    }
+
+    console.log(`[v0] SEC EDGAR returned ${entries.length} Form 4 filings`)
+    return entries
+  } catch (error) {
+    console.error("[v0] SEC EDGAR fetch error:", error)
+    return []
+  }
+}
+
+// ---------------------------------------------------------------------------
+// SOURCE 3: House & Senate Stock Watcher — free public congressional data
+// ---------------------------------------------------------------------------
 async function fetchCongressionalTrades() {
-  // Congressional trades - value ranges are what's disclosed per STOCK Act, not exact amounts
-  // Prices are not available from disclosure forms
+  const sources = [
+    {
+      url: "https://house-stock-watcher-data.s3-us-west-2.amazonaws.com/data/all_transactions.json",
+      chamber: "House",
+    },
+    {
+      url: "https://senate-stock-watcher-data.s3-us-west-2.amazonaws.com/aggregate/all_transactions.json",
+      chamber: "Senate",
+    },
+  ]
+
+  const results = await Promise.allSettled(
+    sources.map(async ({ url, chamber }) => {
+      const response = await fetch(url, { next: { revalidate: 21600 } })
+      if (!response.ok) return [] as any[]
+      const data = await response.json()
+      if (!Array.isArray(data)) return [] as any[]
+
+      return data
+        .map((t: any) => {
+          const ticker = (t.ticker || "").toUpperCase()
+          const rawType = (t.type || "").toLowerCase()
+          const type = rawType.includes("purchase") || rawType.includes("buy")
+            ? "Buy"
+            : rawType.includes("sale") || rawType.includes("sell")
+              ? "Sell"
+              : "Disclosure"
+          return {
+            _date: t.transaction_date || t.disclosure_date || "",
+            date: t.transaction_date || t.disclosure_date || "",
+            type,
+            owner: t.representative || t.senator || "Unknown",
+            role: chamber === "House" ? "Representative" : "Senator",
+            category: "congressional",
+            ticker: ticker && ticker !== "--" ? ticker : "N/A",
+            shares: t.amount ? `${type === "Sell" ? "-" : "+"}${t.amount}` : "N/A",
+            price: "N/A",
+            value: t.amount || "N/A",
+            notes: t.asset_description ? String(t.asset_description).slice(0, 60) : `${chamber} disclosure`,
+            dataSource: `${chamber} STOCK Act disclosure`,
+          }
+        })
+        .filter((t: any) => t.ticker !== "N/A" && t._date)
+    }),
+  )
+
+  const all: any[] = []
+  for (const r of results) {
+    if (r.status === "fulfilled" && Array.isArray(r.value)) {
+      all.push(...r.value)
+    }
+  }
+
+  // Most recent first, take the latest 12
+  all.sort((a, b) => toSortableDate(b._date) - toSortableDate(a._date))
+  const recent = all.slice(0, 12)
+  console.log(`[v0] Congressional sources returned ${all.length} trades (showing ${recent.length})`)
+  return recent
+}
+
+// ---------------------------------------------------------------------------
+// Seed / fallback data — used when every live source is unavailable
+// ---------------------------------------------------------------------------
+function getSeedTransactions() {
   return [
-    {
-      date: "2025-11-23",
-      type: "Buy",
-      owner: "Pelosi Nancy",
-      role: "Representative",
-      category: "congressional",
-      ticker: "MSFT",
-      shares: "+$50K",
-      price: "N/A",
-      value: "$50K",
-      notes: "Spousal trade",
-      dataSource: "Congressional disclosure (45-day delay)",
-    },
-    {
-      date: "2025-11-20",
-      type: "Buy",
-      owner: "Rep. Josh Gottheimer",
-      role: "House",
-      category: "congressional",
-      ticker: "XOM",
-      shares: "+$15K-$50K",
-      price: "N/A",
-      value: "$15K-$50K",
-      notes: "Energy sector",
-      dataSource: "Congressional disclosure",
-    },
-    {
-      date: "2025-11-18",
-      type: "Buy",
-      owner: "Sen. Tommy Tuberville",
-      role: "Senator",
-      category: "congressional",
-      ticker: "LMT",
-      shares: "+$100K-$250K",
-      price: "N/A",
-      value: "$100K-$250K",
-      notes: "Defense allocation",
-      dataSource: "Congressional disclosure",
-    },
-    {
-      date: "2025-11-17",
-      type: "Disclosure",
-      owner: "Sen. Cynthia Lummis",
-      role: "Senator",
-      category: "congressional",
-      ticker: "BTC",
-      shares: "+5 BTC",
-      price: "~$95K",
-      value: "$475K",
-      notes: "Crypto disclosure",
-      dataSource: "Congressional disclosure",
-    },
-    {
-      date: "2025-11-15",
-      type: "Sell",
-      owner: "Rep. Dan Crenshaw",
-      role: "House",
-      category: "congressional",
-      ticker: "NVDA",
-      shares: "-$50K-$100K",
-      price: "N/A",
-      value: "$50K-$100K",
-      notes: "Partial position sale",
-      dataSource: "Congressional disclosure",
-    },
+    { date: "2025-11-25", type: "Sell", owner: "Cook Timothy D", role: "CEO", category: "corporate", ticker: "AAPL", shares: "-100,000", price: "$220/share", value: "$22M", notes: "Routine divestiture", dataSource: "Seed data" },
+    { date: "2025-11-24", type: "Buy", owner: "Pelosi Nancy", role: "Representative", category: "congressional", ticker: "MSFT", shares: "+$50K", price: "N/A", value: "$50K", notes: "Spousal trade", dataSource: "Seed data" },
+    { date: "2025-11-23", type: "Sell", owner: "Huang Jensen", role: "CEO", category: "corporate", ticker: "NVDA", shares: "-50,000", price: "$140/share", value: "$7M", notes: "10b5-1 plan", dataSource: "Seed data" },
+    { date: "2025-11-22", type: "Buy", owner: "Rep. Josh Gottheimer", role: "Representative", category: "congressional", ticker: "XOM", shares: "+$15K-$50K", price: "N/A", value: "$15K-$50K", notes: "Energy bet", dataSource: "Seed data" },
+    { date: "2025-11-21", type: "Sell", owner: "Zuckerberg Mark", role: "CEO", category: "corporate", ticker: "META", shares: "-75,000", price: "$580/share", value: "$43.5M", notes: "Scheduled sale", dataSource: "Seed data" },
+    { date: "2025-11-20", type: "Buy", owner: "Sen. Tommy Tuberville", role: "Senator", category: "congressional", ticker: "LMT", shares: "+$100K-$250K", price: "N/A", value: "$100K-$250K", notes: "Defense allocation", dataSource: "Seed data" },
+    { date: "2025-11-18", type: "Sell", owner: "Dabiri John", role: "Officer", category: "corporate", ticker: "NVDA", shares: "-17,792", price: "$179.42/share", value: "$3.2M", notes: "Open market sale", dataSource: "Seed data" },
   ]
 }
 
 export async function GET() {
   try {
-    const finnhubData = await fetchFinnhubInsiderTransactions()
-    const congressionalData = await fetchCongressionalTrades()
+    // Fetch all sources in parallel
+    const [finnhubData, edgarData, congressionalData] = await Promise.all([
+      fetchFinnhubInsiderTransactions(),
+      fetchSecEdgarForm4(),
+      fetchCongressionalTrades(),
+    ])
 
     const transactions: any[] = []
-
-    let finnhubCount = 0
+    let corporateCount = 0
     let congressionalCount = 0
 
-    // Process Finnhub insider transactions
+    // ---- Corporate: Finnhub structured transactions ----
     if (finnhubData && finnhubData.length > 0) {
       for (const t of finnhubData) {
         const transactionValue = (t.share || 0) * (t.transactionPrice || 0)
@@ -184,6 +256,7 @@ export async function GET() {
           t.transactionCode === "P" ? "Buy" : t.transactionCode === "S" ? "Sell" : t.change > 0 ? "Buy" : "Sell"
 
         transactions.push({
+          _date: t.transactionDate || t.filingDate,
           date: formatDate(t.transactionDate || t.filingDate),
           type: transactionType,
           owner: t.name || "Unknown",
@@ -199,57 +272,64 @@ export async function GET() {
             transactionType === "Buy" ? "Open market buy" : transactionType === "Sell" ? "Open market sale" : "Filing",
           dataSource: "SEC Form 4 via Finnhub",
         })
-        finnhubCount++
+        corporateCount++
       }
     }
 
-    // Add congressional trades
-    for (const trade of congressionalData) {
-      transactions.push({
-        ...trade,
-        date: formatDate(trade.date),
-      })
-      congressionalCount++
+    // ---- Corporate supplement: SEC EDGAR latest filers (when Finnhub thin) ----
+    if (corporateCount < 5 && edgarData && edgarData.length > 0) {
+      for (const e of edgarData.slice(0, 8)) {
+        transactions.push({
+          _date: e.date,
+          date: formatDate(e.date),
+          type: "Disclosure",
+          owner: e.owner,
+          role: "Insider",
+          category: "corporate",
+          ticker: "—",
+          shares: "Form 4",
+          price: "N/A",
+          value: "See filing",
+          notes: "Latest SEC Form 4 filing",
+          dataSource: "SEC EDGAR",
+        })
+        corporateCount++
+      }
     }
 
-    // Sort by date (most recent first)
-    transactions.sort((a, b) => {
-      const monthMap: Record<string, number> = {
-        Jan: 0,
-        Feb: 1,
-        Mar: 2,
-        Apr: 3,
-        May: 4,
-        Jun: 5,
-        Jul: 6,
-        Aug: 7,
-        Sep: 8,
-        Oct: 9,
-        Nov: 10,
-        Dec: 11,
+    // ---- Congressional: House/Senate Stock Watcher ----
+    if (congressionalData && congressionalData.length > 0) {
+      for (const trade of congressionalData) {
+        transactions.push({
+          ...trade,
+          date: formatDate(trade._date || trade.date),
+        })
+        congressionalCount++
       }
-      const parseDate = (d: unknown): number => {
-        if (!d || typeof d !== "string") return 0
-        const parts = d.split(" ")
-        if (parts.length === 2) {
-          const month = monthMap[parts[0]] ?? 10
-          const day = Number.parseInt(parts[1]) || 1
-          return new Date(2025, month, day).getTime()
-        }
-        const timestamp = new Date(d).getTime()
-        return isNaN(timestamp) ? 0 : timestamp
+    }
+
+    const usingLiveData = transactions.length > 0
+
+    // ---- Fallback to seed data when everything failed ----
+    if (!usingLiveData) {
+      for (const t of getSeedTransactions()) {
+        transactions.push({ ...t, date: formatDate(t.date) })
+        if (t.category === "corporate") corporateCount++
+        else congressionalCount++
       }
-      return parseDate(b.date) - parseDate(a.date)
-    })
+    }
 
-    // Existing code for volumeMap ...
+    // Sort all by date, most recent first
+    transactions.sort((a, b) => toSortableDate(b._date) - toSortableDate(a._date))
 
+    // Build volume aggregation for the chart
     const volumeMap: Record<string, { buys: number; sells: number }> = {}
     for (const t of transactions) {
+      if (!t.ticker || t.ticker === "—" || t.ticker === "N/A") continue
       if (!volumeMap[t.ticker]) {
         volumeMap[t.ticker] = { buys: 0, sells: 0 }
       }
-      const valueInMillions = parseValueToMillions(t.value)
+      const valueInMillions = parseValueToMillions(String(t.value))
       if (t.type === "Buy") {
         volumeMap[t.ticker].buys += valueInMillions
       } else if (t.type === "Sell") {
@@ -267,27 +347,48 @@ export async function GET() {
       .sort((a, b) => b.buys + b.sells - (a.buys + a.sells))
       .slice(0, 6)
 
+    // Strip internal _date helper before returning
+    const cleanedTransactions = transactions.map(({ _date, ...rest }) => rest)
+
     return NextResponse.json({
       success: true,
-      transactions,
+      transactions: cleanedTransactions,
       volumeData,
+      source: usingLiveData ? "live" : "seed",
       lastUpdated: new Date().toISOString(),
       dataSources: {
         corporate: {
-          source: finnhubData && finnhubData.length > 0 ? "Finnhub API (SEC Form 4)" : "Sample data",
-          count: finnhubCount,
-          isLive: finnhubData && finnhubData.length > 0,
+          source:
+            finnhubData && finnhubData.length > 0
+              ? "Finnhub API (SEC Form 4)"
+              : edgarData && edgarData.length > 0
+                ? "SEC EDGAR (Form 4 feed)"
+                : "Seed data",
+          count: corporateCount,
+          isLive: usingLiveData && (finnhubData.length > 0 || edgarData.length > 0),
         },
         congressional: {
-          source: "Public congressional disclosures (STOCK Act)",
+          source: "House & Senate Stock Watcher (STOCK Act)",
           count: congressionalCount,
-          isLive: false,
-          note: "Congressional trades disclosed with up to 45-day delay. Exact prices not disclosed - showing current market prices where available.",
+          isLive: congressionalData && congressionalData.length > 0,
+          note: "Congressional trades disclosed with up to 45-day delay. Value ranges (not exact amounts) are reported per the STOCK Act.",
         },
       },
     })
   } catch (error) {
     console.error("[v0] Insider trading API error:", error)
-    return NextResponse.json({ success: false, error: "Failed to fetch insider trading data" }, { status: 500 })
+    // Even on hard failure, return seed data so the page is never empty
+    const seed = getSeedTransactions().map((t) => ({ ...t, date: formatDate(t.date) }))
+    return NextResponse.json({
+      success: true,
+      transactions: seed,
+      volumeData: [],
+      source: "seed",
+      lastUpdated: new Date().toISOString(),
+      dataSources: {
+        corporate: { source: "Seed data", count: 4, isLive: false },
+        congressional: { source: "Seed data", count: 3, isLive: false },
+      },
+    })
   }
 }
