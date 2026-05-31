@@ -32,7 +32,7 @@ import {
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 
 // Threshold (USD) above which a transaction is considered a "big move"
-const BIG_MOVE_THRESHOLD = 1_000_000
+const BIG_MOVE_THRESHOLD = 50_000
 
 // Parse a value string like "$22M" / "$50K" / "$15K-$50K" into an approximate USD number
 function parseValueToUsd(valueStr: string): number {
@@ -203,7 +203,7 @@ const InsiderTradingDashboard = () => {
 
   // Smart filter state
   const [tickerFilter, setTickerFilter] = useState("")
-  const [bigMovesOnly, setBigMovesOnly] = useState(false)
+  const [bigMovesOnly, setBigMovesOnly] = useState(true)
 
   // AI Smart Analysis state
   const [aiSummary, setAiSummary] = useState<string>("")
@@ -498,28 +498,7 @@ const InsiderTradingDashboard = () => {
               </div>
             </div>
 
-            {/* Quick ticker chips */}
-            {availableTickers.length > 0 && (
-              <div className="mb-4 flex flex-wrap gap-1.5">
-                {availableTickers.slice(0, 14).map((tk) => {
-                  const active = tickerFilter.trim().toUpperCase() === tk
-                  return (
-                    <button
-                      key={tk}
-                      type="button"
-                      onClick={() => setTickerFilter(active ? "" : tk)}
-                      className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
-                        active
-                          ? "border-[#0D9488] bg-[#0D9488] text-white"
-                          : "border-gray-200 bg-gray-50 text-gray-600 hover:border-[#0D9488] hover:text-[#0D9488]"
-                      }`}
-                    >
-                      {tk}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
+
 
             {isLoading ? (
               <LoadingSpinner message="Loading insider transactions..." />
