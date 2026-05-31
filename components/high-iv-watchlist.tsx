@@ -229,7 +229,14 @@ export function HighIVWatchlist() {
                         <Flame className="w-4 h-4 text-orange-600" />
                       </div>
                       <div className="text-left">
-                        <div className="font-semibold">{candidate.ticker}</div>
+                        <a
+                          href={`https://finance.yahoo.com/quote/${candidate.ticker}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-semibold text-teal-600 hover:text-teal-700 hover:underline"
+                        >
+                          {candidate.ticker}
+                        </a>
                         <div className="text-xs text-muted-foreground">${candidate.price.toFixed(2)}</div>
                       </div>
                     </div>

@@ -508,7 +508,14 @@ const InsiderTradingDashboard = () => {
                           </div>
                         </td>
                         <td className="py-3 px-2">
-                          <span className="text-sm font-bold text-teal-600">{trade.ticker}</span>
+                          <a
+                            href={`https://finance.yahoo.com/quote/${trade.ticker}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-bold text-teal-600 hover:text-teal-700 hover:underline"
+                          >
+                            {trade.ticker}
+                          </a>
                         </td>
                         <td className="py-3 px-2 text-sm text-gray-900">
                           {trade.shares === "N/A" || trade.shares === "+0" || trade.shares === "-0" ? (
