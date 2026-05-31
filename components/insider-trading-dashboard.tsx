@@ -90,105 +90,7 @@ function formatDateDisplay(dateStr: string): string {
   }
 }
 
-// Fallback sample data with consistent date format
-const fallbackTrades: Trade[] = [
-  {
-    date: "Nov 25",
-    type: "Sell",
-    owner: "Cook Timothy D",
-    role: "CEO",
-    category: "corporate",
-    ticker: "AAPL",
-    shares: "-100,000",
-    price: "$220/share",
-    value: "$22M",
-    notes: "Routine divestiture",
-  },
-  {
-    date: "Nov 24",
-    type: "Buy",
-    owner: "Pelosi Nancy",
-    role: "Senator",
-    category: "congressional",
-    ticker: "MSFT",
-    shares: "+$50K",
-    price: "N/A",
-    value: "$50K",
-    notes: "Spousal trade",
-  },
-  {
-    date: "Nov 23",
-    type: "Sell",
-    owner: "Huang Jensen",
-    role: "CEO",
-    category: "corporate",
-    ticker: "NVDA",
-    shares: "-50,000",
-    price: "$140/share",
-    value: "$7M",
-    notes: "10b5-1 plan",
-  },
-  {
-    date: "Nov 22",
-    type: "Buy",
-    owner: "Rep. Josh Gottheimer",
-    role: "House",
-    category: "congressional",
-    ticker: "XOM",
-    shares: "+$15K-$50K",
-    price: "N/A",
-    value: "$15K-$50K",
-    notes: "Energy bet",
-  },
-  {
-    date: "Nov 21",
-    type: "Sell",
-    owner: "Zuckerberg Mark",
-    role: "CEO",
-    category: "corporate",
-    ticker: "META",
-    shares: "-75,000",
-    price: "$580/share",
-    value: "$43.5M",
-    notes: "Scheduled sale",
-  },
-  {
-    date: "Nov 20",
-    type: "Buy",
-    owner: "Sen. Tommy Tuberville",
-    role: "Senator",
-    category: "congressional",
-    ticker: "LMT",
-    shares: "+$100K-$250K",
-    price: "N/A",
-    value: "$100K-$250K",
-    notes: "Defense allocation",
-  },
-  {
-    date: "Nov 19",
-    type: "Disclosure",
-    owner: "Sen. Cynthia Lummis",
-    role: "Senator",
-    category: "congressional",
-    ticker: "BTC",
-    shares: "+5 BTC",
-    price: "~$95K",
-    value: "$475K",
-    notes: "Crypto disclosure",
-  },
-  {
-    date: "Nov 18",
-    type: "Sell",
-    owner: "Dabiri John",
-    role: "Officer",
-    category: "corporate",
-    ticker: "NVDA",
-    shares: "-17,792",
-    price: "$179.42/share",
-    value: "$3.2M",
-    notes: "Open market sale",
-  },
-]
+
 
 type SortField = "date" | "owner" | "ticker" | "shares" | "price" | "value" | "notes"
 type SortDirection = "asc" | "desc" | null
@@ -196,8 +98,8 @@ type SortDirection = "asc" | "desc" | null
 const InsiderTradingDashboard = () => {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const [trades, setTrades] = useState<Trade[]>(fallbackTrades)
-  const [dataSource, setDataSource] = useState<string>("mock")
+  const [trades, setTrades] = useState<Trade[]>([])
+  const [dataSource, setDataSource] = useState<string>("live")
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [sortField, setSortField] = useState<SortField | null>(null)
   const [sortDirection, setSortDirection] = useState<SortDirection>(null)
@@ -451,7 +353,7 @@ const InsiderTradingDashboard = () => {
                     className={`w-2 h-2 rounded-full ${data.dataSources.corporate?.isLive ? "bg-green-500" : "bg-yellow-500"}`}
                   />
                   <span className="font-medium">Corporate:</span>{" "}
-                  {data.dataSources.corporate?.isLive ? "Live SEC Form 4 data via Finnhub" : "Sample data"} (
+                  {data.dataSources.corporate?.isLive ? "Live SEC Form 4 data via Finnhub" : "Data unavailable"} (
                   {data.dataSources.corporate?.count || 0} trades)
                 </span>
                 <span className="flex items-center gap-1.5">
