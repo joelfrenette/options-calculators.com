@@ -343,7 +343,14 @@ export function CalendarSpreadScanner() {
                       </div>
                       <div className="text-left">
                         <div className="font-semibold flex items-center gap-2">
-                          {setup.ticker}
+                          <a
+                            href={`https://finance.yahoo.com/quote/${setup.ticker}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-teal-600 hover:text-teal-700 hover:underline"
+                          >
+                            {setup.ticker}
+                          </a>
                           {getBetaBadge(setup.beta)}
                         </div>
                         <div className="text-xs text-muted-foreground">{setup.company}</div>

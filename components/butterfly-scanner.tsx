@@ -164,7 +164,14 @@ export function ButterflyScanner() {
         <div className="flex items-start justify-between mb-3">
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-bold text-lg">{setup.ticker}</span>
+              <a
+                href={`https://finance.yahoo.com/quote/${setup.ticker}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold text-lg text-teal-600 hover:text-teal-700 hover:underline"
+              >
+                {setup.ticker}
+              </a>
               <Badge variant="outline" className={setup.type === "call" ? "text-green-600" : "text-red-600"}>
                 {setup.type.toUpperCase()}
               </Badge>

@@ -249,7 +249,14 @@ export function CreditSpreadScanner() {
                       )}
                     </div>
                     <div className="text-left">
-                      <div className="font-semibold">{setup.ticker}</div>
+                      <a
+                        href={`https://finance.yahoo.com/quote/${setup.ticker}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-teal-600 hover:text-teal-700 hover:underline"
+                      >
+                        {setup.ticker}
+                      </a>
                       <div className="text-xs text-muted-foreground">{setup.company}</div>
                     </div>
                   </div>

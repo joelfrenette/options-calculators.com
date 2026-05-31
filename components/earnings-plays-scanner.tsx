@@ -289,7 +289,14 @@ export function EarningsPlaysScanner() {
                         <Calendar className="w-4 h-4 text-blue-600" />
                       </div>
                       <div className="text-left">
-                        <div className="font-semibold">{play.ticker}</div>
+                        <a
+                          href={`https://finance.yahoo.com/quote/${play.ticker}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-semibold text-teal-600 hover:text-teal-700 hover:underline"
+                        >
+                          {play.ticker}
+                        </a>
                         <div className="text-xs text-muted-foreground">
                           {play.earningsDate} {play.earningsTime}
                         </div>
