@@ -3,13 +3,16 @@
 import { useState, useMemo, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { InputGroup, InputGroupInput, InputGroupAddon } from "@/components/ui/input-group"
 import { RunScenarioInAIDialog } from "@/components/run-scenario-ai-dialog"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   TrendingUp,
+  TrendingDown,
   Building2,
   Landmark,
   AlertTriangle,
@@ -20,8 +23,42 @@ import {
   Target,
   ArrowRight,
   Info,
+  Search,
+  X,
+  Sparkles,
+  Zap,
+  Minus,
 } from "lucide-react"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
+
+// Hard floor — trades below this are never shown regardless of toggle
+const MIN_THRESHOLD = 50_000
+
+// Threshold for the "Big moves only" toggle ($500K+)
+const BIG_MOVE_THRESHOLD = 500_000
+
+// Parse a value string like "$22M" / "$50K" / "$15K-$50K" into an approximate USD number
+function parseValueToUsd(valueStr: string): number {
+  if (!valueStr) return 0
+  const part = valueStr.includes("-") ? valueStr.split("-").pop()! : valueStr
+  const cleaned = part.replace(/[$,\s]/g, "")
+  const num = Number.parseFloat(cleaned.replace(/[KMB]/gi, ""))
+  if (isNaN(num)) return 0
+  if (/B/i.test(cleaned)) return num * 1_000_000_000
+  if (/M/i.test(cleaned)) return num * 1_000_000
+  if (/K/i.test(cleaned)) return num * 1_000
+  return num
+}
+
+interface AiSignal {
+  ticker: string
+  direction: "Bullish" | "Bearish" | "Neutral"
+  confidence: "High" | "Medium" | "Low"
+  headline: string
+  rationale: string
+  optionsIdea?: string
+  sources?: string[]
+}
 
 interface Trade {
   date: string
@@ -167,9 +204,21 @@ const InsiderTradingDashboard = () => {
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
   const [data, setData] = useState<any | null>(null)
 
+  // Smart filter state
+  const [tickerFilter, setTickerFilter] = useState("")
+  const [bigMovesOnly, setBigMovesOnly] = useState(true)
+  const [daysBack, setDaysBack] = useState(30)
+
+  // AI Smart Analysis state
+  const [aiSummary, setAiSummary] = useState<string>("")
+  const [aiSignals, setAiSignals] = useState<AiSignal[]>([])
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const [aiProvider, setAiProvider] = useState<string>("")
+
   const fetchData = async () => {
     try {
-      const response = await fetch("/api/insider-trading")
+      const response = await fetch(`/api/insider-trading?days=${daysBack}`)
       if (response.ok) {
         const data = await response.json()
         if (data.success && data.transactions?.length > 0) {
@@ -188,7 +237,7 @@ const InsiderTradingDashboard = () => {
 
   useEffect(() => {
     fetchData()
-  }, [])
+  }, [daysBack])
 
   const handleRefresh = async () => {
     setIsRefreshing(true)
@@ -249,6 +298,56 @@ const InsiderTradingDashboard = () => {
       return aVal > bVal ? -1 : aVal < bVal ? 1 : 0
     })
   }, [trades, sortField, sortDirection])
+
+  // Apply the smart filter (ticker search + big-moves-only) on top of sorting
+  const filteredTrades = useMemo(() => {
+    const query = tickerFilter.trim().toUpperCase()
+    return sortedTrades.filter((trade) => {
+      const matchesTicker =
+        !query ||
+        (trade.ticker || "").toUpperCase().includes(query) ||
+        (trade.owner || "").toUpperCase().includes(query)
+      const usdValue = parseValueToUsd(trade.value)
+      const aboveFloor = usdValue >= MIN_THRESHOLD
+      const matchesBigMove = !bigMovesOnly || usdValue >= BIG_MOVE_THRESHOLD
+      return matchesTicker && aboveFloor && matchesBigMove
+    })
+  }, [sortedTrades, tickerFilter, bigMovesOnly])
+
+  // Quick-access list of the tickers present in the data
+  const availableTickers = useMemo(() => {
+    const set = new Set<string>()
+    for (const t of trades) {
+      const tk = (t.ticker || "").toUpperCase()
+      if (tk && tk !== "—" && tk !== "N/A") set.add(tk)
+    }
+    return Array.from(set).sort()
+  }, [trades])
+
+  const generateAiAnalysis = async () => {
+    setAiLoading(true)
+    setAiError(null)
+    try {
+      const response = await fetch("/api/insider-trading/ai-insights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trades }),
+      })
+      const result = await response.json()
+      if (result.success) {
+        setAiSummary(result.summary || "")
+        setAiSignals(Array.isArray(result.signals) ? result.signals : [])
+        setAiProvider(result.provider || "")
+      } else {
+        setAiError(result.error || "Failed to generate analysis")
+      }
+    } catch (error) {
+      console.error("Error generating AI analysis:", error)
+      setAiError("Unable to reach the AI analysis service")
+    } finally {
+      setAiLoading(false)
+    }
+  }
 
   const getTypeBadge = (type: string) => {
     const normalizedType = (type || "").toLowerCase()
@@ -341,7 +440,9 @@ const InsiderTradingDashboard = () => {
               <InfoTooltip content="This table shows recent SEC Form 4 filings from corporate insiders and congressional trade disclosures. Look for clusters of buying activity as a bullish signal. High-value purchases by CEOs and CFOs are particularly significant." />
             </CardTitle>
             <CardDescription>
-              Showing all {sortedTrades.length} trades from the past week (click column headers to sort)
+              Showing {filteredTrades.length} of {sortedTrades.length} trades
+              {tickerFilter.trim() ? ` matching "${tickerFilter.trim().toUpperCase()}"` : ""}
+              {bigMovesOnly ? " (big moves only)" : ""} — click column headers to sort
             </CardDescription>
             {data?.dataSources && (
               <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mt-2 pt-2 border-t">
@@ -363,9 +464,81 @@ const InsiderTradingDashboard = () => {
             )}
           </CardHeader>
           <CardContent>
+            {/* Smart Filter */}
+            <div className="mb-4 flex flex-col gap-3">
+              {/* Row 1: search + big moves toggle */}
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <InputGroup className="w-full sm:max-w-xs">
+                  <InputGroupAddon>
+                    <Search className="h-4 w-4 text-muted-foreground" />
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    placeholder="Filter by ticker or name (e.g. NVDA)"
+                    value={tickerFilter}
+                    onChange={(e) => setTickerFilter(e.target.value)}
+                    aria-label="Filter trades by ticker or owner name"
+                  />
+                  {tickerFilter && (
+                    <InputGroupAddon align="inline-end">
+                      <button
+                        type="button"
+                        onClick={() => setTickerFilter("")}
+                        className="text-muted-foreground hover:text-foreground"
+                        aria-label="Clear filter"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </InputGroupAddon>
+                  )}
+                </InputGroup>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant={bigMovesOnly ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setBigMovesOnly((v) => !v)}
+                    className={bigMovesOnly ? "bg-[#0D9488] hover:bg-[#0B7E74] text-white" : ""}
+                  >
+                    <Zap className="h-4 w-4 mr-1.5" />
+                    Big moves only
+                  </Button>
+                </div>
+              </div>
+
+              {/* Row 2: days-back selector */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground font-medium shrink-0">Look back:</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { label: "30d", value: 30 },
+                    { label: "60d", value: 60 },
+                    { label: "90d", value: 90 },
+                    { label: "6mo", value: 180 },
+                    { label: "1yr", value: 365 },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setDaysBack(opt.value)}
+                      className={`rounded-full border px-3 py-0.5 text-xs font-medium transition-colors ${
+                        daysBack === opt.value
+                          ? "border-[#0D9488] bg-[#0D9488] text-white"
+                          : "border-gray-200 bg-gray-50 text-gray-600 hover:border-[#0D9488] hover:text-[#0D9488]"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+
+
             {isLoading ? (
               <LoadingSpinner message="Loading insider transactions..." />
-            ) : sortedTrades.length > 0 ? (
+            ) : filteredTrades.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -416,7 +589,7 @@ const InsiderTradingDashboard = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedTrades.map((trade, index) => (
+                    {filteredTrades.map((trade, index) => (
                       <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="py-3 px-2 text-sm text-gray-900">
                           <div className="flex items-center gap-1">
@@ -436,9 +609,13 @@ const InsiderTradingDashboard = () => {
                           <span className="text-sm font-bold text-teal-600">{trade.ticker}</span>
                         </td>
                         <td className="py-3 px-2 text-sm text-gray-900">
-                          <span className={trade.shares.startsWith("-") ? "text-red-600" : "text-green-600"}>
-                            {trade.shares}
-                          </span>
+                          {trade.shares === "N/A" || trade.shares === "+0" || trade.shares === "-0" ? (
+                            <span className="text-gray-400">N/A</span>
+                          ) : (
+                            <span className={trade.shares.startsWith("-") ? "text-red-600" : "text-green-600"}>
+                              {trade.shares}
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-2 text-sm text-gray-900">{trade.price}</td>
                         <td className="py-3 px-2 text-sm font-medium text-gray-900">{trade.value}</td>
@@ -449,7 +626,143 @@ const InsiderTradingDashboard = () => {
                 </table>
               </div>
             ) : (
-              <p className="text-center text-gray-500 py-8">No recent insider transactions found.</p>
+              <p className="text-center text-gray-500 py-8">
+                {tickerFilter.trim() || bigMovesOnly
+                  ? "No trades match your filter. Try clearing the search or the big-moves toggle."
+                  : "No recent insider transactions found."}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* AI Smart Analysis (dynamic, data-driven) */}
+        <Card className="bg-white shadow-md border-0">
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <CardTitle className="text-[#0D9488] flex items-center gap-2">
+                  <Sparkles className="h-5 w-5" />
+                  AI Smart Analysis
+                  <InfoTooltip content="AI cross-references corporate insider Form 4 activity with congressional disclosures to surface unusual clusters, cross-confirmed signals, and plausible catalysts. These are speculative hypotheses for research — not financial advice or claims of illegal insider information." />
+                </CardTitle>
+                <CardDescription>
+                  Correlations & generalizations across insider and politician flows in the current data
+                </CardDescription>
+              </div>
+              <Button
+                type="button"
+                onClick={generateAiAnalysis}
+                disabled={aiLoading || trades.length === 0}
+                className="bg-[#0D9488] hover:bg-[#0B7E74] text-white whitespace-nowrap"
+              >
+                {aiLoading ? (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-1.5 animate-pulse" />
+                    Analyzing...
+                  </>
+                ) : aiSignals.length > 0 ? (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-1.5" />
+                    Re-analyze
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-1.5" />
+                    Generate AI Analysis
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {aiLoading ? (
+              <LoadingSpinner message="Cross-referencing insider & congressional flows..." />
+            ) : aiError ? (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">{aiError}</div>
+            ) : aiSignals.length > 0 ? (
+              <div className="space-y-4">
+                {aiSummary && (
+                  <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
+                    <p className="text-sm text-teal-900 leading-relaxed">{aiSummary}</p>
+                  </div>
+                )}
+                <div className="grid gap-3 md:grid-cols-2">
+                  {aiSignals.map((signal, i) => {
+                    const dirStyles =
+                      signal.direction === "Bullish"
+                        ? { border: "border-green-200", bg: "bg-green-50", text: "text-green-700", Icon: TrendingUp }
+                        : signal.direction === "Bearish"
+                          ? { border: "border-red-200", bg: "bg-red-50", text: "text-red-700", Icon: TrendingDown }
+                          : { border: "border-gray-200", bg: "bg-gray-50", text: "text-gray-600", Icon: Minus }
+                    const DirIcon = dirStyles.Icon
+                    return (
+                      <div key={i} className={`rounded-lg border ${dirStyles.border} ${dirStyles.bg} p-4 space-y-2`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-teal-600">{signal.ticker}</span>
+                            <span className={`flex items-center gap-1 text-xs font-medium ${dirStyles.text}`}>
+                              <DirIcon className="h-3.5 w-3.5" />
+                              {signal.direction}
+                            </span>
+                          </div>
+                          <Badge variant="secondary" className="text-xs">
+                            {signal.confidence} confidence
+                          </Badge>
+                        </div>
+                        <h4 className="text-sm font-semibold text-gray-900">{signal.headline}</h4>
+                        <p className="text-sm text-gray-600 leading-relaxed">{signal.rationale}</p>
+                        {signal.optionsIdea && (
+                          <p className="text-xs font-medium text-[#0D9488] flex items-start gap-1">
+                            <Target className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                            {signal.optionsIdea}
+                          </p>
+                        )}
+                        {signal.sources && signal.sources.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {signal.sources.map((src) => (
+                              <span
+                                key={src}
+                                className="inline-flex items-center gap-1 rounded-full bg-white/70 border border-gray-200 px-2 py-0.5 text-[11px] text-gray-600"
+                              >
+                                {src === "Congressional" ? (
+                                  <Landmark className="h-3 w-3 text-blue-600" />
+                                ) : (
+                                  <Building2 className="h-3 w-3 text-gray-500" />
+                                )}
+                                {src}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <div className="pt-1">
+                          <RunScenarioInAIDialog
+                            context={{
+                              type: "insider",
+                              title: `${signal.ticker} — ${signal.headline}`,
+                              details: `${signal.direction} signal (${signal.confidence} confidence). ${signal.rationale} ${signal.optionsIdea ? "Idea: " + signal.optionsIdea : ""}`,
+                            }}
+                            buttonClassName="text-xs"
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                {aiProvider && (
+                  <p className="text-xs text-muted-foreground text-right">
+                    Generated by {aiProvider} · Speculative research signals, not financial advice
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Sparkles className="h-8 w-8 text-[#0D9488] mx-auto mb-3 opacity-70" />
+                <p className="text-sm text-gray-600 max-w-md mx-auto">
+                  Click <span className="font-semibold">Generate AI Analysis</span> to have AI scan the current data for
+                  unusual clusters — like cross-confirmed buying from both insiders and politicians — and suggest what
+                  catalysts might be driving the flow.
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>
