@@ -578,9 +578,13 @@ const InsiderTradingDashboard = () => {
                           <span className="text-sm font-bold text-teal-600">{trade.ticker}</span>
                         </td>
                         <td className="py-3 px-2 text-sm text-gray-900">
-                          <span className={trade.shares.startsWith("-") ? "text-red-600" : "text-green-600"}>
-                            {trade.shares}
-                          </span>
+                          {trade.shares === "N/A" || trade.shares === "+0" || trade.shares === "-0" ? (
+                            <span className="text-gray-400">N/A</span>
+                          ) : (
+                            <span className={trade.shares.startsWith("-") ? "text-red-600" : "text-green-600"}>
+                              {trade.shares}
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-2 text-sm text-gray-900">{trade.price}</td>
                         <td className="py-3 px-2 text-sm font-medium text-gray-900">{trade.value}</td>

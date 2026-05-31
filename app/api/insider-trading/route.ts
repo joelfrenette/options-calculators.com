@@ -31,6 +31,7 @@ function formatDate(dateInput: unknown): string {
 }
 
 function formatShares(shares: number, change: number): string {
+  if (!shares || shares === 0) return "N/A"
   const formatted = Math.abs(shares).toLocaleString()
   return change > 0 ? `+${formatted}` : `-${formatted}`
 }
