@@ -31,8 +31,11 @@ import {
 } from "lucide-react"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 
-// Threshold (USD) above which a transaction is considered a "big move"
-const BIG_MOVE_THRESHOLD = 50_000
+// Hard floor — trades below this are never shown regardless of toggle
+const MIN_THRESHOLD = 50_000
+
+// Threshold for the "Big moves only" toggle ($500K+)
+const BIG_MOVE_THRESHOLD = 500_000
 
 // Parse a value string like "$22M" / "$50K" / "$15K-$50K" into an approximate USD number
 function parseValueToUsd(valueStr: string): number {
@@ -303,8 +306,10 @@ const InsiderTradingDashboard = () => {
         !query ||
         (trade.ticker || "").toUpperCase().includes(query) ||
         (trade.owner || "").toUpperCase().includes(query)
-      const matchesBigMove = !bigMovesOnly || parseValueToUsd(trade.value) >= BIG_MOVE_THRESHOLD
-      return matchesTicker && matchesBigMove
+      const usdValue = parseValueToUsd(trade.value)
+      const aboveFloor = usdValue >= MIN_THRESHOLD
+      const matchesBigMove = !bigMovesOnly || usdValue >= BIG_MOVE_THRESHOLD
+      return matchesTicker && aboveFloor && matchesBigMove
     })
   }, [sortedTrades, tickerFilter, bigMovesOnly])
 
