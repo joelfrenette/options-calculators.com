@@ -68,7 +68,7 @@ function toSortableDate(dateInput: unknown): number {
 // We also hit the dedicated /stock/insider-sentiment-all endpoint as a
 // secondary signal. Both are free on the Finnhub Basic plan.
 // ---------------------------------------------------------------------------
-async function fetchFinnhubInsiderTransactions() {
+async function fetchFinnhubInsiderTransactions(days = 30) {
   const apiKey = process.env.FINNHUB_API_KEY
   if (!apiKey) {
     console.log("[v0] No Finnhub API key available")
@@ -76,10 +76,10 @@ async function fetchFinnhubInsiderTransactions() {
   }
 
   try {
-    // Date window: last 30 days so we capture small-cap and mid-cap moves too
+    // Date window: respect the caller-specified lookback
     const to = new Date()
     const from = new Date()
-    from.setDate(from.getDate() - 30)
+    from.setDate(from.getDate() - days)
     const fromStr = from.toISOString().split("T")[0]
     const toStr = to.toISOString().split("T")[0]
 
@@ -302,11 +302,13 @@ function getSeedTransactions() {
   ]
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const days = Math.min(365, Math.max(1, parseInt(searchParams.get("days") || "30", 10)))
   try {
     // Fetch all sources in parallel
     const [finnhubData, edgarData, congressionalData] = await Promise.all([
-      fetchFinnhubInsiderTransactions(),
+      fetchFinnhubInsiderTransactions(days),
       fetchSecEdgarForm4(),
       fetchCongressionalTrades(),
     ])

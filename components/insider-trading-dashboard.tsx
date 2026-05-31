@@ -207,6 +207,7 @@ const InsiderTradingDashboard = () => {
   // Smart filter state
   const [tickerFilter, setTickerFilter] = useState("")
   const [bigMovesOnly, setBigMovesOnly] = useState(true)
+  const [daysBack, setDaysBack] = useState(30)
 
   // AI Smart Analysis state
   const [aiSummary, setAiSummary] = useState<string>("")
@@ -217,7 +218,7 @@ const InsiderTradingDashboard = () => {
 
   const fetchData = async () => {
     try {
-      const response = await fetch("/api/insider-trading")
+      const response = await fetch(`/api/insider-trading?days=${daysBack}`)
       if (response.ok) {
         const data = await response.json()
         if (data.success && data.transactions?.length > 0) {
@@ -236,7 +237,7 @@ const InsiderTradingDashboard = () => {
 
   useEffect(() => {
     fetchData()
-  }, [])
+  }, [daysBack])
 
   const handleRefresh = async () => {
     setIsRefreshing(true)
@@ -464,42 +465,72 @@ const InsiderTradingDashboard = () => {
           </CardHeader>
           <CardContent>
             {/* Smart Filter */}
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <InputGroup className="w-full sm:max-w-xs">
-                <InputGroupAddon>
-                  <Search className="h-4 w-4 text-muted-foreground" />
-                </InputGroupAddon>
-                <InputGroupInput
-                  placeholder="Filter by ticker or name (e.g. NVDA)"
-                  value={tickerFilter}
-                  onChange={(e) => setTickerFilter(e.target.value)}
-                  aria-label="Filter trades by ticker or owner name"
-                />
-                {tickerFilter && (
-                  <InputGroupAddon align="inline-end">
-                    <button
-                      type="button"
-                      onClick={() => setTickerFilter("")}
-                      className="text-muted-foreground hover:text-foreground"
-                      aria-label="Clear filter"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
+            <div className="mb-4 flex flex-col gap-3">
+              {/* Row 1: search + big moves toggle */}
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <InputGroup className="w-full sm:max-w-xs">
+                  <InputGroupAddon>
+                    <Search className="h-4 w-4 text-muted-foreground" />
                   </InputGroupAddon>
-                )}
-              </InputGroup>
+                  <InputGroupInput
+                    placeholder="Filter by ticker or name (e.g. NVDA)"
+                    value={tickerFilter}
+                    onChange={(e) => setTickerFilter(e.target.value)}
+                    aria-label="Filter trades by ticker or owner name"
+                  />
+                  {tickerFilter && (
+                    <InputGroupAddon align="inline-end">
+                      <button
+                        type="button"
+                        onClick={() => setTickerFilter("")}
+                        className="text-muted-foreground hover:text-foreground"
+                        aria-label="Clear filter"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </InputGroupAddon>
+                  )}
+                </InputGroup>
 
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant={bigMovesOnly ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setBigMovesOnly((v) => !v)}
+                    className={bigMovesOnly ? "bg-[#0D9488] hover:bg-[#0B7E74] text-white" : ""}
+                  >
+                    <Zap className="h-4 w-4 mr-1.5" />
+                    Big moves only
+                  </Button>
+                </div>
+              </div>
+
+              {/* Row 2: days-back selector */}
               <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant={bigMovesOnly ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setBigMovesOnly((v) => !v)}
-                  className={bigMovesOnly ? "bg-[#0D9488] hover:bg-[#0B7E74] text-white" : ""}
-                >
-                  <Zap className="h-4 w-4 mr-1.5" />
-                  Big moves only
-                </Button>
+                <span className="text-xs text-muted-foreground font-medium shrink-0">Look back:</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { label: "30d", value: 30 },
+                    { label: "60d", value: 60 },
+                    { label: "90d", value: 90 },
+                    { label: "6mo", value: 180 },
+                    { label: "1yr", value: 365 },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setDaysBack(opt.value)}
+                      className={`rounded-full border px-3 py-0.5 text-xs font-medium transition-colors ${
+                        daysBack === opt.value
+                          ? "border-[#0D9488] bg-[#0D9488] text-white"
+                          : "border-gray-200 bg-gray-50 text-gray-600 hover:border-[#0D9488] hover:text-[#0D9488]"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
