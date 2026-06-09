@@ -31,23 +31,34 @@ import {
 } from "lucide-react"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 
-// Hard floor — trades below this are never shown regardless of toggle
-const MIN_THRESHOLD = 50_000
-
 // Threshold for the "Big moves only" toggle ($500K+)
 const BIG_MOVE_THRESHOLD = 500_000
 
-// Parse a value string like "$22M" / "$50K" / "$15K-$50K" into an approximate USD number
-function parseValueToUsd(valueStr: string): number {
-  if (!valueStr) return 0
-  const part = valueStr.includes("-") ? valueStr.split("-").pop()! : valueStr
-  const cleaned = part.replace(/[$,\s]/g, "")
-  const num = Number.parseFloat(cleaned.replace(/[KMB]/gi, ""))
+// Parse a single dollar token like "$22M", "$50K", "1000000" into a USD number
+function parseSingleValue(token: string): number {
+  const cleaned = token.replace(/[$,\s]/g, "")
+  const num = Number.parseFloat(cleaned.replace(/[KMBkmb]/g, ""))
   if (isNaN(num)) return 0
   if (/B/i.test(cleaned)) return num * 1_000_000_000
   if (/M/i.test(cleaned)) return num * 1_000_000
   if (/K/i.test(cleaned)) return num * 1_000
   return num
+}
+
+// Parse value strings including congressional range format "$500,001-$1,000,000"
+// Returns the midpoint for ranges so sorting is accurate
+function parseValueToUsd(valueStr: string): number {
+  if (!valueStr || valueStr === "N/A" || valueStr === "See filing") return 0
+  if (valueStr.includes("-")) {
+    const parts = valueStr.split("-")
+    const low = parseSingleValue(parts[0])
+    const high = parseSingleValue(parts[parts.length - 1])
+    if (low > 0 && high > 0) return (low + high) / 2
+    if (high > 0) return high
+    if (low > 0) return low
+    return 0
+  }
+  return parseSingleValue(valueStr)
 }
 
 interface AiSignal {
@@ -61,7 +72,8 @@ interface AiSignal {
 }
 
 interface Trade {
-  date: string
+  _date?: string  // ISO YYYY-MM-DD from API — used for reliable date sorting
+  date: string    // Formatted display string e.g. "Jun 3, 2026"
   type: string
   owner: string
   role: string
@@ -108,8 +120,11 @@ const InsiderTradingDashboard = () => {
 
   // Smart filter state
   const [tickerFilter, setTickerFilter] = useState("")
-  const [bigMovesOnly, setBigMovesOnly] = useState(true)
+  const [bigMovesOnly, setBigMovesOnly] = useState(false)
   const [daysBack, setDaysBack] = useState(30)
+  // Source category toggles
+  const [showCorporate, setShowCorporate] = useState(true)
+  const [showCongressional, setShowCongressional] = useState(true)
 
   // AI Smart Analysis state
   const [aiSummary, setAiSummary] = useState<string>("")
@@ -118,16 +133,20 @@ const InsiderTradingDashboard = () => {
   const [aiError, setAiError] = useState<string | null>(null)
   const [aiProvider, setAiProvider] = useState<string>("")
 
-  const fetchData = async () => {
+  const fetchData = async (overrideTicker?: string) => {
+    setIsLoading(true)
     try {
-      const response = await fetch(`/api/insider-trading?days=${daysBack}`)
+      const activeTicker = overrideTicker !== undefined ? overrideTicker : tickerFilter.trim().toUpperCase()
+      const params = new URLSearchParams({ days: String(daysBack) })
+      if (activeTicker) params.set("ticker", activeTicker)
+      const response = await fetch(`/api/insider-trading?${params.toString()}`)
       if (response.ok) {
-        const data = await response.json()
-        if (data.success && data.transactions?.length > 0) {
-          setTrades(data.transactions)
-          setDataSource(data.source || "live")
+        const json = await response.json()
+        if (json.success && json.transactions?.length > 0) {
+          setTrades(json.transactions)
+          setDataSource(json.source || "live")
           setLastUpdated(new Date().toLocaleString())
-          setData(data)
+          setData(json)
         }
       }
     } catch (error) {
@@ -139,12 +158,19 @@ const InsiderTradingDashboard = () => {
 
   useEffect(() => {
     fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [daysBack])
 
   const handleRefresh = async () => {
     setIsRefreshing(true)
     await fetchData()
-    setTimeout(() => setIsRefreshing(false), 1000)
+    setIsRefreshing(false)
+  }
+
+  // When the user presses Enter or clicks "Search" in the ticker box, trigger
+  // a dedicated API call that includes the ticker for deeper per-symbol history
+  const handleTickerSearch = () => {
+    fetchData(tickerFilter.trim().toUpperCase())
   }
 
   const handleSort = (field: SortField) => {
@@ -174,47 +200,57 @@ const InsiderTradingDashboard = () => {
   }
 
   const sortedTrades = useMemo(() => {
-    const tradesCopy = [...trades]
+    // Default sort: most recent first using _date (ISO) so "Jun 3" strings don't break order
+    const defaultSorted = [...trades].sort((a, b) => {
+      const aMs = a._date ? new Date(a._date).getTime() : 0
+      const bMs = b._date ? new Date(b._date).getTime() : 0
+      return bMs - aMs
+    })
 
-    if (!sortField || !sortDirection) return tradesCopy
+    if (!sortField || !sortDirection) return defaultSorted
 
-    return tradesCopy.sort((a, b) => {
-      let aVal: string | number = a[sortField as keyof Trade] || ""
-      let bVal: string | number = b[sortField as keyof Trade] || ""
+    return defaultSorted.sort((a, b) => {
+      let aVal: string | number = a[sortField as keyof Trade] ?? ""
+      let bVal: string | number = b[sortField as keyof Trade] ?? ""
 
-      // Handle numeric sorting for value column
+      // Date sort: use _date ISO for reliability
+      if (sortField === "date") {
+        aVal = a._date ? new Date(a._date).getTime() : 0
+        bVal = b._date ? new Date(b._date).getTime() : 0
+      }
+
+      // Value sort: use shared parser that handles ranges and K/M/B suffixes
       if (sortField === "value") {
-        const parseValue = (v: string) => {
-          const num = Number.parseFloat(v.replace(/[$KM,]/g, ""))
-          if (v.includes("M")) return num * 1000000
-          if (v.includes("K")) return num * 1000
-          return num
-        }
-        aVal = parseValue(aVal as string)
-        bVal = parseValue(bVal as string)
+        aVal = parseValueToUsd(aVal as string)
+        bVal = parseValueToUsd(bVal as string)
       }
 
-      if (sortDirection === "asc") {
-        return aVal < bVal ? -1 : aVal > bVal ? 1 : 0
-      }
+      if (sortDirection === "asc") return aVal < bVal ? -1 : aVal > bVal ? 1 : 0
       return aVal > bVal ? -1 : aVal < bVal ? 1 : 0
     })
   }, [trades, sortField, sortDirection])
 
-  // Apply the smart filter (ticker search + big-moves-only) on top of sorting
+  // Apply the smart filter (ticker search + source toggles + big-moves-only) on top of sorting
   const filteredTrades = useMemo(() => {
     const query = tickerFilter.trim().toUpperCase()
     return sortedTrades.filter((trade) => {
+      // Source category filter
+      if (trade.category === "corporate" && !showCorporate) return false
+      if (trade.category === "congressional" && !showCongressional) return false
+
+      // Ticker / name search (client-side; server also runs a per-ticker lookup)
       const matchesTicker =
         !query ||
         (trade.ticker || "").toUpperCase().includes(query) ||
         (trade.owner || "").toUpperCase().includes(query)
+
+      // Big moves toggle: when on, only show trades >= $500K (midpoint for ranges)
       const usdValue = parseValueToUsd(trade.value)
-      const aboveFloor = usdValue >= MIN_THRESHOLD
       const matchesBigMove = !bigMovesOnly || usdValue >= BIG_MOVE_THRESHOLD
-      return matchesTicker && aboveFloor && matchesBigMove
+
+      return matchesTicker && matchesBigMove
     })
-  }, [sortedTrades, tickerFilter, bigMovesOnly])
+  }, [sortedTrades, tickerFilter, bigMovesOnly, showCorporate, showCongressional])
 
   // Quick-access list of the tickers present in the data
   const availableTickers = useMemo(() => {
@@ -344,7 +380,11 @@ const InsiderTradingDashboard = () => {
             <CardDescription>
               Showing {filteredTrades.length} of {sortedTrades.length} trades
               {tickerFilter.trim() ? ` matching "${tickerFilter.trim().toUpperCase()}"` : ""}
-              {bigMovesOnly ? " (big moves only)" : ""} — click column headers to sort
+              {bigMovesOnly ? " · $500K+ only" : ""}
+              {!showCorporate ? " · corporate hidden" : ""}
+              {!showCongressional ? " · congressional hidden" : ""}
+              {" "}· last {daysBack === 180 ? "6 months" : daysBack === 365 ? "1 year" : `${daysBack} days`}
+              {" "}— click column headers to sort
             </CardDescription>
             {data?.dataSources && (
               <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mt-2 pt-2 border-t">
@@ -368,23 +408,26 @@ const InsiderTradingDashboard = () => {
           <CardContent>
             {/* Smart Filter */}
             <div className="mb-4 flex flex-col gap-3">
-              {/* Row 1: search + big moves toggle */}
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <InputGroup className="w-full sm:max-w-xs">
+
+              {/* Row 1: Search + source toggles + big-moves — all in one line */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Ticker search */}
+                <InputGroup className="w-56 shrink-0">
                   <InputGroupAddon>
                     <Search className="h-4 w-4 text-muted-foreground" />
                   </InputGroupAddon>
                   <InputGroupInput
-                    placeholder="Filter by ticker or name (e.g. NVDA)"
+                    placeholder="Ticker or name (e.g. NEE)"
                     value={tickerFilter}
                     onChange={(e) => setTickerFilter(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleTickerSearch()}
                     aria-label="Filter trades by ticker or owner name"
                   />
                   {tickerFilter && (
                     <InputGroupAddon align="inline-end">
                       <button
                         type="button"
-                        onClick={() => setTickerFilter("")}
+                        onClick={() => { setTickerFilter(""); fetchData("") }}
                         className="text-muted-foreground hover:text-foreground"
                         aria-label="Clear filter"
                       >
@@ -394,21 +437,63 @@ const InsiderTradingDashboard = () => {
                   )}
                 </InputGroup>
 
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant={bigMovesOnly ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setBigMovesOnly((v) => !v)}
-                    className={bigMovesOnly ? "bg-[#0D9488] hover:bg-[#0B7E74] text-white" : ""}
-                  >
-                    <Zap className="h-4 w-4 mr-1.5" />
-                    Big moves only
-                  </Button>
-                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleTickerSearch}
+                  className="bg-[#1E3A8A] hover:bg-[#1a3478] text-white shrink-0"
+                >
+                  <Search className="h-4 w-4 mr-1.5" />
+                  Search
+                </Button>
+
+                <div className="w-px h-5 bg-gray-200 mx-1 shrink-0" aria-hidden="true" />
+
+                {/* Source toggles */}
+                <button
+                  type="button"
+                  onClick={() => setShowCorporate((v) => !v)}
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors shrink-0 ${
+                    showCorporate
+                      ? "border-gray-500 bg-gray-700 text-white"
+                      : "border-gray-200 bg-gray-50 text-gray-400 line-through"
+                  }`}
+                  aria-pressed={showCorporate}
+                >
+                  <Building2 className="h-3 w-3" />
+                  Corporate (SEC Form 4)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowCongressional((v) => !v)}
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors shrink-0 ${
+                    showCongressional
+                      ? "border-blue-500 bg-blue-600 text-white"
+                      : "border-gray-200 bg-gray-50 text-gray-400 line-through"
+                  }`}
+                  aria-pressed={showCongressional}
+                >
+                  <Landmark className="h-3 w-3" />
+                  Congressional (STOCK Act)
+                </button>
+
+                <div className="w-px h-5 bg-gray-200 mx-1 shrink-0" aria-hidden="true" />
+
+                {/* Big moves toggle */}
+                <Button
+                  type="button"
+                  variant={bigMovesOnly ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setBigMovesOnly((v) => !v)}
+                  className={`shrink-0 ${bigMovesOnly ? "bg-[#0D9488] hover:bg-[#0B7E74] text-white" : ""}`}
+                >
+                  <Zap className="h-4 w-4 mr-1.5" />
+                  {bigMovesOnly ? "$500K+ only" : "All sizes"}
+                </Button>
               </div>
 
-              {/* Row 2: days-back selector */}
+              {/* Row 2: Look-back selector */}
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground font-medium shrink-0">Look back:</span>
                 <div className="flex flex-wrap gap-1.5">
@@ -433,10 +518,15 @@ const InsiderTradingDashboard = () => {
                     </button>
                   ))}
                 </div>
+                {isLoading && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1 ml-2">
+                    <span className="inline-block h-3 w-3 rounded-full border-2 border-[#0D9488] border-t-transparent animate-spin" />
+                    Loading...
+                  </span>
+                )}
               </div>
+
             </div>
-
-
 
             {isLoading ? (
               <LoadingSpinner message="Loading insider transactions..." />
@@ -450,6 +540,9 @@ const InsiderTradingDashboard = () => {
                         onClick={() => handleSort("date")}
                       >
                         <div className="flex items-center">Date {getSortIcon("date")}</div>
+                      </th>
+                      <th className="text-left py-3 px-2 text-sm font-semibold text-gray-600 select-none min-w-[70px]">
+                        Type
                       </th>
                       <th
                         className="text-left py-3 px-2 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 select-none"
@@ -499,6 +592,9 @@ const InsiderTradingDashboard = () => {
                           </div>
                         </td>
                         <td className="py-3 px-2">
+                          {getTypeBadge(trade.type)}
+                        </td>
+                        <td className="py-3 px-2">
                           <div className="flex items-center gap-2">
                             {getCategoryIcon(trade.category)}
                             <div>
@@ -535,11 +631,18 @@ const InsiderTradingDashboard = () => {
                 </table>
               </div>
             ) : (
-              <p className="text-center text-gray-500 py-8">
-                {tickerFilter.trim() || bigMovesOnly
-                  ? "No trades match your filter. Try clearing the search or the big-moves toggle."
-                  : "No recent insider transactions found."}
-              </p>
+              <div className="text-center text-gray-500 py-8 space-y-2">
+                <p className="font-medium">No trades match your current filters.</p>
+                <p className="text-sm">
+                  {!showCorporate && !showCongressional
+                    ? "Both source types are disabled — enable at least one above."
+                    : tickerFilter.trim()
+                      ? `No results for "${tickerFilter.trim().toUpperCase()}" in the selected ${daysBack}d window. Try a longer look-back or click Search to run a deeper per-ticker scan.`
+                      : bigMovesOnly
+                        ? "No trades over $500K found. Turn off \"Big moves only\" to see all trade sizes."
+                        : "No recent transactions found for the selected sources and date range."}
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>
