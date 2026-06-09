@@ -472,9 +472,9 @@ export function WheelScanner() {
   // FIX: Declare maxPE state variable
   const [maxPE, setMaxPE] = useState([20])
 
-  const [preFilterMarketCap, setPreFilterMarketCap] = useState([4]) // 0=Any, 1=$300M, 2=$2B, 3=$10B, 4=$50B
-  const [preFilterLiquidity, setPreFilterLiquidity] = useState([25]) // Changed from 10M to 25M for ultra-liquid mega-caps
-  const [preFilterTopRanked, setPreFilterTopRanked] = useState([100]) // Changed from 66 (Top 100) to 100 (Top 10) for most elite mega-caps
+  const [preFilterMarketCap, setPreFilterMarketCap] = useState([3]) // 0=Any, 1=$300M, 2=$2B, 3=$10B, 4=$50B
+  const [preFilterLiquidity, setPreFilterLiquidity] = useState([10]) // 10M — ensure liquidity default
+  const [preFilterTopRanked, setPreFilterTopRanked] = useState([66]) // 66 = Top 50 bucket
 
   const [isLoadingPreFilter, setIsLoadingPreFilter] = useState(false) // Renamed from preFilterLoading
   const [preFilterCount, setPreFilterCount] = useState(0)
