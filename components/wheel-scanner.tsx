@@ -465,9 +465,9 @@ const getTopRankedLabel = (percentage: number): string => {
 export function WheelScanner() {
   const [tickersToScan, setTickersToScan] = useState<string>("")
   const [minVolume, setMinVolume] = useState([2])
-  const [maxDebtToEquity, setMaxDebtToEquity] = useState([2]) // Updated from 1 to 2.0 for professional standards
-  const [minROE, setMinROE] = useState([15]) // Updated from 10 to 15 for professional standards
-  const [minProfitableQuarters, setMinProfitableQuarters] = useState([4])
+  const [maxDebtToEquity, setMaxDebtToEquity] = useState([3]) // Default Max Debt/Eq 3.0
+  const [minROE, setMinROE] = useState([10]) // Default Min ROE 10%
+  const [minProfitableQuarters, setMinProfitableQuarters] = useState([4]) // Default 4 quarters
   const [minMarketCapCategory, setMinMarketCapCategory] = useState([3])
   // FIX: Declare maxPE state variable
   const [maxPE, setMaxPE] = useState([20])
