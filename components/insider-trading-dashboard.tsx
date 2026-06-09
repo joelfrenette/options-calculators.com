@@ -394,65 +394,51 @@ const InsiderTradingDashboard = () => {
             {/* Smart Filter */}
             <div className="mb-4 flex flex-col gap-3">
 
-              {/* Row 1: Ticker search + Search button */}
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex gap-2 w-full sm:max-w-sm">
-                  <InputGroup className="flex-1">
-                    <InputGroupAddon>
-                      <Search className="h-4 w-4 text-muted-foreground" />
+              {/* Row 1: Search + source toggles + big-moves — all in one line */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Ticker search */}
+                <InputGroup className="w-56 shrink-0">
+                  <InputGroupAddon>
+                    <Search className="h-4 w-4 text-muted-foreground" />
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    placeholder="Ticker or name (e.g. NEE)"
+                    value={tickerFilter}
+                    onChange={(e) => setTickerFilter(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleTickerSearch()}
+                    aria-label="Filter trades by ticker or owner name"
+                  />
+                  {tickerFilter && (
+                    <InputGroupAddon align="inline-end">
+                      <button
+                        type="button"
+                        onClick={() => { setTickerFilter(""); fetchData("") }}
+                        className="text-muted-foreground hover:text-foreground"
+                        aria-label="Clear filter"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
                     </InputGroupAddon>
-                    <InputGroupInput
-                      placeholder="Search ticker or name (e.g. NEE, Bezos)"
-                      value={tickerFilter}
-                      onChange={(e) => setTickerFilter(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleTickerSearch()}
-                      aria-label="Filter trades by ticker or owner name"
-                    />
-                    {tickerFilter && (
-                      <InputGroupAddon align="inline-end">
-                        <button
-                          type="button"
-                          onClick={() => { setTickerFilter(""); fetchData("") }}
-                          className="text-muted-foreground hover:text-foreground"
-                          aria-label="Clear filter"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </InputGroupAddon>
-                    )}
-                  </InputGroup>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={handleTickerSearch}
-                    className="bg-[#1E3A8A] hover:bg-[#1a3478] text-white shrink-0"
-                  >
-                    <Search className="h-4 w-4 mr-1.5" />
-                    Search
-                  </Button>
-                </div>
+                  )}
+                </InputGroup>
 
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant={bigMovesOnly ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setBigMovesOnly((v) => !v)}
-                    className={bigMovesOnly ? "bg-[#0D9488] hover:bg-[#0B7E74] text-white" : ""}
-                  >
-                    <Zap className="h-4 w-4 mr-1.5" />
-                    {bigMovesOnly ? "Big moves only ($500K+)" : "All trade sizes"}
-                  </Button>
-                </div>
-              </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleTickerSearch}
+                  className="bg-[#1E3A8A] hover:bg-[#1a3478] text-white shrink-0"
+                >
+                  <Search className="h-4 w-4 mr-1.5" />
+                  Search
+                </Button>
 
-              {/* Row 2: Source toggles */}
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="text-xs text-muted-foreground font-medium shrink-0">Sources:</span>
+                <div className="w-px h-5 bg-gray-200 mx-1 shrink-0" aria-hidden="true" />
+
+                {/* Source toggles */}
                 <button
                   type="button"
                   onClick={() => setShowCorporate((v) => !v)}
-                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors shrink-0 ${
                     showCorporate
                       ? "border-gray-500 bg-gray-700 text-white"
                       : "border-gray-200 bg-gray-50 text-gray-400 line-through"
@@ -460,12 +446,13 @@ const InsiderTradingDashboard = () => {
                   aria-pressed={showCorporate}
                 >
                   <Building2 className="h-3 w-3" />
-                  Corporate Insiders (SEC Form 4)
+                  Corporate (SEC Form 4)
                 </button>
+
                 <button
                   type="button"
                   onClick={() => setShowCongressional((v) => !v)}
-                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors shrink-0 ${
                     showCongressional
                       ? "border-blue-500 bg-blue-600 text-white"
                       : "border-gray-200 bg-gray-50 text-gray-400 line-through"
@@ -475,9 +462,23 @@ const InsiderTradingDashboard = () => {
                   <Landmark className="h-3 w-3" />
                   Congressional (STOCK Act)
                 </button>
+
+                <div className="w-px h-5 bg-gray-200 mx-1 shrink-0" aria-hidden="true" />
+
+                {/* Big moves toggle */}
+                <Button
+                  type="button"
+                  variant={bigMovesOnly ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setBigMovesOnly((v) => !v)}
+                  className={`shrink-0 ${bigMovesOnly ? "bg-[#0D9488] hover:bg-[#0B7E74] text-white" : ""}`}
+                >
+                  <Zap className="h-4 w-4 mr-1.5" />
+                  {bigMovesOnly ? "$500K+ only" : "All sizes"}
+                </Button>
               </div>
 
-              {/* Row 3: Look-back selector */}
+              {/* Row 2: Look-back selector */}
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground font-medium shrink-0">Look back:</span>
                 <div className="flex flex-wrap gap-1.5">
