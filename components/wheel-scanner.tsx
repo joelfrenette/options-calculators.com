@@ -541,6 +541,9 @@ export function WheelScanner() {
 
   const [step, setStep] = useState(1) // 1=Initial, 2=After fundamental scan, 3=After technical scan, 4=Relaxed results
 
+  // Step 1: Dollar Amount Filtering
+  const [maxStockPrice, setMaxStockPrice] = useState([500]) // Max share price in dollars ($1-$1000)
+
   const isScanning = loading // `loading` is for Step 2 (Fundamental Scan)
   // const isScanningTechnicals = technicalLoading // This is the correct state for technical scanning
 
@@ -1420,7 +1423,7 @@ export function WheelScanner() {
     console.log("[v0] Current technicalResults.length:", technicalResults.length)
 
     if (fundamentalResults.length === 0) {
-      setError("Please complete Step 2 first (Scan Fundamentals)")
+        setError("Please complete Step 3 first (Scan Fundamentals)")
       setStep(2)
       return
     }
@@ -1838,13 +1841,129 @@ export function WheelScanner() {
           </div>
         </CardHeader>
         <CardContent className="pt-4 space-y-6">
-          {/* STEP 1: PRE-FILTERING */}
+          {/* STEP 1: DOLLAR AMOUNT FILTERING */}
+          {step === 1 && (
+            <div className="bg-emerald-50 border-2 border-emerald-300 rounded-lg p-4">
+              <div className="flex items-start gap-2 mb-3">
+                <Info className="h-5 w-5 text-emerald-700 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-bold text-gray-900 text-base">Dollar Amount Filtering (Step 1)</h3>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Set the maximum stock price you are willing to trade. Selling a put requires 100 shares of cash
+                    collateral — the total cash needed is shown instantly below.
+                  </p>
+                </div>
+              </div>
+
+              <ul className="list-disc list-inside space-y-1 ml-7 text-sm text-gray-700 mb-4">
+                <li>
+                  <strong>Max Stock Price:</strong> Only stocks at or below this price will be included in the scan
+                </li>
+                <li>
+                  <strong>Total Cash Needed:</strong> Max stock price &times; 100 shares (standard put contract size)
+                </li>
+                <li>
+                  Set this to match your available capital or your maximum allocation per trade
+                </li>
+              </ul>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Max Stock Price Slider */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    Max Stock Price
+                    {tooltipsEnabled ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs bg-emerald-50 border-emerald-200 text-gray-900">
+                          <p className="font-semibold mb-1">Maximum Share Price Filter</p>
+                          <p className="text-sm">
+                            Filters out stocks whose share price exceeds this value. When you sell a put, you must hold
+                            100 &times; strike price in cash as collateral.
+                          </p>
+                          <ul className="text-sm mt-1 space-y-1">
+                            <li>
+                              <strong>Low ($50-$150):</strong> Smaller capital requirement, more accessible
+                            </li>
+                            <li>
+                              <strong>High ($300-$1000):</strong> Larger companies, higher premiums, more capital needed
+                            </li>
+                          </ul>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : null}
+                  </Label>
+                  <div className="space-y-2 p-3 rounded-lg border border-gray-200 bg-white hover:border-emerald-300 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xl font-black text-gray-900 bg-emerald-100 px-3 py-1 rounded border border-emerald-300">
+                        ${maxStockPrice[0] === 1000 ? "1,000+" : maxStockPrice[0].toLocaleString()}
+                      </span>
+                    </div>
+                    <Slider
+                      id="maxStockPrice"
+                      value={maxStockPrice}
+                      onValueChange={setMaxStockPrice}
+                      min={1}
+                      max={1000}
+                      step={1}
+                      className="cursor-pointer"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>$1</span>
+                      <span className="text-xs font-semibold">Max share price</span>
+                      <span>$1,000+</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Total Cash Needed Display */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    Total Cash Needed (Per Contract)
+                    {tooltipsEnabled ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs bg-emerald-50 border-emerald-200 text-gray-900">
+                          <p className="font-semibold mb-1">Cash-Secured Put Collateral</p>
+                          <p className="text-sm">
+                            This is the maximum cash you need to hold per contract when selling a cash-secured put.
+                            Calculated as: Max Stock Price &times; 100 shares.
+                          </p>
+                          <p className="text-sm mt-1">
+                            Actual cash required will vary based on the strike price chosen, which is typically set below
+                            the current market price.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : null}
+                  </Label>
+                  <div className="p-4 rounded-lg border-2 border-emerald-300 bg-emerald-50 flex flex-col items-center justify-center min-h-[96px]">
+                    <span className="text-3xl font-black text-emerald-800">
+                      ${(maxStockPrice[0] * 100).toLocaleString()}
+                    </span>
+                    <span className="text-xs text-emerald-700 mt-1 font-semibold">
+                      ${maxStockPrice[0] === 1000 ? "1,000+" : maxStockPrice[0].toLocaleString()} &times; 100 shares
+                    </span>
+                    <span className="text-[10px] text-emerald-600 mt-0.5">
+                      maximum cash collateral per contract
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 2: PRE-FILTERING */}
           {step === 1 && (
             <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
               <div className="flex items-start gap-2 mb-3">
                 <Info className="h-5 w-5 text-blue-700 flex-shrink-0 mt-0.5" />
                 <div>
-                  <h3 className="font-bold text-gray-900 text-base">Smart Pre-Filtering (Step 1)</h3>
+                  <h3 className="font-bold text-gray-900 text-base">Smart Pre-Filtering (Step 2)</h3>
                   <p className="text-xs text-gray-600 mt-1">
                     Customize your starting universe with advanced filters. All stocks are pre-qualified for active
                     options markets.
@@ -1866,7 +1985,7 @@ export function WheelScanner() {
                 </li>
               </ul>
 
-              {/* Step 1 Sliders */}
+              {/* Step 2 Sliders */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-3">
                   <Label className="text-sm font-medium flex items-center gap-2">
@@ -2029,7 +2148,7 @@ export function WheelScanner() {
             ) : (
               <>
                 <Filter className="mr-2 h-5 w-5" />
-                Scan for Potential Stocks (Step 1)
+                Scan for Potential Stocks (Step 2)
               </>
             )}
           </Button>
@@ -2051,7 +2170,7 @@ export function WheelScanner() {
 
           {preFilterCount > 0 && (
             <p className="text-sm text-green-700 font-semibold mt-2 text-center">
-              ✅ {preFilterCount} tickers loaded and ready for Step 2 scan
+              ✅ {preFilterCount} tickers loaded and ready for Step 3 scan
             </p>
           )}
         </CardContent>
@@ -2064,7 +2183,7 @@ export function WheelScanner() {
             <Textarea
               value={tickersToScan}
               onChange={(e) => setTickersToScan(e.target.value)}
-              placeholder="Enter ticker symbols separated by commas (e.g., AAPL, MSFT, GOOGL) or use Step 1 above to load automatically"
+              placeholder="Enter ticker symbols separated by commas (e.g., AAPL, MSFT, GOOGL) or use Step 2 above to load automatically"
               className="h-32 font-mono text-sm"
             />
           </CardContent>
@@ -2076,7 +2195,7 @@ export function WheelScanner() {
           <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b-2 border-blue-200">
             <div className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-blue-700" />
-              <CardTitle className="text-xl font-bold">FUNDAMENTAL CRITERIA (Step 2)</CardTitle>
+              <CardTitle className="text-xl font-bold">FUNDAMENTAL CRITERIA (Step 3)</CardTitle>
             </div>
             <CardDescription>
               Using Twelve Data API for real fundamental metrics. All slider filters are applied with live data.
@@ -2096,7 +2215,7 @@ export function WheelScanner() {
               </li>
             </ul>
 
-            {/* Step 2 Sliders */}
+            {/* Step 3 Sliders */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="space-y-3">
                 <Label className="text-sm font-medium flex items-center gap-2">
@@ -2272,7 +2391,7 @@ export function WheelScanner() {
           ) : (
             <>
               <BarChart3 className="mr-2 h-5 w-5" />
-              Scan Fundamentals (Step 2)
+                Scan Fundamentals (Step 3)
             </>
           )}
         </Button>
@@ -2307,7 +2426,7 @@ export function WheelScanner() {
               </span>
             </CardTitle>
             <CardDescription>
-              These stocks passed fundamental screening. Run Technical Analysis (Step 3) to find optimal entries.
+              These stocks passed fundamental screening. Run Technical Analysis (Step 4) to find optimal entries.
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-4">
@@ -2430,7 +2549,7 @@ export function WheelScanner() {
           <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-200">
             <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-blue-600" />
-              TECHNICAL CRITERIA (Step 3)
+              TECHNICAL CRITERIA (Step 4)
             </CardTitle>
             <CardDescription>
               Adjust technical thresholds to relax or tighten entry criteria for optimal put-selling setups.
@@ -2441,7 +2560,7 @@ export function WheelScanner() {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
               <div className="flex items-center gap-2 mb-2">
                 <CheckCircle2 className="h-4 w-4 text-blue-600" />
-                <span className="font-semibold text-sm text-gray-900">TECHNICAL CRITERIA (Step 3)</span>
+                <span className="font-semibold text-sm text-gray-900">TECHNICAL CRITERIA (Step 4)</span>
               </div>
               <ul className="text-xs text-gray-700 space-y-1 list-disc list-inside">
                 <li>
@@ -2869,7 +2988,7 @@ export function WheelScanner() {
           ) : (
             <>
               <TrendingUp className="mr-2 h-5 w-5" />
-              Run Technical Analysis (Step 3)
+                Run Technical Analysis (Step 4)
             </>
           )}
         </Button>
@@ -2899,7 +3018,7 @@ export function WheelScanner() {
               <div className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5 text-green-600" />
                 <CardTitle className="text-green-900">
-                  Step 3: Technical Analysis Results (Premium Entries) ✨
+                  Step 4: Technical Analysis Results (Premium Entries) ✨
                 </CardTitle>
               </div>
               <span className="text-sm font-semibold text-green-700 bg-green-100 px-3 py-1 rounded-full">
@@ -3174,12 +3293,12 @@ export function WheelScanner() {
           <CardHeader className="bg-gradient-to-r from-yellow-50 to-amber-50">
             <div className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-yellow-600" />
-              <CardTitle className="text-yellow-900">Step 3: No Stocks Passed Technical Criteria</CardTitle>
+              <CardTitle className="text-yellow-900">Step 4: No Stocks Passed Technical Criteria</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="p-6">
             <p className="text-gray-700 mb-4">
-              The current technical filters are very strict. None of the {fundamentalResults.length} stocks from Step 2
+              The current technical filters are very strict. None of the {fundamentalResults.length} stocks from Step 3
               passed all technical criteria.
             </p>
             <p className="text-gray-600 text-sm mb-4">Consider:</p>
