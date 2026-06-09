@@ -274,11 +274,10 @@ async function fetchCongressionalTrades(days = 30) {
     }
   }
 
-  // Sort most recent first, cap at 100 for performance
+  // Sort most recent first — no artificial cap; let the caller decide
   all.sort((a, b) => toSortableDate(b._date) - toSortableDate(a._date))
-  const recent = all.slice(0, 100)
-  console.log(`[v0] Congressional total within ${days}d window: ${recent.length} trades`)
-  return recent
+  console.log(`[v0] Congressional total within ${days}d window: ${all.length} trades`)
+  return all
 }
 
 // ---------------------------------------------------------------------------
@@ -416,14 +415,10 @@ export async function GET(request: Request) {
       .sort((a, b) => b.buys + b.sells - (a.buys + a.sells))
       .slice(0, 6)
 
-    // Strip internal _date before returning
-    const cleanedTransactions = transactions.map(({ _date, ...rest }) => rest)
-
     return NextResponse.json({
       success: true,
-      transactions: cleanedTransactions,
-      // Also return _date for client-side date filtering
-      transactionsRaw: transactions,
+      // Keep _date on every transaction so the client can sort correctly
+      transactions,
       volumeData,
       source: usingLiveData ? "live" : "seed",
       lastUpdated: new Date().toISOString(),

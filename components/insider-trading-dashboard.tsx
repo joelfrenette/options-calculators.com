@@ -31,23 +31,34 @@ import {
 } from "lucide-react"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 
-// Hard floor — trades below this are never shown regardless of toggle
-const MIN_THRESHOLD = 50_000
-
 // Threshold for the "Big moves only" toggle ($500K+)
 const BIG_MOVE_THRESHOLD = 500_000
 
-// Parse a value string like "$22M" / "$50K" / "$15K-$50K" into an approximate USD number
-function parseValueToUsd(valueStr: string): number {
-  if (!valueStr) return 0
-  const part = valueStr.includes("-") ? valueStr.split("-").pop()! : valueStr
-  const cleaned = part.replace(/[$,\s]/g, "")
-  const num = Number.parseFloat(cleaned.replace(/[KMB]/gi, ""))
+// Parse a single dollar token like "$22M", "$50K", "1000000" into a USD number
+function parseSingleValue(token: string): number {
+  const cleaned = token.replace(/[$,\s]/g, "")
+  const num = Number.parseFloat(cleaned.replace(/[KMBkmb]/g, ""))
   if (isNaN(num)) return 0
   if (/B/i.test(cleaned)) return num * 1_000_000_000
   if (/M/i.test(cleaned)) return num * 1_000_000
   if (/K/i.test(cleaned)) return num * 1_000
   return num
+}
+
+// Parse value strings including congressional range format "$500,001-$1,000,000"
+// Returns the midpoint for ranges so sorting is accurate
+function parseValueToUsd(valueStr: string): number {
+  if (!valueStr || valueStr === "N/A" || valueStr === "See filing") return 0
+  if (valueStr.includes("-")) {
+    const parts = valueStr.split("-")
+    const low = parseSingleValue(parts[0])
+    const high = parseSingleValue(parts[parts.length - 1])
+    if (low > 0 && high > 0) return (low + high) / 2
+    if (high > 0) return high
+    if (low > 0) return low
+    return 0
+  }
+  return parseSingleValue(valueStr)
 }
 
 interface AiSignal {
@@ -61,7 +72,8 @@ interface AiSignal {
 }
 
 interface Trade {
-  date: string
+  _date?: string  // ISO YYYY-MM-DD from API — used for reliable date sorting
+  date: string    // Formatted display string e.g. "Jun 3, 2026"
   type: string
   owner: string
   role: string
@@ -188,29 +200,32 @@ const InsiderTradingDashboard = () => {
   }
 
   const sortedTrades = useMemo(() => {
-    const tradesCopy = [...trades]
+    // Default sort: most recent first using _date (ISO) so "Jun 3" strings don't break order
+    const defaultSorted = [...trades].sort((a, b) => {
+      const aMs = a._date ? new Date(a._date).getTime() : 0
+      const bMs = b._date ? new Date(b._date).getTime() : 0
+      return bMs - aMs
+    })
 
-    if (!sortField || !sortDirection) return tradesCopy
+    if (!sortField || !sortDirection) return defaultSorted
 
-    return tradesCopy.sort((a, b) => {
-      let aVal: string | number = a[sortField as keyof Trade] || ""
-      let bVal: string | number = b[sortField as keyof Trade] || ""
+    return defaultSorted.sort((a, b) => {
+      let aVal: string | number = a[sortField as keyof Trade] ?? ""
+      let bVal: string | number = b[sortField as keyof Trade] ?? ""
 
-      // Handle numeric sorting for value column
+      // Date sort: use _date ISO for reliability
+      if (sortField === "date") {
+        aVal = a._date ? new Date(a._date).getTime() : 0
+        bVal = b._date ? new Date(b._date).getTime() : 0
+      }
+
+      // Value sort: use shared parser that handles ranges and K/M/B suffixes
       if (sortField === "value") {
-        const parseValue = (v: string) => {
-          const num = Number.parseFloat(v.replace(/[$KM,]/g, ""))
-          if (v.includes("M")) return num * 1000000
-          if (v.includes("K")) return num * 1000
-          return num
-        }
-        aVal = parseValue(aVal as string)
-        bVal = parseValue(bVal as string)
+        aVal = parseValueToUsd(aVal as string)
+        bVal = parseValueToUsd(bVal as string)
       }
 
-      if (sortDirection === "asc") {
-        return aVal < bVal ? -1 : aVal > bVal ? 1 : 0
-      }
+      if (sortDirection === "asc") return aVal < bVal ? -1 : aVal > bVal ? 1 : 0
       return aVal > bVal ? -1 : aVal < bVal ? 1 : 0
     })
   }, [trades, sortField, sortDirection])
@@ -229,7 +244,7 @@ const InsiderTradingDashboard = () => {
         (trade.ticker || "").toUpperCase().includes(query) ||
         (trade.owner || "").toUpperCase().includes(query)
 
-      // Value floor — skip entries with no parseable value only when big-moves is on
+      // Big moves toggle: when on, only show trades >= $500K (midpoint for ranges)
       const usdValue = parseValueToUsd(trade.value)
       const matchesBigMove = !bigMovesOnly || usdValue >= BIG_MOVE_THRESHOLD
 
