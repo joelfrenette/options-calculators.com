@@ -510,18 +510,18 @@ export function WheelScanner() {
   const [maxROE, setMaxROE] = useState(20)
 
   // Step 3: Technical Analysis Filters
-  const [maxRSI, setMaxRSI] = useState([30]) // Changed from 40 to 30 - captures genuine oversold conditions
-  const [maxStochastic, setMaxStochastic] = useState([25]) // Changed from 30 to 25 - extreme oversold with bounce probability
-  const [minATR, setMinATR] = useState([2.5]) // Keep 2.5 - ensures sufficient premium/volatility
-  const [maxATR, setMaxATR] = useState([6]) // Changed from 8 to 6 - high enough for premiums, low enough for safety
+  const [maxRSI, setMaxRSI] = useState([50]) // Default Max RSI 50 - oversold threshold
+  const [maxStochastic, setMaxStochastic] = useState([30]) // Default Max Stochastic 30 - oversold signal
+  const [minATR, setMinATR] = useState([2]) // Default Min ATR 2% - min volatility
+  const [maxATR, setMaxATR] = useState([15]) // Default Max ATR 15% - max volatility
 
-  const [requireBollingerBands, setRequireBollingerBands] = useState(true) // Keep true - mean reversion is key
+  const [requireBollingerBands, setRequireBollingerBands] = useState(true) // Bollinger Bands Setup
   // FIX: Renamed state variables from require200SMA to requireAbove200SMA and require50SMA to requireAbove50SMA
-  const [requireAbove200SMA, setRequireAbove200SMA] = useState(true) // Keep true - long-term trend protection
-  const [requireAbove50SMA, setRequireAbove50SMA] = useState(false) // Changed to false - allows dips below 50-day
-  const [requireGoldenCross, setRequireGoldenCross] = useState(false) // Changed to false - too restrictive, misses early entries
-  const [requireMACDBullish, setRequireMACDBullish] = useState(false) // Changed to false - optional confirmation, not required
-  const [requireRedDay, setRequireRedDay] = useState(true) // Keep true - sell on weakness for better prices
+  const [requireAbove200SMA, setRequireAbove200SMA] = useState(true) // Above 200-day SMA
+  const [requireAbove50SMA, setRequireAbove50SMA] = useState(true) // Above 50-day SMA
+  const [requireGoldenCross, setRequireGoldenCross] = useState(true) // Golden Cross (50 > 200)
+  const [requireMACDBullish, setRequireMACDBullish] = useState(true) // MACD Bullish Signal
+  const [requireRedDay, setRequireRedDay] = useState(true) // Red Day Preferred
 
   const [cacheStatus, setCacheStatus] = useState<string>("")
 
