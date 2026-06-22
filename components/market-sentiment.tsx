@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useEffect, useState } from "react"
+import { DataLoadGate } from "@/components/data-load-gate"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
@@ -433,6 +434,7 @@ export function MarketSentiment() {
   const [cacheTimestamp, setCacheTimestamp] = useState<string | null>(null)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
   const [error, setError] = useState<string | null>(null) // Added error state
+  const [loaded, setLoaded] = useState(false)
 
   // Define cache keys and version
   const CACHE_KEY = "market_sentiment_data"
@@ -645,6 +647,8 @@ export function MarketSentiment() {
   }
 
   useEffect(() => {
+    if (!loaded) return
+
     const cachedData = localStorage.getItem(CACHE_KEY)
     const cachedSentiment = localStorage.getItem("sentimentHeatmapData")
     const cachedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY)
@@ -730,7 +734,7 @@ export function MarketSentiment() {
         console.error("[v0] Error loading cached sentiment:", error)
       }
     }
-  }, [])
+  }, [loaded])
 
   const fetchData = async () => {
     try {
@@ -1087,6 +1091,16 @@ export function MarketSentiment() {
         allocation: getPortfolioAllocation(87),
       },
     ]
+  }
+
+  if (!loaded) {
+    return (
+      <DataLoadGate
+        title="Load CNN Fear & Greed Index?"
+        description="Fetch the latest CNN Fear & Greed Index and market sentiment data. Nothing loads until you choose to."
+        onConfirm={() => setLoaded(true)}
+      />
+    )
   }
 
   // CHANGE: Replace custom loading spinner with LoadingSpinner

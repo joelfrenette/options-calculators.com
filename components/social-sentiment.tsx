@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { Badge } from "@/components/ui/badge"
 import { RunScenarioInAIDialog } from "@/components/run-scenario-ai-dialog"
+import { DataLoadGate } from "@/components/data-load-gate"
 import {
   Info,
   TrendingUp,
@@ -180,6 +181,7 @@ export function SocialSentiment() {
   const [loadingSource, setLoadingSource] = useState("")
   const [isFromCache, setIsFromCache] = useState(false)
   const [needsInitialFetch, setNeedsInitialFetch] = useState(false)
+  const [loaded, setLoaded] = useState(false)
 
   const CACHE_KEY = "social_sentiment_cache_v6"
   const CACHE_TIMESTAMP_KEY = "social_sentiment_cache_timestamp_v6"
@@ -243,6 +245,8 @@ export function SocialSentiment() {
   }, [])
 
   useEffect(() => {
+    if (!loaded) return
+
     const cached = localStorage.getItem(CACHE_KEY)
     const cacheTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY)
 
@@ -259,7 +263,7 @@ export function SocialSentiment() {
       // No cache exists, need to fetch
       setNeedsInitialFetch(true)
     }
-  }, [])
+  }, [loaded])
 
   useEffect(() => {
     if (needsInitialFetch && !loading) {
@@ -270,6 +274,16 @@ export function SocialSentiment() {
 
   const handleRefresh = () => {
     fetchSentiment()
+  }
+
+  if (!loaded) {
+    return (
+      <DataLoadGate
+        title="Load Social Sentiment Index?"
+        description="Fetch the latest social and macro market sentiment indicators. Nothing loads until you choose to."
+        onConfirm={() => setLoaded(true)}
+      />
+    )
   }
 
   const allIndicators = data?.indicators || []

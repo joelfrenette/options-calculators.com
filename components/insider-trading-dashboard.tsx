@@ -30,6 +30,7 @@ import {
   Minus,
 } from "lucide-react"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
+import { DataLoadGate } from "@/components/data-load-gate"
 
 // Threshold for the "Big moves only" toggle ($500K+)
 const BIG_MOVE_THRESHOLD = 500_000
@@ -110,6 +111,7 @@ type SortDirection = "asc" | "desc" | null
 const InsiderTradingDashboard = () => {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [loaded, setLoaded] = useState(false)
   const [trades, setTrades] = useState<Trade[]>([])
   const [dataSource, setDataSource] = useState<string>("live")
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
@@ -157,9 +159,9 @@ const InsiderTradingDashboard = () => {
   }
 
   useEffect(() => {
-    fetchData()
+    if (loaded) fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [daysBack])
+  }, [daysBack, loaded])
 
   const handleRefresh = async () => {
     setIsRefreshing(true)
@@ -325,6 +327,16 @@ const InsiderTradingDashboard = () => {
           <p className="text-sm text-gray-700">{content}</p>
         </TooltipContent>
       </Tooltip>
+    )
+  }
+
+  if (!loaded) {
+    return (
+      <DataLoadGate
+        title="Load Insider & Congressional Trading Data?"
+        description="Fetch the latest SEC Form 4 and Congressional STOCK Act disclosures. Nothing loads until you choose to."
+        onConfirm={() => setLoaded(true)}
+      />
     )
   }
 
