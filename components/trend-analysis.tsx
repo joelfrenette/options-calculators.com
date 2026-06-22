@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
+import { DataLoadGate } from "@/components/data-load-gate"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
@@ -82,6 +83,7 @@ export function TrendAnalysis() {
   const [error, setError] = useState<string | null>(null)
   const [selectedTicker, setSelectedTicker] = useState<"SPY" | "SPX" | "QQQ">("SPY")
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
+  const [loaded, setLoaded] = useState(false)
 
   const fetchData = async () => {
     setLoading(true)
@@ -99,8 +101,18 @@ export function TrendAnalysis() {
   }
 
   useEffect(() => {
-    fetchData()
-  }, [])
+    if (loaded) fetchData()
+  }, [loaded])
+
+  if (!loaded) {
+    return (
+      <DataLoadGate
+        title="Load Index Trend Analysis?"
+        description="Fetch the latest trend data for SPY, QQQ, IWM, and DIA. Nothing loads until you choose to."
+        onConfirm={() => setLoaded(true)}
+      />
+    )
+  }
 
   const getTrendColor = (trend: string) => {
     switch (trend) {

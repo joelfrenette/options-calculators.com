@@ -5,6 +5,7 @@ import type React from "react"
 import { TooltipContent } from "@/components/ui/tooltip"
 
 import { useEffect, useState } from "react"
+import { DataLoadGate } from "@/components/data-load-gate"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
@@ -117,6 +118,7 @@ export function PanicEuphoria() {
   const [refreshing, setRefreshing] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
+  const [loaded, setLoaded] = useState(false)
 
   const fetchData = async () => {
     try {
@@ -134,6 +136,8 @@ export function PanicEuphoria() {
   }
 
   useEffect(() => {
+    if (!loaded) return
+
     async function initialFetch() {
       setLoading(true)
       await fetchData()
@@ -143,7 +147,17 @@ export function PanicEuphoria() {
     initialFetch()
     const interval = setInterval(fetchData, 60000)
     return () => clearInterval(interval)
-  }, [])
+  }, [loaded])
+
+  if (!loaded) {
+    return (
+      <DataLoadGate
+        title="Load Panic & Euphoria Index?"
+        description="Fetch Citibank's Panic & Euphoria sentiment data. Nothing loads until you choose to."
+        onConfirm={() => setLoaded(true)}
+      />
+    )
+  }
 
   const handleRefresh = async () => {
     setRefreshing(true)
