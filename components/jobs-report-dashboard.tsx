@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import {
   TrendingUp,
   AlertTriangle,
@@ -16,6 +16,7 @@ import {
   Sparkles,
   Target,
   Calendar,
+  Loader2,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { RefreshButton } from "@/components/ui/refresh-button"
@@ -36,118 +37,79 @@ import {
 import { RunScenarioInAIDialog } from "@/components/run-scenario-ai-dialog"
 import { DataLoadGate } from "@/components/data-load-gate"
 
-// Historical unemployment data (last 12 months) - UNRATE from BLS
-const unemploymentData = [
-  { month: "Dec 2024", rate: 4.1, yoyChange: "+0.1%" },
-  { month: "Jan 2025", rate: 4.0, yoyChange: "0.0%" },
-  { month: "Feb 2025", rate: 4.1, yoyChange: "+0.1%" },
-  { month: "Mar 2025", rate: 4.2, yoyChange: "+0.2%" },
-  { month: "Apr 2025", rate: 4.2, yoyChange: "+0.2%" },
-  { month: "May 2025", rate: 4.3, yoyChange: "+0.3%" },
-  { month: "Jun 2025", rate: 4.3, yoyChange: "+0.2%" },
-  { month: "Jul 2025", rate: 4.3, yoyChange: "+0.2%" },
-  { month: "Aug 2025", rate: 4.2, yoyChange: "+0.1%" },
-  { month: "Sep 2025", rate: 4.1, yoyChange: "0.0%" },
-  { month: "Oct 2025", rate: 4.1, yoyChange: "0.0%" },
-  { month: "Nov 2025", rate: 4.2, yoyChange: "+0.2%" },
-]
-
-// Chart data with historical UNRATE and U6 (True Unemployment) plus AI forecasts
-const chartData = [
-  // Historical data (actual)
-  { month: "Jan 2024", unrate: 3.7, u6: 7.2, isForecast: false },
-  { month: "Mar 2024", unrate: 3.8, u6: 7.3, isForecast: false },
-  { month: "May 2024", unrate: 4.0, u6: 7.4, isForecast: false },
-  { month: "Jul 2024", unrate: 4.3, u6: 7.8, isForecast: false },
-  { month: "Sep 2024", unrate: 4.1, u6: 7.7, isForecast: false },
-  { month: "Nov 2024", unrate: 4.2, u6: 7.8, isForecast: false },
-  { month: "Jan 2025", unrate: 4.0, u6: 7.5, isForecast: false },
-  { month: "Mar 2025", unrate: 4.2, u6: 7.9, isForecast: false },
-  { month: "May 2025", unrate: 4.3, u6: 8.0, isForecast: false },
-  { month: "Jul 2025", unrate: 4.3, u6: 8.0, isForecast: false },
-  { month: "Sep 2025", unrate: 4.1, u6: 8.0, isForecast: false },
-  { month: "Nov 2025", unrate: 4.2, u6: 8.1, isForecast: false },
-  // AI Forecast data (projected)
-  {
-    month: "Dec 2025",
-    unrateForecast: 4.2,
-    u6Forecast: 8.1,
-    unrateLow: 4.1,
-    unrateHigh: 4.3,
-    u6Low: 7.9,
-    u6High: 8.3,
-    isForecast: true,
-  },
-  {
-    month: "Jan 2026",
-    unrateForecast: 4.3,
-    u6Forecast: 8.2,
-    unrateLow: 4.1,
-    unrateHigh: 4.5,
-    u6Low: 7.9,
-    u6High: 8.5,
-    isForecast: true,
-  },
-  {
-    month: "Mar 2026",
-    unrateForecast: 4.4,
-    u6Forecast: 8.3,
-    unrateLow: 4.1,
-    unrateHigh: 4.7,
-    u6Low: 7.9,
-    u6High: 8.7,
-    isForecast: true,
-  },
-  {
-    month: "May 2026",
-    unrateForecast: 4.5,
-    u6Forecast: 8.4,
-    unrateLow: 4.2,
-    unrateHigh: 4.8,
-    u6Low: 8.0,
-    u6High: 8.9,
-    isForecast: true,
-  },
-]
-
-// AI Forecast summary
-const aiForecast = {
-  nextRelease: "December 6, 2025",
-  unratePrediction: 4.2,
-  unrateRange: { low: 4.1, high: 4.3 },
-  u6Prediction: 8.1,
-  u6Range: { low: 7.9, high: 8.3 },
-  nfpPrediction: "+175K",
-  nfpRange: { low: "+145K", high: "+205K" },
-  confidence: 78,
-  trend: "stable",
-  analysis:
-    "Labor market showing signs of gradual cooling with unemployment rate expected to remain stable around 4.2%. The Fed's restrictive policy stance is beginning to impact hiring, particularly in interest-rate sensitive sectors. NFP expected to moderate but remain positive, suggesting a soft landing scenario remains in play.",
-  keyFactors: [
-    "Continuing claims trending higher (+5% MoM)",
-    "Tech layoffs stabilizing after 2024 restructuring",
-    "Service sector hiring remains resilient",
-    "Fed policy lag effects materializing",
-  ],
-  tradingImplications: [
-    "Bullish Credit Spreads: Consider selling put spreads on XLF if unemployment stays below 4.5%",
-    "Iron Condors on SPY: Range-bound employment data supports neutral strategies",
-    "Protective Puts: Buy puts on consumer discretionary (XLY) as hedge against labor weakness",
-  ],
+interface JobsData {
+  current: {
+    unrate: number
+    unratePrevMonth: number
+    unratePrevYear: number
+    unrateYoY: number
+    u6: number
+    u6PrevYear: number
+    u6YoY: number
+    unrateU6Diff: number
+    nfp: number | null
+    nfpPrevMonth: number | null
+    nfp3MonthAvg: number | null
+    earnings: number | null
+    earningsMoM: number | null
+    earningsYoY: number | null
+    latestMonth: string
+  }
+  forecast: {
+    nextRelease: string
+    unratePrediction: number
+    unrateRange: { low: number; high: number }
+    u6Prediction: number
+    u6Range: { low: number; high: number }
+    nfpPrediction: string
+    nfpRange: { low: string; high: string }
+    confidence: number
+    trend: "rising" | "falling" | "stable"
+    analysis: string
+    keyFactors: string[]
+    tradingImplications: string[]
+  }
+  chartData: any[]
+  historicalTable: { month: string; rate: number; yoyChange: string }[]
+  lastUpdated: string
+  dataSource: string
 }
+
+const fmtSigned = (v: number, suffix = "%") => `${v > 0 ? "+" : ""}${v}${suffix}`
+const fmtNfp = (v: number | null) => (v === null ? "n/a" : `${v >= 0 ? "+" : ""}${v}K`)
 
 export { JobsReportDashboard }
 export default JobsReportDashboard
 
 function JobsReportDashboard() {
   const [expanded, setExpanded] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
   const [loaded, setLoaded] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [data, setData] = useState<JobsData | null>(null)
 
-  const handleRefresh = () => {
-    setRefreshing(true)
-    setTimeout(() => setRefreshing(false), 1500)
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/jobs-report", { cache: "no-store" })
+      const json = await res.json()
+      if (!res.ok || json.error) {
+        throw new Error(json.error || "Failed to load employment data")
+      }
+      setData(json as JobsData)
+    } catch (err) {
+      console.error("[v0] Jobs report load error:", err)
+      setError(err instanceof Error ? err.message : "Failed to load employment data")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const handleConfirm = () => {
+    setLoaded(true)
+    loadData()
   }
 
   const InfoTooltip = ({ content }: { content: string }) => {
@@ -176,12 +138,10 @@ function JobsReportDashboard() {
     )
   }
 
-  // Custom tooltip for the chart
   const CustomChartTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-      const data = payload[0]?.payload
-      const isForecast = data?.isForecast
-
+      const d = payload[0]?.payload
+      const isForecast = d?.isForecast
       return (
         <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3">
           <p className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
@@ -193,22 +153,22 @@ function JobsReportDashboard() {
           {isForecast ? (
             <>
               <p className="text-sm text-[#1E3A8A]">
-                UNRATE: {data.unrateForecast}%{" "}
+                UNRATE: {d.unrateForecast}%{" "}
                 <span className="text-gray-400">
-                  ({data.unrateLow}-{data.unrateHigh}%)
+                  ({d.unrateLow}-{d.unrateHigh}%)
                 </span>
               </p>
               <p className="text-sm text-[#0D9488]">
-                U-6: {data.u6Forecast}%{" "}
+                U-6: {d.u6Forecast}%{" "}
                 <span className="text-gray-400">
-                  ({data.u6Low}-{data.u6High}%)
+                  ({d.u6Low}-{d.u6High}%)
                 </span>
               </p>
             </>
           ) : (
             <>
-              <p className="text-sm text-[#1E3A8A]">UNRATE: {data.unrate}%</p>
-              <p className="text-sm text-[#0D9488]">U-6: {data.u6}%</p>
+              <p className="text-sm text-[#1E3A8A]">UNRATE: {d.unrate}%</p>
+              <p className="text-sm text-[#0D9488]">U-6: {d.u6}%</p>
             </>
           )}
         </div>
@@ -217,15 +177,52 @@ function JobsReportDashboard() {
     return null
   }
 
+  // Gate: nothing loads until the user confirms
   if (!loaded) {
     return (
       <DataLoadGate
         title="Load BLS Jobs Rate Forecaster?"
-        description="Fetch the latest employment data (UNRATE/U-3, U-6) and AI-powered forecasts. Nothing loads until you choose to."
-        onConfirm={() => setLoaded(true)}
+        description="Fetch the latest live employment data (UNRATE/U-3, U-6, Non-Farm Payrolls, and wage growth) from FRED, plus trend-based forecasts. Nothing loads until you choose to."
+        onConfirm={handleConfirm}
       />
     )
   }
+
+  if (loading && !data) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <Loader2 className="h-10 w-10 text-[#0D9488] animate-spin mb-4" />
+        <p className="text-gray-600 font-medium">Fetching live employment data from FRED…</p>
+      </div>
+    )
+  }
+
+  if (error && !data) {
+    return (
+      <Card className="bg-white shadow-md border-0 max-w-xl mx-auto my-12">
+        <CardContent className="pt-6 text-center">
+          <AlertTriangle className="h-10 w-10 text-amber-500 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-[#1E3A8A] mb-2">Could not load employment data</h3>
+          <p className="text-sm text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={loadData}
+            className="inline-flex items-center gap-2 bg-[#0D9488] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#0D9488]/90"
+          >
+            Try Again
+          </button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (!data) return null
+
+  const { current, forecast, chartData, historicalTable } = data
+  const forecastStart = chartData.filter((d) => !d.isForecast).slice(-1)[0]?.month
+  const trendLabel = forecast.trend === "rising" ? "Rising" : forecast.trend === "falling" ? "Falling" : "Stable"
+  const u6TrendLabel = current.u6YoY > 0 ? "Slight uptick" : current.u6YoY < 0 ? "Easing" : "Stable"
+  const nfpAboveTrend =
+    current.nfp !== null && current.nfp3MonthAvg !== null ? current.nfp >= current.nfp3MonthAvg : true
 
   return (
     <TooltipProvider>
@@ -236,13 +233,13 @@ function JobsReportDashboard() {
             <div>
               <h1 className="text-2xl font-bold text-[#1E3A8A] mb-2 flex items-center gap-2">
                 BLS Jobs Rate Forecaster
-                <InfoTooltip content="AI-powered analysis of employment data to forecast future unemployment trends. Uses official BLS data (UNRATE/U-3 and U-6) combined with leading indicators to predict upcoming releases. Options traders can use these forecasts to position ahead of market-moving jobs reports." />
+                <InfoTooltip content="AI-powered analysis of live employment data to forecast future unemployment trends. Uses official BLS data via FRED (UNRATE/U-3 and U-6) combined with payroll and wage indicators to project upcoming releases." />
               </h1>
-              <p className="text-[#0D9488] text-lg font-medium">AI-Powered Employment Forecasts & Analysis</p>
+              <p className="text-[#0D9488] text-lg font-medium">AI-Powered Employment Forecasts &amp; Analysis</p>
             </div>
             <div className="flex items-center gap-3">
               <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
-              <RefreshButton onClick={handleRefresh} isLoading={refreshing} />
+              <RefreshButton onClick={loadData} isLoading={loading} />
             </div>
           </div>
         </div>
@@ -250,24 +247,24 @@ function JobsReportDashboard() {
         {/* AI Forecast Summary Card */}
         <Card className="bg-gradient-to-r from-purple-50 to-blue-50 shadow-md border-0 mb-6">
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-purple-600" />
                 <CardTitle className="text-[#1E3A8A] text-xl">AI Forecast Summary</CardTitle>
-                <InfoTooltip content="Our AI analyzes leading indicators including initial claims, continuing claims, ADP data, ISM employment indices, and Fed commentary to forecast upcoming employment reports." />
+                <InfoTooltip content="Forecasts are derived from the recent trend in official BLS series (UNRATE, U-6, payrolls) pulled live from FRED. Confidence reflects how steady the labor market has been." />
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2 text-sm">
                   <Calendar className="h-4 w-4 text-gray-500" />
                   <span className="text-gray-600">
-                    Next Release: <span className="font-semibold text-[#1E3A8A]">{aiForecast.nextRelease}</span>
+                    Next Release: <span className="font-semibold text-[#1E3A8A]">{forecast.nextRelease}</span>
                   </span>
                 </div>
                 <RunScenarioInAIDialog
                   context={{
                     type: "jobs_forecast",
                     title: "BLS Jobs Rate Forecast Analysis",
-                    details: `Current UNRATE: 4.2%, U-6: 8.1%, NFP: +227K. AI Forecast: UNRATE ${aiForecast.unrateForecast}% (range: ${aiForecast.unrateRange}), U-6 ${aiForecast.u6Forecast}% (range: ${aiForecast.u6Range}), NFP ${aiForecast.nfpForecast} (range: ${aiForecast.nfpRange}). Model confidence: ${aiForecast.confidence}%. Key factors: ${aiForecast.keyFactors.join(", ")}. Trend: Employment data suggests ${Number.parseFloat(aiForecast.unrateForecast) > 4.2 ? "weakening" : "stable"} labor market conditions.`,
+                    details: `Current UNRATE: ${current.unrate}%, U-6: ${current.u6}%, NFP: ${fmtNfp(current.nfp)}. AI Forecast: UNRATE ${forecast.unratePrediction}% (range: ${forecast.unrateRange.low}-${forecast.unrateRange.high}%), U-6 ${forecast.u6Prediction}% (range: ${forecast.u6Range.low}-${forecast.u6Range.high}%), NFP ${forecast.nfpPrediction} (range: ${forecast.nfpRange.low} to ${forecast.nfpRange.high}). Model confidence: ${forecast.confidence}%. Trend: ${forecast.trend}. Key factors: ${forecast.keyFactors.join(", ")}.`,
                   }}
                 />
               </div>
@@ -279,13 +276,13 @@ function JobsReportDashboard() {
               <div className="bg-white rounded-lg p-4 shadow-sm">
                 <p className="text-sm text-gray-600 mb-1">UNRATE Forecast</p>
                 <div className="flex items-end gap-2">
-                  <span className="text-3xl font-bold text-[#1E3A8A]">{aiForecast.unratePrediction}%</span>
+                  <span className="text-3xl font-bold text-[#1E3A8A]">{forecast.unratePrediction}%</span>
                   <span className="text-xs text-gray-500 pb-1">
-                    ({aiForecast.unrateRange.low}-{aiForecast.unrateRange.high}%)
+                    ({forecast.unrateRange.low}-{forecast.unrateRange.high}%)
                   </span>
                 </div>
                 <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-                  <TrendingUp className="h-3 w-3" /> Stable
+                  <TrendingUp className="h-3 w-3" /> {trendLabel}
                 </p>
               </div>
 
@@ -293,13 +290,13 @@ function JobsReportDashboard() {
               <div className="bg-white rounded-lg p-4 shadow-sm">
                 <p className="text-sm text-gray-600 mb-1">U-6 Forecast</p>
                 <div className="flex items-end gap-2">
-                  <span className="text-3xl font-bold text-[#0D9488]">{aiForecast.u6Prediction}%</span>
+                  <span className="text-3xl font-bold text-[#0D9488]">{forecast.u6Prediction}%</span>
                   <span className="text-xs text-gray-500 pb-1">
-                    ({aiForecast.u6Range.low}-{aiForecast.u6Range.high}%)
+                    ({forecast.u6Range.low}-{forecast.u6Range.high}%)
                   </span>
                 </div>
                 <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-                  <TrendingUp className="h-3 w-3" /> Slight uptick
+                  <TrendingUp className="h-3 w-3" /> {u6TrendLabel}
                 </p>
               </div>
 
@@ -307,32 +304,32 @@ function JobsReportDashboard() {
               <div className="bg-white rounded-lg p-4 shadow-sm">
                 <p className="text-sm text-gray-600 mb-1">NFP Forecast</p>
                 <div className="flex items-end gap-2">
-                  <span className="text-3xl font-bold text-green-600">{aiForecast.nfpPrediction}</span>
+                  <span className="text-3xl font-bold text-green-600">{forecast.nfpPrediction}</span>
                   <span className="text-xs text-gray-500 pb-1">
-                    ({aiForecast.nfpRange.low} to {aiForecast.nfpRange.high})
+                    ({forecast.nfpRange.low} to {forecast.nfpRange.high})
                   </span>
                 </div>
                 <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                  <TrendingUp className="h-3 w-3" /> Above trend
+                  <TrendingUp className="h-3 w-3" /> {nfpAboveTrend ? "Above trend" : "Below trend"}
                 </p>
               </div>
 
               {/* Confidence Score */}
               <div className="bg-white rounded-lg p-4 shadow-sm">
-                <p className="text-sm text-gray-600 mb-1">AI Confidence</p>
+                <p className="text-sm text-gray-600 mb-1">Forecast Confidence</p>
                 <div className="flex items-end gap-2">
-                  <span className="text-3xl font-bold text-purple-600">{aiForecast.confidence}%</span>
+                  <span className="text-3xl font-bold text-purple-600">{forecast.confidence}%</span>
                   <Target className="h-5 w-5 text-purple-400" />
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                  <div className="bg-purple-600 h-2 rounded-full" style={{ width: `${aiForecast.confidence}%` }} />
+                  <div className="bg-purple-600 h-2 rounded-full" style={{ width: `${forecast.confidence}%` }} />
                 </div>
               </div>
             </div>
 
-            {/* AI Analysis */}
+            {/* Analysis */}
             <div className="bg-white rounded-lg p-4 shadow-sm">
-              <p className="text-sm text-gray-700 leading-relaxed">{aiForecast.analysis}</p>
+              <p className="text-sm text-gray-700 leading-relaxed">{forecast.analysis}</p>
             </div>
           </CardContent>
         </Card>
@@ -341,11 +338,11 @@ function JobsReportDashboard() {
         <Card className="bg-white shadow-md border-0 mb-6">
           <CardHeader>
             <CardTitle className="text-[#1E3A8A] text-xl flex items-center gap-2">
-              UNRATE & U-6 Trend with AI Forecasts
-              <InfoTooltip content="This chart shows historical UNRATE (official U-3 unemployment) and U-6 (includes discouraged and part-time workers) with AI-generated forecasts shown as dashed lines. The shaded area represents the confidence interval for predictions." />
+              UNRATE &amp; U-6 Trend with AI Forecasts
+              <InfoTooltip content="Historical UNRATE (official U-3) and U-6 (includes discouraged and part-time workers) from FRED, with trend-based forecasts shown as dashed lines. The shaded area represents the forecast confidence interval." />
             </CardTitle>
             <CardDescription className="text-gray-600">
-              Historical data through Nov 2025, AI forecasts through May 2026
+              Historical data through {current.latestMonth}, forecasts projected forward
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -368,15 +365,15 @@ function JobsReportDashboard() {
                   <RechartsTooltip content={<CustomChartTooltip />} />
                   <Legend />
 
-                  {/* Reference line for forecast start */}
-                  <ReferenceLine
-                    x="Nov 2025"
-                    stroke="#9333EA"
-                    strokeDasharray="5 5"
-                    label={{ value: "Forecast →", position: "top", fill: "#9333EA", fontSize: 11 }}
-                  />
+                  {forecastStart && (
+                    <ReferenceLine
+                      x={forecastStart}
+                      stroke="#9333EA"
+                      strokeDasharray="5 5"
+                      label={{ value: "Forecast →", position: "top", fill: "#9333EA", fontSize: 11 }}
+                    />
+                  )}
 
-                  {/* Historical UNRATE */}
                   <Line
                     type="monotone"
                     dataKey="unrate"
@@ -386,8 +383,6 @@ function JobsReportDashboard() {
                     dot={{ fill: "#1E3A8A", r: 3 }}
                     connectNulls={false}
                   />
-
-                  {/* Historical U-6 */}
                   <Line
                     type="monotone"
                     dataKey="u6"
@@ -397,8 +392,6 @@ function JobsReportDashboard() {
                     dot={{ fill: "#0D9488", r: 3 }}
                     connectNulls={false}
                   />
-
-                  {/* Forecast UNRATE */}
                   <Line
                     type="monotone"
                     dataKey="unrateForecast"
@@ -409,8 +402,6 @@ function JobsReportDashboard() {
                     dot={{ fill: "#1E3A8A", r: 3, strokeDasharray: "0" }}
                     connectNulls={false}
                   />
-
-                  {/* Forecast U-6 */}
                   <Line
                     type="monotone"
                     dataKey="u6Forecast"
@@ -421,8 +412,6 @@ function JobsReportDashboard() {
                     dot={{ fill: "#0D9488", r: 3, strokeDasharray: "0" }}
                     connectNulls={false}
                   />
-
-                  {/* Confidence bands */}
                   <Area
                     type="monotone"
                     dataKey="unrateHigh"
@@ -471,26 +460,31 @@ function JobsReportDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-end gap-2 mb-4">
-                  <span className="text-5xl font-bold text-[#1E3A8A]">4.2%</span>
-                  <span className="text-sm text-amber-600 font-medium pb-2">+0.2% YoY</span>
+                  <span className="text-5xl font-bold text-[#1E3A8A]">{current.unrate}%</span>
+                  <span className="text-sm text-amber-600 font-medium pb-2">{fmtSigned(current.unrateYoY)} YoY</span>
                 </div>
                 <div className="space-y-2 text-sm text-gray-600">
                   <p>
-                    <strong>Previous Month:</strong> 4.1%
+                    <strong>Previous Month:</strong> {current.unratePrevMonth}%
                   </p>
                   <p>
-                    <strong>Previous Year:</strong> 4.0%
+                    <strong>Previous Year:</strong> {current.unratePrevYear}%
                   </p>
                   <p>
-                    <strong>Interpretation:</strong> Labor market remains solid but cooling gradually
+                    <strong>Interpretation:</strong>{" "}
+                    {forecast.trend === "rising"
+                      ? "Labor market cooling as unemployment climbs"
+                      : forecast.trend === "falling"
+                        ? "Labor market re-tightening as unemployment falls"
+                        : "Labor market remains solid and steady"}
                   </p>
                 </div>
               </CardContent>
             </Card>
           </ConditionalTooltip>
 
-          {/* True Unemployment Rate Card - Updated to U-6 */}
-          <ConditionalTooltip content="U-6 is the broadest measure of unemployment, including discouraged workers and those working part-time for economic reasons. When U-6 is significantly higher than UNRATE, it reveals hidden labor market slack. Current U-6 around 8% is historically normal.">
+          {/* Broad Unemployment Rate (U-6) Card */}
+          <ConditionalTooltip content="U-6 is the broadest measure of unemployment, including discouraged workers and those working part-time for economic reasons. When U-6 is significantly higher than UNRATE, it reveals hidden labor market slack.">
             <Card className="bg-white shadow-md border-0 cursor-help">
               <CardHeader className="pb-2">
                 <div className="flex items-center gap-2">
@@ -498,23 +492,26 @@ function JobsReportDashboard() {
                   <CardTitle className="text-[#1E3A8A] text-xl">Broad Unemployment Rate (U-6)</CardTitle>
                 </div>
                 <CardDescription className="text-gray-600">
-                  Includes underemployed & marginally attached workers
+                  Includes underemployed &amp; marginally attached workers
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex items-end gap-2 mb-4">
-                  <span className="text-5xl font-bold text-[#0D9488]">8.1%</span>
-                  <span className="text-sm text-amber-600 font-medium pb-2">+0.3% YoY</span>
+                  <span className="text-5xl font-bold text-[#0D9488]">{current.u6}%</span>
+                  <span className="text-sm text-amber-600 font-medium pb-2">{fmtSigned(current.u6YoY)} YoY</span>
                 </div>
                 <div className="space-y-2 text-sm text-gray-600">
                   <p>
-                    <strong>UNRATE Difference:</strong> +3.9%
+                    <strong>UNRATE Difference:</strong> {fmtSigned(current.unrateU6Diff)}
                   </p>
                   <p>
-                    <strong>Pre-Pandemic Average:</strong> 7.0%
+                    <strong>Year Ago:</strong> {current.u6PrevYear}%
                   </p>
                   <p>
-                    <strong>Interpretation:</strong> Slightly elevated from pre-pandemic norms
+                    <strong>Interpretation:</strong>{" "}
+                    {current.unrateU6Diff > 4
+                      ? "Elevated hidden slack relative to headline rate"
+                      : "In line with typical headline-to-broad spread"}
                   </p>
                 </div>
               </CardContent>
@@ -525,7 +522,7 @@ function JobsReportDashboard() {
         {/* Row 2: Payroll & Wages Cards */}
         <div className="grid md:grid-cols-2 gap-6 mb-6">
           {/* Non-Farm Payrolls Card */}
-          <ConditionalTooltip content="Non-Farm Payrolls (NFP) measures the change in employed people excluding farm workers. Above 200K is strong job growth, 100-200K is moderate, below 100K is weak. Strong NFP is bullish for stocks short-term but may lead to Fed tightening. Weak NFP may initially hurt stocks but could prompt Fed rate cuts.">
+          <ConditionalTooltip content="Non-Farm Payrolls (NFP) measures the change in employed people excluding farm workers. Above 200K is strong job growth, 100-200K is moderate, below 100K is weak. Strong NFP is bullish for stocks short-term but may lead to Fed tightening.">
             <Card className="bg-white shadow-md border-0 cursor-help">
               <CardHeader className="pb-2">
                 <div className="flex items-center gap-2">
@@ -536,18 +533,25 @@ function JobsReportDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-end gap-2 mb-4">
-                  <span className="text-5xl font-bold text-green-600">+227K</span>
-                  <span className="text-sm text-green-600 font-medium pb-2">Above Forecast (+200K)</span>
+                  <span className="text-5xl font-bold text-green-600">{fmtNfp(current.nfp)}</span>
+                  <span className="text-sm text-green-600 font-medium pb-2">
+                    {nfpAboveTrend ? "Above" : "Below"} 3-mo avg
+                  </span>
                 </div>
                 <div className="space-y-2 text-sm text-gray-600">
                   <p>
-                    <strong>Previous Month:</strong> +36K (hurricane impact)
+                    <strong>Previous Month:</strong> {fmtNfp(current.nfpPrevMonth)}
                   </p>
                   <p>
-                    <strong>3-Month Average:</strong> +173K
+                    <strong>3-Month Average:</strong> {fmtNfp(current.nfp3MonthAvg)}
                   </p>
                   <p>
-                    <strong>Interpretation:</strong> Strong rebound after hurricane disruptions
+                    <strong>Interpretation:</strong>{" "}
+                    {current.nfp !== null && current.nfp >= 200
+                      ? "Strong job growth"
+                      : current.nfp !== null && current.nfp >= 100
+                        ? "Moderate hiring pace"
+                        : "Weak hiring — watch for cooling"}
                   </p>
                 </div>
               </CardContent>
@@ -555,7 +559,7 @@ function JobsReportDashboard() {
           </ConditionalTooltip>
 
           {/* Average Hourly Earnings Card */}
-          <ConditionalTooltip content="Average Hourly Earnings measures wage inflation. Rising wages above 3% YoY can pressure corporate margins (bearish) and may lead to Fed rate hikes. Falling wage growth below 2% suggests disinflation, potentially supportive of Fed rate cuts. For options traders, elevated wage growth increases IV in rate-sensitive sectors.">
+          <ConditionalTooltip content="Average Hourly Earnings measures wage inflation. Rising wages above 3% YoY can pressure corporate margins (bearish) and may lead to Fed rate hikes. Falling wage growth below 2% suggests disinflation, potentially supportive of Fed rate cuts.">
             <Card className="bg-white shadow-md border-0 cursor-help">
               <CardHeader className="pb-2">
                 <div className="flex items-center gap-2">
@@ -566,18 +570,28 @@ function JobsReportDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-end gap-2 mb-4">
-                  <span className="text-5xl font-bold text-[#1E3A8A]">$35.61</span>
-                  <span className="text-sm text-amber-600 font-medium pb-2">+4.0% YoY</span>
+                  <span className="text-5xl font-bold text-[#1E3A8A]">
+                    {current.earnings !== null ? `$${current.earnings.toFixed(2)}` : "n/a"}
+                  </span>
+                  {current.earningsYoY !== null && (
+                    <span className="text-sm text-amber-600 font-medium pb-2">{fmtSigned(current.earningsYoY)} YoY</span>
+                  )}
                 </div>
                 <div className="space-y-2 text-sm text-gray-600">
                   <p>
-                    <strong>Monthly Change:</strong> +0.4%
+                    <strong>Monthly Change:</strong>{" "}
+                    {current.earningsMoM !== null ? fmtSigned(current.earningsMoM) : "n/a"}
                   </p>
                   <p>
                     <strong>Fed Target:</strong> ~3.0% YoY
                   </p>
                   <p>
-                    <strong>Interpretation:</strong> Wage pressures remain elevated, hawkish for Fed
+                    <strong>Interpretation:</strong>{" "}
+                    {current.earningsYoY !== null && current.earningsYoY > 3.5
+                      ? "Wage pressures remain elevated, hawkish for Fed"
+                      : current.earningsYoY !== null && current.earningsYoY < 2.5
+                        ? "Wage growth cooling, supportive of rate cuts"
+                        : "Wage growth near the Fed's comfort zone"}
                   </p>
                 </div>
               </CardContent>
@@ -588,17 +602,17 @@ function JobsReportDashboard() {
         {/* AI Trading Implications */}
         <Card className="bg-white shadow-md border-0 mb-6">
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <CardTitle className="text-[#1E3A8A] text-xl flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-purple-600" />
                 AI Trading Implications
-                <InfoTooltip content="AI-generated trading ideas based on employment forecast analysis. These are educational suggestions, not financial advice." />
+                <InfoTooltip content="Trading ideas derived from the current employment trend. These are educational suggestions, not financial advice." />
               </CardTitle>
               <RunScenarioInAIDialog
                 context={{
                   type: "jobs_trading",
                   title: "Employment-Based Trading Strategies",
-                  details: `Current market conditions based on employment data: UNRATE 4.2% (${Number.parseFloat(aiForecast.unrateForecast) > 4.2 ? "forecast rising" : "forecast stable/declining"}), U-6 8.1%, NFP +227K. Trading implications: ${aiForecast.tradingImplications.join(" | ")}. Key factors to watch: ${aiForecast.keyFactors.join(", ")}. Consider options strategies that benefit from ${Number.parseFloat(aiForecast.unrateForecast) > 4.2 ? "increased volatility and defensive positioning" : "stable conditions and premium selling"}.`,
+                  details: `Current conditions: UNRATE ${current.unrate}% (trend: ${forecast.trend}), U-6 ${current.u6}%, NFP ${fmtNfp(current.nfp)}. Trading implications: ${forecast.tradingImplications.join(" | ")}. Key factors: ${forecast.keyFactors.join(", ")}.`,
                 }}
               />
             </div>
@@ -611,7 +625,7 @@ function JobsReportDashboard() {
                   Key Factors Driving Forecast
                 </h4>
                 <ul className="space-y-2">
-                  {aiForecast.keyFactors.map((factor, i) => (
+                  {forecast.keyFactors.map((factor, i) => (
                     <li key={i} className="text-sm text-gray-600 flex items-start gap-2">
                       <span className="text-purple-600 mt-1">•</span>
                       {factor}
@@ -625,7 +639,7 @@ function JobsReportDashboard() {
                   Options Trading Ideas
                 </h4>
                 <ul className="space-y-2">
-                  {aiForecast.tradingImplications.map((idea, i) => (
+                  {forecast.tradingImplications.map((idea, i) => (
                     <li key={i} className="text-sm text-gray-600 flex items-start gap-2">
                       <span className="text-green-600 mt-1">•</span>
                       {idea}
@@ -644,10 +658,10 @@ function JobsReportDashboard() {
               <div>
                 <CardTitle className="text-[#1E3A8A] text-xl flex items-center gap-2">
                   Historical Unemployment Data
-                  <InfoTooltip content="Track unemployment trends over time to identify labor market cycles. Rising unemployment typically precedes recessions by 6-12 months. Options traders can position for increased volatility when unemployment trends higher." />
+                  <InfoTooltip content="Track unemployment trends over time to identify labor market cycles. Rising unemployment typically precedes recessions by 6-12 months." />
                 </CardTitle>
                 <CardDescription className="text-gray-600">
-                  Last 12 months of official unemployment rate data
+                  Last 12 months of official unemployment rate data (FRED: UNRATE)
                 </CardDescription>
               </div>
               <button
@@ -677,21 +691,21 @@ function JobsReportDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(expanded ? unemploymentData : unemploymentData.slice(0, 5)).map((data, index) => (
+                  {(expanded ? historicalTable : historicalTable.slice(0, 5)).map((row, index) => (
                     <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-4 text-sm text-gray-900">{data.month}</td>
-                      <td className="py-3 px-4 text-sm font-medium text-[#1E3A8A]">{data.rate}%</td>
+                      <td className="py-3 px-4 text-sm text-gray-900">{row.month}</td>
+                      <td className="py-3 px-4 text-sm font-medium text-[#1E3A8A]">{row.rate}%</td>
                       <td className="py-3 px-4 text-sm">
                         <span
                           className={
-                            data.yoyChange.startsWith("+")
+                            row.yoyChange.startsWith("+")
                               ? "text-amber-600"
-                              : data.yoyChange === "0.0%"
+                              : row.yoyChange === "0.0%"
                                 ? "text-gray-600"
                                 : "text-green-600"
                           }
                         >
-                          {data.yoyChange}
+                          {row.yoyChange}
                         </span>
                       </td>
                     </tr>
@@ -705,12 +719,12 @@ function JobsReportDashboard() {
         {/* Data Source Attribution */}
         <Card className="bg-gray-50 border border-gray-200">
           <CardContent className="pt-4">
-            <div className="flex items-center justify-between text-sm text-gray-600">
+            <div className="flex items-center justify-between text-sm text-gray-600 flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-amber-500" />
                 <span>
-                  Data sourced from Bureau of Labor Statistics (BLS). AI forecasts are estimates and not financial
-                  advice.
+                  {data.dataSource}. Last updated {new Date(data.lastUpdated).toLocaleString()}. Forecasts are estimates
+                  and not financial advice.
                 </span>
               </div>
               <a
