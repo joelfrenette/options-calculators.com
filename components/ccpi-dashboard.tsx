@@ -17,6 +17,7 @@ import { saveCCPIToCache, loadCCPIFromCache, saveHistoryToCache } from "@/lib/cc
 import { REFRESH_STATUS_MESSAGES } from "@/lib/ccpi/constants"
 import { CCPIChatModal } from "./ccpi-chat-modal"
 import { RefreshButton } from "./ui/refresh-button" // Assuming RefreshButton is in ui/refresh-button.tsx
+import { DataLoadGate } from "@/components/data-load-gate"
 
 interface CCPIIndicatorTooltipProps {
   title: string
@@ -315,6 +316,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [fromCache, setFromCache] = useState(false)
   const [cacheTimestamp, setCacheTimestamp] = useState<string | null>(null)
+  const [loaded, setLoaded] = useState(false)
 
   const pillarData = useMemo(() => {
     if (!data) return []
@@ -454,6 +456,8 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
   }, [])
 
   useEffect(() => {
+    if (!loaded) return
+
     const loadInitialData = async () => {
       const cached = loadCCPIFromCache()
       if (cached) {
@@ -471,7 +475,17 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
     }
 
     loadInitialData()
-  }, []) // Remove fetchCCPIData dependency to prevent auto-refresh
+  }, [loaded]) // Only after the user opts in
+
+  if (!loaded) {
+    return (
+      <DataLoadGate
+        title="Load Crash & Corrections Predictions?"
+        description="Fetch the latest Crash & Correction Probability Index data. Nothing loads until you choose to."
+        onConfirm={() => setLoaded(true)}
+      />
+    )
+  }
 
   if (loading && !data) {
     return (

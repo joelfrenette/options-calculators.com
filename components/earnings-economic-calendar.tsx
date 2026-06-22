@@ -11,6 +11,7 @@ import { RunScenarioInAIDialog } from "@/components/run-scenario-ai-dialog"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { DataLoadGate } from "@/components/data-load-gate"
 
 // Types for dynamic data
 interface EarningsEvent {
@@ -195,6 +196,7 @@ export function EarningsEconomicCalendar() {
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
+  const [loaded, setLoaded] = useState(false)
 
   const fetchCalendarData = useCallback(async () => {
     try {
@@ -218,10 +220,10 @@ export function EarningsEconomicCalendar() {
     }
   }, [])
 
-  // Initial load
+  // Initial load (only after the user opts in)
   useEffect(() => {
-    fetchCalendarData()
-  }, [fetchCalendarData])
+    if (loaded) fetchCalendarData()
+  }, [loaded, fetchCalendarData])
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true)
@@ -239,6 +241,16 @@ export function EarningsEconomicCalendar() {
           <p className="text-sm text-gray-700">{content}</p>
         </TooltipContent>
       </Tooltip>
+    )
+  }
+
+  if (!loaded) {
+    return (
+      <DataLoadGate
+        title="Load Earnings & Economic Calendar?"
+        description="Fetch upcoming earnings dates and economic events. Nothing loads until you choose to."
+        onConfirm={() => setLoaded(true)}
+      />
     )
   }
 
