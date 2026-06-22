@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Slider } from "@/components/ui/slider"
+import { DollarAmountFilter } from "@/components/dollar-amount-filter"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { Layers, Zap, Filter, ArrowUpRight, AlertTriangle, CheckCircle2, Info, Wifi, WifiOff } from "lucide-react"
@@ -39,6 +40,7 @@ export function IronCondorScanner() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
+  const [maxStockPrice, setMaxStockPrice] = useState(200) // Step 1 dollar filter ($200 → $20,000)
 
   useEffect(() => {
     const cached = localStorage.getItem("iron-condor-scanner-cache")
@@ -55,6 +57,10 @@ export function IronCondorScanner() {
   }, [])
 
   const filteredSetups = setups.filter((s) => {
+    // Step 1 dollar filter: the underlying trades between the put and call short
+    // strikes, so their midpoint is a close proxy for the share price.
+    const underlyingProxy = (s.putSpread.short + s.callSpread.short) / 2
+    if (maxStockPrice < 1000 && underlyingProxy > maxStockPrice) return false
     if (s.probability < minProbability[0]) return false
     if (s.dte > maxDte[0]) return false
     if (s.ivRank < minIvRank[0]) return false
@@ -187,6 +193,11 @@ export function IronCondorScanner() {
           </div>
         </CardHeader>
         <CardContent>
+          {/* Dollar Amount Filtering (Step 1) */}
+          <div className="mb-6">
+            <DollarAmountFilter value={maxStockPrice} onChange={setMaxStockPrice} tooltipsEnabled={tooltipsEnabled} />
+          </div>
+
           {/* Filters */}
           <div className="flex flex-wrap gap-4 mb-6 p-4 bg-slate-50 rounded-lg">
             <div className="flex items-center gap-2">

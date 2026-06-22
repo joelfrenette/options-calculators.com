@@ -382,7 +382,7 @@ export default function Home() {
                       }`}
                     >
                       <Zap className="h-4 w-4" />
-                      EXECUTE
+                      LEARN
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="max-w-xs text-center">
@@ -451,7 +451,7 @@ export default function Home() {
                         }`}
                       >
                         <Zap className="h-3 w-3" />
-                        EXECUTE
+                        LEARN
                       </button>
                     </div>
 
@@ -504,7 +504,7 @@ export default function Home() {
                       }`}
                     >
                       <Zap className="h-3 w-3" />
-                      EXECUTE
+                      LEARN
                     </button>
                   </div>
                 </div>

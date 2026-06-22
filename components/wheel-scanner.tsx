@@ -791,6 +791,7 @@ export function WheelScanner() {
     }
 
     const cacheParams = {
+      maxStockPrice: maxStockPrice[0], // Step 1 dollar filter is part of the cache identity
       minVolume: minVolume[0],
       maxDebtToEquity: maxDebtToEquity[0],
       minROE: minROE[0],
@@ -884,6 +885,18 @@ export function WheelScanner() {
             const day = ticker_data?.day || {}
 
             const currentPrice = day.c || prevDay.c || 0
+
+            // Step 1 Dollar Amount filter: exclude stocks priced above the chosen max.
+            // A slider value of 1000 means "1,000+" and is treated as no upper limit.
+            const priceCap = maxStockPrice[0]
+            if (priceCap < 1000 && currentPrice > priceCap) {
+              console.log(
+                `[v0] ⏭️ ${ticker} - price $${currentPrice.toFixed(2)} exceeds max stock price $${priceCap}. Skipping...`,
+              )
+              skippedTickers.push(ticker)
+              return null
+            }
+
             const volume = day.v || prevDay.v || 0
             const volumeInMillions = volume / 1000000
 

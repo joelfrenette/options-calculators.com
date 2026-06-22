@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
+import { DollarAmountFilter } from "@/components/dollar-amount-filter"
 import { Clock, Filter, AlertTriangle, Info, Wifi, WifiOff, TrendingUp, Activity, Shield, Percent } from "lucide-react"
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { RefreshButton } from "@/components/ui/refresh-button"
@@ -77,6 +78,7 @@ export function LEAPSScanner() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [isLiveData, setIsLiveData] = useState(false)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
+  const [maxStockPrice, setMaxStockPrice] = useState(200) // Step 1 dollar filter ($200 → $20,000)
 
   useEffect(() => {
     const cached = localStorage.getItem("leaps-scanner-cache")
@@ -93,6 +95,7 @@ export function LEAPSScanner() {
   }, [])
 
   const filteredSetups = setups.filter((s) => {
+    if (maxStockPrice < 1000 && s.currentPrice > maxStockPrice) return false
     if (optionType !== "all" && s.type !== optionType) return false
     if (s.dte < minDTE) return false
     if (s.debtToEquity > maxDebtEquity) return false
@@ -215,6 +218,11 @@ export function LEAPSScanner() {
               {lastUpdated && <span className="text-gray-500">Updated: {lastUpdated}</span>}
             </div>
             <span className="text-gray-500">{filteredSetups.length} setups found</span>
+          </div>
+
+          {/* Dollar Amount Filtering (Step 1) */}
+          <div className="mb-4">
+            <DollarAmountFilter value={maxStockPrice} onChange={setMaxStockPrice} tooltipsEnabled={tooltipsEnabled} />
           </div>
 
           {/* Filters */}

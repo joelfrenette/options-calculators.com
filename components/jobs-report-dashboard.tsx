@@ -34,6 +34,7 @@ import {
   ComposedChart,
 } from "recharts"
 import { RunScenarioInAIDialog } from "@/components/run-scenario-ai-dialog"
+import { DataLoadGate } from "@/components/data-load-gate"
 
 // Historical unemployment data (last 12 months) - UNRATE from BLS
 const unemploymentData = [
@@ -142,6 +143,7 @@ function JobsReportDashboard() {
   const [expanded, setExpanded] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
+  const [loaded, setLoaded] = useState(false)
 
   const handleRefresh = () => {
     setRefreshing(true)
@@ -213,6 +215,16 @@ function JobsReportDashboard() {
       )
     }
     return null
+  }
+
+  if (!loaded) {
+    return (
+      <DataLoadGate
+        title="Load BLS Jobs Rate Forecaster?"
+        description="Fetch the latest employment data (UNRATE/U-3, U-6) and AI-powered forecasts. Nothing loads until you choose to."
+        onConfirm={() => setLoaded(true)}
+      />
+    )
   }
 
   return (
