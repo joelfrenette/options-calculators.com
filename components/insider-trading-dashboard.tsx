@@ -169,10 +169,19 @@ const InsiderTradingDashboard = () => {
     setIsRefreshing(false)
   }
 
-  // When the user presses Enter or clicks "Search" in the ticker box, trigger
-  // a dedicated API call that includes the ticker for deeper per-symbol history
+  // The live client-side filter (filteredTrades) already matches BOTH ticker and
+  // owner name as the user types. The Search button / Enter additionally runs a
+  // deeper per-symbol server lookup — but only when the query actually looks like
+  // a ticker (short, alphabetic). For name searches we skip the server round-trip
+  // and rely on instant client-side filtering so names always resolve.
+  const looksLikeTicker = (q: string) => /^[A-Za-z]{1,5}(\.[A-Za-z])?$/.test(q.trim())
+
   const handleTickerSearch = () => {
-    fetchData(tickerFilter.trim().toUpperCase())
+    const q = tickerFilter.trim()
+    if (looksLikeTicker(q)) {
+      fetchData(q.toUpperCase()) // deep per-ticker scan
+    }
+    // For names (or empty), the client-side filter handles it instantly — no refetch
   }
 
   const handleSort = (field: SortField) => {

@@ -58,6 +58,74 @@ function parseValueToMillions(valueStr: string): number {
 }
 
 // ---------------------------------------------------------------------------
+// US ticker validation
+// Finnhub's market-wide Form 4 feed mixes in foreign filings whose "symbol" is
+// actually an ISIN (e.g. SE0029279090) or carries a foreign-exchange suffix
+// (e.g. BEAMMW.ST, IFCN.SW). Those rows have no usable share counts, codes, or
+// titles and pollute the table. A real US ticker is 1-5 uppercase letters with
+// an optional single-letter share class (e.g. BRK.B) — never digits, never a
+// multi-char exchange suffix.
+function isValidUsTicker(raw: unknown): boolean {
+  const sym = String(raw || "").trim().toUpperCase()
+  if (!sym) return false
+  if (/\d/.test(sym)) return false // ISINs and foreign codes contain digits
+  // Reject foreign-exchange suffixes like .ST .SW .L .TO .DE .PA .HK etc.
+  if (/\.[A-Z]{2,}$/.test(sym)) return false
+  // Allow plain tickers (AAPL) or US share-class tickers (BRK.B, BF.B)
+  return /^[A-Z]{1,5}(\.[A-Z])?$/.test(sym)
+}
+
+// ---------------------------------------------------------------------------
+// Insider title normalization
+// Surfaces real C-suite roles (CEO/CFO/COO/CMO/CTO/President/Chairman) from the
+// free-text title field when available, otherwise falls back to the boolean
+// role flags Finnhub sometimes provides, then to a generic label.
+// ---------------------------------------------------------------------------
+function normalizeRole(t: any): string {
+  const title = String(t.officerTitle || t.position || t.title || "").trim()
+  const upper = title.toUpperCase()
+
+  // Map common executive titles to clean abbreviations
+  if (/\bCHIEF EXECUTIVE\b|\bCEO\b/.test(upper)) return "CEO"
+  if (/\bCHIEF FINANCIAL\b|\bCFO\b/.test(upper)) return "CFO"
+  if (/\bCHIEF OPERATING\b|\bCOO\b/.test(upper)) return "COO"
+  if (/\bCHIEF MARKETING\b|\bCMO\b/.test(upper)) return "CMO"
+  if (/\bCHIEF TECHNOLOGY\b|\bCTO\b/.test(upper)) return "CTO"
+  if (/\bCHIEF\b/.test(upper)) return title // other C-suite, keep as-is
+  if (/\bPRESIDENT\b/.test(upper)) return "President"
+  if (/\bCHAIR(MAN|WOMAN|PERSON)?\b/.test(upper)) return "Chairman"
+  if (/\bGENERAL COUNSEL\b/.test(upper)) return "General Counsel"
+  if (/\bDIRECTOR\b/.test(upper)) return "Director"
+  if (title) return title // any other specific title supplied
+
+  // Fall back to Finnhub boolean role flags when no title string is present
+  if (t.isOfficer) return "Officer"
+  if (t.isDirector) return "Director"
+  if (t.isTenPercentOwner) return "10% Owner"
+  return "Insider"
+}
+
+// ---------------------------------------------------------------------------
+// Smart, plain-English note describing what the transaction implies.
+// Replaces boilerplate "Open market purchase" with a research-useful summary.
+// ---------------------------------------------------------------------------
+function buildCorporateNote(type: string, role: string, value: number): string {
+  const big = value >= 1_000_000
+  const isCSuite = ["CEO", "CFO", "COO", "CMO", "CTO", "President", "Chairman"].includes(role)
+  if (type === "Buy") {
+    if (isCSuite && big) return `${role} open-market buy — strong insider conviction`
+    if (isCSuite) return `${role} open-market buy — bullish signal`
+    return "Open-market purchase — insider adding shares"
+  }
+  if (type === "Sell") {
+    if (isCSuite && big) return `${role} sale — notable; may be planned (10b5-1)`
+    if (isCSuite) return `${role} sale — often routine/scheduled`
+    return "Open-market sale — insider reducing position"
+  }
+  return "SEC Form 4 filing"
+}
+
+// ---------------------------------------------------------------------------
 // SOURCE 1: Finnhub — market-wide SEC Form 4 feed
 // When a specific ticker is requested we also run a dedicated per-ticker call
 // to get deeper history beyond the 2000-row market-wide cap.
@@ -324,32 +392,46 @@ export async function GET(request: Request) {
         // Enforce date window (market-wide cap can include older entries when ticker-filtered)
         if (isoDate && new Date(isoDate).getTime() < cutoffMs) continue
 
+        // Skip foreign filings: ISIN-style symbols and foreign-exchange suffixes
+        // pollute the feed with rows that have no usable shares/price/title.
+        const symbol = (t.ticker || t.symbol || "").toUpperCase()
+        if (!isValidUsTicker(symbol)) continue
+
+        // Determine Buy/Sell from the SEC transaction code first, then the
+        // signed share change. We need a concrete direction (no "Disclosure"
+        // limbo) so the Type column is always populated for real US trades.
         const transactionCode = (t.transactionCode || "").toUpperCase()
+        const shareChange = Number(t.change ?? t.share ?? 0)
         let transactionType: string
         if (transactionCode === "P") transactionType = "Buy"
         else if (transactionCode === "S") transactionType = "Sell"
-        else if (t.change > 0) transactionType = "Buy"
-        else if (t.change < 0) transactionType = "Sell"
+        else if (shareChange > 0) transactionType = "Buy"
+        else if (shareChange < 0) transactionType = "Sell"
         else transactionType = "Disclosure"
 
-        const shareCount = Math.abs(t.share || 0)
-        const unitPrice = t.transactionPrice || 0
-        const computedValue = shareCount > 0 && unitPrice > 0
-          ? shareCount * unitPrice
-          : Math.abs(t.change || 0) * (unitPrice || 50)
+        // Share quantity: prefer the signed change, fall back to the share field
+        const shareCount = Math.abs(Number(t.share ?? t.change ?? 0))
+        const unitPrice = Number(t.transactionPrice || 0)
+        // Total trade value = shares × price-per-share
+        const computedValue = shareCount > 0 && unitPrice > 0 ? shareCount * unitPrice : 0
+
+        // Skip junk rows with no shares AND no value — they render as all-N/A
+        if (shareCount === 0 && computedValue === 0) continue
+
+        const role = normalizeRole(t)
 
         transactions.push({
           _date: isoDate || rawDate,
           date: formatDate(isoDate || rawDate),
           type: transactionType,
           owner: t.name || "Unknown",
-          role: t.position || "Officer",
+          role,
           category: "corporate",
-          ticker: t.ticker || t.symbol || "",
-          shares: formatShares(shareCount, t.change || 0),
+          ticker: symbol,
+          shares: formatShares(shareCount, shareChange >= 0 ? 1 : -1),
           price: unitPrice > 0 ? `$${unitPrice.toFixed(2)}` : "N/A",
           value: computedValue > 0 ? formatValue(computedValue) : "N/A",
-          notes: transactionType === "Buy" ? "Open market purchase" : transactionType === "Sell" ? "Open market sale" : "SEC Form 4 filing",
+          notes: buildCorporateNote(transactionType, role, computedValue),
           dataSource: "SEC Form 4 via Finnhub",
         })
         corporateCount++

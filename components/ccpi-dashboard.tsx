@@ -60,7 +60,24 @@ interface CCPIGradientBarProps {
 }
 
 const CCPIGradientBar = React.memo(({ value, min = 0, max = 100, reverse = false }: CCPIGradientBarProps) => {
+  // Guard against missing / invalid data. Without this, a NaN value produces a
+  // "NaN%" margin, the gray overlay fails to render, and the bar looks broken
+  // (full green→red with no fill). Render a neutral muted bar instead.
+  const hasValidValue = Number.isFinite(value) && Number.isFinite(min) && Number.isFinite(max) && max !== min
+
+  if (!hasValidValue) {
+    return (
+      <div className="relative w-full h-3 rounded-full overflow-hidden bg-gray-200">
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-[10px] font-medium text-gray-400">No data</span>
+        </div>
+      </div>
+    )
+  }
+
   const percentage = Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100))
+  // Convention: good values sit on the LEFT (green), bad on the RIGHT (red).
+  // "Higher is better" indicators pass reverse so a high value fills from green.
   const marginLeft = reverse ? `${100 - percentage}%` : `${percentage}%`
 
   return (
@@ -1275,15 +1292,23 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                         </span>
                       </div>
                     </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                      <div
-                        className="absolute inset-0 bg-gray-200"
-                        style={{
-                          marginLeft: `${data.indicators?.qqqBollingerProximity || 0}%`,
-                        }}
-                      />
-                    </div>
+                    {Number.isFinite(data.indicators?.qqqBollingerProximity) ? (
+                      <div className="relative w-full h-3 rounded-full overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                        <div
+                          className="absolute inset-0 bg-gray-200"
+                          style={{
+                            marginLeft: `${Math.min(100, Math.max(0, data.indicators.qqqBollingerProximity as number))}%`,
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="relative w-full h-3 rounded-full overflow-hidden bg-gray-200">
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="text-[10px] font-medium text-gray-400">No data</span>
+                        </div>
+                      </div>
+                    )}
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Safe: 0% (at middle band)</span>
                       <span>Warning: 50%</span>
@@ -1744,18 +1769,21 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                       <span className="font-bold">{data.indicators.putCallRatio.toFixed(2)}</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.putCallRatio - 0.5) / 1.0) * 100))}%`,
+                          // Convention: good (low crash risk) on the LEFT/green, bad on the RIGHT/red.
+                          // A HIGH put/call ratio = fear/hedging = lower crash risk (left/green).
+                          // A LOW put/call ratio = complacency = high crash risk (right/red).
+                          marginLeft: `${Math.min(100, Math.max(0, 100 - ((data.indicators.putCallRatio - 0.5) / 1.0) * 100))}%`,
                         }}
                       />
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
-                      <span>Complacent: {"<"}0.7</span>
-                      <span>Normal: 0.8-1.0</span>
                       <span>Fearful: {">"}1.0</span>
+                      <span>Normal: 0.8-1.0</span>
+                      <span>Complacent: {"<"}0.7</span>
                     </div>
                   </div>
                 )}
@@ -1852,18 +1880,21 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                       <span className="font-bold">{data.indicators.aaiiBearish.toFixed(1)}%</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, Math.max(0, (data.indicators.aaiiBearish / 60) * 100))}%`,
+                          // Convention: good (low crash risk) on the LEFT/green, bad on the RIGHT/red.
+                          // HIGH bearishness = extreme fear = contrarian buy / lower crash risk (left/green).
+                          // LOW bearishness = complacency = higher crash risk (right/red).
+                          marginLeft: `${Math.min(100, Math.max(0, 100 - (data.indicators.aaiiBearish / 60) * 100))}%`,
                         }}
                       />
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
-                      <span>Complacent: {"<"}20%</span>
-                      <span>Normal: 25-35%</span>
                       <span>Fear: {">"}50%</span>
+                      <span>Normal: 25-35%</span>
+                      <span>Complacent: {"<"}20%</span>
                     </div>
                   </div>
                 )}

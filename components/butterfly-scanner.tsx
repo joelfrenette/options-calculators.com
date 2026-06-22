@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
+import { DollarAmountFilter } from "@/components/dollar-amount-filter"
 import { Filter, AlertTriangle, Info, Wifi, WifiOff, TrendingUp, Activity, Target, DollarSign } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
@@ -71,6 +72,7 @@ export function ButterflyScanner() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [isLiveData, setIsLiveData] = useState(false)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
+  const [maxStockPrice, setMaxStockPrice] = useState(200) // Step 1 dollar filter ($200 → $20,000)
 
   useEffect(() => {
     const cached = localStorage.getItem("butterfly-scanner-cache")
@@ -87,6 +89,7 @@ export function ButterflyScanner() {
   }, [])
 
   const filteredSetups = setups.filter((s) => {
+    if (maxStockPrice < 1000 && s.currentPrice > maxStockPrice) return false
     if (butterflyType !== "all" && s.structure !== butterflyType) return false
     if (optionType !== "all" && s.type !== optionType) return false
     if (s.ivRank < minIVRank) return false
@@ -341,6 +344,11 @@ export function ButterflyScanner() {
               {lastUpdated && <span className="text-gray-500">Updated: {lastUpdated}</span>}
             </div>
             <span className="text-gray-500">{filteredSetups.length} setups found</span>
+          </div>
+
+          {/* Dollar Amount Filtering (Step 1) */}
+          <div className="mb-4">
+            <DollarAmountFilter value={maxStockPrice} onChange={setMaxStockPrice} tooltipsEnabled={tooltipsEnabled} />
           </div>
 
           {/* Filters */}

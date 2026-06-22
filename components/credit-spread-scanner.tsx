@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { TrendingUp, TrendingDown, Info, Loader2, Target, DollarSign, AlertTriangle, Filter } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
+import { DollarAmountFilter } from "@/components/dollar-amount-filter"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
@@ -40,6 +41,7 @@ export function CreditSpreadScanner() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
+  const [maxStockPrice, setMaxStockPrice] = useState(200) // Step 1 dollar filter ($200 → $20,000)
 
   useEffect(() => {
     const cached = localStorage.getItem("credit-spread-scanner-cache")
@@ -56,6 +58,9 @@ export function CreditSpreadScanner() {
   }, [])
 
   const filteredSetups = setups.filter((s) => {
+    // Step 1 dollar filter: the short strike sits nearest the money, so it is a
+    // close proxy for the underlying share price. Exclude anything above the cap.
+    if (maxStockPrice < 1000 && s.shortStrike > maxStockPrice) return false
     if (spreadType !== "all" && s.type !== spreadType) return false
     if (s.probability < minProbability[0]) return false
     if (s.dte > maxDte[0]) return false
@@ -188,6 +193,11 @@ export function CreditSpreadScanner() {
           </div>
         </CardHeader>
         <CardContent>
+          {/* Dollar Amount Filtering (Step 1) */}
+          <div className="mb-6">
+            <DollarAmountFilter value={maxStockPrice} onChange={setMaxStockPrice} tooltipsEnabled={tooltipsEnabled} />
+          </div>
+
           <div className="flex flex-wrap gap-4 mb-6 p-4 bg-slate-50 rounded-lg">
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-slate-500" />

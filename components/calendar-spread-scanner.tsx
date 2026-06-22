@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
+import { DollarAmountFilter } from "@/components/dollar-amount-filter"
 import {
   Calendar,
   Clock,
@@ -58,6 +59,7 @@ export function CalendarSpreadScanner() {
   const [maxBeta, setMaxBeta] = useState(1.0)
   const [maxHV, setMaxHV] = useState(35)
   const [minStability, setMinStability] = useState(70)
+  const [maxStockPrice, setMaxStockPrice] = useState(200) // Step 1 dollar filter ($200 → $20,000)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [isLiveData, setIsLiveData] = useState(false)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
@@ -77,6 +79,7 @@ export function CalendarSpreadScanner() {
   }, [])
 
   const filteredSetups = spreads.filter((s) => {
+    if (maxStockPrice < 1000 && s.currentPrice > maxStockPrice) return false
     if (spreadType !== "all" && s.type !== spreadType) return false
     if (s.beta > maxBeta) return false
     if (s.historicalVolatility > maxHV) return false
@@ -234,6 +237,11 @@ export function CalendarSpreadScanner() {
                 price movement expected. Ideal when front-month IV is elevated relative to back-month.
               </div>
             </div>
+          </div>
+
+          {/* Dollar Amount Filtering (Step 1) */}
+          <div className="mb-6">
+            <DollarAmountFilter value={maxStockPrice} onChange={setMaxStockPrice} tooltipsEnabled={tooltipsEnabled} />
           </div>
 
           {/* Filters */}
