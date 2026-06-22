@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { DataLoadGate } from "@/components/data-load-gate"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
@@ -63,6 +64,7 @@ export function CpiInflationAnalysis() {
   const [cpiData, setCpiData] = useState<CPIData | null>(null)
   const [showCalculations, setShowCalculations] = useState(false)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
+  const [loaded, setLoaded] = useState(false)
 
   const fetchCPIData = async () => {
     setLoading(true)
@@ -82,8 +84,18 @@ export function CpiInflationAnalysis() {
   }
 
   useEffect(() => {
-    fetchCPIData()
-  }, [])
+    if (loaded) fetchCPIData()
+  }, [loaded])
+
+  if (!loaded) {
+    return (
+      <DataLoadGate
+        title="Load CPI Inflation Analysis?"
+        description="Fetch the latest Consumer Price Index inflation data. Nothing loads until you choose to."
+        onConfirm={() => setLoaded(true)}
+      />
+    )
+  }
 
   const getTrendIcon = (trend: string) => {
     if (trend === "up") return "↑"

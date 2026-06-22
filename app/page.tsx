@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { RiskCalculator } from "@/components/risk-calculator"
 import { MarketSentiment } from "@/components/market-sentiment"
 import { PanicEuphoria } from "@/components/panic-euphoria"
@@ -180,6 +180,18 @@ export default function Home() {
   const [activeCategory, setActiveCategory] = useState<Category>("analyze")
   const [activeTab, setActiveTab] = useState("earnings-calendar")
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  // Keep-alive: once a tab is visited it stays mounted (hidden when inactive)
+  // so its loaded data and state survive navigation for the whole session.
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(() => new Set(["earnings-calendar"]))
+
+  useEffect(() => {
+    setVisitedTabs((prev) => {
+      if (prev.has(activeTab)) return prev
+      const next = new Set(prev)
+      next.add(activeTab)
+      return next
+    })
+  }, [activeTab])
 
   const currentTabs = activeCategory === "analyze" ? ANALYZE_TABS : activeCategory === "scan" ? SCAN_TABS : EXECUTE_TABS
 
@@ -203,8 +215,8 @@ export default function Home() {
     return undefined
   }
 
-  const renderContent = () => {
-    switch (activeTab) {
+  const renderTab = (tabId: string) => {
+    switch (tabId) {
       case "earnings-calendar":
         return <EarningsEconomicCalendar />
       case "trend-analysis":
@@ -271,6 +283,18 @@ export default function Home() {
         return <EarningsEconomicCalendar />
     }
   }
+
+  // Keep every visited tab mounted; hide the inactive ones so their loaded
+  // data and in-progress state persist when the user navigates back to them.
+  const renderContent = () => (
+    <>
+      {Array.from(visitedTabs).map((tabId) => (
+        <div key={tabId} hidden={tabId !== activeTab}>
+          {renderTab(tabId)}
+        </div>
+      ))}
+    </>
+  )
 
   return (
     <TooltipProvider delayDuration={300}>

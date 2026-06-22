@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { DataLoadGate } from "@/components/data-load-gate"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
@@ -125,6 +126,7 @@ export function FomcPredictions() {
   const [chartData, setChartData] = useState<any[]>([])
   const [showTooltips, setShowTooltips] = useState(true) // State for tooltip toggle
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true) // New state for tooltip toggle
+  const [loaded, setLoaded] = useState(false)
 
   const InfoTooltip = ({ content }: { content: string }) => {
     if (!tooltipsEnabled) return null
@@ -266,8 +268,18 @@ export function FomcPredictions() {
   }
 
   useEffect(() => {
-    fetchFomcData()
-  }, [])
+    if (loaded) fetchFomcData()
+  }, [loaded])
+
+  if (!loaded) {
+    return (
+      <DataLoadGate
+        title="Load FOMC Predictions?"
+        description="Fetch the latest Federal Reserve rate predictions and meeting data. Nothing loads until you choose to."
+        onConfirm={() => setLoaded(true)}
+      />
+    )
+  }
 
   const generateOptionsStrategies = (meeting: NextMeeting, currentRate: number): OptionsStrategy[] => {
     const strategies: OptionsStrategy[] = []
