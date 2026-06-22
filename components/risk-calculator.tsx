@@ -251,11 +251,13 @@ export function RiskCalculator() {
   const [vixHistory, setVixHistory] = useState<Array<{ date: string; value: number }>>([])
   const [chartLoading, setChartLoading] = useState(true)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
+  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
+    if (!loaded) return
     fetchVixData()
     fetchVixHistory()
-  }, [])
+  }, [loaded])
 
   async function fetchVixData() {
     try {
@@ -311,6 +313,16 @@ export function RiskCalculator() {
         <TooltipTrigger asChild>{children}</TooltipTrigger>
         <TooltipContent className="max-w-xs">{content}</TooltipContent>
       </Tooltip>
+    )
+  }
+
+  if (!loaded) {
+    return (
+      <DataLoadGate
+        title="Load CBOE VIX Volatility Index?"
+        description="Fetch the current VIX reading, 6-month history, and portfolio allocation guidance. Nothing loads until you choose to."
+        onConfirm={() => setLoaded(true)}
+      />
     )
   }
 
