@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Missing ticker parameter" }, { status: 400 })
   }
 
-  const apiKey = process.env.TWELVEDATA_API_KEY
+  const apiKey = process.env.TWELVEDATA_API_KEY || process.env.TWELVE_DATA_API_KEY
   if (!apiKey) {
     return NextResponse.json({ error: "Twelve Data API key not configured" }, { status: 500 })
   }

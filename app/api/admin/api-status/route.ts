@@ -123,6 +123,46 @@ export async function GET() {
       purpose: "LLM sentiment analysis (final fallback)",
       usedIn: ["Social Sentiment Score"],
     },
+    {
+      name: "Finnhub API",
+      key: process.env.FINNHUB_API_KEY,
+      testUrl: "https://finnhub.io/api/v1/quote?symbol=AAPL&token=",
+      endpoint: "https://finnhub.io/api/v1",
+      purpose: "Earnings calendar, insider transactions, news sentiment",
+      usedIn: ["Earnings Calendar", "Insider Trading", "Strategy Scanner", "Social Sentiment"],
+    },
+    {
+      name: "SerpAPI",
+      key: process.env.SERPAPI_KEY,
+      testUrl: "https://serpapi.com/account?api_key=",
+      endpoint: "https://serpapi.com/search",
+      purpose: "Google Trends fear/greed search volume (distinct from Serper.dev)",
+      usedIn: ["Social Sentiment Score (Google Trends)"],
+    },
+    {
+      name: "Anthropic Claude",
+      key: process.env.ANTHROPIC_API_KEY,
+      testUrl: null,
+      endpoint: "https://api.anthropic.com/v1/messages",
+      purpose: "LLM sentiment analysis & market data validation (AI fallback chain)",
+      usedIn: ["Social Sentiment Score", "CCPI Executive Summary", "CCPI Chat"],
+    },
+    {
+      name: "OpenRouter",
+      key: process.env.OPENROUTER_API_KEY,
+      testUrl: null,
+      endpoint: "https://openrouter.ai/api/v1/chat/completions",
+      purpose: "Aggregator LLM fallback",
+      usedIn: ["CCPI Executive Summary", "CCPI Chat", "AI Provider Fallback"],
+    },
+    {
+      name: "Perplexity",
+      key: process.env.PERPLEXITY_API_KEY,
+      testUrl: null,
+      endpoint: "https://api.perplexity.ai/chat/completions",
+      purpose: "Search-augmented LLM fallback",
+      usedIn: ["AI Provider Fallback"],
+    },
   ]
 
   // Test each API

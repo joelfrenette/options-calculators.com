@@ -39,8 +39,38 @@ export async function GET() {
       hasKey: !!process.env.XAI_API_KEY || !!process.env.GROK_XAI_API_KEY,
       status: (process.env.XAI_API_KEY || process.env.GROK_XAI_API_KEY) ? "online" : "offline",
       endpoint: "api.x.ai",
-      usedFor: ["Final AI fallback", "Real-time data extraction"],
+      usedFor: ["Real-time data extraction", "Market data fetch"],
       averageLatency: "3.2s"
+    },
+    {
+      name: "Google Gemini",
+      priority: 5,
+      speed: "Fast",
+      hasKey: !!process.env.GOOGLE_AI_API_KEY || !!process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+      status: (process.env.GOOGLE_AI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY) ? "online" : "offline",
+      endpoint: "generativelanguage.googleapis.com",
+      usedFor: ["AI fallback chain", "CCPI summaries & chat"],
+      averageLatency: "1.5s"
+    },
+    {
+      name: "OpenRouter",
+      priority: 6,
+      speed: "Standard",
+      hasKey: !!process.env.OPENROUTER_API_KEY,
+      status: process.env.OPENROUTER_API_KEY ? "online" : "offline",
+      endpoint: "openrouter.ai",
+      usedFor: ["Aggregator fallback", "CCPI summaries & chat"],
+      averageLatency: "2.8s"
+    },
+    {
+      name: "Perplexity",
+      priority: 7,
+      speed: "Standard",
+      hasKey: !!process.env.PERPLEXITY_API_KEY,
+      status: process.env.PERPLEXITY_API_KEY ? "online" : "offline",
+      endpoint: "api.perplexity.ai",
+      usedFor: ["Search-augmented fallback"],
+      averageLatency: "3.0s"
     }
   ]
 

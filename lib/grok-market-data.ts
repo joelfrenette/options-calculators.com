@@ -4,10 +4,11 @@ import { createOpenAI } from "@ai-sdk/openai"
 // Use environment variables directly - priority: Groq > OpenAI > xAI
 function getAIProvider() {
   // For market data, prefer xAI/Grok as it's trained on real-time data
-  if (process.env.XAI_API_KEY) {
+  const xaiKey = process.env.XAI_API_KEY || process.env.GROK_XAI_API_KEY
+  if (xaiKey) {
     return {
       provider: createOpenAI({
-        apiKey: process.env.XAI_API_KEY,
+        apiKey: xaiKey,
         baseURL: "https://api.x.ai/v1",
       }),
       model: "grok-2-latest",

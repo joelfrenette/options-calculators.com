@@ -22,16 +22,19 @@ const providerConfigs = [
   },
   {
     name: "Google",
-    key: () => process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-    create: () => createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || "" }),
+    key: () => process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_AI_API_KEY,
+    create: () =>
+      createGoogleGenerativeAI({
+        apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_AI_API_KEY || "",
+      }),
     model: "gemini-2.0-flash-exp",
   },
   {
     name: "xAI",
-    key: () => process.env.XAI_API_KEY,
+    key: () => process.env.XAI_API_KEY || process.env.GROK_XAI_API_KEY,
     create: () =>
       createOpenAI({
-        apiKey: process.env.XAI_API_KEY || "",
+        apiKey: process.env.XAI_API_KEY || process.env.GROK_XAI_API_KEY || "",
         baseURL: "https://api.x.ai/v1",
       }),
     model: "grok-2-latest",
