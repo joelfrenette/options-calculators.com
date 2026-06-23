@@ -12,7 +12,12 @@ export const metadata: Metadata = {
     "Empower your options trading with cutting-edge calculators: Fear & Greed Index, Fed rate predictions, market trend analysis, and smart strategy suggestions. Optimize profits and trade smarter—start now at Options-Calculators.com!",
   generator: "v0.app",
   icons: {
-    icon: "/favicon.png",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/logo.png", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/logo.png",
   },
   openGraph: {
     title: "OPTIONS-CALCULATORS.COM",
