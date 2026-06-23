@@ -1,22 +1,34 @@
 import { NextResponse } from "next/server"
-import { getRedditSentiment, getGoogleTrendsSentiment, getTwitterSentiment } from "@/lib/sentiment-sources"
+import {
+  getRedditSentiment,
+  getGoogleTrendsSentiment,
+  getTwitterSentiment,
+  getGoogleNewsSentiment,
+  getCNNFearGreedSentiment,
+} from "@/lib/sentiment-sources"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 90
 
-const API_VERSION = "6.0.0"
+const API_VERSION = "7.0.0"
 
 /**
- * Social Sentiment API v6.0.0 — REAL DATA ONLY
+ * Social Sentiment API v7.0.0 — REAL DATA ONLY
  *
  * Every source pulls live data and returns score -1 ("No data") on failure.
  * No fabricated numbers, no hardcoded "neutral" fallbacks, no LLM guesses.
  *
  * Higher score = MORE BULLISH (green/left). Lower score = MORE BEARISH (red/right).
  *
- * SOCIAL sources:  Reddit (r/wallstreetbets), Twitter/X ($SPY via Apify),
- *                  StockTwits (bull/bear tags), Google Trends (SerpAPI).
- * MACRO sources:   Finnhub news, Polygon news, News Fear/Greed, AAII survey.
+ * SOCIAL sources:  Reddit (multi-sub), Twitter/X ($SPY via Apify),
+ *                  StockTwits (bull/bear tags), Google Trends (SerpAPI),
+ *                  Google News pulse (Serper).
+ * MACRO sources:   CNN Fear & Greed, AAII survey, Finnhub news, Polygon news,
+ *                  News Fear/Greed.
+ *
+ * Combination:     Reliability-weighted average across only the LIVE sources.
+ *                  Hard data feeds (CNN F&G, AAII, news APIs) carry more weight
+ *                  than social scrapes. Any "No data" source is excluded.
  */
 
 const POSITIVE_WORDS = ["surge", "rally", "gain", "rise", "bull", "record", "growth", "profit", "beat", "strong", "upgrade", "buy", "optimism", "boost"]
@@ -273,6 +285,8 @@ export async function GET() {
       reddit,
       twitter,
       trends,
+      googleNews,
+      cnnFearGreed,
       stocktwitsSPY,
       finnhub,
       polygon,
@@ -286,6 +300,8 @@ export async function GET() {
       getRedditSentiment(),
       getTwitterSentiment(),
       getGoogleTrendsSentiment(),
+      getGoogleNewsSentiment(),
+      getCNNFearGreedSentiment(),
       getStockTwitsSentiment("SPY"),
       getFinnhubSentiment(),
       getPolygonNewsSentiment(),
@@ -297,15 +313,20 @@ export async function GET() {
     ])
 
     // Build indicator list (name, score, weight, group). score -1 => not live.
+    // Reliability weighting: hard data feeds (CNN F&G, AAII, news APIs) > social scrapes.
     const indicators = [
-      { name: "Reddit (WSB)", score: reddit.score, source: reddit.source, weight: 0.18, group: "social", description: `r/wallstreetbets hot posts (${reddit.posts} analyzed)` },
-      { name: "Twitter / X", score: twitter.score, source: twitter.source, weight: 0.15, group: "social", description: `Live $SPY tweet sentiment (${twitter.tweets} tweets)` },
-      { name: "StockTwits", score: stocktwitsSPY.score, source: stocktwitsSPY.source, weight: 0.15, group: "social", description: `SPY bullish/bearish tags (${stocktwitsSPY.bullish}B/${stocktwitsSPY.bearish}Be)` },
-      { name: "Google Trends", score: trends.score, source: trends.source, weight: 0.12, group: "social", description: `Real search interest, rally vs crash (${trends.detail})` },
-      { name: "Finnhub News", score: finnhub.score, source: finnhub.source, weight: 0.12, group: "macro", description: `Financial news headline sentiment (${finnhub.articles} articles)` },
+      // --- Hard data / aggregated indices (highest reliability) ---
+      { name: "CNN Fear & Greed", score: cnnFearGreed.score, source: cnnFearGreed.source, weight: 0.16, group: "macro", description: cnnFearGreed.score >= 0 ? `CNN multi-factor index${cnnFearGreed.detail ? ` (${cnnFearGreed.detail})` : ""}` : "CNN multi-factor index (no live reading)" },
+      { name: "AAII Survey", score: aaii.score, source: aaii.source, weight: 0.12, group: "macro", description: aaii.score >= 0 ? `Weekly investor survey (${aaii.bullish}% bullish)` : "Weekly individual-investor survey (no live reading)" },
+      { name: "Finnhub News", score: finnhub.score, source: finnhub.source, weight: 0.11, group: "macro", description: `Financial news headline sentiment (${finnhub.articles} articles)` },
       { name: "Polygon News", score: polygon.score, source: polygon.source, weight: 0.1, group: "macro", description: `Polygon.io news sentiment (${polygon.articles} articles)` },
-      { name: "News Fear & Greed", score: newsFearGreed.score, source: newsFearGreed.source, weight: 0.1, group: "macro", description: "Greed vs fear language across general market news" },
-      { name: "AAII Survey", score: aaii.score, source: aaii.source, weight: 0.08, group: "macro", description: aaii.score >= 0 ? `Weekly investor survey (${aaii.bullish}% bullish)` : "Weekly individual-investor survey (no live reading)" },
+      { name: "News Fear & Greed", score: newsFearGreed.score, source: newsFearGreed.source, weight: 0.08, group: "macro", description: "Greed vs fear language across general market news" },
+      // --- Social / retail scrapes (lower reliability) ---
+      { name: "StockTwits", score: stocktwitsSPY.score, source: stocktwitsSPY.source, weight: 0.11, group: "social", description: `SPY bullish/bearish tags (${stocktwitsSPY.bullish}B/${stocktwitsSPY.bearish}Be)` },
+      { name: "Reddit (multi-sub)", score: reddit.score, source: reddit.source, weight: 0.1, group: "social", description: `WSB, stocks, investing, options hot posts (${reddit.posts} analyzed)` },
+      { name: "Google News", score: googleNews.score, source: googleNews.source, weight: 0.08, group: "social", description: `Market headline pulse (${googleNews.detail})` },
+      { name: "Twitter / X", score: twitter.score, source: twitter.source, weight: 0.08, group: "social", description: `Live $SPY tweet sentiment (${twitter.tweets} tweets)` },
+      { name: "Google Trends", score: trends.score, source: trends.source, weight: 0.06, group: "social", description: `Real search interest, rally vs crash (${trends.detail})` },
     ].map((i) => ({ ...i, status: i.score >= 0 ? "LIVE" : "UNAVAILABLE" }))
 
     const valid = indicators.filter((i) => i.score >= 0)

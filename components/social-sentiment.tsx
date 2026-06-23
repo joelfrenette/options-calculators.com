@@ -572,11 +572,24 @@ export function SocialSentiment() {
                     <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent className="max-w-sm bg-white border shadow-lg">
-                    <p className="text-sm">All sentiment data sources sorted alphabetically with real-time status.</p>
+                    <p className="text-sm">
+                      Every source pulls live data and is reliability-weighted into the headline score. Sources with no
+                      live reading show &quot;No data&quot; and are excluded from the average. Sorted alphabetically.
+                    </p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             </CardTitle>
+            <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                Left = Bullish (good)
+              </span>
+              <span className="flex items-center gap-1.5">
+                Right = Bearish (bad)
+                <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
+              </span>
+            </div>
           </CardHeader>
           <CardContent className="pt-4">
             {uniqueIndicators.map((indicator, idx) => (
