@@ -298,7 +298,8 @@ export function SocialSentiment() {
     )
   }
 
-  const allIndicators = data?.indicators || []
+  const HIDDEN_INDICATORS = ["Reddit (multi-sub)", "Twitter / X"]
+  const allIndicators = (data?.indicators || []).filter((ind) => !HIDDEN_INDICATORS.includes(ind.name))
   const uniqueIndicators: SentimentIndicator[] = Array.from(
     new Map(
       allIndicators.map((ind) => [
