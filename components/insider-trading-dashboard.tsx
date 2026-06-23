@@ -553,7 +553,18 @@ const InsiderTradingDashboard = () => {
               <LoadingSpinner message="Loading insider transactions..." />
             ) : filteredTrades.length > 0 ? (
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full table-fixed min-w-[900px]">
+                  {/* Fixed column widths so geometry never shifts when filters change the row set */}
+                  <colgroup>
+                    <col className="w-[8%]" />
+                    <col className="w-[9%]" />
+                    <col className="w-[21%]" />
+                    <col className="w-[9%]" />
+                    <col className="w-[13%]" />
+                    <col className="w-[9%]" />
+                    <col className="w-[10%]" />
+                    <col className="w-[21%]" />
+                  </colgroup>
                   <thead>
                     <tr className="border-b border-gray-200">
                       <th
@@ -612,7 +623,7 @@ const InsiderTradingDashboard = () => {
                             <span>{formatDateDisplay(trade.date)}</span>
                           </div>
                         </td>
-                        <td className="py-3 px-2">
+                        <td className="py-3 px-2 whitespace-nowrap">
                           {getTypeBadge(trade.type)}
                         </td>
                         <td className="py-3 px-2">
