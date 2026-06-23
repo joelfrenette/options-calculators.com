@@ -52,12 +52,11 @@ interface SentimentData {
   per_symbol?: Array<{
     symbol: string
     name: string
-    sentiment: number
+    sentiment: number | null
     direction?: string
-    stocktwits_sentiment?: number | null
-    reddit_sentiment?: number | null
-    twitter_sentiment?: number | null
-    google_trends?: number | null
+    bullish?: number
+    bearish?: number
+    source?: string
   }>
 }
 
@@ -125,9 +124,17 @@ function SentimentPill({ value, label }: { value: number; label: string }) {
 }
 
 // Sentiment indicator row component
+// Orientation: LEFT = green/bullish (high score), RIGHT = red/bearish (low score).
 function SentimentIndicatorRow({ indicator }: { indicator: SentimentIndicator }) {
-  const score = indicator.score ?? 0
+  const score = Math.min(100, Math.max(0, indicator.score ?? 0))
   const isLive = indicator.isLive
+  const scoreColor = !isLive
+    ? "text-gray-400"
+    : score >= 60
+      ? "text-green-600"
+      : score >= 40
+        ? "text-gray-600"
+        : "text-red-600"
 
   return (
     <div className="py-3 border-b border-gray-100 last:border-0">
@@ -135,19 +142,24 @@ function SentimentIndicatorRow({ indicator }: { indicator: SentimentIndicator })
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-gray-700">{indicator.name}</span>
           <Badge variant={isLive ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
-            {isLive ? "LIVE" : "N/A"}
+            {isLive ? "LIVE" : "No data"}
           </Badge>
+          {isLive && (
+            <span className={`text-[10px] font-semibold ${scoreColor}`}>{getSentimentLabel(score)}</span>
+          )}
         </div>
-        <span className={`text-sm font-bold ${isLive ? "text-gray-900" : "text-gray-400"}`}>
-          {isLive ? Math.round(score) : "No data"}
-        </span>
+        <span className={`text-sm font-bold ${scoreColor}`}>{isLive ? Math.round(score) : "No data"}</span>
       </div>
       <div className="relative h-2.5 bg-gray-100 rounded-full overflow-hidden">
         {isLive ? (
           <>
-            <div className="absolute inset-y-0 left-0 bg-green-500" />
-            <div className="absolute inset-y-0 right-0 bg-red-500" />
-            <div className="absolute inset-y-0 bg-yellow-400" style={{ width: `${score}%` }} />
+            {/* Green (bullish) on the LEFT, red (bearish) on the RIGHT */}
+            <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-400 to-red-500" />
+            {/* Marker: high score sits on the left (green), low score on the right (red) */}
+            <div
+              className="absolute top-0 bottom-0 w-1 bg-gray-900 rounded"
+              style={{ left: `${100 - score}%`, transform: "translateX(-50%)" }}
+            />
           </>
         ) : (
           <div className="absolute inset-0 bg-gray-200 opacity-80" />
@@ -193,14 +205,14 @@ export function SocialSentiment() {
 
     const sources = [
       "Initializing...",
-      "Fetching Grok AI sentiment...",
+      "Fetching Reddit (r/wallstreetbets)...",
+      "Fetching Twitter / X tweets...",
+      "Fetching StockTwits tags...",
       "Fetching Google Trends...",
-      "Fetching AAII Survey...",
-      "Fetching CNN Fear & Greed...",
-      "Fetching StockTwits...",
-      "Fetching Finnhub News...",
-      "Fetching Reddit sentiment...",
-      "Fetching Yahoo Finance...",
+      "Fetching Finnhub news...",
+      "Fetching Polygon news...",
+      "Calculating News Fear & Greed...",
+      "Fetching AAII survey...",
       "Generating AI summary...",
       "Finalizing data...",
     ]
@@ -404,13 +416,10 @@ export function SocialSentiment() {
                       </span>
                     </div>
                     <div className="relative h-3 rounded-full overflow-hidden mb-1">
+                      {/* Green/bullish LEFT, red/bearish RIGHT */}
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-400 to-red-500" />
                       <div
-                        className="absolute top-0 bottom-0 right-0 bg-gray-200"
-                        style={{ width: `${safeNumber(data?.macro_sentiment, 47)}%` }}
-                      />
-                      <div
-                        className="absolute top-0 bottom-0 w-1 bg-gray-800 rounded"
+                        className="absolute top-0 bottom-0 w-1 bg-gray-900 rounded"
                         style={{
                           left: `${100 - safeNumber(data?.macro_sentiment, 47)}%`,
                           transform: "translateX(-50%)",
@@ -431,13 +440,10 @@ export function SocialSentiment() {
                       </span>
                     </div>
                     <div className="relative h-3 rounded-full overflow-hidden mb-1">
+                      {/* Green/bullish LEFT, red/bearish RIGHT */}
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-400 to-red-500" />
                       <div
-                        className="absolute top-0 bottom-0 right-0 bg-gray-200"
-                        style={{ width: `${safeNumber(data?.social_sentiment, 54)}%` }}
-                      />
-                      <div
-                        className="absolute top-0 bottom-0 w-1 bg-gray-800 rounded"
+                        className="absolute top-0 bottom-0 w-1 bg-gray-900 rounded"
                         style={{
                           left: `${100 - safeNumber(data?.social_sentiment, 54)}%`,
                           transform: "translateX(-50%)",
@@ -458,7 +464,7 @@ export function SocialSentiment() {
           <CardHeader className="bg-gray-50 border-b border-gray-200">
             <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-teal-600" />
-              Macro Sentiment Indicators
+              Index Sentiment by Symbol
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger>
@@ -467,14 +473,15 @@ export function SocialSentiment() {
                   <TooltipContent className="max-w-sm bg-white border shadow-lg">
                     <p className="font-semibold text-sm">Index Sentiment Heatmap</p>
                     <p className="text-xs text-gray-600">
-                      Blended sentiment for major indices from social media, AI analysis, and news sources.
+                      Live per-symbol sentiment from StockTwits bullish/bearish message tags. Shows "No live data"
+                      when there isn&apos;t enough recent activity to score.
                     </p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             </CardTitle>
             <p className="text-sm text-gray-600 mt-1">
-              AI-powered sentiment from social media discussions and news analysis
+              Live, symbol-specific sentiment from StockTwits bullish/bearish tags. Higher (left/green) is more bullish.
             </p>
           </CardHeader>
           <CardContent className="pt-4">
@@ -485,8 +492,11 @@ export function SocialSentiment() {
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 {indexData.map((item) => {
-                  const score = safeNumber(item.sentiment, 50)
-                  const direction = item.direction || (score >= 55 ? "Bullish" : score >= 45 ? "Neutral" : "Bearish")
+                  const hasData = item.sentiment !== null && item.sentiment !== undefined
+                  const score = Math.min(100, Math.max(0, item.sentiment ?? 0))
+                  const direction = !hasData
+                    ? "No data"
+                    : item.direction || (score >= 55 ? "Bullish" : score >= 45 ? "Neutral" : "Bearish")
                   const DirectionIcon =
                     direction === "Bullish" ? ArrowUpRight : direction === "Bearish" ? ArrowDownRight : Minus
                   const directionColor =
@@ -512,38 +522,37 @@ export function SocialSentiment() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className="text-3xl font-bold text-gray-900">{Math.round(score)}</span>
-                        <span className="text-sm text-gray-500">/100</span>
-                      </div>
+                      {hasData ? (
+                        <>
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="text-3xl font-bold text-gray-900">{Math.round(score)}</span>
+                            <span className="text-sm text-gray-500">/100</span>
+                          </div>
 
-                      <div className="relative h-3 bg-gray-100 rounded-full overflow-hidden mb-3">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-400 to-red-500" />
-                        <div className="absolute top-0 bottom-0 right-0 bg-gray-200" style={{ width: `${score}%` }} />
-                        <div
-                          className="absolute top-0 bottom-0 w-1 bg-gray-800 rounded"
-                          style={{ left: `${100 - score}%`, transform: "translateX(-50%)" }}
-                        />
-                      </div>
+                          <div className="relative h-3 bg-gray-100 rounded-full overflow-hidden mb-3">
+                            {/* Green/bullish LEFT, red/bearish RIGHT */}
+                            <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-400 to-red-500" />
+                            <div
+                              className="absolute top-0 bottom-0 w-1 bg-gray-900 rounded"
+                              style={{ left: `${100 - score}%`, transform: "translateX(-50%)" }}
+                            />
+                          </div>
 
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">StockTwits:</span>
-                          <span className="font-medium">{Math.round(safeNumber(item.stocktwits_sentiment, 50))}</span>
+                          <div className="flex items-center justify-between text-xs text-gray-500">
+                            <span>
+                              {safeNumber(item.bullish, 0)} bullish / {safeNumber(item.bearish, 0)} bearish tags
+                            </span>
+                            <span className="text-teal-600 font-medium">{item.source}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-4 text-center">
+                          <span className="text-sm font-medium text-gray-400">No live data</span>
+                          <span className="text-xs text-gray-400 mt-1">
+                            Not enough StockTwits activity to score right now
+                          </span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Reddit:</span>
-                          <span className="font-medium">{Math.round(safeNumber(item.reddit_sentiment, 50))}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Twitter:</span>
-                          <span className="font-medium">{Math.round(safeNumber(item.twitter_sentiment, 50))}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Trends:</span>
-                          <span className="font-medium">{Math.round(safeNumber(item.google_trends, 50))}</span>
-                        </div>
-                      </div>
+                      )}
                     </div>
                   )
                 })}
@@ -563,11 +572,24 @@ export function SocialSentiment() {
                     <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent className="max-w-sm bg-white border shadow-lg">
-                    <p className="text-sm">All sentiment data sources sorted alphabetically with real-time status.</p>
+                    <p className="text-sm">
+                      Every source pulls live data and is reliability-weighted into the headline score. Sources with no
+                      live reading show &quot;No data&quot; and are excluded from the average. Sorted alphabetically.
+                    </p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             </CardTitle>
+            <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                Left = Bullish (good)
+              </span>
+              <span className="flex items-center gap-1.5">
+                Right = Bearish (bad)
+                <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
+              </span>
+            </div>
           </CardHeader>
           <CardContent className="pt-4">
             {uniqueIndicators.map((indicator, idx) => (
