@@ -298,7 +298,7 @@ const InsiderTradingDashboard = () => {
     }
   }
 
-  const getTypeBadge = (type: string) => {
+  const getTypeBadge = (type: string, shares?: string) => {
     const normalizedType = (type || "").toLowerCase()
     if (normalizedType === "buy" || normalizedType.includes("buy") || normalizedType === "p") {
       return <Badge className="bg-green-500 hover:bg-green-600 text-white text-xs px-2 py-0.5">Buy</Badge>
@@ -309,7 +309,15 @@ const InsiderTradingDashboard = () => {
     if (normalizedType === "disclosure" || normalizedType.includes("disclos")) {
       return <Badge className="bg-orange-500 hover:bg-orange-600 text-white text-xs px-2 py-0.5">Disclosure</Badge>
     }
-    // Fallback - show whatever type we have or "N/A"
+    // Fallback - infer Buy/Sell from the share amount sign (e.g. "+330,006" vs "-176,935")
+    const sharesStr = (shares || "").trim()
+    if (sharesStr.startsWith("-")) {
+      return <Badge className="bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-0.5">Sell</Badge>
+    }
+    if (sharesStr.startsWith("+") || /\d/.test(sharesStr)) {
+      return <Badge className="bg-green-500 hover:bg-green-600 text-white text-xs px-2 py-0.5">Buy</Badge>
+    }
+    // Last resort - show whatever type we have or "N/A"
     return (
       <Badge variant="secondary" className="text-xs px-2 py-0.5">
         {type || "N/A"}
@@ -624,7 +632,7 @@ const InsiderTradingDashboard = () => {
                           </div>
                         </td>
                         <td className="py-3 px-2 whitespace-nowrap">
-                          {getTypeBadge(trade.type)}
+                          {getTypeBadge(trade.type, trade.shares)}
                         </td>
                         <td className="py-3 px-2">
                           <div className="flex items-center gap-2">
