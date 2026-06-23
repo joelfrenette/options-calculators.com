@@ -88,15 +88,24 @@ export function ButterflyScanner() {
     }
   }, [])
 
-  const filteredSetups = setups.filter((s) => {
-    // Capital at risk for a butterfly is the max loss (debit for standard; broken side for BWB)
-    if (maxDebit < 5000 && s.maxLoss * 100 > maxDebit) return false
-    if (butterflyType !== "all" && s.structure !== butterflyType) return false
-    if (optionType !== "all" && s.type !== optionType) return false
-    if (s.ivRank < minIVRank) return false
-    if (s.dte > maxDTE) return false
-    return true
-  })
+  // Risk-adjusted rank: reward (max profit vs capital at risk) weighted by the
+  // probability of landing in the profit zone. Higher = better.
+  const rankScore = (s: ButterflySetup) => {
+    const rewardToRisk = s.maxLoss > 0 ? s.maxProfit / s.maxLoss : 0
+    return rewardToRisk * (s.probabilityOfProfit / 100)
+  }
+
+  const filteredSetups = setups
+    .filter((s) => {
+      // Capital at risk for a butterfly is the max loss (debit for standard; broken side for BWB)
+      if (maxDebit < 5000 && s.maxLoss * 100 > maxDebit) return false
+      if (butterflyType !== "all" && s.structure !== butterflyType) return false
+      if (optionType !== "all" && s.type !== optionType) return false
+      if (s.ivRank < minIVRank) return false
+      if (s.dte > maxDTE) return false
+      return true
+    })
+    .sort((a, b) => rankScore(b) - rankScore(a))
 
   const standardSetups = filteredSetups.filter((s) => s.structure === "standard")
   const brokenWingSetups = filteredSetups.filter((s) => s.structure === "broken-wing")

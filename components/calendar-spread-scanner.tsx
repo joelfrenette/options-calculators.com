@@ -80,14 +80,26 @@ export function CalendarSpreadScanner() {
     }
   }, [])
 
-  const filteredSetups = spreads.filter((s) => {
-    if (maxDebit < 5000 && s.debit * 100 > maxDebit) return false
-    if (spreadType !== "all" && s.type !== spreadType) return false
-    if (s.beta > maxBeta) return false
-    if (s.historicalVolatility > maxHV) return false
-    if (s.priceStability < minStability) return false
-    return true
-  })
+  // Risk-adjusted rank: reward profitability (return on capital) and penalize risk
+  // (low price stability). Prefer the API quality score when it is available.
+  const rankScore = (s: CalendarSpreadSetup) => {
+    const roc = s.returnOnCapital ?? (s.debit > 0 ? (s.maxProfit / s.debit) * 100 : 0)
+    const stability = s.priceStability ?? 0
+    if (s.qualityScore != null) return s.qualityScore
+    // Blend: profitability scaled by how "calm"/low-risk the underlying is.
+    return roc * (stability / 100)
+  }
+
+  const filteredSetups = spreads
+    .filter((s) => {
+      if (maxDebit < 5000 && s.debit * 100 > maxDebit) return false
+      if (spreadType !== "all" && s.type !== spreadType) return false
+      if (s.beta > maxBeta) return false
+      if (s.historicalVolatility > maxHV) return false
+      if (s.priceStability < minStability) return false
+      return true
+    })
+    .sort((a, b) => rankScore(b) - rankScore(a))
 
   const handleRefresh = async () => {
     setIsLoading(true)
