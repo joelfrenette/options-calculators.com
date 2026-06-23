@@ -1871,6 +1871,20 @@ export function WheelScanner() {
           </div>
         </CardHeader>
         <CardContent className="pt-4 space-y-6">
+          {/* Educational Info Banner */}
+          <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <Info className="w-4 h-4 text-indigo-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-indigo-800">
+                <strong>Cash-Secured Puts (CSP)</strong> generate income by selling a put while setting aside enough cash
+                to buy 100 shares at the strike. You keep the premium if the stock stays above your strike, or you get
+                assigned the shares at a <strong>discount to today&apos;s price</strong> if it drops. Best on{" "}
+                <strong>quality stocks you would happily own</strong> at the strike. Look for elevated implied
+                volatility (richer premium), strikes below support, and strong annualized return on the cash you tie up.
+              </div>
+            </div>
+          </div>
+
           {/* STEP 1: DOLLAR AMOUNT FILTERING */}
           {step === 1 && (
             <div className="bg-emerald-50 border-2 border-emerald-300 rounded-lg p-4">
