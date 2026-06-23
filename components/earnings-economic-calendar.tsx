@@ -333,9 +333,6 @@ export function EarningsEconomicCalendar() {
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                           Ticker
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden sm:table-cell">
-                          Company
-                        </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                           <span className="flex items-center gap-1">
                             <Sparkles className="h-3 w-3 text-teal-600" />
@@ -359,8 +356,14 @@ export function EarningsEconomicCalendar() {
                             <div className="text-sm font-medium text-gray-900">{item.date}</div>
                             <div className="text-xs text-gray-500 flex items-center gap-2">
                               <Clock className="h-3 w-3" />
-                              {item.time}
-                              <TimingBadge timing={item.timing} />
+                              {item.timing !== "TBD" ? (
+                                <>
+                                  <span>{item.time}</span>
+                                  <TimingBadge timing={item.timing} />
+                                </>
+                              ) : (
+                                <span>Time TBD</span>
+                              )}
                             </div>
                           </td>
                           <td className="px-4 py-3">
@@ -373,7 +376,6 @@ export function EarningsEconomicCalendar() {
                               {item.ticker}
                             </a>
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-600 hidden sm:table-cell">{item.company}</td>
                           <td className="px-4 py-3 text-sm text-gray-700 max-w-xs">{item.aiExplainer}</td>
                           <td className="px-4 py-3 text-sm text-gray-900 font-medium text-right">{item.estimate}</td>
                           <td className="px-4 py-3 text-center">
