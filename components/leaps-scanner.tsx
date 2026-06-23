@@ -94,15 +94,22 @@ export function LEAPSScanner() {
     }
   }, [])
 
-  const filteredSetups = setups.filter((s) => {
-    // Capital at risk for a long LEAP is the premium paid (× 100 per contract)
-    if (maxDebit < 5000 && s.premium * 100 > maxDebit) return false
-    if (optionType !== "all" && s.type !== optionType) return false
-    if (s.dte < minDTE) return false
-    if (s.debtToEquity > maxDebtEquity) return false
-    if (Math.abs(s.delta) < minDelta) return false
-    return true
-  })
+  // Risk-adjusted rank: reward is capital efficiency (leverage × stock-likeness
+  // delta), divided by the annualized "rent" cost of the time value. Higher =
+  // more stock-like leverage per unit of carrying cost.
+  const rankScore = (s: LEAPSSetup) => (s.leverageRatio * Math.abs(s.delta)) / Math.max(s.annualizedCost, 0.1)
+
+  const filteredSetups = setups
+    .filter((s) => {
+      // Capital at risk for a long LEAP is the premium paid (× 100 per contract)
+      if (maxDebit < 5000 && s.premium * 100 > maxDebit) return false
+      if (optionType !== "all" && s.type !== optionType) return false
+      if (s.dte < minDTE) return false
+      if (s.debtToEquity > maxDebtEquity) return false
+      if (Math.abs(s.delta) < minDelta) return false
+      return true
+    })
+    .sort((a, b) => rankScore(b) - rankScore(a))
 
   const handleRefresh = async () => {
     setIsLoading(true)

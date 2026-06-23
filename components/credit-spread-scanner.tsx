@@ -57,15 +57,24 @@ export function CreditSpreadScanner() {
     }
   }, [])
 
-  const filteredSetups = setups.filter((s) => {
-    // Step 1 dollar filter: buying power tied up = max loss × 100 = (width − credit) × 100.
-    // Exclude any setup whose margin requirement exceeds the cap.
-    if (maxMargin < 5000 && s.maxLoss * 100 > maxMargin) return false
-    if (spreadType !== "all" && s.type !== spreadType) return false
-    if (s.probability < minProbability[0]) return false
-    if (s.dte > maxDte[0]) return false
-    return true
-  })
+  // Risk-adjusted rank: return on capital (credit collected vs margin at risk)
+  // weighted by the probability of profit. Higher = better reward for the risk.
+  const rankScore = (s: SpreadSetup) => {
+    const returnOnRisk = s.maxLoss > 0 ? s.credit / s.maxLoss : 0
+    return returnOnRisk * (s.probability / 100)
+  }
+
+  const filteredSetups = setups
+    .filter((s) => {
+      // Step 1 dollar filter: buying power tied up = max loss × 100 = (width − credit) × 100.
+      // Exclude any setup whose margin requirement exceeds the cap.
+      if (maxMargin < 5000 && s.maxLoss * 100 > maxMargin) return false
+      if (spreadType !== "all" && s.type !== spreadType) return false
+      if (s.probability < minProbability[0]) return false
+      if (s.dte > maxDte[0]) return false
+      return true
+    })
+    .sort((a, b) => rankScore(b) - rankScore(a))
 
   const handleRefresh = async () => {
     setIsLoading(true)

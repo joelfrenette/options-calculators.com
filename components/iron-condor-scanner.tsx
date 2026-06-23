@@ -56,15 +56,24 @@ export function IronCondorScanner() {
     }
   }, [])
 
-  const filteredSetups = setups.filter((s) => {
-    // Step 1 dollar filter: an iron condor's margin is the max loss of its single
-    // tested side = (width − total credit) × 100. Exclude anything above the cap.
-    if (maxMargin < 5000 && s.maxLoss * 100 > maxMargin) return false
-    if (s.probability < minProbability[0]) return false
-    if (s.dte > maxDte[0]) return false
-    if (s.ivRank < minIvRank[0]) return false
-    return true
-  })
+  // Risk-adjusted rank: return on capital (total credit vs margin at risk)
+  // weighted by the probability of profit. Higher = better reward for the risk.
+  const rankScore = (s: CondorSetup) => {
+    const returnOnRisk = s.maxLoss > 0 ? s.totalCredit / s.maxLoss : 0
+    return returnOnRisk * (s.probability / 100)
+  }
+
+  const filteredSetups = setups
+    .filter((s) => {
+      // Step 1 dollar filter: an iron condor's margin is the max loss of its single
+      // tested side = (width − total credit) × 100. Exclude anything above the cap.
+      if (maxMargin < 5000 && s.maxLoss * 100 > maxMargin) return false
+      if (s.probability < minProbability[0]) return false
+      if (s.dte > maxDte[0]) return false
+      if (s.ivRank < minIvRank[0]) return false
+      return true
+    })
+    .sort((a, b) => rankScore(b) - rankScore(a))
 
   const handleRefresh = async () => {
     setIsLoading(true)

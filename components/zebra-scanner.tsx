@@ -88,14 +88,21 @@ export function ZEBRAScanner() {
     }
   }, [])
 
-  const filteredSetups = setups.filter((s) => {
-    if (maxDebit < 5000 && s.netDebit * 100 > maxDebit) return false
-    if (optionType !== "all" && s.type !== optionType) return false
-    if (trendFilter !== "all" && s.trend !== trendFilter) return false
-    if (s.dte < minDTE) return false
-    if (Math.abs(s.distanceToBreakeven) > maxBreakevenDistance) return false
-    return true
-  })
+  // Risk-adjusted rank: ZEBRA upside is open-ended, so reward is proxied by
+  // capital efficiency (leverage) weighted by the fundamental stock quality
+  // score (higher score = lower thesis risk). Higher = better.
+  const rankScore = (s: ZEBRASetup) => s.leverageRatio * (s.stockScore / 10)
+
+  const filteredSetups = setups
+    .filter((s) => {
+      if (maxDebit < 5000 && s.netDebit * 100 > maxDebit) return false
+      if (optionType !== "all" && s.type !== optionType) return false
+      if (trendFilter !== "all" && s.trend !== trendFilter) return false
+      if (s.dte < minDTE) return false
+      if (Math.abs(s.distanceToBreakeven) > maxBreakevenDistance) return false
+      return true
+    })
+    .sort((a, b) => rankScore(b) - rankScore(a))
 
   const handleRefresh = async () => {
     setIsLoading(true)
