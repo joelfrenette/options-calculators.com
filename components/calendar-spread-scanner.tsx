@@ -247,14 +247,14 @@ export function CalendarSpreadScanner() {
           </div>
 
           {/* Filters */}
-          <div className="flex flex-wrap gap-4 mb-6 p-4 bg-slate-50 rounded-lg">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-nowrap items-center gap-4 mb-6 p-4 bg-slate-50 rounded-lg overflow-x-auto">
+            <div className="flex items-center gap-2 shrink-0">
               <Filter className="w-4 h-4 text-slate-500" />
               <span className="text-sm font-medium">Filters:</span>
               <InfoTooltip content="Use these filters to narrow down calendar spread opportunities based on your risk tolerance and market view. Stricter filters (lower beta, lower HV, higher stability) show more conservative trades." />
             </div>
             <Select value={spreadType} onValueChange={(v: "all" | "call" | "put") => setSpreadType(v)}>
-              <SelectTrigger className="w-[130px]">
+              <SelectTrigger className="w-[130px] shrink-0">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -263,8 +263,8 @@ export function CalendarSpreadScanner() {
                 <SelectItem value="put">Put Calendar</SelectItem>
               </SelectContent>
             </Select>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-600">Max Beta:</span>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-sm text-slate-600 whitespace-nowrap">Max Beta:</span>
               <InfoTooltip content="Beta measures how much a stock moves compared to the overall market. A beta of 1.0 means it moves exactly with the market. For calendar spreads, you want LOW beta stocks (under 0.8) because you need the stock to stay near your strike price. High beta stocks move too much and can blow through your breakeven points." />
               <Slider
                 value={[maxBeta]}
@@ -276,8 +276,8 @@ export function CalendarSpreadScanner() {
               />
               <span className="text-sm font-medium w-8">{maxBeta.toFixed(1)}</span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-600">Max HV:</span>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-sm text-slate-600 whitespace-nowrap">Max HV:</span>
               <InfoTooltip content="Historical Volatility (HV) shows how much the stock has actually moved in the past 30 days, expressed as a percentage. Lower HV (under 25%) means the stock has been calm and predictable. Calendar spreads need low-volatility stocks because you profit when the stock stays near your strike. High HV stocks are too unpredictable for this strategy." />
               <Slider
                 value={[maxHV]}
@@ -289,8 +289,8 @@ export function CalendarSpreadScanner() {
               />
               <span className="text-sm font-medium w-8">{maxHV}%</span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-600">Min Stability:</span>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-sm text-slate-600 whitespace-nowrap">Min Stability:</span>
               <InfoTooltip content="Price Stability Score measures what percentage of the last 30 days the stock stayed within a tight trading range. A score of 80% means the stock stayed put 80% of the time. Higher stability is BETTER for calendar spreads - you want boring, predictable stocks that don't make sudden moves. Look for 75% or higher." />
               <Slider
                 value={[minStability]}
