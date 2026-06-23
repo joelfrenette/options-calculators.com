@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -492,8 +492,14 @@ export function WheelScanner() {
 
   const [sortColumn, setSortColumn] = useState<keyof QualifyingStock>("yield")
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc")
-  const [relaxedSortColumn, setRelaxedSortColumn] = useState<keyof QualifyingStock>("yield")
-  const [relaxedSortDirection, setRelaxedSortDirection] = useState<"asc" | "desc">("desc")
+  // Default: shortest DTE first, then highest Yield % within each DTE group
+  const [relaxedSortColumn, setRelaxedSortColumn] = useState<keyof QualifyingStock>("daysToExpiry")
+  const [relaxedSortDirection, setRelaxedSortDirection] = useState<"asc" | "desc">("asc")
+
+  // Refs/state for the synced top horizontal scrollbar on the relaxed results table
+  const topScrollRef = useRef<HTMLDivElement>(null)
+  const tableScrollRef = useRef<HTMLDivElement>(null)
+  const [relaxedScrollWidth, setRelaxedScrollWidth] = useState(0)
   const [scanProgress, setScanProgress] = useState(0)
   const [currentTicker, setCurrentTicker] = useState("")
   const [technicalProgress, setTechnicalProgress] = useState(0)
@@ -1683,33 +1689,44 @@ export function WheelScanner() {
         })
       : [] // Initialize as empty array if no technical results
 
-  // Sorting logic for relaxed results
+  // Sorting logic for relaxed results.
+  // Default view: shortest DTE first, then highest Yield % within each DTE group.
   const sortedRelaxedResults = [...relaxedResults].sort((a, b) => {
-    const aHasUpcomingEarnings = a.daysToEarnings !== undefined && a.daysToEarnings >= 0 && a.daysToEarnings <= 14
-    const bHasUpcomingEarnings = b.daysToEarnings !== undefined && b.daysToEarnings >= 0 && b.daysToEarnings <= 14
-
-    if (aHasUpcomingEarnings && !bHasUpcomingEarnings) return -1
-    if (!aHasUpcomingEarnings && bHasUpcomingEarnings) return 1
-
     const aVal = a[relaxedSortColumn]
     const bVal = b[relaxedSortColumn]
 
-    if (typeof aVal === "number" && typeof bVal === "number") {
-      return relaxedSortDirection === "asc" ? aVal - bVal : bVal - aVal
-    }
+    // Highest-yield tiebreaker, used to rank rows that share the same primary value
+    const yieldTiebreak = () => (b.yield ?? 0) - (a.yield ?? 0)
 
     if (relaxedSortColumn === "redDay") {
       const aBool = Boolean(aVal)
       const bBool = Boolean(bVal)
-      if (relaxedSortDirection === "asc") {
-        return Number(aBool) - Number(bBool)
-      } else {
-        return Number(bBool) - Number(aBool)
-      }
+      const diff =
+        relaxedSortDirection === "asc" ? Number(aBool) - Number(bBool) : Number(bBool) - Number(aBool)
+      return diff !== 0 ? diff : yieldTiebreak()
     }
 
-    return 0
+    if (typeof aVal === "number" || typeof bVal === "number") {
+      // Treat missing numeric values as the largest so they sort last when ascending
+      const aNum = typeof aVal === "number" ? aVal : Number.POSITIVE_INFINITY
+      const bNum = typeof bVal === "number" ? bVal : Number.POSITIVE_INFINITY
+      const diff = relaxedSortDirection === "asc" ? aNum - bNum : bNum - aNum
+      // Within the same DTE, rank by highest yield
+      if (diff === 0 && relaxedSortColumn === "daysToExpiry") return yieldTiebreak()
+      return diff
+    }
+
+    // String comparison fallback (e.g. expiryDate, bollingerPosition, macdSignal)
+    const cmp = String(aVal ?? "").localeCompare(String(bVal ?? ""))
+    return relaxedSortDirection === "asc" ? cmp : -cmp
   })
+
+  // Keep the top scrollbar spacer width in sync with the actual table width
+  useEffect(() => {
+    if (tableScrollRef.current) {
+      setRelaxedScrollWidth(tableScrollRef.current.scrollWidth)
+    }
+  }, [relaxedResults, showRelaxedResults, relaxedSortColumn, relaxedSortDirection])
 
   const handleFundamentalSort = (column: string) => {
     if (fundamentalSortColumn === column) {
@@ -3370,7 +3387,27 @@ export function WheelScanner() {
             </p>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            {/* Top horizontal scrollbar, synced with the table below */}
+            <div
+              ref={topScrollRef}
+              className="overflow-x-auto"
+              onScroll={() => {
+                if (tableScrollRef.current && topScrollRef.current) {
+                  tableScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft
+                }
+              }}
+            >
+              <div style={{ width: relaxedScrollWidth, height: 1 }} aria-hidden="true" />
+            </div>
+            <div
+              ref={tableScrollRef}
+              className="overflow-x-auto"
+              onScroll={() => {
+                if (tableScrollRef.current && topScrollRef.current) {
+                  topScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft
+                }
+              }}
+            >
               <table className="w-full text-sm">
                 <thead className="bg-purple-50 border-b border-purple-200">
                   <tr>
@@ -3428,6 +3465,12 @@ export function WheelScanner() {
                     >
                       Annual Yield %{" "}
                       {relaxedSortColumn === "annualizedYield" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
+                      onClick={() => handleRelaxedSort("daysToEarnings")}
+                    >
+                      Earnings {relaxedSortColumn === "daysToEarnings" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
                     </th>
                     <th
                       className="text-center p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
@@ -3532,6 +3575,34 @@ export function WheelScanner() {
                           {stock.annualizedYield !== undefined && stock.annualizedYield > 0
                             ? stock.annualizedYield.toFixed(1) + "%"
                             : "N/A"}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.daysToEarnings !== undefined &&
+                          stock.daysToEarnings >= 0 &&
+                          stock.daysToExpiry !== undefined &&
+                          stock.daysToEarnings <= stock.daysToExpiry ? (
+                            <span
+                              className="text-green-600 font-bold text-lg"
+                              title={
+                                stock.earningsDate
+                                  ? `Earnings ${stock.earningsDate} (${stock.daysToEarnings}d) — within ${stock.daysToExpiry}d DTE`
+                                  : `Earnings within ${stock.daysToExpiry}d DTE`
+                              }
+                            >
+                              ✓
+                            </span>
+                          ) : (
+                            <span
+                              className="text-red-600 font-bold text-lg"
+                              title={
+                                stock.earningsDate
+                                  ? `Earnings ${stock.earningsDate} (${stock.daysToEarnings}d) — outside DTE window`
+                                  : "No earnings scheduled within the DTE window"
+                              }
+                            >
+                              ✗
+                            </span>
+                          )}
                         </td>
                         <td className="text-center p-3">
                           {stock.redDay ? (

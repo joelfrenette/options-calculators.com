@@ -305,11 +305,11 @@ export default function Home() {
               <div className="flex items-center justify-between py-3 gap-4">
                 <div className="flex items-center gap-2">
                   <Image
-                    src="/images/design-mode/calculator-trim.png"
-                    alt="Calculator Logo"
+                    src="/logo.png"
+                    alt="Options Calculators Logo"
                     width={32}
                     height={32}
-                    className="h-8 w-8"
+                    className="h-8 w-8 rounded-md"
                   />
                   <a
                     href="https://OPTIONS-CALCULATORS.COM"
