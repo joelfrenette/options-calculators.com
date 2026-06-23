@@ -16,8 +16,8 @@ All API keys are:
 
 1. Navigate to `https://options-calculators.com/login`
 2. Login with your credentials:
-   - Email: `joelfrenette@gmail.com`
-   - Password: `Japan2025!`
+   - Email: `<your-admin-email>`
+   - Password: `<set-in-env>`
 
 ### 2. Configure API Keys
 

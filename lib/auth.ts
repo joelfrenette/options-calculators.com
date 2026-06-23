@@ -1,9 +1,12 @@
 import { cookies } from "next/headers"
 
-const ADMIN_EMAIL = "joelfrenette@gmail.com"
-const ADMIN_PASSWORD = "Japan2025!"
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD
 
 export async function verifyCredentials(email: string, password: string) {
+  if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+    throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD environment variables must be set")
+  }
   return email === ADMIN_EMAIL && password === ADMIN_PASSWORD
 }
 
