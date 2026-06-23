@@ -21,6 +21,7 @@ import {
   Info,
 } from "lucide-react"
 import { Area, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from "recharts"
+import { TradeWalkthroughModal, type WalkthroughSetup } from "@/components/trade-walkthrough-modal"
 
 // Strategy configurations
 const STRATEGIES = {
@@ -593,6 +594,11 @@ export function OptionsStrategyToolbox({ strategy = "credit-spreads" }: OptionsS
   const [isScanning, setIsScanning] = useState(false)
   const [lastScanned, setLastScanned] = useState<Date | null>(null)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
+  const [walkthroughSetup, setWalkthroughSetup] = useState<WalkthroughSetup | null>(null)
+
+  // The example cards are static teaching examples drawn from the strategy
+  // config (not live scanner output). Scanned results, when present, refresh them.
+  const exampleSetups: StrategySetup[] = setups.length > 0 ? setups : config.setups
 
   if (!config) {
     return <div className="p-8 text-center text-gray-500">Strategy not found</div>
@@ -820,9 +826,9 @@ export function OptionsStrategyToolbox({ strategy = "credit-spreads" }: OptionsS
             <div className="flex items-center gap-2 mb-4">
               <div className="h-1 w-8 bg-teal-500 rounded" />
               <h2 className="text-xl font-bold" style={{ color: "#1E3A8A" }}>
-                Best Current Setups This Week
+                Example Setups (For Learning)
               </h2>
-              <InfoTooltip content="These are real trade ideas based on current market conditions. Each setup shows the ticker, specific options to trade, premium collected or paid, and probability of profit. Always do your own research before trading." />
+              <InfoTooltip content="These are illustrative teaching examples — not live trade recommendations. Each example shows a realistic ticker, the specific options to trade, premium, and probability of profit. Click Run Scenario for a step-by-step walkthrough of how to place the trade. Always do your own research before trading." />
               {isScanning && (
                 <Badge className="bg-teal-100 text-teal-700 ml-2">
                   <Loader2 className="h-3 w-3 mr-1 animate-spin" />
@@ -831,7 +837,7 @@ export function OptionsStrategyToolbox({ strategy = "credit-spreads" }: OptionsS
               )}
             </div>
             <div className="grid md:grid-cols-3 gap-4">
-              {setups.map((setup, idx) => (
+              {exampleSetups.map((setup, idx) => (
                 <Card
                   key={idx}
                   className={`shadow-md hover:shadow-lg transition-shadow ${isScanning ? "opacity-50" : ""}`}
@@ -860,12 +866,16 @@ export function OptionsStrategyToolbox({ strategy = "credit-spreads" }: OptionsS
                     </div>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button className="w-full text-white bg-[#0D9488] hover:bg-[#0F766E]">Run Scenario</Button>
+                        <Button
+                          onClick={() => setWalkthroughSetup(setup)}
+                          className="w-full text-white bg-[#0D9488] hover:bg-[#0F766E]"
+                        >
+                          Run Scenario
+                        </Button>
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>
-                          {setup.setup} on {setup.ticker}. Premium: {setup.credit}, Probability of Profit: {setup.pop}.
-                          Signal strength: {setup.signal}.
+                          Step-by-step walkthrough: how to place {setup.setup} on {setup.ticker} in thinkorswim.
                         </p>
                       </TooltipContent>
                     </Tooltip>
@@ -950,6 +960,15 @@ export function OptionsStrategyToolbox({ strategy = "credit-spreads" }: OptionsS
           </div>
         </div>
       </div>
+
+      <TradeWalkthroughModal
+        open={walkthroughSetup !== null}
+        onClose={() => setWalkthroughSetup(null)}
+        setup={walkthroughSetup}
+        strategyKey={strategy}
+        strategyName={config.name}
+        typicalDTE={config.stats.typicalDTE}
+      />
     </TooltipProvider>
   )
 }
