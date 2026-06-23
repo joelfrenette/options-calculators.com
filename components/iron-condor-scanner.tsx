@@ -40,7 +40,7 @@ export function IronCondorScanner() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
-  const [maxStockPrice, setMaxStockPrice] = useState(200) // Step 1 dollar filter ($200 → $20,000)
+  const [maxMargin, setMaxMargin] = useState(1000) // Step 1 dollar filter: max buying-power reduction per condor ($)
 
   useEffect(() => {
     const cached = localStorage.getItem("iron-condor-scanner-cache")
@@ -57,10 +57,9 @@ export function IronCondorScanner() {
   }, [])
 
   const filteredSetups = setups.filter((s) => {
-    // Step 1 dollar filter: the underlying trades between the put and call short
-    // strikes, so their midpoint is a close proxy for the share price.
-    const underlyingProxy = (s.putSpread.short + s.callSpread.short) / 2
-    if (maxStockPrice < 1000 && underlyingProxy > maxStockPrice) return false
+    // Step 1 dollar filter: an iron condor's margin is the max loss of its single
+    // tested side = (width − total credit) × 100. Exclude anything above the cap.
+    if (maxMargin < 5000 && s.maxLoss * 100 > maxMargin) return false
     if (s.probability < minProbability[0]) return false
     if (s.dte > maxDte[0]) return false
     if (s.ivRank < minIvRank[0]) return false
@@ -195,7 +194,12 @@ export function IronCondorScanner() {
         <CardContent>
           {/* Dollar Amount Filtering (Step 1) */}
           <div className="mb-6">
-            <DollarAmountFilter value={maxStockPrice} onChange={setMaxStockPrice} tooltipsEnabled={tooltipsEnabled} />
+            <DollarAmountFilter
+            value={maxMargin}
+            onChange={setMaxMargin}
+            tooltipsEnabled={tooltipsEnabled}
+            mode="credit-margin"
+          />
           </div>
 
           {/* Filters */}
@@ -339,6 +343,25 @@ export function IronCondorScanner() {
                       <div className="font-medium text-xs">{setup.dataSource || "API"}</div>
                     </div>
                   </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                    <div className="p-3 rounded-lg border border-emerald-200 bg-emerald-50">
+                      <p className="text-xs text-emerald-700 font-medium flex items-center">
+                        Buying Power Tied Up
+                        <InfoTooltip content="Collateral held for this iron condor. Because both sides can't lose at once, margin = the max loss of one side = (width − total credit) × 100. The credit you collect offsets this; it is not extra capital required." />
+                      </p>
+                      <p className="font-bold text-emerald-800">${(setup.maxLoss * 100).toLocaleString()}</p>
+                      <p className="text-[11px] text-emerald-600">max loss × 100 · = margin held</p>
+                    </div>
+                    <div className="p-3 rounded-lg border border-blue-200 bg-blue-50">
+                      <p className="text-xs text-blue-700 font-medium flex items-center">
+                        Credit Collected
+                        <InfoTooltip content="Total premium credited to your account up front from both spreads, calculated as total credit × 100. This is your max profit and reduces the net capital tied up." />
+                      </p>
+                      <p className="font-bold text-blue-800">${(setup.totalCredit * 100).toLocaleString()}</p>
+                      <p className="text-[11px] text-blue-600">total credit × 100 · = max profit</p>
+                    </div>
+                  </div>
+
                   <div className="mt-3 p-3 bg-purple-50 rounded-lg">
                     <div className="flex items-start gap-2">
                       <Info className="w-4 h-4 text-purple-500 mt-0.5" />

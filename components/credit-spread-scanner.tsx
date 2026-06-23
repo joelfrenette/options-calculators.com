@@ -41,7 +41,7 @@ export function CreditSpreadScanner() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
-  const [maxStockPrice, setMaxStockPrice] = useState(200) // Step 1 dollar filter ($200 → $20,000)
+  const [maxMargin, setMaxMargin] = useState(1000) // Step 1 dollar filter: max buying-power reduction per spread ($)
 
   useEffect(() => {
     const cached = localStorage.getItem("credit-spread-scanner-cache")
@@ -58,9 +58,9 @@ export function CreditSpreadScanner() {
   }, [])
 
   const filteredSetups = setups.filter((s) => {
-    // Step 1 dollar filter: the short strike sits nearest the money, so it is a
-    // close proxy for the underlying share price. Exclude anything above the cap.
-    if (maxStockPrice < 1000 && s.shortStrike > maxStockPrice) return false
+    // Step 1 dollar filter: buying power tied up = max loss × 100 = (width − credit) × 100.
+    // Exclude any setup whose margin requirement exceeds the cap.
+    if (maxMargin < 5000 && s.maxLoss * 100 > maxMargin) return false
     if (spreadType !== "all" && s.type !== spreadType) return false
     if (s.probability < minProbability[0]) return false
     if (s.dte > maxDte[0]) return false
@@ -195,7 +195,12 @@ export function CreditSpreadScanner() {
         <CardContent>
           {/* Dollar Amount Filtering (Step 1) */}
           <div className="mb-6">
-            <DollarAmountFilter value={maxStockPrice} onChange={setMaxStockPrice} tooltipsEnabled={tooltipsEnabled} />
+            <DollarAmountFilter
+            value={maxMargin}
+            onChange={setMaxMargin}
+            tooltipsEnabled={tooltipsEnabled}
+            mode="credit-margin"
+          />
           </div>
 
           <div className="flex flex-wrap gap-4 mb-6 p-4 bg-slate-50 rounded-lg">
@@ -338,6 +343,25 @@ export function CreditSpreadScanner() {
                     <div className="font-medium text-xs">{setup.dataSource || "API"}</div>
                   </div>
                 </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                  <div className="p-3 rounded-lg border border-emerald-200 bg-emerald-50">
+                    <div className="text-xs text-emerald-700 font-medium flex items-center">
+                      Buying Power Tied Up
+                      <InfoTooltip content="Collateral your broker locks up to hold this defined-risk credit spread = max loss = (strike width − credit) × 100. The premium you collect offsets this; it is not extra capital required." />
+                    </div>
+                    <div className="font-bold text-emerald-800">${(setup.maxLoss * 100).toLocaleString()}</div>
+                    <div className="text-[11px] text-emerald-600">max loss × 100 · = margin held</div>
+                  </div>
+                  <div className="p-3 rounded-lg border border-blue-200 bg-blue-50">
+                    <div className="text-xs text-blue-700 font-medium flex items-center">
+                      Credit Collected
+                      <InfoTooltip content="Premium credited to your account up front when you open the spread, calculated as credit × 100. This is your max profit and reduces the net capital tied up." />
+                    </div>
+                    <div className="font-bold text-blue-800">${(setup.credit * 100).toLocaleString()}</div>
+                    <div className="text-[11px] text-blue-600">credit × 100 · = max profit</div>
+                  </div>
+                </div>
+
                 <div className="mt-3 p-3 bg-blue-50 rounded-lg">
                   <div className="flex items-start gap-2">
                     <Info className="w-4 h-4 text-blue-500 mt-0.5" />
