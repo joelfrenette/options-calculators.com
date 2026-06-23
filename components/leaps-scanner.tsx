@@ -78,7 +78,7 @@ export function LEAPSScanner() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [isLiveData, setIsLiveData] = useState(false)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
-  const [maxStockPrice, setMaxStockPrice] = useState(200) // Step 1 dollar filter ($200 → $20,000)
+  const [maxDebit, setMaxDebit] = useState(1000) // Step 1 dollar filter: max premium / capital at risk per contract ($)
 
   useEffect(() => {
     const cached = localStorage.getItem("leaps-scanner-cache")
@@ -95,7 +95,8 @@ export function LEAPSScanner() {
   }, [])
 
   const filteredSetups = setups.filter((s) => {
-    if (maxStockPrice < 1000 && s.currentPrice > maxStockPrice) return false
+    // Capital at risk for a long LEAP is the premium paid (× 100 per contract)
+    if (maxDebit < 5000 && s.premium * 100 > maxDebit) return false
     if (optionType !== "all" && s.type !== optionType) return false
     if (s.dte < minDTE) return false
     if (s.debtToEquity > maxDebtEquity) return false
@@ -222,7 +223,12 @@ export function LEAPSScanner() {
 
           {/* Dollar Amount Filtering (Step 1) */}
           <div className="mb-4">
-            <DollarAmountFilter value={maxStockPrice} onChange={setMaxStockPrice} tooltipsEnabled={tooltipsEnabled} />
+              <DollarAmountFilter
+                value={maxDebit}
+                onChange={setMaxDebit}
+                tooltipsEnabled={tooltipsEnabled}
+                mode="net-debit"
+              />
           </div>
 
           {/* Filters */}
@@ -460,6 +466,25 @@ export function LEAPSScanner() {
                           <InfoTooltip content="The total market value of the company (share price × shares outstanding). Larger market cap ($100B+) = more stable, less volatile. Smaller cap = more growth potential but more risk. For LEAPS, large caps are safer; mid-caps offer more upside if you're confident in your thesis." />
                         </p>
                         <p className="font-semibold">{setup.marketCap}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                      <div className="p-3 rounded-lg border border-emerald-200 bg-emerald-50">
+                        <p className="text-xs text-emerald-700 font-medium flex items-center">
+                          Capital Tied Up
+                          <InfoTooltip content="The premium you pay to buy this LEAP, per contract. This is the actual capital that leaves your account and your maximum loss. Calculated as premium × 100." />
+                        </p>
+                        <p className="font-bold text-emerald-800">${(setup.premium * 100).toLocaleString()}</p>
+                        <p className="text-[11px] text-emerald-600">premium × 100 · = max loss</p>
+                      </div>
+                      <div className="p-3 rounded-lg border border-gray-200 bg-gray-50">
+                        <p className="text-xs text-gray-600 font-medium flex items-center">
+                          Early-Assignment Reserve
+                          <InfoTooltip content="A LEAP is a single LONG option — you have no short leg that could be assigned. There is no early-assignment settlement risk, so no cash buffer beyond the premium is required." />
+                        </p>
+                        <p className="font-bold text-gray-700">None</p>
+                        <p className="text-[11px] text-gray-500">long-only · no short leg to assign</p>
                       </div>
                     </div>
 

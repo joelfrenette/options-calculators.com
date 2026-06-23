@@ -72,7 +72,7 @@ export function ZEBRAScanner() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [isLiveData, setIsLiveData] = useState(false)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
-  const [maxStockPrice, setMaxStockPrice] = useState(200) // Step 1 dollar filter ($200 → $20,000)
+  const [maxDebit, setMaxDebit] = useState(1000) // Step 1 dollar filter: max net debit per spread ($)
 
   useEffect(() => {
     const cached = localStorage.getItem("zebra-scanner-cache")
@@ -89,7 +89,7 @@ export function ZEBRAScanner() {
   }, [])
 
   const filteredSetups = setups.filter((s) => {
-    if (maxStockPrice < 1000 && s.currentPrice > maxStockPrice) return false
+    if (maxDebit < 5000 && s.netDebit * 100 > maxDebit) return false
     if (optionType !== "all" && s.type !== optionType) return false
     if (trendFilter !== "all" && s.trend !== trendFilter) return false
     if (s.dte < minDTE) return false
@@ -215,7 +215,12 @@ export function ZEBRAScanner() {
 
           {/* Dollar Amount Filtering (Step 1) */}
           <div className="mb-4">
-            <DollarAmountFilter value={maxStockPrice} onChange={setMaxStockPrice} tooltipsEnabled={tooltipsEnabled} />
+                <DollarAmountFilter
+                  value={maxDebit}
+                  onChange={setMaxDebit}
+                  tooltipsEnabled={tooltipsEnabled}
+                  mode="net-debit"
+                />
           </div>
 
           {/* Filters */}
@@ -454,6 +459,25 @@ export function ZEBRAScanner() {
                           <InfoTooltip content="Options trading volume - higher is better for liquidity. 10K+ daily volume means tight bid-ask spreads and easy entry/exit. Low volume (<1K) can mean wide spreads and difficulty closing the position at a fair price. Stick to liquid options (5K+ volume)." />
                         </p>
                         <p className="font-semibold">{(setup.optionVolume / 1000).toFixed(0)}K</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                      <div className="p-3 rounded-lg border border-emerald-200 bg-emerald-50">
+                        <p className="text-xs text-emerald-700 font-medium flex items-center">
+                          Capital Tied Up
+                          <InfoTooltip content="The net debit you pay to open this ZEBRA, per position. This is the actual capital that leaves your account and your maximum loss. Calculated as net debit × 100." />
+                        </p>
+                        <p className="font-bold text-emerald-800">${(setup.netDebit * 100).toLocaleString()}</p>
+                        <p className="text-[11px] text-emerald-600">net debit × 100 · = max loss</p>
+                      </div>
+                      <div className="p-3 rounded-lg border border-amber-200 bg-amber-50">
+                        <p className="text-xs text-amber-700 font-medium flex items-center">
+                          Early-Assignment Reserve
+                          <InfoTooltip content="Risk reserve only — NOT required to open. If the short leg you sold is assigned early, you may briefly need this much cash to settle 100 shares before unwinding with your 2 long legs. Calculated as short strike × 100." />
+                        </p>
+                        <p className="font-bold text-amber-800">${(setup.shortStrike * 100).toLocaleString()}</p>
+                        <p className="text-[11px] text-amber-600">short strike × 100 · worst-case buffer</p>
                       </div>
                     </div>
 

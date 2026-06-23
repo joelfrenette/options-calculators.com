@@ -61,7 +61,7 @@ export function CalendarSpreadScanner() {
   const [maxBeta, setMaxBeta] = useState(1.0)
   const [maxHV, setMaxHV] = useState(35)
   const [minStability, setMinStability] = useState(70)
-  const [maxStockPrice, setMaxStockPrice] = useState(200) // Step 1 dollar filter ($200 → $20,000)
+  const [maxDebit, setMaxDebit] = useState(1000) // Step 1 dollar filter: max net debit per spread ($)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [isLiveData, setIsLiveData] = useState(false)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
@@ -81,7 +81,7 @@ export function CalendarSpreadScanner() {
   }, [])
 
   const filteredSetups = spreads.filter((s) => {
-    if (maxStockPrice < 1000 && s.currentPrice > maxStockPrice) return false
+    if (maxDebit < 5000 && s.debit * 100 > maxDebit) return false
     if (spreadType !== "all" && s.type !== spreadType) return false
     if (s.beta > maxBeta) return false
     if (s.historicalVolatility > maxHV) return false
@@ -243,7 +243,12 @@ export function CalendarSpreadScanner() {
 
           {/* Dollar Amount Filtering (Step 1) */}
           <div className="mb-6">
-            <DollarAmountFilter value={maxStockPrice} onChange={setMaxStockPrice} tooltipsEnabled={tooltipsEnabled} />
+            <DollarAmountFilter
+              value={maxDebit}
+              onChange={setMaxDebit}
+              tooltipsEnabled={tooltipsEnabled}
+              mode="net-debit"
+            />
           </div>
 
           {/* Filters */}
@@ -487,6 +492,26 @@ export function CalendarSpreadScanner() {
                       </div>
                       <div className="font-medium">{setup.thetaAdvantage.toFixed(1)}x</div>
                       <div className="text-xs text-muted-foreground">Near/Far decay ratio</div>
+                    </div>
+                  </div>
+
+                  {/* Capital mechanics */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                    <div className="p-3 rounded-lg border border-emerald-200 bg-emerald-50">
+                      <div className="text-xs text-emerald-700 font-medium flex items-center">
+                        Capital Tied Up
+                        <InfoTooltip content="The net debit you pay to open this calendar, per contract. This is the actual capital that leaves your account and your maximum loss. Calculated as net debit × 100." />
+                      </div>
+                      <div className="font-bold text-emerald-800">${(setup.debit * 100).toLocaleString()}</div>
+                      <div className="text-[11px] text-emerald-600">net debit × 100 · = max loss</div>
+                    </div>
+                    <div className="p-3 rounded-lg border border-amber-200 bg-amber-50">
+                      <div className="text-xs text-amber-700 font-medium flex items-center">
+                        Early-Assignment Reserve
+                        <InfoTooltip content="Risk reserve only — NOT required to open. If the short (near-term) leg is assigned early, you may briefly need this much cash to settle 100 shares before unwinding with your long leg. Calculated as strike × 100." />
+                      </div>
+                      <div className="font-bold text-amber-800">${(setup.strike * 100).toLocaleString()}</div>
+                      <div className="text-[11px] text-amber-600">strike × 100 · worst-case buffer</div>
                     </div>
                   </div>
 

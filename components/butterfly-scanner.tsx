@@ -72,7 +72,7 @@ export function ButterflyScanner() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [isLiveData, setIsLiveData] = useState(false)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
-  const [maxStockPrice, setMaxStockPrice] = useState(200) // Step 1 dollar filter ($200 → $20,000)
+  const [maxDebit, setMaxDebit] = useState(1000) // Step 1 dollar filter: max net debit / capital at risk per spread ($)
 
   useEffect(() => {
     const cached = localStorage.getItem("butterfly-scanner-cache")
@@ -89,7 +89,8 @@ export function ButterflyScanner() {
   }, [])
 
   const filteredSetups = setups.filter((s) => {
-    if (maxStockPrice < 1000 && s.currentPrice > maxStockPrice) return false
+    // Capital at risk for a butterfly is the max loss (debit for standard; broken side for BWB)
+    if (maxDebit < 5000 && s.maxLoss * 100 > maxDebit) return false
     if (butterflyType !== "all" && s.structure !== butterflyType) return false
     if (optionType !== "all" && s.type !== optionType) return false
     if (s.ivRank < minIVRank) return false
@@ -296,6 +297,25 @@ export function ButterflyScanner() {
           <span>Exp: {setup.expiration}</span>
         </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+          <div className="p-3 rounded-lg border border-emerald-200 bg-emerald-50">
+            <p className="text-xs text-emerald-700 font-medium flex items-center">
+              Capital Tied Up
+              <InfoTooltip content="The defined risk of this butterfly per contract — the most you can lose. For a standard butterfly this equals the debit paid; for a broken-wing it is the loss on the broken side. Calculated as max loss × 100." />
+            </p>
+            <p className="font-bold text-emerald-800">${(setup.maxLoss * 100).toLocaleString()}</p>
+            <p className="text-[11px] text-emerald-600">max loss × 100 · capital at risk</p>
+          </div>
+          <div className="p-3 rounded-lg border border-amber-200 bg-amber-50">
+            <p className="text-xs text-amber-700 font-medium flex items-center">
+              Early-Assignment Reserve
+              <InfoTooltip content="Risk reserve only — NOT required to open. A butterfly sells 2 middle-strike options. If both are assigned early, you may briefly need this much cash to settle 200 shares before exercising your wings to cover. Calculated as middle strike × 200." />
+            </p>
+            <p className="font-bold text-amber-800">${(setup.middleStrike * 200).toLocaleString()}</p>
+            <p className="text-[11px] text-amber-600">middle strike × 200 · worst-case buffer</p>
+          </div>
+        </div>
+
         <div className="mt-2 text-xs text-gray-600 bg-blue-50 p-2 rounded">
           <strong>Setup Rationale:</strong> {setup.reason}
         </div>
@@ -348,7 +368,12 @@ export function ButterflyScanner() {
 
           {/* Dollar Amount Filtering (Step 1) */}
           <div className="mb-4">
-            <DollarAmountFilter value={maxStockPrice} onChange={setMaxStockPrice} tooltipsEnabled={tooltipsEnabled} />
+            <DollarAmountFilter
+            value={maxDebit}
+            onChange={setMaxDebit}
+            tooltipsEnabled={tooltipsEnabled}
+            mode="net-debit"
+          />
           </div>
 
           {/* Filters */}
