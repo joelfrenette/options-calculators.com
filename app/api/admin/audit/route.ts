@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { AbortSignal } from 'abort-controller';
+import { isAuthenticated } from "@/lib/auth"
 
 export async function GET(request: NextRequest) {
+  if (!(await isAuthenticated())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
   const auditResults = {
     verdict: "PASS" as "PASS" | "FAIL" | "CONDITIONAL PASS",
     summary: "",

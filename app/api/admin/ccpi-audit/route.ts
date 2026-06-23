@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server"
+import { isAuthenticated } from "@/lib/auth"
 
 // CCPI Audit API - Complete transparency for all 32 indicators
 // Validates data sources, formulas, and calculations
 
 export async function GET() {
+  if (!(await isAuthenticated())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
   try {
     const indicators = await auditAllIndicators()
     const pillars = await auditPillarFormulas()

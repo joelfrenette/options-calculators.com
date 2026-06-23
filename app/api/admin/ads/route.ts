@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isAuthenticated } from "@/lib/auth"
 
 // In a real implementation, this would use a database or Vercel Blob storage
 // For now, we'll use environment variables or a simple JSON structure
@@ -10,10 +11,16 @@ const adsData = {
 }
 
 export async function GET() {
+  if (!(await isAuthenticated())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
   return NextResponse.json(adsData)
 }
 
 export async function POST(request: Request) {
+  if (!(await isAuthenticated())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
   try {
     const data = await request.json()
 
@@ -28,6 +35,9 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  if (!(await isAuthenticated())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
   try {
     const { index } = await request.json()
 
