@@ -6,7 +6,7 @@ export async function POST(request: Request) {
   try {
     const { email } = await request.json()
 
-    if (email !== "joelfrenette@gmail.com") {
+    if (email !== process.env.ADMIN_EMAIL) {
       return NextResponse.json({ error: "Email not found" }, { status: 404 })
     }
 
