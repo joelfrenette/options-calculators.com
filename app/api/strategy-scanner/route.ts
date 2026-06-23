@@ -552,6 +552,16 @@ const CALENDAR_SPREAD_TICKERS = [
   "T", // AT&T Inc. - Telecom
   "UNH", // UnitedHealth Group - Healthcare
   "SPY", // S&P 500 ETF - Benchmark
+  "MO", // Altria - High-dividend consumer staple
+  "PM", // Philip Morris - Consumer staple
+  "MDLZ", // Mondelez - Consumer staple
+  "MRK", // Merck - Healthcare staple
+  "ABBV", // AbbVie - Healthcare/pharma
+  "COST", // Costco - Defensive retail
+  "HD", // Home Depot - Blue-chip retail
+  "LMT", // Lockheed Martin - Low-beta defense
+  "XLV", // Health Care SPDR - Low-volatility sector ETF
+  "IYR", // Real Estate ETF - Income/low-beta
 ]
 
 const CALENDAR_COMPANY_NAMES: Record<string, string> = {
@@ -570,6 +580,16 @@ const CALENDAR_COMPANY_NAMES: Record<string, string> = {
   T: "AT&T Inc.",
   UNH: "UnitedHealth Group",
   SPY: "SPDR S&P 500 ETF",
+  MO: "Altria Group",
+  PM: "Philip Morris International",
+  MDLZ: "Mondelez International",
+  MRK: "Merck & Co.",
+  ABBV: "AbbVie Inc.",
+  COST: "Costco Wholesale",
+  HD: "Home Depot",
+  LMT: "Lockheed Martin",
+  XLV: "Health Care Select SPDR",
+  IYR: "iShares U.S. Real Estate ETF",
 }
 
 const CALENDAR_FALLBACK_PRICES: Record<string, number> = {
@@ -588,6 +608,16 @@ const CALENDAR_FALLBACK_PRICES: Record<string, number> = {
   T: 23,
   UNH: 580,
   SPY: 595,
+  MO: 56,
+  PM: 118,
+  MDLZ: 66,
+  MRK: 98,
+  ABBV: 178,
+  COST: 880,
+  HD: 360,
+  LMT: 460,
+  XLV: 150,
+  IYR: 95,
 }
 
 // Beta values for calendar spread candidates (lower = more stable)
@@ -607,12 +637,22 @@ const STOCK_BETAS: Record<string, number> = {
   T: 0.65,
   UNH: 0.72,
   SPY: 1.0,
+  MO: 0.58,
+  PM: 0.56,
+  MDLZ: 0.5,
+  MRK: 0.4,
+  ABBV: 0.58,
+  COST: 0.78,
+  HD: 0.95,
+  LMT: 0.45,
+  XLV: 0.6,
+  IYR: 0.85,
 }
 
 async function generateCalendarSpreads(tickers: string[] = CALENDAR_SPREAD_TICKERS): Promise<any[]> {
   const calendarSpreads: any[] = []
 
-  for (const ticker of tickers.slice(0, 10)) {
+  for (const ticker of tickers.slice(0, 25)) {
     try {
       // Get price data with fallback
       let price = CALENDAR_FALLBACK_PRICES[ticker] || 100
@@ -671,7 +711,13 @@ async function generateCalendarSpreads(tickers: string[] = CALENDAR_SPREAD_TICKE
       const nearPremium = price * (frontIV / 100) * Math.sqrt(nearDte / 365) * 0.4
       const farPremium = price * (backIV / 100) * Math.sqrt(farDte / 365) * 0.4
       const debit = Math.max(0.5, farPremium - nearPremium)
-      const maxProfit = debit * 1.5 // Typical max profit potential
+      // Max profit at front-month expiry ≈ remaining extrinsic value of the back-month
+      // option (priced at the front IV) minus the net debit paid. A larger IV skew and a
+      // bigger theta advantage both widen the achievable profit.
+      const farResidualValue = price * (frontIV / 100) * Math.sqrt((farDte - nearDte) / 365) * 0.4
+      const maxProfit = Math.max(0.1, farResidualValue - debit)
+      // Return on capital: the real profitability metric for a debit spread
+      const returnOnCapital = (maxProfit / debit) * 100
 
       // Breakeven range
       const breakevenRange = price * (historicalVolatility / 100) * Math.sqrt(nearDte / 365)
@@ -691,8 +737,20 @@ async function generateCalendarSpreads(tickers: string[] = CALENDAR_SPREAD_TICKE
         reason = `Higher risk calendar: Beta of ${beta.toFixed(2)} and ${historicalVolatility.toFixed(0)}% HV suggest more price movement. Consider tighter timeframes or skip if looking for pure theta plays.`
       }
 
-      // Randomly assign call or put type (ATM calendars can be either)
-      const type = Math.random() > 0.5 ? "call" : "put"
+      // Type is driven by trend, not chance: a stock trading above its ATM strike leans
+      // bullish (call calendar); at/below leans defensive (put calendar).
+      const type = price >= atmStrike ? "call" : "put"
+
+      // Composite quality score: rewards profitability (ROC, theta edge, favorable IV skew)
+      // and penalizes risk (beta, historical volatility, low price stability). Higher = a
+      // more profitable AND lower-risk setup, so the best candidates sort to the top.
+      const qualityScore =
+        Math.min(returnOnCapital, 100) * 0.4 + // profitability (capped so outliers don't dominate)
+        thetaAdvantage * 8 + // time-decay edge
+        Math.max(0, ivSkew) * 4 + // favorable volatility skew
+        priceStability * 0.5 + // range stability (risk)
+        (1.5 - beta) * 20 - // lower beta rewarded (risk)
+        historicalVolatility * 0.6 // lower HV rewarded (risk)
 
       calendarSpreads.push({
         ticker,
@@ -706,6 +764,8 @@ async function generateCalendarSpreads(tickers: string[] = CALENDAR_SPREAD_TICKE
         farDte,
         debit: Math.round(debit * 100) / 100,
         maxProfit: Math.round(maxProfit * 100) / 100,
+        returnOnCapital: Math.round(returnOnCapital),
+        qualityScore: Math.round(qualityScore * 10) / 10,
         breakeven: {
           low: Math.round((price - breakevenRange) * 100) / 100,
           high: Math.round((price + breakevenRange) * 100) / 100,
@@ -728,13 +788,14 @@ async function generateCalendarSpreads(tickers: string[] = CALENDAR_SPREAD_TICKE
     }
   }
 
-  // Sort by signal strength and beta (lower beta first)
+  // Rank by composite quality score so the most profitable, lowest-risk setups
+  // surface first. Signal strength is used only as a tiebreaker.
   return calendarSpreads.sort((a, b) => {
-    const signalOrder = { strong: 0, moderate: 1, speculative: 2 }
-    if (signalOrder[a.signal] !== signalOrder[b.signal]) {
-      return signalOrder[a.signal] - signalOrder[b.signal]
+    if (b.qualityScore !== a.qualityScore) {
+      return b.qualityScore - a.qualityScore
     }
-    return a.beta - b.beta
+    const signalOrder = { strong: 0, moderate: 1, speculative: 2 }
+    return signalOrder[a.signal] - signalOrder[b.signal]
   })
 }
 
