@@ -37,6 +37,8 @@ interface CalendarSpreadSetup {
   farDte: number
   debit: number
   maxProfit: number
+  returnOnCapital?: number
+  qualityScore?: number
   breakeven: { low: number; high: number }
   beta: number
   historicalVolatility: number
@@ -368,7 +370,12 @@ export function CalendarSpreadScanner() {
                       {getSignalBadge(setup.signal)}
                       <div className="text-right">
                         <div className="font-semibold text-indigo-600">${setup.debit.toFixed(2)} debit</div>
-                        <div className="text-xs text-muted-foreground">Max: ${setup.maxProfit.toFixed(2)} profit</div>
+                        <div className="text-xs text-muted-foreground">
+                          Max: ${setup.maxProfit.toFixed(2)}
+                          {typeof setup.returnOnCapital === "number" && (
+                            <span className="ml-1 font-medium text-green-600">({setup.returnOnCapital}% ROC)</span>
+                          )}
+                        </div>
                       </div>
                       <ArrowUpRight className="w-4 h-4 text-slate-400" />
                     </div>
