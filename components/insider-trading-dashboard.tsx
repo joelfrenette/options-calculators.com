@@ -298,31 +298,36 @@ const InsiderTradingDashboard = () => {
     }
   }
 
+  const buyClasses =
+    "inline-flex items-center rounded-md border border-green-200 bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700"
+  const sellClasses =
+    "inline-flex items-center rounded-md border border-red-200 bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700"
+  const disclosureClasses =
+    "inline-flex items-center rounded-md border border-orange-200 bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-700"
+  const neutralClasses =
+    "inline-flex items-center rounded-md border border-gray-200 bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600"
+
   const getTypeBadge = (type: string, shares?: string) => {
     const normalizedType = (type || "").toLowerCase()
     if (normalizedType === "buy" || normalizedType.includes("buy") || normalizedType === "p") {
-      return <Badge className="bg-green-500 hover:bg-green-600 text-white text-xs px-2 py-0.5">Buy</Badge>
+      return <span className={buyClasses}>Buy</span>
     }
     if (normalizedType === "sell" || normalizedType.includes("sell") || normalizedType === "s") {
-      return <Badge className="bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-0.5">Sell</Badge>
+      return <span className={sellClasses}>Sell</span>
     }
     if (normalizedType === "disclosure" || normalizedType.includes("disclos")) {
-      return <Badge className="bg-orange-500 hover:bg-orange-600 text-white text-xs px-2 py-0.5">Disclosure</Badge>
+      return <span className={disclosureClasses}>Disclosure</span>
     }
     // Fallback - infer Buy/Sell from the share amount sign (e.g. "+330,006" vs "-176,935")
     const sharesStr = (shares || "").trim()
     if (sharesStr.startsWith("-")) {
-      return <Badge className="bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-0.5">Sell</Badge>
+      return <span className={sellClasses}>Sell</span>
     }
     if (sharesStr.startsWith("+") || /\d/.test(sharesStr)) {
-      return <Badge className="bg-green-500 hover:bg-green-600 text-white text-xs px-2 py-0.5">Buy</Badge>
+      return <span className={buyClasses}>Buy</span>
     }
     // Last resort - show whatever type we have or "N/A"
-    return (
-      <Badge variant="secondary" className="text-xs px-2 py-0.5">
-        {type || "N/A"}
-      </Badge>
-    )
+    return <span className={neutralClasses}>{type || "N/A"}</span>
   }
 
   const getCategoryIcon = (category: string) => {
