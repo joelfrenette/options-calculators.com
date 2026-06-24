@@ -68,19 +68,19 @@ const STRATEGIES = {
     ],
     insights: {
       outlook:
-        "With VIX at elevated levels and markets showing consolidation, credit spreads offer attractive risk/reward. Focus on put credit spreads if you're moderately bullish, or call credit spreads for bearish exposure. Current IV rank above 50 makes premium collection favorable.",
+        "A credit spread is two options at once: you SELL one option (collect cash) and BUY another at a worse strike (a safety net). The cash you collect is your max profit. The gap between the two strikes minus your credit is your max loss. It's a defined-risk way to make money when you think a stock will stay above (bull put spread) or below (bear call spread) a level — without needing it to actually MOVE there. You don't even need direction; you just need it NOT to go against you too hard.",
       entryRules: [
-        "Only enter when IV Rank > 40",
-        "Sell the short strike at 30 delta or less",
-        "Collect at least 1/3 of spread width as credit",
-        "Avoid earnings week unless intentional",
-        "Check for upcoming catalysts (Fed meetings, data releases)",
+        "Only enter when IV Rank is above 40 (options expensive = good premiums to sell)",
+        "Pick the short strike with about a 30% chance of finishing in-the-money (Delta ~ 0.30)",
+        "Collect at least 1/3 of the strike width as credit (so $5-wide spread → $1.65+ credit)",
+        "Avoid earnings week unless you specifically want the volatility crush",
+        "Check the calendar — Fed meetings and CPI releases inside your window add risk",
       ],
       adjustments: [
-        "Close at 50% profit to lock in gains",
-        "If tested, roll down/up and out for credit",
-        "Close if spread reaches 2x credit received",
-        "Consider adding opposite spread to create Iron Condor if directionally wrong",
+        "Close the spread once you've captured 50% of the max profit — don't get greedy",
+        "If the stock moves against you, you can 'roll' the spread out in time for more credit",
+        "If the spread is worth 2x what you collected, take the loss and walk away",
+        "If you're wrong on direction, you can add the OPPOSITE spread to turn it into an Iron Condor",
       ],
     },
   },
@@ -120,19 +120,19 @@ const STRATEGIES = {
     ],
     insights: {
       outlook:
-        "Iron Condors thrive in range-bound markets with elevated implied volatility. Current market conditions show VIX above historical average, making premium rich. SPY has been consolidating between key support and resistance levels, ideal for this strategy.",
+        "An Iron Condor is two credit spreads stacked: a bull put spread BELOW the stock and a bear call spread ABOVE it. You collect premium from BOTH and profit if the stock just stays inside the range. It's the classic 'I don't care which way it goes, I just don't want it to move much' trade. Best in choppy, range-bound markets with high implied volatility (so the premium is rich).",
       entryRules: [
-        "Only enter when IV Rank > 50",
-        "Short strikes at 16 delta or less (1 standard deviation)",
-        "Wing width of $5 for SPY/QQQ, $2.50 for smaller ETFs",
-        "Collect at least 1/3 of wing width as credit",
-        "Avoid major news events within the trade duration",
+        "Only enter when IV Rank is above 50 (rich premium pays for both spreads)",
+        "Place the short strikes at about 16 Delta — that's roughly 1 standard deviation out, ~84% probability of expiring worthless",
+        "Use $5-wide wings for SPY / QQQ; $2.50 for smaller-priced ETFs",
+        "Collect at least 1/3 of the wing width as credit (so $5 wing → $1.65+ total)",
+        "Check for earnings or Fed events INSIDE your expiration window — a big surprise breaks the range",
       ],
       adjustments: [
-        "Close at 50% profit – don't get greedy",
-        "If one side tested, roll untested side closer",
-        "If breached, close tested side, keep untested",
-        "Consider rolling out in time if still in expected range",
+        "Close the entire condor at 50% of max profit — sitting in a winning trade past 50% is bad risk/reward",
+        "If one side is being tested by price, ROLL the untested side closer to the stock for extra credit",
+        "If a side is breached (stock blew through it), close that side; let the other side decay",
+        "If still in your expected range near expiration but profit isn't there yet, roll the whole condor 30 days out",
       ],
     },
   },
@@ -179,19 +179,19 @@ const STRATEGIES = {
     ],
     insights: {
       outlook:
-        "Calendar spreads benefit when IV is low and expected to rise. With current IV percentile below 30 on many tech names, calendars offer attractive risk/reward. Best positioned on stocks expected to stay range-bound short-term but move later.",
+        "A Calendar Spread is two options at the same strike but DIFFERENT expirations: you sell a short-term one and buy a longer-term one. You profit when the short option decays faster than the long one (time-decay edge). Best when the stock stays near the strike AND volatility rises later. Think of it as 'I want time to be on my side, and I expect volatility to come back to life.'",
       entryRules: [
-        "Enter when IV Rank < 30 (buying cheap IV)",
-        "Choose strikes near current stock price (ATM)",
-        "Front month 20-30 DTE, back month 50-60 DTE",
-        "Avoid earnings between expiration dates",
-        "Look for stocks in consolidation patterns",
+        "Enter when IV Rank is below 30 — you're buying cheap volatility",
+        "Pick strikes near the current stock price (At-The-Money)",
+        "Short the near-term option (20-30 days to expiration); buy the far-term option (50-60 DTE)",
+        "Make sure there are NO earnings between the two expiration dates",
+        "Look for stocks that have been quiet — flat trading ranges",
       ],
       adjustments: [
-        "Close at 25-50% profit",
-        "If stock moves significantly, close or roll",
-        "Can convert to diagonal if directional bias develops",
-        "Roll front month if still at target price",
+        "Close once you've made 25-50% of the debit you paid",
+        "If the stock moves sharply away from your strike, close — the calendar dies when price runs",
+        "If a direction becomes clear, convert to a diagonal (different strikes on the two legs)",
+        "After the short expires, if the stock is still at your target, sell a new short to roll the trade forward",
       ],
     },
   },
@@ -238,19 +238,19 @@ const STRATEGIES = {
     ],
     insights: {
       outlook:
-        "Butterflies offer exceptional reward-to-risk when you have a price target. With upcoming options expiration and key support/resistance levels identified, positioned butterflies around expected pin prices can yield 3-5x returns.",
+        "A Butterfly is three strikes: buy 1 wing-low + sell 2 middle + buy 1 wing-high. Tiny cost to enter, huge payout if the stock pins right at the middle strike at expiration, and nothing lost beyond the entry cost if it doesn't. It's a 'sniper trade' — you need a real opinion on WHERE the stock will be on a specific date. When you're right, payoffs of 3-5x what you risked are common; when you're wrong, you just lose the small debit.",
       entryRules: [
-        "Have a specific price target (middle strike)",
-        "Enter 2-3 weeks before expiration",
-        "Risk only 1-2% of portfolio per butterfly",
-        "Use wide wings for higher probability, narrow for higher payout",
-        "Consider broken-wing butterflies for directional bias",
+        "Have a concrete price target — the middle strike is where you think the stock will pin at expiration",
+        "Enter 2-3 weeks before expiration (the magic of butterflies only works close to expiry)",
+        "Risk only 1-2% of your portfolio on any single butterfly — they fail often, win big",
+        "Wider wings = higher probability but smaller payoff; narrower wings = lottery ticket",
+        "Try a 'broken-wing' butterfly (one wing wider than the other) to add a directional lean",
       ],
       adjustments: [
-        "Close at 50% profit or better",
-        "If target changes, close and reposition",
-        "Can add butterflies at different strikes to widen range",
-        "Close if underlying moves beyond wing strikes",
+        "Close at 50% of max profit — butterflies that go all the way to expiration are rare",
+        "If your price target changes, exit the trade and put on a new butterfly at the new target",
+        "Add a second butterfly at a different middle strike to cover a range instead of a single point",
+        "If the stock blows past either wing, close — the butterfly can't recover",
       ],
     },
   },
@@ -297,19 +297,19 @@ const STRATEGIES = {
     ],
     insights: {
       outlook:
-        "With market uncertainty and your profitable long positions, collars provide sleep-at-night protection. Sell calls to finance protective puts. Ideal before earnings, Fed meetings, or when you want to lock in gains while maintaining upside participation.",
+        "A Collar wraps a stock you already own with TWO options at once: you buy a protective put (sets a floor — you can't lose below it) and you sell a covered call (sets a ceiling — you cap the upside). The call's premium helps pay for the put, so the protection is cheap or even free. Use it when you want to LOCK IN gains on a winning stock before earnings, a Fed meeting, or any event that could move it sharply.",
       entryRules: [
-        "Only collar positions you're willing to be called away from",
-        "Put strike at your 'must protect' level",
-        "Call strike at price you'd happily sell",
-        "Try to structure for zero cost or small credit",
-        "Consider rolling calls if stock rises toward strike",
+        "Only collar shares you'd be OK selling if the call gets exercised",
+        "Set the put strike at your 'I can't afford to lose more than this' level",
+        "Set the call strike at a price you'd happily take profits at",
+        "Try to structure so the put cost equals the call premium — zero net cost ('free collar')",
+        "Use it before known events (earnings, FOMC) when you want certainty for a couple of weeks",
       ],
       adjustments: [
-        "Roll call up and out if stock rallies (to capture more upside)",
-        "Roll put down and out if stock consolidates above put",
-        "Remove collar if outlook becomes strongly bullish",
-        "Add to collar if protection needs increase",
+        "If the stock rallies hard toward the call strike, roll the call UP and OUT to keep capturing upside",
+        "If the stock just sits, roll the put down and out for a credit — recoup some hedging cost",
+        "If you decide you're now strongly bullish, remove the collar (cost: lose the protection)",
+        "If risk goes up (volatility spikes), add MORE collars on additional positions",
       ],
     },
   },
@@ -356,19 +356,19 @@ const STRATEGIES = {
     ],
     insights: {
       outlook:
-        "Diagonals combine the best of calendars and verticals. Buy a longer-dated option and sell shorter-dated options against it repeatedly. Ideal for slow, grinding directional moves. Current low volatility makes buying back-month options attractive.",
+        "A Diagonal Spread is a calendar spread with DIFFERENT strikes — long a far-month option, short a near-month option at a different strike. It combines time decay (from the short) with directional bias (from picking different strikes). The Poor Man's Covered Call (PMCC) is the most popular diagonal: long a deep-ITM LEAPS, short a near-term OTM call repeatedly for income. Great for slow, grinding directional moves.",
       entryRules: [
-        "Buy back-month option ITM or ATM",
-        "Sell front-month option OTM in direction of bias",
-        "Aim to collect 30-50% of back-month cost in first front sale",
-        "Choose liquid underlyings for easy adjustments",
-        "Avoid earnings in front month cycle",
+        "Buy the back-month option deep in-the-money or at-the-money — that's your 'stock substitute'",
+        "Sell the front-month option out-of-the-money in the direction you're leaning",
+        "Try to collect 30-50% of what you paid for the long leg in the very first short sale",
+        "Stick to liquid stocks (tight bid-ask spreads) — diagonals need active management",
+        "Avoid having earnings BETWEEN the two expirations — the volatility crush is unpredictable",
       ],
       adjustments: [
-        "Roll front-month option when it loses 50% value",
-        "Adjust front strike as underlying moves",
-        "Close entire position at 50% profit on debit",
-        "Convert to vertical if big move expected",
+        "Once the short option has lost 50% of its value, buy it back and sell a new one further out",
+        "If the stock moves a lot, slide the front-month strike up or down to keep collecting premium",
+        "Close the whole thing at 50% profit on your original debit",
+        "If you expect a big move, simplify to a vertical spread (same expiration)",
       ],
     },
   },
@@ -415,19 +415,19 @@ const STRATEGIES = {
     ],
     insights: {
       outlook:
-        "Buy volatility when it's cheap and a catalyst approaches. With IV rank low on several names ahead of earnings or major events, long straddles/strangles can profit from the expected IV expansion and price movement. Choose stocks known for big moves.",
+        "A Straddle is a long call AND a long put at the SAME strike, both bought together. A Strangle is the same idea but with the call OTM above and the put OTM below — cheaper to enter, needs a bigger move to win. Both profit when the stock moves BIG in either direction. You're buying volatility, so they're best entered when volatility is cheap (low IV Rank) and a catalyst is approaching (earnings, FDA decision, Fed meeting).",
       entryRules: [
-        "Only buy when IV Rank < 30",
-        "Must have identified catalyst (earnings, FDA, etc.)",
-        "Straddle for maximum gamma, strangle for lower cost",
-        "Size positions knowing max loss is 100% of premium",
-        "Enter 1-2 weeks before expected catalyst",
+        "Only buy when IV Rank is below 30 — options must be cheap or you can't make the math work",
+        "You MUST have a real catalyst on the calendar (earnings, FDA, court ruling, Fed)",
+        "Use a Straddle for maximum sensitivity to small moves; a Strangle for lower cost",
+        "Position size knowing the worst case is 100% loss of the premium you paid",
+        "Enter 1-2 weeks BEFORE the catalyst so you also benefit from rising IV (vega)",
       ],
       adjustments: [
-        "Sell half if one side doubles (free ride remaining)",
-        "Close before catalyst if IV expansion gives profit",
-        "Can convert to ratio spread if directional bias develops",
-        "Close losing side early if move is clearly one-directional",
+        "If one side doubles in value (big move already happened), sell HALF — your free ride covers what's left",
+        "If IV jumps a lot before the event, you can close for a profit BEFORE the event hits",
+        "If the move is clearly one direction, sell the losing side to recover some cost",
+        "Never let a straddle sit through expiration — sell or roll once the catalyst is past",
       ],
     },
   },
@@ -474,104 +474,160 @@ const STRATEGIES = {
     ],
     insights: {
       outlook:
-        "The Wheel is the ultimate 'get paid to wait' strategy. Sell cash-secured puts on stocks you'd happily own at lower prices. If assigned, sell covered calls until called away. Rinse and repeat for consistent income on quality names.",
+        "The Wheel is the 'get paid to wait' strategy. Step 1: pick a stock you'd genuinely want to own. Step 2: sell a cash-secured put — somebody pays you cash for the promise to buy that stock at a lower price. Step 3: if the stock stays above your strike, the put expires worthless and you keep the cash — repeat. Step 4: if the stock falls and you get assigned, you own 100 shares at a price you chose. Step 5: now sell covered calls on those shares for more cash, until the stock rallies and the shares get called away. Then start over. Done well, you collect 1-2% per month on the capital — about 12-24% per year, without ever needing the stock to soar.",
       entryRules: [
-        "Only wheel stocks you'd own long-term",
-        "Sell puts at price you'd gladly buy (support levels)",
-        "Target 1-2% premium per month",
-        "Have cash secured for potential assignment",
-        "Start with high-quality, liquid names",
+        "Pick stocks you genuinely want to own — quality companies you'd hold for years",
+        "Sell puts at a strike where you'd actually be happy buying — usually a recent support level",
+        "Aim for roughly 1-2% premium per month relative to the cash you've set aside",
+        "ALWAYS have the full cash sitting aside — strike price × 100 per contract",
+        "Start with big, liquid names (e.g. SPY, AAPL, KO) before trying smaller stocks",
       ],
       adjustments: [
-        "Roll puts down and out if tested (avoid assignment at poor prices)",
-        "If assigned, immediately sell covered calls",
-        "Sell calls above cost basis to ensure profit if called",
-        "Roll calls up and out if stock rallies (capture more upside)",
+        "If the stock drops near your strike before expiration, you can 'roll' the put — buy back the existing one and sell a new one further out and lower, to avoid assignment at a bad price",
+        "If you get assigned (now own shares), don't panic — immediately start selling covered calls",
+        "Sell covered calls at a strike ABOVE your cost basis so any assignment is profitable",
+        "If the stock rallies hard, roll the covered call up and out — capture more upside before shares get called away",
       ],
     },
   },
 }
 
+// ===========================================================================
 // Payoff diagram generators
+//
+// Each returns Array<{ x: priceAtExpiration, y: pnlPerContract }> using the
+// canonical at-expiration payoff for one contract (×100 share multiplier).
+// All math here is textbook — no curves are fabricated.
+//
+// Reference numbers used: $100 stock so the shape is easy to read; you can
+// rescale by changing the strikes inside each function. Strike spacing
+// reflects how the strategy is typically constructed.
+// ===========================================================================
+
+function sample(minPrice: number, maxPrice: number, steps: number, payoff: (s: number) => number) {
+  return Array.from({ length: steps }, (_, i) => {
+    const x = minPrice + ((maxPrice - minPrice) * i) / (steps - 1)
+    return { x: Math.round(x * 100) / 100, y: Math.round(payoff(x) * 100) / 100 }
+  })
+}
+
+// Bull put spread (credit): short put K_short, long put K_long (K_long < K_short).
+// Net credit = c. P&L per contract:
+//   if S >= K_short: +c × 100  (max profit)
+//   if S <= K_long:  (K_long - K_short + c) × 100 (max loss, negative)
+//   between: linear interpolation
 function generateCreditSpreadPayoff() {
-  return Array.from({ length: 50 }, (_, i) => {
-    const x = i - 25
-    let y
-    if (x < -10) y = -5
-    else if (x < 0) y = -5 + (x + 10) * 0.7
-    else y = 2
-    return { x: x + 550, y: y, breakeven: x === -7 }
-  })
+  const K_short = 100
+  const K_long = 95
+  const credit = 1.5 // $ per share
+  const payoff = (S: number) => {
+    if (S >= K_short) return credit * 100
+    if (S <= K_long) return (K_long - K_short + credit) * 100
+    return (S - K_short + credit) * 100
+  }
+  return sample(85, 115, 100, payoff)
 }
 
+// Iron Condor: bull put spread + bear call spread. Net credit = c.
+// Profit zone is between the two short strikes; max loss = wing width − c.
 function generateIronCondorPayoff() {
-  return Array.from({ length: 60 }, (_, i) => {
-    const x = i - 30
-    let y
-    if (x < -15) y = -5
-    else if (x < -8) y = -5 + (x + 15) * 0.7
-    else if (x < 8) y = 3
-    else if (x < 15) y = 3 - (x - 8) * 0.7
-    else y = -5
-    return { x: x + 565, y: y }
-  })
+  const putShort = 95,
+    putLong = 90 // bull put spread
+  const callShort = 105,
+    callLong = 110 // bear call spread
+  const credit = 2.0
+  const payoff = (S: number) => {
+    const putPnL = S >= putShort ? 0 : Math.max(S - putShort, putLong - putShort)
+    const callPnL = S <= callShort ? 0 : -Math.min(S - callShort, callLong - callShort)
+    return (credit + putPnL + callPnL) * 100
+  }
+  return sample(85, 115, 100, payoff)
 }
 
+// Calendar spread (call). Pay a debit; max profit at the short strike at
+// the front-month expiration (short call expires worthless, long call retains
+// time value). The at-front-expiration profile is the difference between the
+// long call's value (intrinsic + remaining time premium, simplified) and the
+// short call's intrinsic value. We use a simple BS approximation where the
+// long call's residual time value is modeled as a normal-like bump.
 function generateCalendarPayoff() {
-  return Array.from({ length: 50 }, (_, i) => {
-    const x = i - 25
-    const y = 3 * Math.exp((-x * x) / 100) - 1
-    return { x: x + 190, y: y }
-  })
+  const K = 100
+  const debit = 2.0
+  const remainingTV = 4.0 // approx long call extrinsic at short expiry
+  const payoff = (S: number) => {
+    const shortIntrinsic = Math.max(0, S - K)
+    // Long call value at short expiry ≈ intrinsic + time premium that decays
+    // with |S - K| (peaked at K). A Gaussian centered at K models this well.
+    const longTimePremium = remainingTV * Math.exp(-Math.pow(S - K, 2) / (2 * 5 * 5))
+    const longTotal = Math.max(0, S - K) + longTimePremium
+    return (longTotal - shortIntrinsic - debit) * 100
+  }
+  return sample(85, 115, 100, payoff)
 }
 
+// Long Call Butterfly: long 1 call K1, short 2 calls K2, long 1 call K3 (K1<K2<K3).
+// Net debit = d. Max profit at K2 = (K2 - K1 - d) × 100. Max loss = d × 100.
 function generateButterflyPayoff() {
-  return Array.from({ length: 50 }, (_, i) => {
-    const x = i - 25
-    let y
-    if (x < -10) y = -1
-    else if (x < 0) y = -1 + (x + 10) * 0.4
-    else if (x < 10) y = 3 - x * 0.4
-    else y = -1
-    return { x: x + 570, y: y }
-  })
+  const K1 = 95,
+    K2 = 100,
+    K3 = 105
+  const debit = 1.0
+  const c = (S: number, k: number) => Math.max(0, S - k)
+  const payoff = (S: number) => (c(S, K1) - 2 * c(S, K2) + c(S, K3) - debit) * 100
+  return sample(85, 115, 100, payoff)
 }
 
+// Collar: long 100 shares at entry P0, long put K_p, short call K_c (K_p < P0 < K_c).
+// Net cost of options = debit (small or zero).
 function generateCollarPayoff() {
-  return Array.from({ length: 50 }, (_, i) => {
-    const x = i - 25
-    let y
-    if (x < -10) y = -8
-    else if (x < 10) y = x * 0.8
-    else y = 8
-    return { x: x + 190, y: y }
-  })
+  const entry = 100
+  const K_put = 95
+  const K_call = 110
+  const netDebit = 0.5 // cost of put minus premium of call
+  const payoff = (S: number) => {
+    const stockPnL = S - entry
+    const putPayoff = Math.max(0, K_put - S)
+    const callObligation = Math.max(0, S - K_call)
+    return (stockPnL + putPayoff - callObligation - netDebit) * 100
+  }
+  return sample(80, 130, 100, payoff)
 }
 
+// Diagonal call spread: long deep-ITM long-dated call (LEAPS) + short
+// near-dated OTM call. At short expiry the long call still has time value;
+// we model intrinsic + remaining time premium with a Gaussian centered near
+// its strike. (PMCC is a specific case of this with K_long deep ITM.)
 function generateDiagonalPayoff() {
-  return Array.from({ length: 50 }, (_, i) => {
-    const x = i - 25
-    const y = 2 * Math.exp((-(x - 5) * (x - 5)) / 150) - 0.5
-    return { x: x + 175, y: y }
-  })
+  const K_long = 90
+  const longCost = 12 // premium paid for the long
+  const K_short = 105
+  const shortPremium = 1.5
+  const remainingTV = 3.5
+  const payoff = (S: number) => {
+    const longTotal = Math.max(0, S - K_long) + remainingTV * Math.exp(-Math.pow(S - K_long, 2) / (2 * 12 * 12))
+    const shortObligation = Math.max(0, S - K_short)
+    return (longTotal - longCost - shortObligation + shortPremium) * 100
+  }
+  return sample(75, 125, 100, payoff)
 }
 
+// Long straddle: long 1 call + long 1 put, both at K. Cost = total premium p.
 function generateStraddlePayoff() {
-  return Array.from({ length: 50 }, (_, i) => {
-    const x = i - 25
-    const y = Math.abs(x) * 0.5 - 8
-    return { x: x + 250, y: y }
-  })
+  const K = 100
+  const totalPremium = 5
+  const payoff = (S: number) => (Math.max(0, S - K) + Math.max(0, K - S) - totalPremium) * 100
+  return sample(80, 120, 100, payoff)
 }
 
+// The Wheel — there's no single-expiration payoff (it's a cycle), so we
+// show the most pedagogically useful slice: a single cash-secured put
+// (the entry leg). Capped upside = premium; downside = stock falls below
+// strike, partially cushioned by premium.
 function generateWheelPayoff() {
-  return Array.from({ length: 50 }, (_, i) => {
-    const x = i - 25
-    let y
-    if (x < -5) y = x + 5
-    else y = 2 + Math.sin(x / 5) * 0.5
-    return { x: x + 130, y: y }
-  })
+  const K = 50
+  const premium = 2 // $ per share for the put
+  const payoff = (S: number) => (premium - Math.max(0, K - S)) * 100
+  return sample(30, 70, 100, payoff)
 }
 
 interface StrategySetup {
