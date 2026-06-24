@@ -4,8 +4,11 @@ import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { RefreshCw, TrendingUp, TrendingDown, AlertTriangle, ExternalLink, Building2, Star } from "lucide-react"
+import { TrendingUp, TrendingDown, AlertTriangle, ExternalLink, Building2, Star, Info } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DataLoadGate } from "@/components/data-load-gate"
+import { RefreshButton } from "@/components/ui/refresh-button"
+import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 
 interface Trade {
   date: string
@@ -58,6 +61,21 @@ export function PoliticianSpotlight() {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<Resp | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
+
+  const InfoTooltip = ({ content }: { content: string }) => {
+    if (!tooltipsEnabled) return null
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help ml-1 inline-block align-middle" />
+        </TooltipTrigger>
+        <TooltipContent className="max-w-sm bg-white border shadow-lg p-3">
+          <p className="text-sm text-gray-700">{content}</p>
+        </TooltipContent>
+      </Tooltip>
+    )
+  }
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -94,21 +112,23 @@ export function PoliticianSpotlight() {
     })
 
   return (
+    <TooltipProvider delayDuration={250}>
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
             <Star className="h-6 w-6 text-amber-500" />
             Politician Spotlight
+            <InfoTooltip content="Curated cards for the most-watched senators and representatives. Each shows their trade activity, top tickers, and average performance vs the S&P 500. Use these as one signal among many — disclosures lag up to 45 days." />
           </h2>
           <p className="text-sm text-slate-600 mt-1">
             Last {data?.windowDays ?? 180} days of trades by the most-watched members of Congress.
           </p>
         </div>
-        <Button onClick={fetchData} disabled={loading} size="sm" variant="outline" className="bg-white">
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-3">
+          <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
+          <RefreshButton onClick={fetchData} isLoading={loading} loadingText="Refreshing..." />
+        </div>
       </div>
 
       <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 flex items-start gap-2">
@@ -245,5 +265,6 @@ export function PoliticianSpotlight() {
         </p>
       )}
     </div>
+    </TooltipProvider>
   )
 }

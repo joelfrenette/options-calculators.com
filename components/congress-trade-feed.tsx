@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/tooltip"
 import {
   Building2,
-  RefreshCw,
   Info,
   TrendingUp,
   TrendingDown,
@@ -22,6 +21,8 @@ import {
   ExternalLink,
 } from "lucide-react"
 import { DataLoadGate } from "@/components/data-load-gate"
+import { RefreshButton } from "@/components/ui/refresh-button"
+import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 
 interface Trade {
   reportDate: string
@@ -72,6 +73,7 @@ export function CongressTradeFeed() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<FeedResponse | null>(null)
+  const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
 
   // Filters
   const [days, setDays] = useState(30)
@@ -122,6 +124,21 @@ export function CongressTradeFeed() {
     return optionsOnly ? data.trades.filter((t) => t.tickerType === "option") : data.trades
   }, [data, optionsOnly])
 
+  // Shared tooltip helper — gates on the page-level tooltips toggle.
+  const InfoTooltip = ({ content }: { content: string }) => {
+    if (!tooltipsEnabled) return null
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help ml-1 inline-block align-middle" />
+        </TooltipTrigger>
+        <TooltipContent className="max-w-sm bg-white border shadow-lg p-3">
+          <p className="text-sm text-gray-700">{content}</p>
+        </TooltipContent>
+      </Tooltip>
+    )
+  }
+
   if (!loaded) {
     return (
       <DataLoadGate
@@ -141,15 +158,16 @@ export function CongressTradeFeed() {
             <h2 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
               <Building2 className="h-6 w-6 text-emerald-600" />
               Congressional Trade Feed
+              <InfoTooltip content="Every senator and representative must disclose their stock and options trades within 45 days under the STOCK Act. This feed pulls those disclosures so you can see what they're buying and selling — and use it as one (lagging) signal among many." />
             </h2>
             <p className="text-sm text-slate-600 mt-1">
               Live feed of senator + representative stock and options trades disclosed under the STOCK Act.
             </p>
           </div>
-          <Button onClick={fetchTrades} disabled={loading} size="sm" variant="outline" className="bg-white">
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
+          <div className="flex items-center gap-3">
+            <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
+            <RefreshButton onClick={fetchTrades} isLoading={loading} loadingText="Refreshing..." />
+          </div>
         </div>
 
         {/* STOCK Act disclaimer */}
@@ -300,28 +318,33 @@ export function CongressTradeFeed() {
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead className="bg-slate-50 text-xs uppercase text-slate-600">
                 <tr>
-                  <th className="px-3 py-2 text-left font-semibold">Trade Date</th>
                   <th className="px-3 py-2 text-left font-semibold">
-                    <Tooltip>
-                      <TooltipTrigger className="inline-flex items-center gap-1">
-                        Lag <Info className="h-3 w-3 text-slate-400" />
-                      </TooltipTrigger>
-                      <TooltipContent>Days between transaction and disclosure (STOCK Act limit: 45).</TooltipContent>
-                    </Tooltip>
+                    Trade Date
+                    <InfoTooltip content="When the actual buy or sell happened — not when it was disclosed. Older trades are less actionable; the lag column shows the gap." />
                   </th>
-                  <th className="px-3 py-2 text-left font-semibold">Member</th>
-                  <th className="px-3 py-2 text-left font-semibold">Ticker</th>
-                  <th className="px-3 py-2 text-left font-semibold">Side</th>
-                  <th className="px-3 py-2 text-left font-semibold">Size</th>
+                  <th className="px-3 py-2 text-left font-semibold">
+                    Lag
+                    <InfoTooltip content="Days between the transaction and the disclosure filing. STOCK Act allows up to 45 days. Green = fresh (≤7d), amber = ≤30d, red = stale." />
+                  </th>
+                  <th className="px-3 py-2 text-left font-semibold">
+                    Member
+                    <InfoTooltip content="The senator or representative who placed the trade. The colored badge shows their party (D/R/I) and chamber (Sen/Hou)." />
+                  </th>
+                  <th className="px-3 py-2 text-left font-semibold">
+                    Ticker
+                    <InfoTooltip content="The stock or ETF symbol. The purple OPT marker means this was an options trade, which usually signals higher conviction." />
+                  </th>
+                  <th className="px-3 py-2 text-left font-semibold">
+                    Side
+                    <InfoTooltip content="Buy = member added to a position. Sell = member exited or trimmed. Cluster buying across many members is a stronger signal than any single trade." />
+                  </th>
+                  <th className="px-3 py-2 text-left font-semibold">
+                    Size
+                    <InfoTooltip content="The dollar range disclosed under the STOCK Act. Members report buckets (e.g. $1,001-$15,000), not exact amounts." />
+                  </th>
                   <th className="px-3 py-2 text-right font-semibold">
-                    <Tooltip>
-                      <TooltipTrigger className="inline-flex items-center gap-1">
-                        Excess vs SPY <Info className="h-3 w-3 text-slate-400" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        Trade&apos;s % return minus SPY&apos;s % return, since the trade date.
-                      </TooltipContent>
-                    </Tooltip>
+                    Excess vs SPY
+                    <InfoTooltip content="The trade's percent return minus the S&P 500's return since the trade date. Positive = the member beat the market on this pick; negative = they underperformed." />
                   </th>
                   <th className="px-3 py-2 text-left font-semibold">Action</th>
                 </tr>

@@ -4,8 +4,11 @@ import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { RefreshCw, Trophy, TrendingUp, TrendingDown, Users, Info } from "lucide-react"
+import { Trophy, TrendingUp, TrendingDown, Users, Info } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DataLoadGate } from "@/components/data-load-gate"
+import { RefreshButton } from "@/components/ui/refresh-button"
+import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 
 interface MemberRow {
   member: string
@@ -50,6 +53,21 @@ export function TopPerformers() {
   const [loading, setLoading] = useState(false)
   const [days, setDays] = useState(180)
   const [data, setData] = useState<Resp | null>(null)
+  const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
+
+  const InfoTooltip = ({ content }: { content: string }) => {
+    if (!tooltipsEnabled) return null
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help ml-1 inline-block align-middle" />
+        </TooltipTrigger>
+        <TooltipContent className="max-w-sm bg-white border shadow-lg p-3">
+          <p className="text-sm text-gray-700">{content}</p>
+        </TooltipContent>
+      </Tooltip>
+    )
+  }
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -79,18 +97,20 @@ export function TopPerformers() {
   }
 
   return (
+    <TooltipProvider delayDuration={250}>
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
             <Trophy className="h-6 w-6 text-amber-500" />
             Top Performers Leaderboard
+            <InfoTooltip content="Ranks members of Congress by how their disclosed trades have performed relative to the S&P 500. Quiver Quant calculates excess return per trade; we average those across each member's trades in the window." />
           </h2>
           <p className="text-sm text-slate-600 mt-1">
             Ranked by average <strong>excess return vs SPY</strong>. Minimum {data?.minTradesForRanking ?? "—"} trades to qualify.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <label className="text-xs text-slate-600">
             Window:{" "}
             <select
@@ -105,10 +125,8 @@ export function TopPerformers() {
               ))}
             </select>
           </label>
-          <Button onClick={fetchData} disabled={loading} size="sm" variant="outline" className="bg-white">
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
+          <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
+          <RefreshButton onClick={fetchData} isLoading={loading} loadingText="Refreshing..." />
         </div>
       </div>
 
@@ -208,6 +226,7 @@ export function TopPerformers() {
         </p>
       )}
     </div>
+    </TooltipProvider>
   )
 }
 

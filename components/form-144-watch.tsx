@@ -3,8 +3,11 @@
 import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { RefreshCw, ExternalLink, AlertTriangle, FileText } from "lucide-react"
+import { ExternalLink, AlertTriangle, FileText, Info } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DataLoadGate } from "@/components/data-load-gate"
+import { RefreshButton } from "@/components/ui/refresh-button"
+import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 
 interface Filing {
   filer: string
@@ -27,6 +30,21 @@ export function Form144Watch() {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<Resp | null>(null)
   const [filter, setFilter] = useState("")
+  const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
+
+  const InfoTooltip = ({ content }: { content: string }) => {
+    if (!tooltipsEnabled) return null
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help ml-1 inline-block align-middle" />
+        </TooltipTrigger>
+        <TooltipContent className="max-w-sm bg-white border shadow-lg p-3">
+          <p className="text-sm text-gray-700">{content}</p>
+        </TooltipContent>
+      </Tooltip>
+    )
+  }
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -60,21 +78,23 @@ export function Form144Watch() {
   )
 
   return (
+    <TooltipProvider delayDuration={250}>
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
             <FileText className="h-6 w-6 text-amber-600" />
             Form 144 Watch
+            <InfoTooltip content="Form 144 is an SEC filing an insider files when they INTEND to sell restricted or control stock — usually 1-90 days before the actual sale. Most are routine diversification; large or unusually-timed 144s near earnings can be a warning." />
           </h2>
           <p className="text-sm text-slate-600 mt-1">
             Insider <strong>planned-sale</strong> filings — the early warning before stock actually hits the tape.
           </p>
         </div>
-        <Button onClick={fetchData} disabled={loading} size="sm" variant="outline" className="bg-white">
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-3">
+          <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
+          <RefreshButton onClick={fetchData} isLoading={loading} loadingText="Refreshing..." />
+        </div>
       </div>
 
       <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 flex items-start gap-2">
@@ -161,5 +181,6 @@ export function Form144Watch() {
         </p>
       )}
     </div>
+    </TooltipProvider>
   )
 }

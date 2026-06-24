@@ -4,8 +4,11 @@ import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { RefreshCw, TrendingUp, TrendingDown, ExternalLink, Wallet, Building2, Users } from "lucide-react"
+import { TrendingUp, TrendingDown, ExternalLink, Wallet, Building2, Users, Info } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DataLoadGate } from "@/components/data-load-gate"
+import { RefreshButton } from "@/components/ui/refresh-button"
+import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 
 interface ETF {
   ticker: string
@@ -36,6 +39,21 @@ export function SmartMoneyEtfs() {
   const [loaded, setLoaded] = useState(false)
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<Resp | null>(null)
+  const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
+
+  const InfoTooltip = ({ content }: { content: string }) => {
+    if (!tooltipsEnabled) return null
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help ml-1 inline-block align-middle" />
+        </TooltipTrigger>
+        <TooltipContent className="max-w-sm bg-white border shadow-lg p-3">
+          <p className="text-sm text-gray-700">{content}</p>
+        </TooltipContent>
+      </Tooltip>
+    )
+  }
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -67,6 +85,7 @@ export function SmartMoneyEtfs() {
   const categories: ETF["category"][] = ["Congress", "Hedge Fund", "Insider"]
 
   return (
+    <TooltipProvider delayDuration={250}>
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -74,15 +93,16 @@ export function SmartMoneyEtfs() {
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
             <Wallet className="h-6 w-6 text-emerald-600" />
             Smart-Money ETF Tracker
+            <InfoTooltip content="These ETFs do the copying for you. NANC/KRUZ mirror disclosed Democrat/Republican trades. GURU follows top hedge-fund holdings. BRK.B is Buffett. Holdings update on the fund's cadence (monthly or quarterly), so they lag actual trades." />
           </h2>
           <p className="text-sm text-slate-600 mt-1">
             ETFs that <em>copy by design</em> — let a fund mirror Congress/hedge-fund/insider trades for you.
           </p>
         </div>
-        <Button onClick={fetchData} disabled={loading} size="sm" variant="outline" className="bg-white">
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-3">
+          <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
+          <RefreshButton onClick={fetchData} isLoading={loading} loadingText="Refreshing..." />
+        </div>
       </div>
 
       {data?.message && (
@@ -169,5 +189,6 @@ export function SmartMoneyEtfs() {
         disclosed at vendor cadence (monthly for NANC/KRUZ, quarterly for 13F-based funds), so they lag real-time trades.
       </p>
     </div>
+    </TooltipProvider>
   )
 }
