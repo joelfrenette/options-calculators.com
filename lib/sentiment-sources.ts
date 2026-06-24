@@ -74,6 +74,8 @@ const REDDIT_UA = "web:options-calculators.com:v1.0 (market-sentiment)"
 async function getRedditToken(): Promise<string | null> {
   const id = process.env.REDDIT_CLIENT_ID
   const secret = process.env.REDDIT_CLIENT_SECRET
+  // Diagnostic (presence + lengths only — never logs the actual values).
+  console.log(`[v0] Reddit creds: id=${!!id}(${(id || "").length}) secret=${!!secret}(${(secret || "").length})`)
   if (!id || !secret) return null
   try {
     const res = await fetch("https://www.reddit.com/api/v1/access_token", {
@@ -86,9 +88,14 @@ async function getRedditToken(): Promise<string | null> {
       body: "grant_type=client_credentials",
       signal: AbortSignal.timeout(8000),
     })
-    if (!res.ok) return null
+    if (!res.ok) {
+      const body = await res.text().catch(() => "")
+      console.log(`[v0] Reddit token HTTP ${res.status}: ${body.slice(0, 150)}`)
+      return null
+    }
     return (await res.json())?.access_token || null
-  } catch {
+  } catch (e) {
+    console.log("[v0] Reddit token error:", e instanceof Error ? e.message : "unknown")
     return null
   }
 }
