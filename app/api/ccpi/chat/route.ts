@@ -4,7 +4,7 @@ import { createAnthropic } from "@ai-sdk/anthropic"
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { resolveApiKey } from "@/lib/api-keys"
 
-const OPENROUTER_FREE_MODEL = process.env.OPENROUTER_FREE_MODEL || "deepseek/deepseek-v4-flash:free"
+const OPENROUTER_FREE_MODEL = process.env.OPENROUTER_FREE_MODEL || "openai/gpt-oss-120b:free"
 
 const providerConfigs = [
   {
@@ -32,7 +32,7 @@ const providerConfigs = [
     name: "Google",
     key: () => resolveApiKey("GOOGLE_AI_API_KEY"),
     create: () => createGoogleGenerativeAI({ apiKey: resolveApiKey("GOOGLE_AI_API_KEY") }),
-    model: "gemini-2.0-flash-exp",
+    model: "gemini-2.0-flash",
   },
   // --- paid fallbacks; disable via DISABLED_APIS to guarantee $0 ---
   {

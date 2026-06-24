@@ -20,11 +20,11 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { resolveApiKey } from "@/lib/api-keys"
 
 // OpenRouter free model used as the primary provider (zero per-token cost).
-// Override via OPENROUTER_FREE_MODEL if you want a different :free model.
-// DeepSeek V4 Flash: reasoning-capable, fast, 1M context — strongest free
-// pick for market analysis. Override via OPENROUTER_FREE_MODEL if the slug
-// changes (verify at openrouter.ai/models, free filter).
-const OPENROUTER_FREE_MODEL = process.env.OPENROUTER_FREE_MODEL || "deepseek/deepseek-v4-flash:free"
+// gpt-oss-120b:free — strong, reliable general reasoning, 131k context.
+// For max raw capability try nvidia/nemotron-3-ultra-550b-a55b:free; for speed
+// meta-llama/llama-3.3-70b-instruct:free. Verify slugs at openrouter.ai/api/v1/models
+// (no DeepSeek model is currently free). Override via OPENROUTER_FREE_MODEL.
+const OPENROUTER_FREE_MODEL = process.env.OPENROUTER_FREE_MODEL || "openai/gpt-oss-120b:free"
 
 const providerConfigs = [
   {
@@ -58,7 +58,7 @@ const providerConfigs = [
     displayName: "Google (Gemini 2.0 Flash)",
     key: () => resolveApiKey("GOOGLE_AI_API_KEY"),
     create: () => createGoogleGenerativeAI({ apiKey: resolveApiKey("GOOGLE_AI_API_KEY") }),
-    model: "gemini-2.0-flash-exp",
+    model: "gemini-2.0-flash",
   },
   // --- paid fallbacks below; reachable only if all free providers fail AND
   //     their keys are set (disable via DISABLED_APIS to guarantee $0). ---
