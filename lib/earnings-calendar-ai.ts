@@ -26,7 +26,19 @@ async function callAI(prompt: string, maxTokens = 100, timeoutMs = 18_000): Prom
       temperature: 0.4,
       abortSignal: controller.signal,
     })
-    return text.trim()
+    const trimmed = text.trim()
+    // Some openrouter/free models (Nemotron, etc.) return safety refusals
+    // instead of an error. Treat these as failures so the caller uses fallback.
+    if (
+      /User Safety:\s*unsafe|Unauthorized Advice|I (cannot|can't|won't) (provide|give|offer)|I'm not able to (provide|give)/i.test(
+        trimmed,
+      ) ||
+      trimmed.length < 20
+    ) {
+      console.log("[v0] Calendar AI: refusal/empty response — using fallback")
+      return null
+    }
+    return trimmed
   } catch (err) {
     const msg = err instanceof Error ? err.message : "unknown"
     if (controller.signal.aborted) {
