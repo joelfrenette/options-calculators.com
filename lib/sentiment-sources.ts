@@ -66,6 +66,32 @@ function keywordScore(texts: string[]): { score: number; bullish: number; bearis
 // (public JSON, no key required). Scores titles + selftext from hot posts.
 // ============================================================================
 const REDDIT_SUBS = ["wallstreetbets", "stocks", "investing", "options"]
+const REDDIT_UA = "web:options-calculators.com:v1.0 (market-sentiment)"
+
+// App-only OAuth token (client_credentials). Reddit blocks datacenter IPs on
+// the public www JSON endpoint, but oauth.reddit.com works with free app creds
+// (set REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET). Returns null if not configured.
+async function getRedditToken(): Promise<string | null> {
+  const id = process.env.REDDIT_CLIENT_ID
+  const secret = process.env.REDDIT_CLIENT_SECRET
+  if (!id || !secret) return null
+  try {
+    const res = await fetch("https://www.reddit.com/api/v1/access_token", {
+      method: "POST",
+      headers: {
+        Authorization: "Basic " + Buffer.from(`${id}:${secret}`).toString("base64"),
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": REDDIT_UA,
+      },
+      body: "grant_type=client_credentials",
+      signal: AbortSignal.timeout(8000),
+    })
+    if (!res.ok) return null
+    return (await res.json())?.access_token || null
+  } catch {
+    return null
+  }
+}
 
 export async function getRedditSentiment(): Promise<{
   score: number
@@ -73,11 +99,15 @@ export async function getRedditSentiment(): Promise<{
   posts: number
 }> {
   try {
-    console.log("[v0] Source (Reddit): Fetching", REDDIT_SUBS.length, "subreddits...")
+    const token = await getRedditToken()
+    const base = token ? "https://oauth.reddit.com" : "https://www.reddit.com"
+    const headers: Record<string, string> = { "User-Agent": REDDIT_UA }
+    if (token) headers.Authorization = `Bearer ${token}`
+    console.log(`[v0] Source (Reddit): Fetching ${REDDIT_SUBS.length} subs via ${token ? "OAuth" : "public"}...`)
     const results = await Promise.allSettled(
       REDDIT_SUBS.map((sub) =>
-        fetch(`https://www.reddit.com/r/${sub}/hot.json?limit=40`, {
-          headers: { "User-Agent": "Mozilla/5.0 (compatible; OptionsCalcBot/1.0)" },
+        fetch(`${base}/r/${sub}/hot${token ? "" : ".json"}?limit=40`, {
+          headers,
           signal: AbortSignal.timeout(10000),
         }).then((r) => (r.ok ? r.json() : null)),
       ),
