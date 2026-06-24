@@ -1,14 +1,15 @@
 /**
  * AI Provider Configuration with Fallback Support
  *
- * Priority order (by speed/reliability):
- * 1. Groq (llama-3.3-70b) - Fastest inference
- * 2. OpenAI (gpt-4o-mini) - Fast, reliable
- * 3. Google (gemini-2.0-flash) - Good speed
- * 4. xAI/Grok (grok-2) - Good for market data
- * 5. Anthropic (claude-3-5-sonnet) - High quality
- * 6. OpenRouter - Fallback aggregator
- * 7. Perplexity - Search-augmented
+ * Priority order (FREE providers first to minimize cost):
+ * 1. Groq (llama-3.3-70b) - Free tier, fastest inference
+ * 2. Google (gemini-2.0-flash) - Free tier
+ * --- paid fallbacks below; only used if the free ones fail ---
+ * 3. OpenAI (gpt-4o-mini)
+ * 4. xAI/Grok (grok-2)
+ * 5. Anthropic (claude-3-5-sonnet)
+ * 6. OpenRouter - aggregator
+ * 7. Perplexity - search-augmented
  */
 
 import { generateText, streamText, type CoreMessage } from "ai"
@@ -29,6 +30,17 @@ const providerConfigs = [
     model: "llama-3.3-70b-versatile",
   },
   {
+    // Free tier — tried right after Groq so paid providers stay unused.
+    name: "google" as const,
+    displayName: "Google (Gemini 2.0 Flash)",
+    key: () => process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_AI_API_KEY,
+    create: () =>
+      createGoogleGenerativeAI({
+        apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_AI_API_KEY || "",
+      }),
+    model: "gemini-2.0-flash-exp",
+  },
+  {
     name: "openai" as const,
     displayName: "OpenAI (GPT-4o Mini)",
     key: () => process.env.OPENAI_API_KEY,
@@ -36,19 +48,12 @@ const providerConfigs = [
     model: "gpt-4o-mini",
   },
   {
-    name: "google" as const,
-    displayName: "Google (Gemini 2.0 Flash)",
-    key: () => process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-    create: () => createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || "" }),
-    model: "gemini-2.0-flash-exp",
-  },
-  {
     name: "xai" as const,
     displayName: "xAI (Grok 2)",
-    key: () => process.env.XAI_API_KEY,
+    key: () => process.env.XAI_API_KEY || process.env.GROK_XAI_API_KEY,
     create: () =>
       createOpenAI({
-        apiKey: process.env.XAI_API_KEY || "",
+        apiKey: process.env.XAI_API_KEY || process.env.GROK_XAI_API_KEY || "",
         baseURL: "https://api.x.ai/v1",
       }),
     model: "grok-2-latest",

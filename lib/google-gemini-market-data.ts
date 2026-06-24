@@ -2,7 +2,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google"
 
 // Function to get Google provider
 function getGoogleProvider() {
-  const apiKey = process.env.GOOGLE_AI_API_KEY
+  const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY
   if (!apiKey) return null
   return createGoogleGenerativeAI({ apiKey })
 }
