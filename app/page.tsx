@@ -18,6 +18,9 @@ import { EarningsEconomicCalendar } from "@/components/earnings-economic-calenda
 import { JobsReportDashboard } from "@/components/jobs-report-dashboard"
 import { InsiderTradingDashboard } from "@/components/insider-trading-dashboard"
 import { CongressTradeFeed } from "@/components/congress-trade-feed"
+import { PoliticianSpotlight } from "@/components/politician-spotlight"
+import { TopPerformers } from "@/components/top-performers"
+import { SmartMoneyEtfs } from "@/components/smart-money-etfs"
 import { LearnCSP } from "@/components/learn-csp"
 import { LearnCC } from "@/components/learn-cc"
 import { LearnLEAPS } from "@/components/learn-leaps"
@@ -156,10 +159,13 @@ const SCAN_TABS = [
   { id: "zebra-scanner", label: "ZEBRA" },
 ]
 
-// COPY — follow-the-smart-money tools (insiders + politicians)
+// COPY — follow-the-smart-money tools (insiders + politicians + funds)
 const COPY_TABS = [
   { id: "insiders", label: "Insider Activity" },
   { id: "congress-feed", label: "Congress Trade Feed" },
+  { id: "politician-spotlight", label: "Politician Spotlight" },
+  { id: "top-performers", label: "Top Performers" },
+  { id: "smart-money-etfs", label: "Smart-Money ETFs" },
 ]
 
 // LEARN tabs — ordered around the Wheel as the flagship teaching strategy:
@@ -276,6 +282,12 @@ export default function Home() {
         return <InsiderTradingDashboard />
       case "congress-feed":
         return <CongressTradeFeed />
+      case "politician-spotlight":
+        return <PoliticianSpotlight />
+      case "top-performers":
+        return <TopPerformers />
+      case "smart-money-etfs":
+        return <SmartMoneyEtfs />
       // SCAN tabs
       case "wheel-scanner":
         return <WheelScanner />
