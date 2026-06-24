@@ -197,28 +197,72 @@ export function EarningsEconomicCalendar() {
   const [refreshing, setRefreshing] = useState(false)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
   const [loaded, setLoaded] = useState(false)
+  // Phase 2 (progressive AI): calendar renders fast, AI fills in after.
+  const [insightsLoading, setInsightsLoading] = useState(false)
+
+  // Phase 2 — POST the rendered items to /insights and merge AI back in.
+  const fetchInsights = useCallback(async (initial: CalendarData) => {
+    try {
+      setInsightsLoading(true)
+      const res = await fetch("/api/earnings-calendar/insights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          earnings: initial.earnings.map((e) => ({ ticker: e.ticker, company: e.company, estimate: e.estimate })),
+          economic: initial.economic.map((e) => ({ event: e.event, impact: e.impact, forecast: e.forecast })),
+          label: initial.dateRange,
+        }),
+      })
+      if (!res.ok) return // graceful — calendar already showing
+      const payload = await res.json()
+      const earningsMap = new Map<string, string>(
+        (payload.earningsExplainers || []).map((x: any) => [x.ticker, x.aiExplainer]),
+      )
+      const economicMap = new Map<string, string>(
+        (payload.economicExplainers || []).map((x: any) => [x.event, x.aiExplainer]),
+      )
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              earnings: prev.earnings.map((e) => ({ ...e, aiExplainer: earningsMap.get(e.ticker) ?? e.aiExplainer })),
+              economic: prev.economic.map((e) => ({ ...e, aiExplainer: economicMap.get(e.event) ?? e.aiExplainer })),
+              earningsInsights: payload.earningsInsights || prev.earningsInsights,
+              economicInsights: payload.economicInsights || prev.economicInsights,
+            }
+          : prev,
+      )
+    } catch (err) {
+      console.log("[v0] Insights fetch error (calendar still usable):", err)
+    } finally {
+      setInsightsLoading(false)
+    }
+  }, [])
 
   const fetchCalendarData = useCallback(async () => {
     try {
       setError(null)
-      const res = await fetch("/api/earnings-calendar", {
-        cache: "no-store",
-      })
+      // Phase 1: fast calendar (no AI) — typically ~2s vs ~75s with AI.
+      const res = await fetch("/api/earnings-calendar?skipAI=true", { cache: "no-store" })
 
       if (!res.ok) {
         throw new Error("Failed to fetch calendar data")
       }
 
-      const calendarData = await res.json()
+      const calendarData = (await res.json()) as CalendarData
       setData(calendarData)
+      setLoading(false)
+      setRefreshing(false)
+
+      // Phase 2: fire-and-forget AI fill-in.
+      fetchInsights(calendarData)
     } catch (err) {
       console.error("[v0] Calendar fetch error:", err)
       setError("Unable to load calendar data. Please try again.")
-    } finally {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [])
+  }, [fetchInsights])
 
   // Initial load (only after the user opts in)
   useEffect(() => {
@@ -288,6 +332,13 @@ export function EarningsEconomicCalendar() {
               <p className="text-xs text-gray-500 mt-1">
                 Sources: Earnings via {data.dataSources.earnings || "N/A"}, Economic via{" "}
                 {data.dataSources.economic || "N/A"}
+              </p>
+            )}
+            {insightsLoading && (
+              <p className="text-xs text-teal-600 mt-1 inline-flex items-center gap-1.5">
+                <Sparkles className="h-3 w-3" />
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Generating AI insights — calendar is ready to use; analysis fills in shortly.
               </p>
             )}
           </div>
@@ -376,7 +427,16 @@ export function EarningsEconomicCalendar() {
                               {item.ticker}
                             </a>
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-700 max-w-xs">{item.aiExplainer}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700 max-w-xs">
+                            {item.aiExplainer ? (
+                              item.aiExplainer
+                            ) : insightsLoading ? (
+                              <span className="inline-flex items-center gap-1.5 text-xs text-gray-400 italic">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                AI analysis loading…
+                              </span>
+                            ) : null}
+                          </td>
                           <td className="px-4 py-3 text-sm text-gray-900 font-medium text-right">{item.estimate}</td>
                           <td className="px-4 py-3 text-center">
                             <RunScenarioInAIDialog
@@ -467,7 +527,16 @@ export function EarningsEconomicCalendar() {
                           <td className="px-4 py-3">
                             <ImpactBadge impact={event.impact} />
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-600 max-w-[320px]">{event.aiExplainer}</td>
+                          <td className="px-4 py-3 text-sm text-gray-600 max-w-[320px]">
+                            {event.aiExplainer ? (
+                              event.aiExplainer
+                            ) : insightsLoading ? (
+                              <span className="inline-flex items-center gap-1.5 text-xs text-gray-400 italic">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                AI analysis loading…
+                              </span>
+                            ) : null}
+                          </td>
                           <td className="px-4 py-3 text-center text-sm text-gray-600">{event.forecast || "—"}</td>
                           <td className="px-4 py-3 text-center">
                             <RunScenarioInAIDialog

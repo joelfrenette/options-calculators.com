@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server"
-import { generateText } from "ai"
+import {
+  generateEarningsExplainer as aiEarningsExplainer,
+  generateEconomicExplainer as aiEconomicExplainer,
+  generateWeeklyInsights as aiWeeklyInsights,
+} from "@/lib/earnings-calendar-ai"
 
-const AI_MODELS = ["openai/gpt-4o-mini", "anthropic/claude-3-haiku-20240307", "xai/grok-2-1212"]
+export const maxDuration = 90
 
 // Get current week range (Mon-Fri, or next week if Sat/Sun)
 function getCurrentWeekRange(): { start: Date; end: Date; label: string } {
@@ -171,160 +175,18 @@ function generateCuratedEconomicEvents(startDate: Date, endDate: Date): any[] {
   return events
 }
 
-async function generateWithFallback(prompt: string, maxTokens = 100): Promise<string | null> {
-  for (const model of AI_MODELS) {
-    try {
-      console.log(`[v0] Trying AI model: ${model}`)
-      const { text } = await generateText({
-        model: model as any,
-        prompt,
-        maxTokens,
-      })
-      console.log(`[v0] AI success with ${model}`)
-      return text.trim()
-    } catch (error) {
-      console.error(`[v0] AI error (${model}):`, error instanceof Error ? error.message : error)
-      continue
-    }
-  }
-  console.log("[v0] All AI models failed, returning null")
-  return null
-}
+// AI helpers (per-row explainers + weekly insights) live in
+// @/lib/earnings-calendar-ai so they can be reused by /api/earnings-calendar/insights
+// for the progressive load path.
+const generateEarningsExplainer = aiEarningsExplainer
+const generateEconomicExplainer = aiEconomicExplainer
 
-// Generate AI explainer for an earnings event
-async function generateEarningsExplainer(ticker: string, company: string, estimate: string): Promise<string> {
-  const prompt = `You are an options trading expert. In 1-2 sentences, explain the options trading opportunity for ${ticker} (${company}) with EPS estimate ${estimate}. Focus on IV levels, expected move, and potential strategies like selling premium or buying straddles. Be concise and actionable for beginner traders.`
+const generateWeeklyInsights = aiWeeklyInsights
 
-  const result = await generateWithFallback(prompt, 100)
-  return (
-    result || `Watch for volatility expansion before ${ticker} earnings. Consider premium selling if IV is elevated.`
-  )
-}
-
-// Generate AI explainer for an economic event
-async function generateEconomicExplainer(event: string, impact: string, forecast: string): Promise<string> {
-  const prompt = `You are an options trading expert. In 1-2 sentences, explain how the ${event} economic release (Impact: ${impact}, Forecast: ${forecast}) affects options trading. Focus on which sectors/ETFs might move, volatility implications, and potential strategies. Be concise and actionable for beginner traders.`
-
-  const result = await generateWithFallback(prompt, 100)
-  return (
-    result || `Economic data release may increase market volatility. Consider SPY or QQQ options for directional plays.`
-  )
-}
-
-// Generate deep AI insights for the week
-async function generateWeeklyInsights(
-  earnings: any[],
-  economicEvents: any[],
-  weekLabel: string,
-): Promise<{ earningsInsights: any[]; economicInsights: any[] }> {
-  const earningsInsights: any[] = []
-  const economicInsights: any[] = []
-
-  const majorTickers = earnings
-    .filter((e) =>
-      ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "CRM", "ZS", "AVGO", "COST", "ADBE", "ORCL"].includes(
-        e.symbol || e.ticker,
-      ),
-    )
-    .slice(0, 5)
-
-  const highImpactEvents = economicEvents.filter((e) => e.impact === "High" || e.importance === 3).slice(0, 5)
-
-  const prompt = `You are an expert options trading analyst. Generate a trading insight for the week of ${weekLabel}.
-
-Upcoming major earnings: ${majorTickers.map((e) => e.symbol || e.ticker).join(", ") || "Light earnings week"}
-Upcoming high-impact economic events: ${highImpactEvents.map((e) => e.event || e.name).join(", ") || "No major events"}
-
-Provide a JSON response with this structure:
-{
-  "weeklyOverview": {
-    "title": "Weekly Trading Theme",
-    "summary": "2-3 sentence overview of what options traders should expect this week",
-    "watchPoints": ["3 key things to watch"],
-    "tradingTips": ["3 actionable trading tips for options traders"]
-  },
-  "topEarningsPlay": {
-    "title": "Top Earnings Play",
-    "summary": "Analysis of the most important earnings event",
-    "watchPoints": ["What to watch"],
-    "tradingTips": ["How to trade it"]
-  },
-  "topEconomicPlay": {
-    "title": "Key Economic Event",
-    "summary": "Analysis of the most important economic event",
-    "watchPoints": ["What to watch"],
-    "tradingTips": ["How to trade it"]
-  }
-}
-
-Be specific, actionable, and focused on options trading strategies.`
-
-  const result = await generateWithFallback(prompt, 800)
-
-  if (result) {
-    try {
-      const parsed = JSON.parse(result)
-
-      if (parsed.weeklyOverview) {
-        earningsInsights.push({
-          id: "weekly-overview",
-          ...parsed.weeklyOverview,
-        })
-      }
-
-      if (parsed.topEarningsPlay) {
-        earningsInsights.push({
-          id: "top-earnings",
-          ...parsed.topEarningsPlay,
-        })
-      }
-
-      if (parsed.topEconomicPlay) {
-        economicInsights.push({
-          id: "top-economic",
-          ...parsed.topEconomicPlay,
-        })
-      }
-    } catch {
-      // JSON parsing failed, use fallbacks
-    }
-  }
-
-  // Fallback static insights if AI fails
-  if (earningsInsights.length === 0) {
-    earningsInsights.push({
-      id: "weekly-overview",
-      title: "Weekly Trading Dynamics",
-      summary:
-        "Review the earnings calendar for premium selling opportunities. Elevated IV before announcements can offer attractive credit spreads.",
-      watchPoints: ["Pre-earnings IV expansion", "Sector correlation moves", "Post-earnings IV crush"],
-      tradingTips: [
-        "Consider iron condors on high IV names",
-        "Wait for confirmation before directional plays",
-        "Size positions conservatively around events",
-      ],
-    })
-  }
-
-  if (economicInsights.length === 0) {
-    economicInsights.push({
-      id: "economic-overview",
-      title: "Economic Calendar Impact",
-      summary:
-        "Economic data releases can drive broad market moves. Monitor SPY and QQQ for volatility plays around major announcements.",
-      watchPoints: ["Fed commentary and rate expectations", "Inflation data surprises", "Employment metrics"],
-      tradingTips: [
-        "Use straddles for binary events",
-        "Consider sector rotation plays",
-        "Adjust stops for increased volatility",
-      ],
-    })
-  }
-
-  return { earningsInsights, economicInsights }
-}
-
-export async function GET() {
+export async function GET(request: Request) {
+  // ?skipAI=true returns calendar data with empty AI fields immediately so the
+  // UI can render in ~2s; the client then POSTs to /insights for the slow parts.
+  const skipAI = new URL(request.url).searchParams.get("skipAI") === "true"
   try {
     const { start, end, label } = getCurrentWeekRange()
     const startDate = start.toISOString().split("T")[0]
@@ -372,12 +234,14 @@ export async function GET() {
           e.hour === 1 ? "BMO" : e.hour === 2 ? "AMC" : e.time === "bmo" ? "BMO" : e.time === "amc" ? "AMC" : "TBD"
         const timeStr = timing === "BMO" ? "Before Market Open" : timing === "AMC" ? "After Market Close" : "TBD"
 
-        // Generate AI explainer - with fallback
+        // Generate AI explainer - skipped in fast path (filled in by /insights endpoint)
         let aiExplainer = ""
-        try {
-          aiExplainer = await generateEarningsExplainer(ticker, company, estimate)
-        } catch {
-          aiExplainer = `Watch for volatility expansion before ${ticker} earnings. Consider premium selling if IV is elevated.`
+        if (!skipAI) {
+          try {
+            aiExplainer = await generateEarningsExplainer(ticker, company, estimate)
+          } catch {
+            aiExplainer = `Watch for volatility expansion before ${ticker} earnings. Consider premium selling if IV is elevated.`
+          }
         }
 
         return {
@@ -398,10 +262,12 @@ export async function GET() {
         const dateStr = dateObj.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
 
         let aiExplainer = ""
-        try {
-          aiExplainer = await generateEconomicExplainer(e.event, e.impact, e.forecast || "—")
-        } catch {
-          aiExplainer = `Economic data release may increase market volatility. Consider SPY or QQQ options for directional plays.`
+        if (!skipAI) {
+          try {
+            aiExplainer = await generateEconomicExplainer(e.event, e.impact, e.forecast || "—")
+          } catch {
+            aiExplainer = `Economic data release may increase market volatility. Consider SPY or QQQ options for directional plays.`
+          }
         }
 
         return {
@@ -418,14 +284,17 @@ export async function GET() {
       }),
     )
 
-    // Generate AI insights for the week
+    // Generate AI insights for the week — skipped in the fast path
+    // (client will POST to /api/earnings-calendar/insights after first render).
     let earningsInsights: any[] = []
     let economicInsights: any[] = []
 
     try {
-      const insights = await generateWeeklyInsights(earnings, economicEvents, label)
-      earningsInsights = insights.earningsInsights
-      economicInsights = insights.economicInsights
+      if (!skipAI) {
+        const insights = await generateWeeklyInsights(earnings, economicEvents, label)
+        earningsInsights = insights.earningsInsights
+        economicInsights = insights.economicInsights
+      }
     } catch (e) {
       console.error("[v0] Weekly insights generation failed:", e)
       // Use static fallbacks
