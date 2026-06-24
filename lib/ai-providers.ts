@@ -21,7 +21,10 @@ import { resolveApiKey } from "@/lib/api-keys"
 
 // OpenRouter free model used as the primary provider (zero per-token cost).
 // Override via OPENROUTER_FREE_MODEL if you want a different :free model.
-const OPENROUTER_FREE_MODEL = process.env.OPENROUTER_FREE_MODEL || "meta-llama/llama-3.3-70b-instruct:free"
+// DeepSeek V4 Flash: reasoning-capable, fast, 1M context — strongest free
+// pick for market analysis. Override via OPENROUTER_FREE_MODEL if the slug
+// changes (verify at openrouter.ai/models, free filter).
+const OPENROUTER_FREE_MODEL = process.env.OPENROUTER_FREE_MODEL || "deepseek/deepseek-v4-flash:free"
 
 const providerConfigs = [
   {

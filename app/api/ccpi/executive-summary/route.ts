@@ -5,7 +5,7 @@ import { createAnthropic } from "@ai-sdk/anthropic"
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { resolveApiKey } from "@/lib/api-keys"
 
-const OPENROUTER_FREE_MODEL = process.env.OPENROUTER_FREE_MODEL || "meta-llama/llama-3.3-70b-instruct:free"
+const OPENROUTER_FREE_MODEL = process.env.OPENROUTER_FREE_MODEL || "deepseek/deepseek-v4-flash:free"
 
 const providerConfigs = [
   {

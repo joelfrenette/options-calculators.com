@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { resolveApiKey } from "@/lib/api-keys"
+import { generateWithFallback } from "@/lib/ai-providers"
 import {
   getRedditSentiment,
   getGoogleTrendsSentiment,
@@ -168,8 +169,47 @@ async function getNewsFearGreed(): Promise<{ score: number; source: string }> {
   }
 }
 
-// ========== AAII INVESTOR SURVEY (scrape; -1 if unavailable, never historical fake) ==========
+// ========== AAII INVESTOR SURVEY ==========
+// Free-first: fetch aaii.com directly (the weekly survey numbers are public).
+// Only fall back to ScrapingBee if its key is still enabled. -1 if all fail —
+// never a fabricated/historical value.
+function parseAAII(html: string): { score: number; source: string; bullish: number } | null {
+  const bullMatch = html.match(/Bullish[:\s]*(\d+(?:\.\d+)?)\s*%/i) || html.match(/(\d+(?:\.\d+)?)\s*%\s*Bullish/i)
+  const bearMatch = html.match(/Bearish[:\s]*(\d+(?:\.\d+)?)\s*%/i) || html.match(/(\d+(?:\.\d+)?)\s*%\s*Bearish/i)
+  if (!bullMatch) return null
+  const bullish = Number.parseFloat(bullMatch[1])
+  const bearish = bearMatch ? Number.parseFloat(bearMatch[1]) : (100 - bullish) / 2
+  if (!(bullish > 0 && bullish < 100)) return null
+  const score = Math.round((bullish / (bullish + bearish)) * 100)
+  return { score, source: "aaii_live", bullish }
+}
+
 async function getAAIISentiment(): Promise<{ score: number; source: string; bullish: number }> {
+  // 1) Direct free fetch (no scraper) — browser-like UA, weekly data so cacheable.
+  for (const url of ["https://www.aaii.com/sentimentsurvey", "https://www.aaii.com/sentimentsurvey/sent_results"]) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+          Accept: "text/html,application/xhtml+xml",
+        },
+        signal: AbortSignal.timeout(12000),
+        next: { revalidate: 3600 },
+      })
+      if (res.ok) {
+        const parsed = parseAAII(await res.text())
+        if (parsed) {
+          console.log(`[v0] ✓ AAII (direct free): ${parsed.score}/100 (${parsed.bullish}% bullish)`)
+          return parsed
+        }
+      }
+    } catch {
+      /* try next url / fall through */
+    }
+  }
+
+  // 2) Optional ScrapingBee fallback (only if key still enabled).
   try {
     const key = resolveApiKey("SCRAPINGBEE_API_KEY") // respects DISABLED_APIS kill switch
     if (key) {
@@ -178,24 +218,19 @@ async function getAAIISentiment(): Promise<{ score: number; source: string; bull
         signal: AbortSignal.timeout(15000),
       })
       if (res.ok) {
-        const html = await res.text()
-        const bullMatch = html.match(/Bullish[:\s]*(\d+(?:\.\d+)?)\s*%/i) || html.match(/(\d+(?:\.\d+)?)\s*%\s*Bullish/i)
-        const bearMatch = html.match(/Bearish[:\s]*(\d+(?:\.\d+)?)\s*%/i) || html.match(/(\d+(?:\.\d+)?)\s*%\s*Bearish/i)
-        if (bullMatch) {
-          const bullish = Number.parseFloat(bullMatch[1])
-          const bearish = bearMatch ? Number.parseFloat(bearMatch[1]) : (100 - bullish) / 2
-          const score = Math.round((bullish / (bullish + bearish)) * 100)
-          console.log(`[v0] ✓ AAII (live): ${score}/100 (${bullish}% bullish)`)
-          return { score, source: "aaii_live", bullish }
+        const parsed = parseAAII(await res.text())
+        if (parsed) {
+          console.log(`[v0] ✓ AAII (scrapingbee): ${parsed.score}/100`)
+          return parsed
         }
       }
     }
-    console.log("[v0] AAII: unavailable (no live scrape)")
-    return { score: -1, source: "unavailable", bullish: 0 }
   } catch (err) {
-    console.log("[v0] AAII error:", err instanceof Error ? err.message : "Unknown")
-    return { score: -1, source: "error", bullish: 0 }
+    console.log("[v0] AAII scrape error:", err instanceof Error ? err.message : "Unknown")
   }
+
+  console.log("[v0] AAII: unavailable")
+  return { score: -1, source: "unavailable", bullish: 0 }
 }
 
 // ========== AI EXECUTIVE SUMMARY (analysis of the REAL scores above) ==========
@@ -203,41 +238,22 @@ async function generateExecutiveSummary(
   globalScore: number,
   indicators: Array<{ name: string; score: number; status: string }>,
 ): Promise<{ summary: string; outlook: string; strategies: string[] }> {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) return generateFallbackSummary(globalScore)
   try {
     const active = indicators.filter((i) => i.status === "LIVE" && i.score >= 0)
     const indicatorSummary = active.map((i) => `${i.name}: ${i.score}/100`).join(", ")
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `You are a senior options trading analyst. Higher sentiment = more bullish. RESPOND WITH ONLY JSON:
+    // Routed through the free-first AI chain (OpenRouter free -> Groq -> Gemini).
+    const { text } = await generateWithFallback({
+      system: `You are a senior options trading analyst. Higher sentiment = more bullish. RESPOND WITH ONLY JSON:
 {"summary":"<2-3 sentences on current social sentiment and market meaning>","outlook":"<1 sentence weekly outlook for options traders>","strategies":["<s1>","<s2>","<s3>"]}
 Be specific about options strategies (credit spreads, iron condors, straddles, etc.)`,
-          },
-          {
-            role: "user",
-            content: `Global social sentiment: ${globalScore}/100. Live indicators: ${indicatorSummary}. What does this mean for options traders this week?`,
-          },
-        ],
-        temperature: 0.3,
-        max_tokens: 300,
-      }),
-      signal: AbortSignal.timeout(20000),
+      prompt: `Global social sentiment: ${globalScore}/100. Live indicators: ${indicatorSummary}. What does this mean for options traders this week?`,
+      temperature: 0.3,
+      maxTokens: 300,
     })
-    if (res.ok) {
-      const data = await res.json()
-      const content = data.choices?.[0]?.message?.content?.trim() || ""
-      const m = content.match(/\{[\s\S]*\}/)
-      if (m) {
-        const parsed = JSON.parse(m[0])
-        return { summary: parsed.summary || "", outlook: parsed.outlook || "", strategies: parsed.strategies || [] }
-      }
+    const m = text.match(/\{[\s\S]*\}/)
+    if (m) {
+      const parsed = JSON.parse(m[0])
+      return { summary: parsed.summary || "", outlook: parsed.outlook || "", strategies: parsed.strategies || [] }
     }
   } catch (err) {
     console.log("[v0] Executive summary error:", err)
