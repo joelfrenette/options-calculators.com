@@ -21,6 +21,9 @@ import { CongressTradeFeed } from "@/components/congress-trade-feed"
 import { PoliticianSpotlight } from "@/components/politician-spotlight"
 import { TopPerformers } from "@/components/top-performers"
 import { SmartMoneyEtfs } from "@/components/smart-money-etfs"
+import { InsiderClusters } from "@/components/insider-clusters"
+import { Form144Watch } from "@/components/form-144-watch"
+import { HedgeFund13F } from "@/components/hedge-fund-13f"
 import { LearnCSP } from "@/components/learn-csp"
 import { LearnCC } from "@/components/learn-cc"
 import { LearnLEAPS } from "@/components/learn-leaps"
@@ -162,9 +165,12 @@ const SCAN_TABS = [
 // COPY — follow-the-smart-money tools (insiders + politicians + funds)
 const COPY_TABS = [
   { id: "insiders", label: "Insider Activity" },
+  { id: "insider-clusters", label: "Cluster Buys" },
+  { id: "form-144", label: "Form 144 Watch" },
   { id: "congress-feed", label: "Congress Trade Feed" },
   { id: "politician-spotlight", label: "Politician Spotlight" },
   { id: "top-performers", label: "Top Performers" },
+  { id: "hedge-fund-13f", label: "Hedge Fund 13F" },
   { id: "smart-money-etfs", label: "Smart-Money ETFs" },
 ]
 
@@ -288,6 +294,12 @@ export default function Home() {
         return <TopPerformers />
       case "smart-money-etfs":
         return <SmartMoneyEtfs />
+      case "insider-clusters":
+        return <InsiderClusters />
+      case "form-144":
+        return <Form144Watch />
+      case "hedge-fund-13f":
+        return <HedgeFund13F />
       // SCAN tabs
       case "wheel-scanner":
         return <WheelScanner />
