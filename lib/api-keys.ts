@@ -35,6 +35,29 @@ export const API_KEY_ALIASES: Record<string, string[]> = {
 
 export type ApiKeyName = keyof typeof API_KEY_ALIASES
 
+// --- Cost controls (no-infra kill switch) ---------------------------------
+// Set DISABLED_APIS in the environment to a comma-separated list of canonical
+// key names (e.g. "TWELVE_DATA_API_KEY,APIFY_API_TOKEN"). Disabled services
+// resolve to an empty key, so the app behaves as if unconfigured and falls
+// back to its free/local path — letting you stop paying for an API without
+// deleting its key.
+export function getDisabledServices(): string[] {
+  return (process.env.DISABLED_APIS ?? "")
+    .split(",")
+    .map((s) => s.trim().toUpperCase())
+    .filter(Boolean)
+}
+
+export function isServiceDisabled(name: string): boolean {
+  return getDisabledServices().includes(name.toUpperCase())
+}
+
+// Monthly budget target (USD) for the cost dashboard. Default $40.
+export function getMonthlyBudgetTarget(): number {
+  const raw = Number(process.env.MONTHLY_BUDGET_TARGET)
+  return Number.isFinite(raw) && raw >= 0 ? raw : 40
+}
+
 // Backwards-compatible interface (kept for existing imports).
 export interface ApiKeyConfig {
   POLYGON_API_KEY?: string
@@ -48,7 +71,9 @@ export interface ApiKeyConfig {
 }
 
 // Resolve a key by canonical name, falling back through every known alias.
+// Returns "" if the service has been disabled via DISABLED_APIS (kill switch).
 export function resolveApiKey(name: string): string {
+  if (isServiceDisabled(name)) return ""
   const aliases = API_KEY_ALIASES[name] ?? [name]
   for (const alias of aliases) {
     const value = process.env[alias]
@@ -66,9 +91,16 @@ export function getApiKey(keyName: string): string {
   return value
 }
 
-// Is a given service configured (any alias present)?
+// Is a given service configured (any alias present)? Respects the kill switch.
 export function isKeyConfigured(name: string): boolean {
   return resolveApiKey(name).length > 0
+}
+
+// Is a raw key present, ignoring the kill switch? Lets the dashboard tell
+// "disabled but key still set" apart from "no key at all".
+export function hasRawKey(name: string): boolean {
+  const aliases = API_KEY_ALIASES[name] ?? [name]
+  return aliases.some((alias) => !!process.env[alias])
 }
 
 // For the admin UI - presence map across every service the app uses.
