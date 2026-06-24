@@ -17,6 +17,7 @@ import { SocialSentiment } from "@/components/social-sentiment"
 import { EarningsEconomicCalendar } from "@/components/earnings-economic-calendar"
 import { JobsReportDashboard } from "@/components/jobs-report-dashboard"
 import { InsiderTradingDashboard } from "@/components/insider-trading-dashboard"
+import { CongressTradeFeed } from "@/components/congress-trade-feed"
 import { OptionsStrategyToolbox } from "@/components/options-strategy-toolbox"
 import { ExitRulesDashboard } from "@/components/exit-rules-dashboard"
 import { CreditSpreadScanner } from "@/components/credit-spread-scanner"
@@ -25,7 +26,7 @@ import { CalendarSpreadScanner } from "@/components/calendar-spread-scanner"
 import { ButterflyScanner } from "@/components/butterfly-scanner"
 import { LEAPSScanner } from "@/components/leaps-scanner"
 import { ZEBRAScanner } from "@/components/zebra-scanner"
-import { Menu, X, TrendingUp, Zap, Search } from "lucide-react"
+import { Menu, X, TrendingUp, Zap, Search, Users } from "lucide-react"
 import Image from "next/image"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
@@ -142,7 +143,6 @@ const ANALYZE_TABS: Array<{ id: string; label: string; tooltip: string; featured
 ]
 
 const SCAN_TABS = [
-  { id: "insiders", label: "Insider Trading Scanner" },
   { id: "wheel-scanner", label: "Sell Put Scanner" },
   { id: "calendar-spread-scanner", label: "Calendar Spreads" },
   { id: "credit-spread-scanner", label: "Credit Spreads" },
@@ -150,6 +150,12 @@ const SCAN_TABS = [
   { id: "butterfly-scanner", label: "Butterflies" },
   { id: "leaps-scanner", label: "LEAPS" },
   { id: "zebra-scanner", label: "ZEBRA" },
+]
+
+// COPY — follow-the-smart-money tools (insiders + politicians)
+const COPY_TABS = [
+  { id: "insiders", label: "Insider Activity" },
+  { id: "congress-feed", label: "Congress Trade Feed" },
 ]
 
 const EXECUTE_TABS = [
@@ -171,11 +177,12 @@ const CATEGORY_TOOLTIPS = {
   analyze:
     "Research tools: Check market conditions, sentiment, and upcoming events before you trade. Know the environment before placing any trades.",
   scan: "Find opportunities: Screen for the best setups across different strategies. These scanners find high-probability trades that match specific criteria.",
+  copy: "Follow the smart money: Track what corporate insiders and members of Congress are buying and selling under STOCK Act and Form 4 disclosures.",
   execute:
     "Learn & calculate: Understand each strategy's mechanics, see payoff diagrams, and calculate risk/reward before you enter a trade.",
 }
 
-type Category = "analyze" | "scan" | "execute"
+type Category = "analyze" | "scan" | "copy" | "execute"
 
 export default function Home() {
   const [activeCategory, setActiveCategory] = useState<Category>("analyze")
@@ -194,11 +201,25 @@ export default function Home() {
     })
   }, [activeTab])
 
-  const currentTabs = activeCategory === "analyze" ? ANALYZE_TABS : activeCategory === "scan" ? SCAN_TABS : EXECUTE_TABS
+  const currentTabs =
+    activeCategory === "analyze"
+      ? ANALYZE_TABS
+      : activeCategory === "scan"
+        ? SCAN_TABS
+        : activeCategory === "copy"
+          ? COPY_TABS
+          : EXECUTE_TABS
 
   const handleCategoryChange = (category: Category) => {
     setActiveCategory(category)
-    const firstTab = category === "analyze" ? ANALYZE_TABS[0] : category === "scan" ? SCAN_TABS[0] : EXECUTE_TABS[0]
+    const firstTab =
+      category === "analyze"
+        ? ANALYZE_TABS[0]
+        : category === "scan"
+          ? SCAN_TABS[0]
+          : category === "copy"
+            ? COPY_TABS[0]
+            : EXECUTE_TABS[0]
     setActiveTab(firstTab.id)
   }
 
@@ -238,8 +259,11 @@ export default function Home() {
         return <CpiInflationAnalysis />
       case "jobs":
         return <JobsReportDashboard />
+      // COPY tabs
       case "insiders":
         return <InsiderTradingDashboard />
+      case "congress-feed":
+        return <CongressTradeFeed />
       // SCAN tabs
       case "wheel-scanner":
         return <WheelScanner />
@@ -335,7 +359,7 @@ export default function Home() {
 
           <div className="container mx-auto px-4 bg-gray-50 border-b border-gray-200">
             <div className="max-w-5xl mx-auto">
-              <div className="hidden md:grid grid-cols-3 gap-0 py-0">
+              <div className="hidden md:grid grid-cols-4 gap-0 py-0">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
@@ -370,6 +394,24 @@ export default function Home() {
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="max-w-xs text-center">
                     <p>{CATEGORY_TOOLTIPS.scan}</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => handleCategoryChange("copy")}
+                      className={`flex items-center justify-center gap-2 px-6 py-3 text-sm font-bold transition-all border-b-2 border-r border-gray-200 ${
+                        activeCategory === "copy"
+                          ? "bg-emerald-700 text-white border-emerald-700"
+                          : "bg-white text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                      }`}
+                    >
+                      <Users className="h-4 w-4" />
+                      COPY
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs text-center">
+                    <p>{CATEGORY_TOOLTIPS.copy}</p>
                   </TooltipContent>
                 </Tooltip>
                 <Tooltip>
@@ -453,6 +495,15 @@ export default function Home() {
                         SCAN
                       </button>
                       <button
+                        onClick={() => setActiveCategory("copy")}
+                        className={`flex-1 flex items-center justify-center gap-1 px-2 py-2 text-xs font-bold rounded-lg transition-all ${
+                          activeCategory === "copy" ? "bg-emerald-700 text-white" : "bg-gray-100 text-gray-600"
+                        }`}
+                      >
+                        <Users className="h-3 w-3" />
+                        COPY
+                      </button>
+                      <button
                         onClick={() => setActiveCategory("execute")}
                         className={`flex-1 flex items-center justify-center gap-1 px-2 py-2 text-xs font-bold rounded-lg transition-all ${
                           activeCategory === "execute" ? "bg-emerald-700 text-white" : "bg-gray-100 text-gray-600"
@@ -513,6 +564,15 @@ export default function Home() {
                     >
                       <Search className="h-3 w-3" />
                       SCAN
+                    </button>
+                    <button
+                      onClick={() => handleCategoryChange("copy")}
+                      className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-bold rounded transition-all ${
+                        activeCategory === "copy" ? "bg-emerald-700 text-white" : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      <Users className="h-3 w-3" />
+                      COPY
                     </button>
                     <button
                       onClick={() => handleCategoryChange("execute")}
