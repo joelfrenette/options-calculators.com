@@ -72,10 +72,11 @@ const REDDIT_UA = "web:options-calculators.com:v1.0 (market-sentiment)"
 // the public www JSON endpoint, but oauth.reddit.com works with free app creds
 // (set REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET). Returns null if not configured.
 async function getRedditToken(): Promise<string | null> {
+  // NOTE: Reddit's client_credentials (app-only) grant requires a SCRIPT-type
+  // app. Web/installed apps return 401 here. Create a "script" app at
+  // reddit.com/prefs/apps and set REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET.
   const id = process.env.REDDIT_CLIENT_ID
   const secret = process.env.REDDIT_CLIENT_SECRET
-  // Diagnostic (presence + lengths only — never logs the actual values).
-  console.log(`[v0] Reddit creds: id=${!!id}(${(id || "").length}) secret=${!!secret}(${(secret || "").length})`)
   if (!id || !secret) return null
   try {
     const res = await fetch("https://www.reddit.com/api/v1/access_token", {
