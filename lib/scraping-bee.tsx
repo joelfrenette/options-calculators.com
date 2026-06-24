@@ -4,6 +4,7 @@
  */
 
 import { fetchShortInterestWithGrok, fetchMarketDataWithGrok } from "./grok-market-data"
+import { resolveApiKey } from "./api-keys"
 
 export interface ScrapingBeeOptions {
   renderJs?: boolean // Render JavaScript (default: true)
@@ -27,19 +28,42 @@ export interface ScrapingBeeResponse {
  * Scrape a URL using ScrapingBee
  */
 export async function scrapeUrl(url: string, options: ScrapingBeeOptions = {}): Promise<ScrapingBeeResponse> {
-  const response = await fetch("/api/scraping-bee", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url, options }),
-  })
-
-  const result = await response.json()
-
-  if (!result.success) {
-    throw new Error(result.message || "Failed to scrape URL")
+  // Short-circuit when ScrapingBee is unconfigured/disabled. (The original
+  // implementation used a relative `/api/scraping-bee` fetch which is invalid
+  // server-side and always threw — callers swallowed the rejection and fell
+  // back to baseline. Fail cleanly so callers can branch instead.)
+  const key = resolveApiKey("SCRAPINGBEE_API_KEY") // respects DISABLED_APIS
+  if (!key) {
+    throw new Error("ScrapingBee is not configured")
   }
 
-  return result
+  const params = new URLSearchParams({
+    api_key: key,
+    url,
+    render_js: options.renderJs === false ? "false" : "true",
+    premium_proxy: options.premiumProxy === false ? "false" : "true",
+    country_code: options.countryCode || "us",
+    ...(options.customParams || {}),
+  })
+  const response = await fetch(`https://app.scrapingbee.com/api/v1/?${params.toString()}`, {
+    headers: { Accept: "text/html, application/json, */*" },
+    signal: AbortSignal.timeout(25000),
+  })
+
+  if (!response.ok) {
+    throw new Error(`ScrapingBee HTTP ${response.status}`)
+  }
+  const text = await response.text()
+  return {
+    success: true,
+    data: text,
+    metadata: {
+      url,
+      contentType: response.headers.get("content-type"),
+      timestamp: new Date().toISOString(),
+      creditsUsed: response.headers.get("Spb-cost") || "0",
+    },
+  }
 }
 
 /**
