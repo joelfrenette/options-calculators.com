@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { resolveApiKey } from "@/lib/api-keys"
 
 /**
  * COMPREHENSIVE DATA SOURCE ANALYSIS & FALLBACK STRATEGY
@@ -113,18 +114,18 @@ const DATA_SOURCES = {
     cnn: "https://production.dataviz.cnn.io/index/fearandgreed/graphdata",
   },
   scraping: {
-    nyseHighsLows: process.env.SCRAPINGBEE_API_KEY ? "https://www.barchart.com/stocks/highs-lows/highs" : null,
+    nyseHighsLows: resolveApiKey("SCRAPINGBEE_API_KEY") ? "https://www.barchart.com/stocks/highs-lows/highs" : null,
   },
 }
 
 async function fetchNYSEHighsLows(): Promise<{ highs: number; lows: number } | null> {
-  if (!process.env.SCRAPINGBEE_API_KEY) {
+  if (!resolveApiKey("SCRAPINGBEE_API_KEY")) {
     console.log("[v0] ScrapingBee API key not found, using calculated approximation")
     return null
   }
 
   try {
-    const url = `https://app.scrapingbee.com/api/v1/?api_key=${process.env.SCRAPINGBEE_API_KEY}&url=https://www.barchart.com/stocks/highs-lows/highs&render_js=false`
+    const url = `https://app.scrapingbee.com/api/v1/?api_key=${resolveApiKey("SCRAPINGBEE_API_KEY")}&url=https://www.barchart.com/stocks/highs-lows/highs&render_js=false`
     const response = await fetch(url, { signal: AbortSignal.timeout(10000) })
 
     if (!response.ok) {
@@ -482,13 +483,13 @@ async function calculateFallbackIndex() {
 }
 
 async function scrapeCNNFearGreed() {
-  if (!process.env.SCRAPINGBEE_API_KEY) {
+  if (!resolveApiKey("SCRAPINGBEE_API_KEY")) {
     console.log("[v0] ScrapingBee API key not found, skipping CNN scraping")
     return null
   }
 
   try {
-    const url = `https://app.scrapingbee.com/api/v1/?api_key=${process.env.SCRAPINGBEE_API_KEY}&url=${encodeURIComponent("https://www.cnn.com/markets/fear-and-greed")}&render_js=true&wait=5000&wait_for=.market-fng-gauge`
+    const url = `https://app.scrapingbee.com/api/v1/?api_key=${resolveApiKey("SCRAPINGBEE_API_KEY")}&url=${encodeURIComponent("https://www.cnn.com/markets/fear-and-greed")}&render_js=true&wait=5000&wait_for=.market-fng-gauge`
 
     console.log("[v0] Fetching CNN Fear & Greed page with JavaScript rendering...")
     const response = await fetch(url, { signal: AbortSignal.timeout(30000) })

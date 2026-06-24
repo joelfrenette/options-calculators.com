@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { resolveApiKey } from "@/lib/api-keys"
 import {
   getRedditSentiment,
   getGoogleTrendsSentiment,
@@ -170,7 +171,7 @@ async function getNewsFearGreed(): Promise<{ score: number; source: string }> {
 // ========== AAII INVESTOR SURVEY (scrape; -1 if unavailable, never historical fake) ==========
 async function getAAIISentiment(): Promise<{ score: number; source: string; bullish: number }> {
   try {
-    const key = process.env.SCRAPINGBEE_API_KEY
+    const key = resolveApiKey("SCRAPINGBEE_API_KEY") // respects DISABLED_APIS kill switch
     if (key) {
       const target = encodeURIComponent("https://www.aaii.com/sentimentsurvey")
       const res = await fetch(`https://app.scrapingbee.com/api/v1/?api_key=${key}&url=${target}&render_js=true`, {

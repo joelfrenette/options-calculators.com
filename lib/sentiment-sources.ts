@@ -369,7 +369,7 @@ export async function getGoogleNewsSentiment(): Promise<{
 // fetch) so it works inside route handlers. Returns HTML string or null.
 // ----------------------------------------------------------------------------
 async function scrapeBeeHtml(targetUrl: string, renderJs = true): Promise<string | null> {
-  const key = process.env.SCRAPINGBEE_API_KEY
+  const key = resolveApiKey("SCRAPINGBEE_API_KEY") // respects DISABLED_APIS kill switch
   if (!key) return null
   try {
     const params = new URLSearchParams({
