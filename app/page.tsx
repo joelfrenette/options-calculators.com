@@ -18,6 +18,10 @@ import { EarningsEconomicCalendar } from "@/components/earnings-economic-calenda
 import { JobsReportDashboard } from "@/components/jobs-report-dashboard"
 import { InsiderTradingDashboard } from "@/components/insider-trading-dashboard"
 import { CongressTradeFeed } from "@/components/congress-trade-feed"
+import { LearnCSP } from "@/components/learn-csp"
+import { LearnCC } from "@/components/learn-cc"
+import { LearnLEAPS } from "@/components/learn-leaps"
+import { LearnPMCC } from "@/components/learn-pmcc"
 import { OptionsStrategyToolbox } from "@/components/options-strategy-toolbox"
 import { ExitRulesDashboard } from "@/components/exit-rules-dashboard"
 import { CreditSpreadScanner } from "@/components/credit-spread-scanner"
@@ -158,15 +162,23 @@ const COPY_TABS = [
   { id: "congress-feed", label: "Congress Trade Feed" },
 ]
 
+// LEARN tabs — ordered around the Wheel as the flagship teaching strategy:
+//   1. The Wheel (destination)
+//   2-5. Prerequisites needed to understand the Wheel (CSP, CC, LEAPS, PMCC)
+//   6+ Other strategies ranked by popularity, then utility tools last.
 const EXECUTE_TABS = [
+  { id: "wheel-strategy", label: "The Wheel" },
+  { id: "learn-csp", label: "Cash-Secured Puts" },
+  { id: "learn-cc", label: "Covered Calls" },
+  { id: "learn-leaps", label: "LEAPS" },
+  { id: "learn-pmcc", label: "PMCC" },
   { id: "credit-spreads", label: "Credit Spreads" },
   { id: "iron-condors", label: "Iron Condors" },
+  { id: "straddles-strangles", label: "Straddles" },
+  { id: "diagonals", label: "Diagonals" },
   { id: "calendar-spreads", label: "Calendars" },
   { id: "butterflies", label: "Butterflies" },
   { id: "collars", label: "Collars" },
-  { id: "diagonals", label: "Diagonals" },
-  { id: "straddles-strangles", label: "Straddles" },
-  { id: "wheel-strategy", label: "Wheel" },
   { id: "exit-rules", label: "Exit Rules" },
   { id: "earnings-iv-crusher", label: "Earnings EM" },
   { id: "greeks", label: "Greeks Calc" },
@@ -296,6 +308,15 @@ export default function Home() {
         return <OptionsStrategyToolbox strategy="straddles-strangles" />
       case "wheel-strategy":
         return <OptionsStrategyToolbox strategy="wheel-strategy" />
+      // Wheel-prerequisite teaching pages (new)
+      case "learn-csp":
+        return <LearnCSP />
+      case "learn-cc":
+        return <LearnCC />
+      case "learn-leaps":
+        return <LearnLEAPS />
+      case "learn-pmcc":
+        return <LearnPMCC />
       case "exit-rules":
         return <ExitRulesDashboard />
       case "earnings-iv-crusher":
