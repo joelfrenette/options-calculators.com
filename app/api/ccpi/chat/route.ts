@@ -2,59 +2,60 @@ import { streamText, convertToModelMessages, type UIMessage } from "ai"
 import { createOpenAI } from "@ai-sdk/openai"
 import { createAnthropic } from "@ai-sdk/anthropic"
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
+import { resolveApiKey } from "@/lib/api-keys"
+
+const OPENROUTER_FREE_MODEL = process.env.OPENROUTER_FREE_MODEL || "meta-llama/llama-3.3-70b-instruct:free"
 
 const providerConfigs = [
   {
-    name: "Groq",
-    key: () => process.env.GROQ_API_KEY,
+    // PRIMARY — OpenRouter free model ($0 per token).
+    name: "OpenRouter (free)",
+    key: () => resolveApiKey("OPENROUTER_API_KEY"),
     create: () =>
       createOpenAI({
-        apiKey: process.env.GROQ_API_KEY || "",
+        apiKey: resolveApiKey("OPENROUTER_API_KEY"),
+        baseURL: "https://openrouter.ai/api/v1",
+      }),
+    model: OPENROUTER_FREE_MODEL,
+  },
+  {
+    name: "Groq",
+    key: () => resolveApiKey("GROQ_API_KEY"),
+    create: () =>
+      createOpenAI({
+        apiKey: resolveApiKey("GROQ_API_KEY"),
         baseURL: "https://api.groq.com/openai/v1",
       }),
     model: "llama-3.3-70b-versatile",
   },
   {
-    // Free tier — kept ahead of paid providers.
     name: "Google",
-    key: () => process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_AI_API_KEY,
-    create: () =>
-      createGoogleGenerativeAI({
-        apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_AI_API_KEY || "",
-      }),
+    key: () => resolveApiKey("GOOGLE_AI_API_KEY"),
+    create: () => createGoogleGenerativeAI({ apiKey: resolveApiKey("GOOGLE_AI_API_KEY") }),
     model: "gemini-2.0-flash-exp",
   },
+  // --- paid fallbacks; disable via DISABLED_APIS to guarantee $0 ---
   {
     name: "OpenAI",
-    key: () => process.env.OPENAI_API_KEY,
-    create: () => createOpenAI({ apiKey: process.env.OPENAI_API_KEY || "" }),
+    key: () => resolveApiKey("OPENAI_API_KEY"),
+    create: () => createOpenAI({ apiKey: resolveApiKey("OPENAI_API_KEY") }),
     model: "gpt-4o-mini",
   },
   {
     name: "xAI",
-    key: () => process.env.XAI_API_KEY || process.env.GROK_XAI_API_KEY,
+    key: () => resolveApiKey("XAI_API_KEY"),
     create: () =>
       createOpenAI({
-        apiKey: process.env.XAI_API_KEY || process.env.GROK_XAI_API_KEY || "",
+        apiKey: resolveApiKey("XAI_API_KEY"),
         baseURL: "https://api.x.ai/v1",
       }),
     model: "grok-2-latest",
   },
   {
     name: "Anthropic",
-    key: () => process.env.ANTHROPIC_API_KEY,
-    create: () => createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "" }),
+    key: () => resolveApiKey("ANTHROPIC_API_KEY"),
+    create: () => createAnthropic({ apiKey: resolveApiKey("ANTHROPIC_API_KEY") }),
     model: "claude-3-5-sonnet-20241022",
-  },
-  {
-    name: "OpenRouter",
-    key: () => process.env.OPENROUTER_API_KEY,
-    create: () =>
-      createOpenAI({
-        apiKey: process.env.OPENROUTER_API_KEY || "",
-        baseURL: "https://openrouter.ai/api/v1",
-      }),
-    model: "meta-llama/llama-3.3-70b-instruct",
   },
 ]
 

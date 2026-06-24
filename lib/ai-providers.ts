@@ -2,13 +2,14 @@
  * AI Provider Configuration with Fallback Support
  *
  * Priority order (FREE providers first to minimize cost):
- * 1. Groq (llama-3.3-70b) - Free tier, fastest inference
- * 2. Google (gemini-2.0-flash) - Free tier
- * --- paid fallbacks below; only used if the free ones fail ---
- * 3. OpenAI (gpt-4o-mini)
- * 4. xAI/Grok (grok-2)
- * 5. Anthropic (claude-3-5-sonnet)
- * 6. OpenRouter - aggregator
+ * 1. OpenRouter (:free model) - $0 per token, primary
+ * 2. Groq (llama-3.3-70b) - free tier backup
+ * 3. Google (gemini-2.0-flash) - free tier backup
+ * --- paid fallbacks below; only used if all free providers fail AND the key
+ *     is set. Disable via DISABLED_APIS to guarantee $0. ---
+ * 4. OpenAI (gpt-4o-mini)
+ * 5. xAI/Grok (grok-2)
+ * 6. Anthropic (claude-3-5-sonnet)
  * 7. Perplexity - search-augmented
  */
 
@@ -16,44 +17,62 @@ import { generateText, streamText, type CoreMessage } from "ai"
 import { createOpenAI } from "@ai-sdk/openai"
 import { createAnthropic } from "@ai-sdk/anthropic"
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
+import { resolveApiKey } from "@/lib/api-keys"
+
+// OpenRouter free model used as the primary provider (zero per-token cost).
+// Override via OPENROUTER_FREE_MODEL if you want a different :free model.
+const OPENROUTER_FREE_MODEL = process.env.OPENROUTER_FREE_MODEL || "meta-llama/llama-3.3-70b-instruct:free"
 
 const providerConfigs = [
   {
-    name: "groq" as const,
-    displayName: "Groq (Llama 3.3 70B)",
-    key: () => process.env.GROQ_API_KEY,
+    // PRIMARY — OpenRouter free model. $0 per token; one-time $10 deposit
+    // raises the daily cap to 1,000 requests.
+    name: "openrouter" as const,
+    displayName: "OpenRouter (free model)",
+    key: () => resolveApiKey("OPENROUTER_API_KEY"),
     create: () =>
       createOpenAI({
-        apiKey: process.env.GROQ_API_KEY || "",
+        apiKey: resolveApiKey("OPENROUTER_API_KEY"),
+        baseURL: "https://openrouter.ai/api/v1",
+      }),
+    model: OPENROUTER_FREE_MODEL,
+  },
+  {
+    // Free backup.
+    name: "groq" as const,
+    displayName: "Groq (Llama 3.3 70B)",
+    key: () => resolveApiKey("GROQ_API_KEY"),
+    create: () =>
+      createOpenAI({
+        apiKey: resolveApiKey("GROQ_API_KEY"),
         baseURL: "https://api.groq.com/openai/v1",
       }),
     model: "llama-3.3-70b-versatile",
   },
   {
-    // Free tier — tried right after Groq so paid providers stay unused.
+    // Free backup.
     name: "google" as const,
     displayName: "Google (Gemini 2.0 Flash)",
-    key: () => process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_AI_API_KEY,
-    create: () =>
-      createGoogleGenerativeAI({
-        apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_AI_API_KEY || "",
-      }),
+    key: () => resolveApiKey("GOOGLE_AI_API_KEY"),
+    create: () => createGoogleGenerativeAI({ apiKey: resolveApiKey("GOOGLE_AI_API_KEY") }),
     model: "gemini-2.0-flash-exp",
   },
+  // --- paid fallbacks below; reachable only if all free providers fail AND
+  //     their keys are set (disable via DISABLED_APIS to guarantee $0). ---
   {
     name: "openai" as const,
     displayName: "OpenAI (GPT-4o Mini)",
-    key: () => process.env.OPENAI_API_KEY,
-    create: () => createOpenAI({ apiKey: process.env.OPENAI_API_KEY || "" }),
+    key: () => resolveApiKey("OPENAI_API_KEY"),
+    create: () => createOpenAI({ apiKey: resolveApiKey("OPENAI_API_KEY") }),
     model: "gpt-4o-mini",
   },
   {
     name: "xai" as const,
     displayName: "xAI (Grok 2)",
-    key: () => process.env.XAI_API_KEY || process.env.GROK_XAI_API_KEY,
+    key: () => resolveApiKey("XAI_API_KEY"),
     create: () =>
       createOpenAI({
-        apiKey: process.env.XAI_API_KEY || process.env.GROK_XAI_API_KEY || "",
+        apiKey: resolveApiKey("XAI_API_KEY"),
         baseURL: "https://api.x.ai/v1",
       }),
     model: "grok-2-latest",
@@ -61,28 +80,17 @@ const providerConfigs = [
   {
     name: "anthropic" as const,
     displayName: "Anthropic (Claude 3.5 Sonnet)",
-    key: () => process.env.ANTHROPIC_API_KEY,
-    create: () => createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "" }),
+    key: () => resolveApiKey("ANTHROPIC_API_KEY"),
+    create: () => createAnthropic({ apiKey: resolveApiKey("ANTHROPIC_API_KEY") }),
     model: "claude-3-5-sonnet-20241022",
-  },
-  {
-    name: "openrouter" as const,
-    displayName: "OpenRouter (Llama 3.3)",
-    key: () => process.env.OPENROUTER_API_KEY,
-    create: () =>
-      createOpenAI({
-        apiKey: process.env.OPENROUTER_API_KEY || "",
-        baseURL: "https://openrouter.ai/api/v1",
-      }),
-    model: "meta-llama/llama-3.3-70b-instruct",
   },
   {
     name: "perplexity" as const,
     displayName: "Perplexity (Sonar Large)",
-    key: () => process.env.PERPLEXITY_API_KEY,
+    key: () => resolveApiKey("PERPLEXITY_API_KEY"),
     create: () =>
       createOpenAI({
-        apiKey: process.env.PERPLEXITY_API_KEY || "",
+        apiKey: resolveApiKey("PERPLEXITY_API_KEY"),
         baseURL: "https://api.perplexity.ai",
       }),
     model: "llama-3.1-sonar-large-128k-online",
