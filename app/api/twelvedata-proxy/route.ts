@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { resolveApiKey } from "@/lib/api-keys"
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -9,7 +10,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Missing ticker parameter" }, { status: 400 })
   }
 
-  const apiKey = process.env.TWELVEDATA_API_KEY || process.env.TWELVE_DATA_API_KEY
+  const apiKey = resolveApiKey("TWELVE_DATA_API_KEY") // alias-aware + respects DISABLED_APIS
   if (!apiKey) {
     return NextResponse.json({ error: "Twelve Data API key not configured" }, { status: 500 })
   }
