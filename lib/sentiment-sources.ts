@@ -3,6 +3,7 @@
 // Every function returns a 0-100 score where HIGHER = MORE BULLISH.
 // On any failure they return score: -1 ("No data") — NEVER a fabricated value.
 // ============================================================================
+import { resolveApiKey } from "@/lib/api-keys"
 
 const BULLISH_WORDS = [
   "moon",
@@ -120,9 +121,9 @@ export async function getGoogleTrendsSentiment(): Promise<{
   source: string
   detail: string
 }> {
-  const key = process.env.SERPAPI_KEY
+  const key = resolveApiKey("SERPAPI_KEY") // respects DISABLED_APIS kill switch
   if (!key) {
-    console.log("[v0] Source (Trends): SERPAPI_KEY not set")
+    console.log("[v0] Source (Trends): SERPAPI_KEY not set or disabled")
     return { score: -1, source: "unavailable", detail: "no_key" }
   }
   try {
