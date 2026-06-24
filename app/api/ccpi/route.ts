@@ -3,6 +3,7 @@ import { fetchVIXTermStructure } from "@/lib/vix-term-structure"
 import { fetchQQQTechnicals as fetchQQQTechnicalsData } from "@/lib/qqq-technicals"
 import { scrapeBuffettIndicator, scrapePutCallRatio, scrapeAAIISentiment } from "@/lib/scraping-bee"
 import { fetchApifyYahooFinance as fetchApifyYahooFinanceUtil } from "@/lib/apify-yahoo-finance"
+import { fetchFMPValuation } from "@/lib/fmp-valuation"
 
 import {
   getShillerCAPE,
@@ -279,6 +280,7 @@ async function fetchMarketData() {
     scrapeBuffettIndicator(),
     scrapePutCallRatio(),
     scrapeAAIISentiment(),
+    fetchFMPValuation("SPY"), // live valuation fallback when Apify is disabled
   ])
 
   const qqqData = results[0].status === "fulfilled" ? results[0].value : null
@@ -297,6 +299,7 @@ async function fetchMarketData() {
       ? results[9].value
       : { bullish: aaiiBullishResult.value, bearish: 30, neutral: 35, spread: 5, status: aaiiBullishResult.source }
   const shortInterestData = { spyShortRatio: shortInterestResult.value, status: shortInterestResult.source }
+  const fmpVal = results[10].status === "fulfilled" ? results[10].value : null
 
   apiStatus.technical = {
     live: qqqData?.source === "live",
@@ -390,12 +393,12 @@ async function fetchMarketData() {
     bullishPercent: 58,
 
     // Valuation (use AI fallback)
-    spxPE: apifyData?.spxPE || 22.5,
-    spxPS: apifyData?.spxPS || 2.8,
+    spxPE: apifyData?.spxPE || fmpVal?.spxPE || 22.5,
+    spxPS: apifyData?.spxPS || fmpVal?.spxPS || 2.8,
     qqqPE: qqqPEResult.value,
     mag7Concentration: mag7Result.value,
     shillerCAPE: shillerCAPEResult.value,
-    equityRiskPremium: calculateEquityRiskPremium(apifyData?.spxPE || 22.5, fredData?.yieldCurve10Y || 4.5),
+    equityRiskPremium: calculateEquityRiskPremium(apifyData?.spxPE || fmpVal?.spxPE || 22.5, fredData?.yieldCurve10Y || 4.5),
 
     // Macro
     fedFundsRate: fredData?.fedFundsRate || 5.33,

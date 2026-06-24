@@ -178,9 +178,9 @@ export async function getTwitterSentiment(): Promise<{
   source: string
   tweets: number
 }> {
-  const token = process.env.APIFY_API_TOKEN || process.env.APIFY_API_KEY
+  const token = resolveApiKey("APIFY_API_TOKEN") // alias-aware + respects DISABLED_APIS
   if (!token) {
-    console.log("[v0] Source (Twitter): APIFY token not set")
+    console.log("[v0] Source (Twitter): APIFY token not set or disabled")
     return { score: -1, source: "unavailable", tweets: 0 }
   }
   try {
