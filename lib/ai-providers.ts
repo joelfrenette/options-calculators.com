@@ -19,12 +19,12 @@ import { createAnthropic } from "@ai-sdk/anthropic"
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { resolveApiKey } from "@/lib/api-keys"
 
-// OpenRouter free model used as the primary provider (zero per-token cost).
-// gpt-oss-120b:free — strong, reliable general reasoning, 131k context.
-// For max raw capability try nvidia/nemotron-3-ultra-550b-a55b:free; for speed
-// meta-llama/llama-3.3-70b-instruct:free. Verify slugs at openrouter.ai/api/v1/models
-// (no DeepSeek model is currently free). Override via OPENROUTER_FREE_MODEL.
-const OPENROUTER_FREE_MODEL = process.env.OPENROUTER_FREE_MODEL || "openai/gpt-oss-120b:free"
+// OpenRouter free auto-router (zero per-token cost). "openrouter/free" lets
+// OpenRouter pick among whatever models are currently free, so it survives the
+// free roster changing (the bug that broke a pinned DeepSeek slug). Pin a
+// specific model via OPENROUTER_FREE_MODEL for consistent output, e.g.
+// openai/gpt-oss-120b:free or nvidia/nemotron-3-ultra-550b-a55b:free.
+const OPENROUTER_FREE_MODEL = process.env.OPENROUTER_FREE_MODEL || "openrouter/free"
 
 const providerConfigs = [
   {

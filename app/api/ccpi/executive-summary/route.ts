@@ -5,7 +5,7 @@ import { createAnthropic } from "@ai-sdk/anthropic"
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { resolveApiKey } from "@/lib/api-keys"
 
-const OPENROUTER_FREE_MODEL = process.env.OPENROUTER_FREE_MODEL || "openai/gpt-oss-120b:free"
+const OPENROUTER_FREE_MODEL = process.env.OPENROUTER_FREE_MODEL || "openrouter/free"
 
 const providerConfigs = [
   {
