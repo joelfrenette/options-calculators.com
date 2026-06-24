@@ -77,7 +77,14 @@ const TAB_TOOLTIPS: Record<string, string> = {
     "Calculate your potential profit vs. potential loss before entering a trade. A good trade typically has 2:1 or better reward-to-risk. This tool helps you evaluate whether a setup is worth taking.",
 }
 
-const ANALYZE_TABS = [
+const ANALYZE_TABS: Array<{ id: string; label: string; tooltip: string; featured?: boolean }> = [
+  {
+    id: "ccpi",
+    label: "Crash & Corrections Prediction Index",
+    tooltip:
+      "Our flagship index. AI-powered crash probability model combining 30+ risk indicators across 4 pillars (momentum, risk appetite, valuation, macro) to estimate the chance of a major market decline. Helps you decide when to hedge or reduce risk.",
+    featured: true,
+  },
   {
     id: "earnings-calendar",
     label: "Earnings & Economic Calendar",
@@ -113,12 +120,6 @@ const ANALYZE_TABS = [
     label: "Social Sentiment Index",
     tooltip:
       "What retail traders are saying across StockTwits, financial news, and market forums. Extreme bullish sentiment often signals tops; extreme bearish sentiment may signal bottoms.",
-  },
-  {
-    id: "ccpi",
-    label: "Crash & Corrections Prediction Index",
-    tooltip:
-      "AI-powered crash probability model. Combines multiple risk factors to estimate the chance of a major market decline. Helps you decide when to hedge or reduce risk.",
   },
   {
     id: "fomc-predictions",
@@ -178,11 +179,11 @@ type Category = "analyze" | "scan" | "execute"
 
 export default function Home() {
   const [activeCategory, setActiveCategory] = useState<Category>("analyze")
-  const [activeTab, setActiveTab] = useState("earnings-calendar")
+  const [activeTab, setActiveTab] = useState("ccpi")
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   // Keep-alive: once a tab is visited it stays mounted (hidden when inactive)
   // so its loaded data and state survive navigation for the whole session.
-  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(() => new Set(["earnings-calendar"]))
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(() => new Set(["ccpi"]))
 
   useEffect(() => {
     setVisitedTabs((prev) => {
@@ -398,17 +399,24 @@ export default function Home() {
               <nav className="hidden md:flex border-b border-gray-200 -mx-4 px-4">
                 {currentTabs.map((tab) => {
                   const tooltip = getTabTooltip(tab.id)
+                  const featured = (tab as { featured?: boolean }).featured
+                  const isActive = activeTab === tab.id
                   return (
                     <Tooltip key={tab.id}>
                       <TooltipTrigger asChild>
                         <button
                           onClick={() => setActiveTab(tab.id)}
                           className={`flex-1 px-2 py-2 text-xs font-semibold transition-colors border-b-2 text-center leading-tight ${
-                            activeTab === tab.id
-                              ? "border-primary text-primary bg-green-50"
-                              : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                            featured
+                              ? isActive
+                                ? "border-amber-500 text-amber-700 bg-amber-50"
+                                : "border-transparent text-amber-700 hover:bg-amber-50/60 ring-1 ring-amber-200/60 rounded-t"
+                              : isActive
+                                ? "border-primary text-primary bg-green-50"
+                                : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                           }`}
                         >
+                          {featured && <span aria-hidden className="mr-1">★</span>}
                           {tab.label}
                         </button>
                       </TooltipTrigger>
@@ -457,17 +465,26 @@ export default function Home() {
 
                     {currentTabs.map((tab) => {
                       const tooltip = getTabTooltip(tab.id)
+                      const featured = (tab as { featured?: boolean }).featured
+                      const isActive = activeTab === tab.id
                       return (
                         <button
                           key={tab.id}
                           onClick={() => handleTabChange(tab.id)}
                           className={`w-full text-left px-4 py-3 transition-colors ${
-                            activeTab === tab.id
-                              ? "bg-green-50 text-primary border-l-4 border-primary"
-                              : "text-gray-700 hover:bg-gray-50 border-l-4 border-transparent"
+                            featured
+                              ? isActive
+                                ? "bg-amber-50 text-amber-700 border-l-4 border-amber-500"
+                                : "bg-amber-50/40 text-amber-700 border-l-4 border-amber-300"
+                              : isActive
+                                ? "bg-green-50 text-primary border-l-4 border-primary"
+                                : "text-gray-700 hover:bg-gray-50 border-l-4 border-transparent"
                           }`}
                         >
-                          <div className="font-semibold text-base">{tab.label}</div>
+                          <div className="font-semibold text-base">
+                            {featured && <span aria-hidden className="mr-1">★</span>}
+                            {tab.label}
+                          </div>
                           {tooltip && <div className="text-xs text-gray-500 mt-0.5 line-clamp-2">{tooltip}</div>}
                         </button>
                       )
@@ -513,11 +530,14 @@ export default function Home() {
                   onChange={(e) => handleTabChange(e.target.value)}
                   className="w-full mt-2 p-2 border border-gray-300 rounded-lg text-sm font-medium bg-white"
                 >
-                  {currentTabs.map((tab) => (
-                    <option key={tab.id} value={tab.id}>
-                      {tab.label}
-                    </option>
-                  ))}
+                  {currentTabs.map((tab) => {
+                    const featured = (tab as { featured?: boolean }).featured
+                    return (
+                      <option key={tab.id} value={tab.id}>
+                        {featured ? `★ ${tab.label}` : tab.label}
+                      </option>
+                    )
+                  })}
                 </select>
               </div>
             </div>

@@ -558,6 +558,9 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
           <div>
             <h2 className="text-2xl font-bold tracking-tight">Crash &amp; Corrections Prediction Index (CCPI)</h2>
             <p className="text-muted-foreground">Real-time market crash risk assessment across 4 key dimensions</p>
+            <p className="text-xs text-muted-foreground italic mt-0.5">
+              Original index designed by Joel Frenette
+            </p>
             {data?.lastUpdated && (
               <p className="text-xs text-muted-foreground mt-1">
                 Last updated: {new Date(data.lastUpdated).toLocaleString()}
