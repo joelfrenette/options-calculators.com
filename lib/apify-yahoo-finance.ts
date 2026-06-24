@@ -4,7 +4,8 @@ export async function fetchApifyYahooFinance(ticker: string) {
   const APIFY_API_TOKEN = getApiKey("APIFY_API_TOKEN")
 
   if (!APIFY_API_TOKEN) {
-    console.error("[v0] Apify: API token not configured")
+    // Disabled-by-design (DISABLED_APIS or no key) — info-level, not an error.
+    console.log("[v0] Apify: disabled (no token) — using baseline")
     return {
       data: null,
       dataSource: "baseline-no-token",

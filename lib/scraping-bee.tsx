@@ -166,7 +166,13 @@ export async function scrapeBuffettIndicator(): Promise<{
 
     throw new Error("Could not parse Buffett Indicator")
   } catch (error) {
-    console.error("[v0] Buffett Indicator scraping failed:", error)
+    // "not configured" is the user's deliberate choice (DISABLED_APIS) -> info, not error.
+    const msg = error instanceof Error ? error.message : String(error)
+    if (msg.includes("not configured")) {
+      console.log("[v0] Buffett Indicator: ScrapingBee disabled — using baseline")
+    } else {
+      console.error("[v0] Buffett Indicator scraping failed:", error)
+    }
     return {
       ratio: 180, // Baseline: moderately elevated
       status: "baseline",
@@ -296,8 +302,12 @@ export async function scrapeAAIISentiment(): Promise<{
 
     throw new Error("Could not parse AAII sentiment")
   } catch (error) {
-    console.error("[v0] AAII sentiment scraping failed:", error)
-
+    const msg = error instanceof Error ? error.message : String(error)
+    if (msg.includes("not configured")) {
+      console.log("[v0] AAII: ScrapingBee disabled — trying AI fallback")
+    } else {
+      console.error("[v0] AAII sentiment scraping failed:", error)
+    }
     console.log("[v0] AAII: Trying Grok AI fallback...")
 
     try {
