@@ -3,8 +3,6 @@ import { resolveApiKey } from "@/lib/api-keys"
 import { generateWithFallback } from "@/lib/ai-providers"
 import {
   getRedditSentiment,
-  getGoogleTrendsSentiment,
-  getTwitterSentiment,
   getGoogleNewsSentiment,
   getCNNFearGreedSentiment,
 } from "@/lib/sentiment-sources"
@@ -300,8 +298,6 @@ export async function GET() {
   try {
     const [
       reddit,
-      twitter,
-      trends,
       googleNews,
       cnnFearGreed,
       stocktwitsSPY,
@@ -315,8 +311,6 @@ export async function GET() {
       stDIA,
     ] = await Promise.all([
       getRedditSentiment(),
-      getTwitterSentiment(),
-      getGoogleTrendsSentiment(),
       getGoogleNewsSentiment(),
       getCNNFearGreedSentiment(),
       getStockTwitsSentiment("SPY"),
@@ -342,8 +336,6 @@ export async function GET() {
       { name: "StockTwits", score: stocktwitsSPY.score, source: stocktwitsSPY.source, weight: 0.11, group: "social", description: `SPY bullish/bearish tags (${stocktwitsSPY.bullish}B/${stocktwitsSPY.bearish}Be)` },
       { name: "Reddit (multi-sub)", score: reddit.score, source: reddit.source, weight: 0.1, group: "social", description: `WSB, stocks, investing, options hot posts (${reddit.posts} analyzed)` },
       { name: "Google News", score: googleNews.score, source: googleNews.source, weight: 0.08, group: "social", description: `Market headline pulse (${googleNews.detail})` },
-      { name: "Twitter / X", score: twitter.score, source: twitter.source, weight: 0.08, group: "social", description: `Live $SPY tweet sentiment (${twitter.tweets} tweets)` },
-      { name: "Google Trends", score: trends.score, source: trends.source, weight: 0.06, group: "social", description: `Real search interest, rally vs crash (${trends.detail})` },
     ].map((i) => ({ ...i, status: i.score >= 0 ? "LIVE" : "UNAVAILABLE" }))
 
     const valid = indicators.filter((i) => i.score >= 0)

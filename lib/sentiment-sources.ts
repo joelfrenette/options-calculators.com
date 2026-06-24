@@ -113,62 +113,6 @@ export async function getRedditSentiment(): Promise<{
 }
 
 // ============================================================================
-// GOOGLE TRENDS — real Interest Over Time via SerpAPI (engine=google_trends)
-// Compares bullish vs bearish search interest. Higher bull share = more bullish.
-// ============================================================================
-export async function getGoogleTrendsSentiment(): Promise<{
-  score: number
-  source: string
-  detail: string
-}> {
-  const key = resolveApiKey("SERPAPI_KEY") // respects DISABLED_APIS kill switch
-  if (!key) {
-    console.log("[v0] Source (Trends): SERPAPI_KEY not set or disabled")
-    return { score: -1, source: "unavailable", detail: "no_key" }
-  }
-  try {
-    console.log("[v0] Source (Trends): Fetching real Google Trends via SerpAPI...")
-    // Compare two terms head-to-head over the last 7 days (Trends allows comma-separated terms)
-    const url =
-      "https://serpapi.com/search.json?engine=google_trends" +
-      "&q=" +
-      encodeURIComponent("stock market rally,stock market crash") +
-      "&data_type=TIMESERIES&date=now+7-d&geo=US&hl=en&api_key=" +
-      key
-
-    const res = await fetch(url, { signal: AbortSignal.timeout(15000) })
-    if (!res.ok) {
-      console.log("[v0] Source (Trends): HTTP", res.status)
-      return { score: -1, source: "http_error", detail: String(res.status) }
-    }
-    const data = await res.json()
-    const timeline: any[] = data?.interest_over_time?.timeline_data || []
-    if (timeline.length === 0) {
-      console.log("[v0] Source (Trends): empty timeline")
-      return { score: -1, source: "no_data", detail: "empty" }
-    }
-
-    // timeline_data[i].values = [{ query: "rally", extracted_value }, { query: "crash", ... }]
-    let bullSum = 0
-    let bearSum = 0
-    for (const point of timeline) {
-      const vals: any[] = point.values || []
-      bullSum += Number(vals[0]?.extracted_value ?? vals[0]?.value ?? 0)
-      bearSum += Number(vals[1]?.extracted_value ?? vals[1]?.value ?? 0)
-    }
-    const total = bullSum + bearSum
-    if (total <= 0) return { score: -1, source: "no_interest", detail: "zero" }
-
-    const score = Math.round((bullSum / total) * 100)
-    console.log(`[v0] ✓ Source (Trends): ${score}/100 (rally ${bullSum} vs crash ${bearSum})`)
-    return { score, source: "serpapi_google_trends", detail: `rally ${bullSum} / crash ${bearSum}` }
-  } catch (err) {
-    console.log("[v0] Source (Trends) error:", err instanceof Error ? err.message : "Unknown")
-    return { score: -1, source: "error", detail: "exception" }
-  }
-}
-
-// ============================================================================
 // TWITTER / X — real recent tweets for $SPY cashtag via Apify tweet scraper.
 // Uses the run-sync endpoint so we get items back in one call within budget.
 // If the actor does not finish in time, we return -1 ("No data") — never fake.
