@@ -15,12 +15,7 @@ const providerConfigs = [
     model: "llama-3.3-70b-versatile",
   },
   {
-    name: "OpenAI",
-    key: () => process.env.OPENAI_API_KEY,
-    create: () => createOpenAI({ apiKey: process.env.OPENAI_API_KEY || "" }),
-    model: "gpt-4o-mini",
-  },
-  {
+    // Free tier — kept ahead of paid providers.
     name: "Google",
     key: () => process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_AI_API_KEY,
     create: () =>
@@ -28,6 +23,12 @@ const providerConfigs = [
         apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_AI_API_KEY || "",
       }),
     model: "gemini-2.0-flash-exp",
+  },
+  {
+    name: "OpenAI",
+    key: () => process.env.OPENAI_API_KEY,
+    create: () => createOpenAI({ apiKey: process.env.OPENAI_API_KEY || "" }),
+    model: "gpt-4o-mini",
   },
   {
     name: "xAI",
