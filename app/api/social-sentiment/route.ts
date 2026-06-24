@@ -2,7 +2,6 @@ import { NextResponse } from "next/server"
 import { resolveApiKey } from "@/lib/api-keys"
 import { generateWithFallback } from "@/lib/ai-providers"
 import {
-  getRedditSentiment,
   getGoogleNewsSentiment,
   getCNNFearGreedSentiment,
 } from "@/lib/sentiment-sources"
@@ -20,9 +19,7 @@ const API_VERSION = "7.0.0"
  *
  * Higher score = MORE BULLISH (green/left). Lower score = MORE BEARISH (red/right).
  *
- * SOCIAL sources:  Reddit (multi-sub), Twitter/X ($SPY via Apify),
- *                  StockTwits (bull/bear tags), Google Trends (SerpAPI),
- *                  Google News pulse (Serper).
+ * SOCIAL sources:  StockTwits (bull/bear tags), Google News pulse (Serper).
  * MACRO sources:   CNN Fear & Greed, AAII survey, Finnhub news, Polygon news,
  *                  News Fear/Greed.
  *
@@ -297,7 +294,6 @@ export async function GET() {
 
   try {
     const [
-      reddit,
       googleNews,
       cnnFearGreed,
       stocktwitsSPY,
@@ -310,7 +306,6 @@ export async function GET() {
       stIWM,
       stDIA,
     ] = await Promise.all([
-      getRedditSentiment(),
       getGoogleNewsSentiment(),
       getCNNFearGreedSentiment(),
       getStockTwitsSentiment("SPY"),
@@ -334,7 +329,6 @@ export async function GET() {
       { name: "News Fear & Greed", score: newsFearGreed.score, source: newsFearGreed.source, weight: 0.08, group: "macro", description: "Greed vs fear language across general market news" },
       // --- Social / retail scrapes (lower reliability) ---
       { name: "StockTwits", score: stocktwitsSPY.score, source: stocktwitsSPY.source, weight: 0.11, group: "social", description: `SPY bullish/bearish tags (${stocktwitsSPY.bullish}B/${stocktwitsSPY.bearish}Be)` },
-      { name: "Reddit (multi-sub)", score: reddit.score, source: reddit.source, weight: 0.1, group: "social", description: `WSB, stocks, investing, options hot posts (${reddit.posts} analyzed)` },
       { name: "Google News", score: googleNews.score, source: googleNews.source, weight: 0.08, group: "social", description: `Market headline pulse (${googleNews.detail})` },
     ].map((i) => ({ ...i, status: i.score >= 0 ? "LIVE" : "UNAVAILABLE" }))
 

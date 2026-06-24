@@ -95,8 +95,8 @@ export const API_COSTS: ApiCost[] = [
     monthlyCost: 49,
     targetCost: 0,
     status: "eliminate",
-    provides: "Reddit/CNN social sentiment scraping",
-    replacement: "Free Reddit API + Alternative.me (sentiment is nice-to-have)",
+    provides: "Social/market sentiment scraping (CNN, etc.)",
+    replacement: "CNN direct API + Alternative.me (sentiment is nice-to-have)",
   },
   {
     key: "SERPER_API_KEY",

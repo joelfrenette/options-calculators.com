@@ -80,7 +80,7 @@ export function ApiKeysManager() {
     {
       name: "SCRAPINGBEE_API_KEY",
       label: "ScrapingBee API Key",
-      description: "Web scraping for social/market sentiment (Reddit, CNN)",
+      description: "Web scraping for social/market sentiment (CNN, etc.)",
       configured: false,
       envVarName: "SCRAPINGBEE_API_KEY",
       category: "Scraping & Search",

@@ -80,7 +80,7 @@ export async function GET() {
       key: process.env.SCRAPINGBEE_API_KEY,
       testUrl: "https://app.scrapingbee.com/api/v1/?api_key=",
       endpoint: "https://app.scrapingbee.com/api/v1/",
-      purpose: "Web scraping for social media sentiment (Reddit, Twitter, StockTwits) and CNN data",
+      purpose: "Web scraping for social/market sentiment and CNN data",
       usedIn: ["Social Sentiment Score", "Fear & Greed Index", "Market Sentiment"],
     },
     {

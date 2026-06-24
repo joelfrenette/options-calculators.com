@@ -205,10 +205,7 @@ export function SocialSentiment() {
 
     const sources = [
       "Initializing...",
-      "Fetching Reddit (r/wallstreetbets)...",
-      "Fetching Twitter / X tweets...",
       "Fetching StockTwits tags...",
-      "Fetching Google Trends...",
       "Fetching Finnhub news...",
       "Fetching Polygon news...",
       "Calculating News Fear & Greed...",
@@ -298,7 +295,7 @@ export function SocialSentiment() {
     )
   }
 
-  const HIDDEN_INDICATORS = ["Reddit (multi-sub)", "Twitter / X"]
+  const HIDDEN_INDICATORS: string[] = []
   const allIndicators = (data?.indicators || []).filter((ind) => !HIDDEN_INDICATORS.includes(ind.name))
   const uniqueIndicators: SentimentIndicator[] = Array.from(
     new Map(
@@ -432,7 +429,7 @@ export function SocialSentiment() {
                     </div>
                   </div>
                 </ConditionalTooltip>
-                <ConditionalTooltip content="Social Sentiment measures retail trader mood from Reddit, Twitter, and StockTwits. Extreme bullish readings often precede reversals - consider selling premium. Extreme bearish readings may signal capitulation - look for mean reversion plays.">
+                <ConditionalTooltip content="Social Sentiment measures retail trader mood from StockTwits and financial news. Extreme bullish readings often precede reversals - consider selling premium. Extreme bearish readings may signal capitulation - look for mean reversion plays.">
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 cursor-help">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-semibold text-gray-700">Social Sentiment</span>

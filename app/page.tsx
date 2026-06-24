@@ -112,7 +112,7 @@ const ANALYZE_TABS = [
     id: "social-sentiment",
     label: "Social Sentiment Index",
     tooltip:
-      "What retail traders are saying on Reddit, Twitter, and forums. Extreme bullish sentiment often signals tops; extreme bearish sentiment may signal bottoms.",
+      "What retail traders are saying across StockTwits, financial news, and market forums. Extreme bullish sentiment often signals tops; extreme bearish sentiment may signal bottoms.",
   },
   {
     id: "ccpi",

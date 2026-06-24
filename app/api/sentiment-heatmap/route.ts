@@ -34,7 +34,7 @@ async function analyzeSentimentWithAI(
     const systemPrompt =
       "You are a financial sentiment analyst specializing in social media analysis. Provide accurate, data-driven sentiment scores based on recent market discussions. Always respond with valid JSON only."
 
-    const prompt = `Analyze the current social media and market sentiment for ${tickerName} (${ticker}) based on recent discussions on Reddit (r/wallstreetbets, r/stocks, r/investing), Twitter/X financial community, and general market news from the past 24 hours.
+    const prompt = `Analyze the current social media and market sentiment for ${tickerName} (${ticker}) based on recent StockTwits discussions, financial news, and general market commentary from the past 24 hours.
 
 Provide a JSON response with:
 - bullishScore: percentage of bullish sentiment (0-100)
@@ -105,7 +105,7 @@ export async function GET() {
     return NextResponse.json({
       data: sentimentData,
       lastUpdated: new Date().toISOString(),
-      dataSource: "AI-powered sentiment analysis from social media (Reddit, Twitter/X, financial forums)",
+      dataSource: "AI-powered sentiment analysis from StockTwits, financial news, and market forums",
     })
   } catch (error) {
     console.error("[v0] Error fetching sentiment heatmap:", error)
