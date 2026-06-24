@@ -14,13 +14,29 @@ const EARNINGS_FALLBACK = (ticker: string) =>
 const ECONOMIC_FALLBACK = () =>
   `Economic data release may increase market volatility. Consider SPY or QQQ options for directional plays.`
 
-async function callAI(prompt: string, maxTokens = 100): Promise<string | null> {
+// Per-call AbortController timeout so a slow OpenRouter free model can't
+// block the parent /insights request past Vercel's 60s function limit.
+async function callAI(prompt: string, maxTokens = 100, timeoutMs = 18_000): Promise<string | null> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
-    const { text } = await generateWithFallback({ prompt, maxTokens, temperature: 0.4 })
+    const { text } = await generateWithFallback({
+      prompt,
+      maxTokens,
+      temperature: 0.4,
+      abortSignal: controller.signal,
+    })
     return text.trim()
   } catch (err) {
-    console.log("[v0] Calendar AI error:", err instanceof Error ? err.message : "unknown")
+    const msg = err instanceof Error ? err.message : "unknown"
+    if (controller.signal.aborted) {
+      console.log(`[v0] Calendar AI timeout after ${timeoutMs}ms — falling back`)
+    } else {
+      console.log("[v0] Calendar AI error:", msg)
+    }
     return null
+  } finally {
+    clearTimeout(timer)
   }
 }
 
@@ -89,7 +105,10 @@ Provide a JSON response with this structure:
 
 Be specific, actionable, and focused on options trading strategies. Respond with ONLY the JSON, no preamble.`
 
-  const result = await callAI(prompt, 900)
+  // 500 max tokens is plenty for the three-section JSON and keeps the call
+  // well under the 18s per-call timeout above. (Was 900 — was timing out on
+  // OpenRouter free reasoning models.)
+  const result = await callAI(prompt, 500, 25_000)
 
   if (result) {
     try {
