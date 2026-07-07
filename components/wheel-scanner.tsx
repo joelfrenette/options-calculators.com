@@ -163,6 +163,10 @@ interface QualifyingStock {
   optionAsk?: number
   bidPrice?: number // Added to match enrichWithOptionsData update
   askPrice?: number // Added to match enrichWithOptionsData update
+
+  // Populated during Step 3: the names of fundamental filters this stock *didn't* pass.
+  // Empty (or undefined) means strict pass; length 1–2 means "near miss" for the relaxed Step 4 fallback.
+  failedFilters?: string[]
 }
 
 const MEGA_CAP_STOCKS = [
@@ -485,6 +489,15 @@ export function WheelScanner() {
   const [technicalScanAttempted, setTechnicalScanAttempted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fundamentalResults, setFundamentalResults] = useState<QualifyingStock[]>([])
+  const [rejectionSummary, setRejectionSummary] = useState<{
+    scanned: number
+    passed: number
+    rejected: Record<string, string[]>
+    skipped: Record<string, string[]>
+  } | null>(null)
+  // Stocks that failed 1–2 fundamental filters but otherwise have real Polygon data.
+  // Used as the Step-4 relaxed fallback when strict Step 3 returns 0.
+  const [nearMissFundamentals, setNearMissFundamentals] = useState<QualifyingStock[]>([])
   const [technicalResults, setTechnicalResults] = useState<QualifyingStock[]>([])
   const [showRelaxedResults, setShowRelaxedResults] = useState(false)
   const [fundamentalSortColumn, setFundamentalSortColumn] = useState<string>("ticker")
@@ -835,13 +848,32 @@ export function WheelScanner() {
     setTechnicalScanAttempted(false)
     setScanProgress(0)
     setCurrentTicker("")
+    setRejectionSummary(null)
+    setNearMissFundamentals([])
 
     try {
       console.log(`[v0] Step 2: Scanning ${tickers.length} stocks with Polygon API`)
       console.log(`[v0] Using optimized batch processing for paid account: 5 stocks at a time with 1000ms delays`)
 
       const qualifyingStocks: QualifyingStock[] = []
+      const nearMissStocks: QualifyingStock[] = []
       const skippedTickers: string[] = []
+
+      // Diagnostics: track WHY each ticker was rejected/skipped so we can show it on-screen
+      const rejectionBuckets: Record<string, string[]> = {
+        priceCap: [],
+        volume: [],
+        debtEquity: [],
+        roe: [],
+        eps: [],
+        marketCap: [],
+      }
+      const skipBuckets: Record<string, string[]> = {
+        rateLimit: [],
+        apiError: [],
+        thinFinancials: [],
+        exception: [],
+      }
 
       const batchSize = 2 // Reduced from 5 to 2 for better rate limit compliance
       const batchDelay = 2000 // Increased from 1000ms to 2000ms between batches
@@ -867,12 +899,16 @@ export function WheelScanner() {
             if (snapshotRes.status === 429 || financialsRes.status === 429 || aggregatesRes.status === 429) {
               console.log(`[v0] ⚠️ ${ticker} - Rate limit hit after retries. Skipping...`)
               skippedTickers.push(ticker)
+              skipBuckets.rateLimit.push(ticker)
               return null
             }
 
             if (!snapshotRes.ok || !aggregatesRes.ok) {
-              console.log(`[v0] ⚠️ ${ticker} - Polygon API error. Skipping...`)
+              console.log(
+                `[v0] ⚠️ ${ticker} - Polygon API error. snapshot=${snapshotRes.status} financials=${financialsRes.status} aggregates=${aggregatesRes.status}. Skipping...`,
+              )
               skippedTickers.push(ticker)
+              skipBuckets.apiError.push(ticker)
               return null
             }
 
@@ -900,6 +936,7 @@ export function WheelScanner() {
                 `[v0] ⏭️ ${ticker} - price $${currentPrice.toFixed(2)} exceeds max stock price $${priceCap}. Skipping...`,
               )
               skippedTickers.push(ticker)
+              rejectionBuckets.priceCap.push(`${ticker}($${currentPrice.toFixed(0)})`)
               return null
             }
 
@@ -909,6 +946,16 @@ export function WheelScanner() {
             const financials = financialsData.results?.[0]?.financials || {}
             const income_statement = financials.income_statement || {}
             const balance_sheet = financials.balance_sheet || {}
+
+            const financialsCount = Object.keys(financials).length
+            const hasIncome = Object.keys(income_statement).length > 0
+            const hasBalance = Object.keys(balance_sheet).length > 0
+            if (!hasIncome || !hasBalance) {
+              console.log(
+                `[v0] ⚠️ ${ticker} - Thin financials (income=${hasIncome}, balance=${hasBalance}, sections=${financialsCount}, results.length=${financialsData.results?.length ?? 0}). Filters below will likely reject with ROE=0/EPS=0.`,
+              )
+              skipBuckets.thinFinancials.push(ticker)
+            }
 
             const revenues = income_statement.revenues?.value || 0
             const net_income = income_statement.net_income_loss?.value || 0
@@ -980,32 +1027,32 @@ export function WheelScanner() {
               `[v0] ${ticker}: Price=$${currentPrice.toFixed(2)}, EPS=$${eps.toFixed(4)}, PE=${peRatio.toFixed(1)}, MarketCap=$${(marketCap / 1e9).toFixed(1)}B, Vol=${volumeInMillions.toFixed(1)}M, D/E=${debtToEquity.toFixed(2)}, ROE=${roe.toFixed(1)}%${earningsDate ? `, Earnings: ${earningsDate} (${daysToEarnings}d)` : " (no earnings date)"} ${eps > 0 ? "(REAL EPS)" : "(ESTIMATED PE)"}`,
             )
 
-            // Apply filters with REAL data from Polygon
+            // Apply filters with REAL data from Polygon — record which ones fail so we
+            // can build a "near miss" relaxed set even when strict Step 3 returns 0.
             const minVolumeValue = minVolume[0]
             const maxDebtValue = maxDebtToEquity[0]
             const minROEValue = minROE[0]
+            const failedFilters: string[] = []
 
-            // Filter 1: Volume (real data)
             if (volumeInMillions < minVolumeValue) {
               console.log(`[v0]   ❌ ${ticker}: Volume ${volumeInMillions.toFixed(1)}M < ${minVolumeValue}M`)
-              return null
+              rejectionBuckets.volume.push(`${ticker}(${volumeInMillions.toFixed(1)}M)`)
+              failedFilters.push("volume")
             }
-
-            // Filter 3: Debt-to-Equity (real data)
             if (debtToEquity > 0 && debtToEquity > maxDebtValue) {
               console.log(`[v0]   ❌ ${ticker}: D/E ${debtToEquity.toFixed(2)} > ${maxDebtValue}`)
-              return null
+              rejectionBuckets.debtEquity.push(`${ticker}(${debtToEquity.toFixed(2)})`)
+              failedFilters.push("debtEquity")
             }
-
-            // Filter 4: ROE (real data) - reject if below minimum (including 0%)
             if (roe < minROEValue) {
               console.log(`[v0]   ❌ ${ticker}: ROE ${roe.toFixed(1)}% < ${minROEValue}%`)
-              return null
+              rejectionBuckets.roe.push(`${ticker}(${roe.toFixed(1)}%)`)
+              failedFilters.push("roe")
             }
-            // Filter 5: Profitable Quarters (REAL DATA)
             if (minProfitableQuarters[0] > 0 && eps <= 0) {
               console.log(`[v0]   ❌ ${ticker}: EPS ${eps.toFixed(2)} <= 0 (unprofitable)`)
-              return null
+              rejectionBuckets.eps.push(`${ticker}(${eps.toFixed(2)})`)
+              failedFilters.push("eps")
             }
             const marketCapThresholds = [0, 300_000_000, 2_000_000_000, 10_000_000_000]
             const minMarketCapValue = marketCapThresholds[minMarketCapCategory[0]]
@@ -1013,10 +1060,15 @@ export function WheelScanner() {
               console.log(
                 `[v0]   ❌ ${ticker}: Market Cap $${(marketCap / 1e9).toFixed(1)}B < $${(minMarketCapValue / 1e9).toFixed(1)}B`,
               )
-              return null
+              rejectionBuckets.marketCap.push(`${ticker}($${(marketCap / 1e9).toFixed(1)}B)`)
+              failedFilters.push("marketCap")
             }
 
-            console.log(`[v0]   ✅ ${ticker} PASSED all filters with REAL Polygon data`)
+            if (failedFilters.length === 0) {
+              console.log(`[v0]   ✅ ${ticker} PASSED all filters with REAL Polygon data`)
+            } else {
+              console.log(`[v0]   ⚠️ ${ticker} — near-miss (${failedFilters.length} failed: ${failedFilters.join(",")})`)
+            }
 
             const historicalData = aggregatesData.results || []
             const closes = historicalData.map((bar: any) => bar.c).filter((c: number) => c != null)
@@ -1091,17 +1143,26 @@ export function WheelScanner() {
               volume: volume, // Store raw volume
               roe: Number(roe.toFixed(1)), // Return on Equity percentage
               debtToEquity: Number(debtToEquity.toFixed(2)), // Debt-to-Equity ratio
+              failedFilters, // [] on strict pass; 1–2 entries → near miss for relaxed Step 4
             }
           } catch (err) {
             console.log(`[v0] Error processing ${ticker}:`, err)
             skippedTickers.push(ticker)
+            skipBuckets.exception.push(ticker)
             return null
           }
         })
 
         const batchResults = await Promise.all(batchPromises)
         const validResults = batchResults.filter((r): r is QualifyingStock => r !== null)
-        qualifyingStocks.push(...validResults)
+        // Only stocks that passed every filter belong in the strict results;
+        // near-misses (1–2 failed filters) are held aside for the relaxed Step 4 fallback.
+        for (const s of validResults) {
+          if (!s) continue // preserve existing wide type; upstream predicate is already flagged
+          const failedCount = s.failedFilters?.length ?? 0
+          if (failedCount === 0) qualifyingStocks.push(s)
+          else if (failedCount <= 2) nearMissStocks.push(s)
+        }
 
         if (i + batchSize < tickers.length) {
           await delay(batchDelay)
@@ -1118,6 +1179,23 @@ export function WheelScanner() {
       if (skippedTickers.length > 0) {
         console.log(`[v0] Skipped tickers: ${skippedTickers.join(", ")}`)
       }
+
+      console.log(`[v0] 📊 REJECTION BREAKDOWN — ${qualifyingStocks.length}/${tickers.length} passed strict, ${nearMissStocks.length} near-miss (≤2 fails)`)
+      Object.entries(rejectionBuckets).forEach(([reason, ts]) => {
+        if (ts.length) console.log(`[v0]   ❌ ${reason} (${ts.length}): ${ts.slice(0, 25).join(", ")}${ts.length > 25 ? ", ..." : ""}`)
+      })
+      Object.entries(skipBuckets).forEach(([reason, ts]) => {
+        if (ts.length) console.log(`[v0]   ⚠️ skip:${reason} (${ts.length}): ${ts.slice(0, 25).join(", ")}${ts.length > 25 ? ", ..." : ""}`)
+      })
+
+      setNearMissFundamentals(nearMissStocks)
+
+      setRejectionSummary({
+        scanned: tickers.length,
+        passed: qualifyingStocks.length,
+        rejected: rejectionBuckets,
+        skipped: skipBuckets,
+      })
 
       const qualified = qualifyingStocks // Alias for clarity
       setFundamentalResults(qualified)
@@ -2455,6 +2533,80 @@ export function WheelScanner() {
             ></div>
           </div>
         </div>
+      )}
+
+      {!loading && rejectionSummary && rejectionSummary.passed === 0 && (
+        <Card className="mt-6 w-full max-w-7xl mx-auto shadow border-amber-300 bg-amber-50">
+          <CardHeader className="border-b border-amber-200">
+            <CardTitle className="text-base font-bold text-amber-900 flex items-center gap-2">
+              <AlertCircle className="h-5 w-5" />
+              Step 3 — No stocks passed the strict filters ({rejectionSummary.scanned} scanned)
+            </CardTitle>
+            <CardDescription className="text-amber-800">
+              {nearMissFundamentals.length > 0
+                ? `${nearMissFundamentals.length} stocks came within 1–2 filters of passing. Click below to proceed to Step 4 with the relaxed set, or loosen a slider and rescan.`
+                : "Breakdown of why every ticker was rejected. Loosen the slider next to the largest bucket to get results."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-4 space-y-2 text-sm">
+            {nearMissFundamentals.length > 0 && (
+              <Button
+                onClick={() => {
+                  console.log(
+                    `[v0] 🟣 Promoting ${nearMissFundamentals.length} near-miss stocks into Step 4 relaxed flow`,
+                  )
+                  setFundamentalResults(nearMissFundamentals)
+                  setStep(2)
+                }}
+                className="w-full h-11 text-base font-semibold bg-purple-600 hover:bg-purple-700 text-white mb-2"
+              >
+                <Filter className="mr-2 h-5 w-5" />
+                Use Relaxed Fundamentals ({nearMissFundamentals.length} stocks) → Step 4
+              </Button>
+            )}
+            {(Object.entries(rejectionSummary.rejected) as [string, string[]][])
+              .filter(([, ts]) => ts.length > 0)
+              .sort((a, b) => b[1].length - a[1].length)
+              .map(([reason, ts]) => (
+                <div key={reason} className="flex flex-col gap-1 border-b border-amber-200 pb-2 last:border-0">
+                  <div className="flex justify-between font-semibold text-amber-900">
+                    <span>
+                      {reason === "priceCap" && "Above Max Stock Price (Step 1)"}
+                      {reason === "volume" && "Volume below Min Volume"}
+                      {reason === "debtEquity" && "Debt/Equity above Max"}
+                      {reason === "roe" && "ROE below Min ROE %"}
+                      {reason === "eps" && "EPS ≤ 0 (unprofitable / EPS field missing from Polygon)"}
+                      {reason === "marketCap" && "Market cap below Min"}
+                    </span>
+                    <span>{ts.length}</span>
+                  </div>
+                  <div className="text-xs text-amber-700 break-words">
+                    {ts.slice(0, 25).join(", ")}
+                    {ts.length > 25 ? `, +${ts.length - 25} more` : ""}
+                  </div>
+                </div>
+              ))}
+            {(Object.entries(rejectionSummary.skipped) as [string, string[]][])
+              .filter(([, ts]) => ts.length > 0)
+              .map(([reason, ts]) => (
+                <div key={reason} className="flex flex-col gap-1 border-b border-amber-200 pb-2 last:border-0">
+                  <div className="flex justify-between font-semibold text-amber-900">
+                    <span>
+                      {reason === "rateLimit" && "Skipped — Polygon rate limit (429)"}
+                      {reason === "apiError" && "Skipped — Polygon API error (non-200)"}
+                      {reason === "thinFinancials" && "Warn — Polygon returned thin financials (likely null ROE/EPS)"}
+                      {reason === "exception" && "Skipped — client-side exception in loop"}
+                    </span>
+                    <span>{ts.length}</span>
+                  </div>
+                  <div className="text-xs text-amber-700 break-words">
+                    {ts.slice(0, 25).join(", ")}
+                    {ts.length > 25 ? `, +${ts.length - 25} more` : ""}
+                  </div>
+                </div>
+              ))}
+          </CardContent>
+        </Card>
       )}
 
       {fundamentalResults.length > 0 && (
