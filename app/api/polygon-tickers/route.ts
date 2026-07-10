@@ -57,6 +57,83 @@ async function fetchFMPScreener(params: {
   }
 }
 
+// Polygon Grouped Daily Bars — one free call returns prev-day OHLCV for the entire
+// US stock market (~10k tickers). Ideal for a proper Step-2 universe: server-side
+// filtering by price + volume, sorted by dollar volume (best free proxy for the
+// combination of size + liquidity + options interest). No per-ticker enrichment
+// loop, so the request stays well under Vercel's edge timeout.
+async function fetchPolygonGroupedBars(params: {
+  minVolume: number
+  maxPrice: number | null
+  limit: number
+}): Promise<{ ticker: string; price: number; volume: number }[] | null> {
+  const key = resolveApiKey("POLYGON_API_KEY")
+  if (!key) return null
+
+  // The grouped endpoint needs a specific TRADING day. Weekends and market holidays
+  // 404. Try the 5 most recent calendar days and use whichever has data.
+  const now = new Date()
+  const attempts: string[] = []
+  for (let daysBack = 1; daysBack <= 5; daysBack++) {
+    const d = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000)
+    const dow = d.getUTCDay()
+    if (dow === 0 || dow === 6) continue
+    attempts.push(d.toISOString().slice(0, 10))
+  }
+
+  for (const date of attempts) {
+    const url = `https://api.polygon.io/v2/aggs/grouped/locale/us/market/stocks/${date}?adjusted=true&apiKey=${key}`
+    console.log(`[v0] Polygon grouped bars: trying date=${date}`)
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(12000) })
+      if (!res.ok) {
+        console.log(`[v0] Polygon grouped bars ${date} HTTP ${res.status}`)
+        continue
+      }
+      const data = await res.json()
+      const results: any[] = Array.isArray(data.results) ? data.results : []
+      if (results.length === 0) {
+        console.log(`[v0] Polygon grouped bars ${date} empty — trying older date`)
+        continue
+      }
+
+      // Basic sanity filter to drop warrants, preferreds, units, ETNs, etc.
+      // Real US common stocks are 1–5 alpha chars (BRK.B etc. are represented as "BRKB"
+      // in Polygon grouped bars — we handle Class-B rename downstream via DUPLICATE_TICKERS).
+      const filtered = results
+        .map((r) => ({
+          ticker: (typeof r.T === "string" ? r.T : "").toUpperCase(),
+          price: Number(r.c) || 0,
+          volume: Number(r.v) || 0,
+        }))
+        .filter((r) => {
+          if (!r.ticker || r.ticker.length === 0 || r.ticker.length > 5) return false
+          if (!/^[A-Z]+$/.test(r.ticker)) return false
+          if (r.price <= 0 || r.volume <= 0) return false
+          if (params.minVolume > 0 && r.volume < params.minVolume) return false
+          if (params.maxPrice != null && r.price > params.maxPrice) return false
+          return true
+        })
+
+      // Sort by dollar volume desc — proxy for "biggest liquid names first".
+      filtered.sort((a, b) => b.price * b.volume - a.price * a.volume)
+      const top = filtered.slice(0, Math.min(1000, params.limit))
+      console.log(
+        `[v0] Polygon grouped bars ${date}: ${results.length} total → ${filtered.length} pass filters → returning top ${top.length}`,
+      )
+      return top
+    } catch (err) {
+      console.error(
+        `[v0] Polygon grouped bars ${date} error:`,
+        err instanceof Error ? err.message : String(err),
+      )
+      continue
+    }
+  }
+
+  return null
+}
+
 // Map of duplicate tickers - key is the ticker to remove, value is the primary ticker to keep
 const DUPLICATE_TICKERS: Record<string, string> = {
   GOOG: "GOOGL", // Alphabet Class C → Class A (more liquid)
@@ -278,7 +355,8 @@ export async function GET(request: NextRequest) {
     )
 
     // Preferred: FMP stock-screener does all filtering server-side and
-    // returns up to `limit` tickers pre-sorted by market cap.
+    // returns up to `limit` tickers pre-sorted by market cap. Requires a
+    // paid FMP tier — returns null / HTTPS 403 on the free plan.
     const fmpTickers = await fetchFMPScreener({ minMarketCap, minVolume, maxPrice, limit })
     if (fmpTickers && fmpTickers.length > 0) {
       console.log(`[v0] Returning ${fmpTickers.length} tickers from FMP screener`)
@@ -288,7 +366,29 @@ export async function GET(request: NextRequest) {
         source: "fmp-screener",
       })
     }
-    console.log(`[v0] FMP screener unavailable — falling back to hardcoded Polygon universe`)
+
+    // Next best: Polygon Grouped Daily Bars — one free call, whole US market
+    // (~10k tickers) with price+volume. Filters by price/volume server-side,
+    // sorts by dollar volume as a market-cap proxy. Skips the market-cap
+    // threshold (unavailable in grouped bars); Step 3's per-ticker fundamentals
+    // scan applies the real market-cap filter downstream.
+    const groupedRows = await fetchPolygonGroupedBars({ minVolume, maxPrice, limit })
+    if (groupedRows && groupedRows.length > 0) {
+      const tickers = groupedRows.map((r) => r.ticker)
+      console.log(
+        `[v0] Returning ${tickers.length} tickers from Polygon grouped bars (top 5: ${tickers.slice(0, 5).join(", ")})`,
+      )
+      return NextResponse.json({
+        tickers,
+        count: tickers.length,
+        source: "polygon-grouped-bars",
+        note:
+          minMarketCap > 0
+            ? "Market cap threshold not applied at this stage (grouped bars have no market cap). Step 3 fundamentals scan enforces it per ticker."
+            : undefined,
+      })
+    }
+    console.log(`[v0] FMP + grouped bars unavailable — falling back to hardcoded Polygon universe`)
 
     async function fetchWithRetry(url: string, maxRetries = 3, timeoutMs = 10000): Promise<Response | null> {
       for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -364,11 +464,12 @@ export async function GET(request: NextRequest) {
 
     console.log(`[v0] ${tickersWithData.length} tickers passed volume filter (>= ${minVolume})`)
 
-    // Enrich up to the smaller of the requested limit or 200 (edge-fn budget).
-    // Previously capped at 50 which prevented Top-500 from ever returning >50.
-    const enrichCap = Math.min(200, Math.max(50, limit))
+    // Enrichment loop is sequential w/ 300ms delay per ticker so cap at ~60
+    // to stay under Vercel's 25s edge budget. This is a LAST-RESORT fallback —
+    // the FMP + grouped-bars paths above are the real universes.
+    const enrichCap = Math.min(60, Math.max(30, limit))
     const tickersToEnrich = tickersWithData.slice(0, enrichCap)
-    console.log(`[v0] Fetching market cap for top ${tickersToEnrich.length} tickers (enrichCap=${enrichCap})`)
+    console.log(`[v0] Fetching market cap for top ${tickersToEnrich.length} tickers (enrichCap=${enrichCap}, last-resort path)`)
 
     // Fetch market cap for tickers that passed volume filter
     const tickersWithMarketCap: TickerData[] = []
