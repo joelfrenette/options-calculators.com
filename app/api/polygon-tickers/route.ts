@@ -57,6 +57,59 @@ async function fetchFMPScreener(params: {
   }
 }
 
+// Cached common-stock allowlist. Polygon's Grouped Daily Bars returns EVERY
+// security (ETFs, warrants, ADRs, ETNs, preferreds) with no type field, so we
+// intersect its results against Polygon's /v3/reference/tickers?type=CS list —
+// the canonical US common-stock universe — before returning. The reference
+// list changes slowly (new IPOs / delistings), so a 6-hour in-memory cache is
+// plenty and keeps the CS fetch out of the hot path for repeat requests within
+// the same edge isolate.
+let CS_ALLOWLIST_CACHE: { set: Set<string>; expiresAt: number } | null = null
+const CS_ALLOWLIST_TTL_MS = 6 * 60 * 60 * 1000 // 6h
+
+async function fetchPolygonCommonStocksAllowlist(): Promise<Set<string> | null> {
+  const now = Date.now()
+  if (CS_ALLOWLIST_CACHE && CS_ALLOWLIST_CACHE.expiresAt > now) {
+    console.log(`[v0] CS allowlist cache hit (${CS_ALLOWLIST_CACHE.set.size} tickers)`)
+    return CS_ALLOWLIST_CACHE.set
+  }
+
+  const key = resolveApiKey("POLYGON_API_KEY")
+  if (!key) return null
+
+  const tickers = new Set<string>()
+  let url = `https://api.polygon.io/v3/reference/tickers?market=stocks&type=CS&active=true&limit=1000&apiKey=${key}`
+  for (let page = 0; page < 6; page++) {
+    // hard cap at 6 pages (6000 CS tickers) to stay under the edge budget.
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
+      if (!res.ok) {
+        console.log(`[v0] CS allowlist page ${page} HTTP ${res.status}`)
+        break
+      }
+      const data = await res.json()
+      const rows: any[] = Array.isArray(data.results) ? data.results : []
+      for (const r of rows) {
+        if (typeof r.ticker === "string") tickers.add(r.ticker.toUpperCase())
+      }
+      if (!data.next_url) break
+      // next_url comes back WITHOUT apiKey — append it.
+      url = `${data.next_url}&apiKey=${key}`
+    } catch (err) {
+      console.error(
+        `[v0] CS allowlist page ${page} error:`,
+        err instanceof Error ? err.message : String(err),
+      )
+      break
+    }
+  }
+
+  if (tickers.size === 0) return null
+  console.log(`[v0] CS allowlist fetched: ${tickers.size} common-stock tickers`)
+  CS_ALLOWLIST_CACHE = { set: tickers, expiresAt: now + CS_ALLOWLIST_TTL_MS }
+  return tickers
+}
+
 // Polygon Grouped Daily Bars — one free call returns prev-day OHLCV for the entire
 // US stock market (~10k tickers). Ideal for a proper Step-2 universe: server-side
 // filtering by price + volume, sorted by dollar volume (best free proxy for the
@@ -69,6 +122,10 @@ async function fetchPolygonGroupedBars(params: {
 }): Promise<{ ticker: string; price: number; volume: number }[] | null> {
   const key = resolveApiKey("POLYGON_API_KEY")
   if (!key) return null
+
+  // Kick off the CS allowlist fetch in parallel with the grouped bars call.
+  // If it fails, we degrade to unfiltered grouped bars (better than nothing).
+  const allowlistPromise = fetchPolygonCommonStocksAllowlist()
 
   // The grouped endpoint needs a specific TRADING day. Weekends and market holidays
   // 404. Try the 5 most recent calendar days and use whichever has data.
@@ -115,11 +172,17 @@ async function fetchPolygonGroupedBars(params: {
           return true
         })
 
+      // Await the allowlist and intersect. Grouped bars contain ETFs, warrants,
+      // preferreds, ETNs, ADRs — none of which have income statements, so
+      // Step 3 would reject them anyway. Strip them here for a cleaner Step 2.
+      const allowlist = await allowlistPromise
+      const csFiltered = allowlist ? filtered.filter((r) => allowlist.has(r.ticker)) : filtered
+
       // Sort by dollar volume desc — proxy for "biggest liquid names first".
-      filtered.sort((a, b) => b.price * b.volume - a.price * a.volume)
-      const top = filtered.slice(0, Math.min(1000, params.limit))
+      csFiltered.sort((a, b) => b.price * b.volume - a.price * a.volume)
+      const top = csFiltered.slice(0, Math.min(1000, params.limit))
       console.log(
-        `[v0] Polygon grouped bars ${date}: ${results.length} total → ${filtered.length} pass filters → returning top ${top.length}`,
+        `[v0] Polygon grouped bars ${date}: ${results.length} total → ${filtered.length} pass price/vol → ${csFiltered.length} after CS allowlist (${allowlist ? "applied" : "unavailable, skipped"}) → returning top ${top.length}`,
       )
       return top
     } catch (err) {
