@@ -1629,8 +1629,12 @@ export function WheelScanner() {
       setPreFilterProgress(10)
       setPreFilterCurrentTicker("Fetching major index tickers...")
 
+      // Pass the Step-1 dollar ceiling through so the pre-filter itself
+      // excludes tickers priced above it (previously only Step 3 filtered by price).
+      const priceCap = maxStockPrice[0]
+      const priceParam = priceCap > 0 && priceCap < 1000 ? `&maxPrice=${priceCap}` : ""
       const response = await fetch(
-        `/api/polygon-tickers?minMarketCap=${marketCapThreshold}&minVolume=${minVolumeValue}&limit=${topRankedLimit}`,
+        `/api/polygon-tickers?minMarketCap=${marketCapThreshold}&minVolume=${minVolumeValue}&limit=${topRankedLimit}${priceParam}`,
       )
 
       setPreFilterProgress(50)

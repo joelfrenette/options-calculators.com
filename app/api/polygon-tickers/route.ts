@@ -1,8 +1,61 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getApiKey } from "@/lib/api-keys"
+import { getApiKey, resolveApiKey } from "@/lib/api-keys"
 
 export const runtime = "edge"
 export const dynamic = "force-dynamic"
+
+// FMP stock-screener: proper universe, filters by market cap / volume / price
+// server-side, pre-sorted by market cap desc. Returns null on error so the
+// caller can fall through to the hardcoded Polygon list.
+async function fetchFMPScreener(params: {
+  minMarketCap: number
+  minVolume: number
+  maxPrice: number | null
+  limit: number
+}): Promise<string[] | null> {
+  const key = resolveApiKey("FMP_API_KEY") // respects DISABLED_APIS
+  if (!key) return null
+
+  const qs = new URLSearchParams()
+  if (params.minMarketCap > 0) qs.set("marketCapMoreThan", String(params.minMarketCap))
+  if (params.minVolume > 0) qs.set("volumeMoreThan", String(params.minVolume))
+  if (params.maxPrice != null) qs.set("priceLowerThan", String(params.maxPrice))
+  qs.set("isActivelyTrading", "true")
+  qs.set("isEtf", "false")
+  qs.set("isFund", "false")
+  qs.set("country", "US")
+  qs.set("exchange", "nyse,nasdaq")
+  qs.set("limit", String(Math.max(1, Math.min(1000, params.limit))))
+  qs.set("apikey", key)
+
+  const url = `https://financialmodelingprep.com/api/v3/stock-screener?${qs.toString()}`
+  console.log(`[v0] FMP screener request: ${url.replace(key, "API_KEY")}`)
+
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) })
+    if (!res.ok) {
+      console.error(`[v0] FMP screener HTTP ${res.status}`)
+      return null
+    }
+    const rows: Array<{ symbol: string; marketCap?: number; price?: number; volume?: number }> = await res.json()
+    if (!Array.isArray(rows)) {
+      console.error(`[v0] FMP screener returned non-array`)
+      return null
+    }
+    // FMP returns market-cap-desc by default; sort explicitly to be safe.
+    rows.sort((a, b) => (b.marketCap ?? 0) - (a.marketCap ?? 0))
+    const tickers = rows
+      .map((r) => (typeof r.symbol === "string" ? r.symbol.trim().toUpperCase() : ""))
+      .filter((t) => t.length > 0 && /^[A-Z][A-Z0-9.-]{0,6}$/.test(t))
+    console.log(
+      `[v0] FMP screener returned ${tickers.length} tickers (top 5: ${tickers.slice(0, 5).join(", ")})`,
+    )
+    return tickers.slice(0, params.limit)
+  } catch (err) {
+    console.error(`[v0] FMP screener fetch error:`, err instanceof Error ? err.message : String(err))
+    return null
+  }
+}
 
 // Map of duplicate tickers - key is the ticker to remove, value is the primary ticker to keep
 const DUPLICATE_TICKERS: Record<string, string> = {
@@ -216,10 +269,26 @@ export async function GET(request: NextRequest) {
     const minMarketCap = Number.parseFloat(searchParams.get("minMarketCap") || "0")
     const minVolume = Number.parseFloat(searchParams.get("minVolume") || "0")
     const limit = Number.parseInt(searchParams.get("limit") || "500")
+    // Step 1 dollar ceiling. Anything ≥ 1000 (or absent) is treated as "no cap".
+    const maxPriceRaw = Number.parseFloat(searchParams.get("maxPrice") || "0")
+    const maxPrice = maxPriceRaw > 0 && maxPriceRaw < 1000 ? maxPriceRaw : null
 
     console.log(
-      `[v0] Filtering major index tickers: minMarketCap=${minMarketCap}, minVolume=${minVolume}, limit=${limit}`,
+      `[v0] Ticker screener request: minMarketCap=${minMarketCap}, minVolume=${minVolume}, maxPrice=${maxPrice ?? "none"}, limit=${limit}`,
     )
+
+    // Preferred: FMP stock-screener does all filtering server-side and
+    // returns up to `limit` tickers pre-sorted by market cap.
+    const fmpTickers = await fetchFMPScreener({ minMarketCap, minVolume, maxPrice, limit })
+    if (fmpTickers && fmpTickers.length > 0) {
+      console.log(`[v0] Returning ${fmpTickers.length} tickers from FMP screener`)
+      return NextResponse.json({
+        tickers: fmpTickers,
+        count: fmpTickers.length,
+        source: "fmp-screener",
+      })
+    }
+    console.log(`[v0] FMP screener unavailable — falling back to hardcoded Polygon universe`)
 
     async function fetchWithRetry(url: string, maxRetries = 3, timeoutMs = 10000): Promise<Response | null> {
       for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -273,10 +342,10 @@ export async function GET(request: NextRequest) {
             const volume = snapshot.prevDay?.v || snapshot.day?.v || 0
             const price = snapshot.prevDay?.c || snapshot.day?.c || 0
 
-            console.log(`[v0] ${snapshot.ticker}: volume=${(volume / 1e6).toFixed(1)}M`)
+            console.log(`[v0] ${snapshot.ticker}: price=$${price.toFixed(2)} volume=${(volume / 1e6).toFixed(1)}M`)
 
-            // Apply volume filter (Note: This is previous day's volume, not 30-day average)
-            if (volume >= minVolume) {
+            // Apply volume + Step-1 price filter (prev day's numbers)
+            if (volume >= minVolume && (maxPrice == null || price <= maxPrice)) {
               tickersWithData.push({
                 ticker: snapshot.ticker,
                 volume: volume,
@@ -295,8 +364,11 @@ export async function GET(request: NextRequest) {
 
     console.log(`[v0] ${tickersWithData.length} tickers passed volume filter (>= ${minVolume})`)
 
-    const tickersToEnrich = tickersWithData.slice(0, 50)
-    console.log(`[v0] Fetching market cap for top ${tickersToEnrich.length} tickers (to avoid timeout)`)
+    // Enrich up to the smaller of the requested limit or 200 (edge-fn budget).
+    // Previously capped at 50 which prevented Top-500 from ever returning >50.
+    const enrichCap = Math.min(200, Math.max(50, limit))
+    const tickersToEnrich = tickersWithData.slice(0, enrichCap)
+    console.log(`[v0] Fetching market cap for top ${tickersToEnrich.length} tickers (enrichCap=${enrichCap})`)
 
     // Fetch market cap for tickers that passed volume filter
     const tickersWithMarketCap: TickerData[] = []
@@ -381,6 +453,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       tickers: finalTickers,
       count: finalTickers.length,
+      source: "polygon-hardcoded-fallback",
     })
   } catch (error) {
     console.error("[v0] Error in polygon-tickers API:", error)
