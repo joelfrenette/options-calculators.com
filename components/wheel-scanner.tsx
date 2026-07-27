@@ -561,7 +561,7 @@ export function WheelScanner() {
   const [step, setStep] = useState(1) // 1=Initial, 2=After fundamental scan, 3=After technical scan, 4=Relaxed results
 
   // Step 1: Dollar Amount Filtering
-  const [maxStockPrice, setMaxStockPrice] = useState([200]) // Default $200 → $20,000 total cash ($1-$1000)
+  const [maxStockPrice, setMaxStockPrice] = useState([110]) // Default $110 → $11,000 total cash ($1-$1000)
 
   const isScanning = loading // `loading` is for Step 2 (Fundamental Scan)
   // const isScanningTechnicals = technicalLoading // This is the correct state for technical scanning
