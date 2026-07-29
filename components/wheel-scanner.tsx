@@ -466,6 +466,23 @@ const getTopRankedLabel = (percentage: number): string => {
   return "Top 10"
 }
 
+// Shared 12-stop market-cap ladder for the Step 2 pre-filter slider.
+// Keep values and labels in lockstep — indexed together by preFilterMarketCap[0].
+const PRE_FILTER_MARKET_CAP_TIERS = [
+  { value: 0, label: "Any" },
+  { value: 100_000_000, label: "$100M+" },
+  { value: 300_000_000, label: "$300M+" },
+  { value: 500_000_000, label: "$500M+" },
+  { value: 1_000_000_000, label: "$1B+" },
+  { value: 2_000_000_000, label: "$2B+" },
+  { value: 5_000_000_000, label: "$5B+" },
+  { value: 10_000_000_000, label: "$10B+" },
+  { value: 25_000_000_000, label: "$25B+" },
+  { value: 50_000_000_000, label: "$50B+" },
+  { value: 100_000_000_000, label: "$100B+" },
+  { value: 250_000_000_000, label: "$250B+" },
+] as const
+
 export function WheelScanner() {
   const [tickersToScan, setTickersToScan] = useState<string>("")
   const [minVolume, setMinVolume] = useState([2])
@@ -476,7 +493,7 @@ export function WheelScanner() {
   // FIX: Declare maxPE state variable
   const [maxPE, setMaxPE] = useState([20])
 
-  const [preFilterMarketCap, setPreFilterMarketCap] = useState([3]) // 0=Any, 1=$300M, 2=$2B, 3=$10B, 4=$50B
+  const [preFilterMarketCap, setPreFilterMarketCap] = useState([7]) // 12-stop scale — see PRE_FILTER_MARKET_CAP_TIERS below; default 7 = $10B+
   const [preFilterLiquidity, setPreFilterLiquidity] = useState([10]) // 10M — ensure liquidity default
   const [preFilterTopRanked, setPreFilterTopRanked] = useState([66]) // 66 = Top 50 bucket
 
@@ -1615,14 +1632,13 @@ export function WheelScanner() {
     setError(null)
 
     try {
-      const marketCapThreshold = [0, 300_000_000, 2_000_000_000, 10_000_000_000, 50_000_000_000][preFilterMarketCap[0]]
+      const tier = PRE_FILTER_MARKET_CAP_TIERS[preFilterMarketCap[0]] ?? PRE_FILTER_MARKET_CAP_TIERS[0]
+      const marketCapThreshold = tier.value
       const minVolumeValue = preFilterLiquidity[0] * 1000000
       const topRankedLimit = getTopRankedValue(preFilterTopRanked[0])
 
       console.log("[v0] Step 1 Filter Parameters:")
-      console.log(
-        `  - Market Cap: $${(marketCapThreshold / 1000000000).toFixed(1)}B+ (${["Any", "Small", "Mid", "Large", "Mega"][preFilterMarketCap[0]]})`,
-      )
+      console.log(`  - Market Cap: ${tier.label} (${marketCapThreshold.toLocaleString()})`)
       console.log(`  - Min Volume: ${(minVolumeValue / 1000000).toFixed(1)}M`)
       console.log(`  - Top Ranked: ${getTopRankedLabel(preFilterTopRanked[0])} (limit to ${topRankedLimit} stocks)`)
 
@@ -2141,7 +2157,7 @@ export function WheelScanner() {
                   <div className="space-y-2 p-3 rounded-lg border border-gray-200 bg-white hover:border-primary/30 transition-colors">
                     <div className="flex items-center justify-between">
                       <span className="text-xl font-black text-gray-900 bg-blue-100 px-3 py-1 rounded border border-blue-300">
-                        {["Any", "$300M+", "$2B+", "$10B+", "$50B+"][preFilterMarketCap[0]]}
+                        {PRE_FILTER_MARKET_CAP_TIERS[preFilterMarketCap[0]]?.label ?? "Any"}
                       </span>
                     </div>
                     <Slider
@@ -2149,14 +2165,14 @@ export function WheelScanner() {
                       value={preFilterMarketCap}
                       onValueChange={setPreFilterMarketCap}
                       min={0}
-                      max={4}
+                      max={PRE_FILTER_MARKET_CAP_TIERS.length - 1}
                       step={1}
                       className="cursor-pointer"
                     />
                     <div className="flex justify-between text-xs text-gray-500">
                       <span>Any</span>
                       <span className="text-xs font-semibold">Company size filter</span>
-                      <span>$50B+</span>
+                      <span>{PRE_FILTER_MARKET_CAP_TIERS[PRE_FILTER_MARKET_CAP_TIERS.length - 1].label}</span>
                     </div>
                   </div>
                 </div>
