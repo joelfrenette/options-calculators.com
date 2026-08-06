@@ -574,12 +574,15 @@ export function WheelScanner() {
   const [maxROE, setMaxROE] = useState(20)
 
   // Step 3: Technical Analysis Filters
-  const [maxRSI, setMaxRSI] = useState([50]) // Default Max RSI 50 - oversold threshold
-  const [maxStochastic, setMaxStochastic] = useState([50]) // Default Max Stochastic 50 — 30 combined with the uptrend gates almost never triggers
+  const [maxRSI, setMaxRSI] = useState([60]) // Default Max RSI 60 — 50 excludes normal uptrend momentum; overbought risk starts ~70
+  const [maxStochastic, setMaxStochastic] = useState([70]) // Default Max Stochastic 70 — uptrending stocks sit high on the stochastic most of the time
   const [minATR, setMinATR] = useState([2]) // Default Min ATR 2% - min volatility
   const [maxATR, setMaxATR] = useState([15]) // Default Max ATR 15% - max volatility
 
-  const [requireBollingerBands, setRequireBollingerBands] = useState(true) // Bollinger Bands Setup
+  // Bollinger default OFF: "price at/below the 20-day mean" directly contradicts the
+  // above-50-SMA uptrend gate for most volatile names — together they left strict
+  // Step 4 empty. Re-enable for precise pullback-entry timing.
+  const [requireBollingerBands, setRequireBollingerBands] = useState(false) // Bollinger Bands Setup
   // FIX: Renamed state variables from require200SMA to requireAbove200SMA and require50SMA to requireAbove50SMA
   const [requireAbove200SMA, setRequireAbove200SMA] = useState(true) // Above 200-day SMA
   const [requireAbove50SMA, setRequireAbove50SMA] = useState(true) // Above 50-day SMA
@@ -3161,14 +3164,14 @@ export function WheelScanner() {
                     value={maxStochastic}
                     onValueChange={setMaxStochastic}
                     min={10}
-                    max={50}
+                    max={80}
                     step={1}
                     className="cursor-pointer"
                   />
                   <div className="flex justify-between text-xs text-gray-500">
                     <span>10</span>
                     <span className="text-xs font-semibold">Oversold signal</span>
-                    <span>50</span>
+                    <span>80</span>
                   </div>
                 </div>
               </div>
