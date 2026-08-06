@@ -510,7 +510,7 @@ export function WheelScanner() {
   const [tickersToScan, setTickersToScan] = useState<string>("")
   const [minVolume, setMinVolume] = useState([2])
   const [maxDebtToEquity, setMaxDebtToEquity] = useState([3]) // Default Max Debt/Eq 3.0
-  const [minROE, setMinROE] = useState([5]) // Default Min ROE 5% — growth companies reinvest, so quality names often run 3-8%
+  const [minROE, setMinROE] = useState([4]) // Default Min ROE 4% — admits TSLA-class growth names (~4.6% TTM ROE)
   const [minProfitableQuarters, setMinProfitableQuarters] = useState([2]) // Default 2 quarters — admits newly-profitable names (BE-class)
   // Step 3 market-cap floor — index into PRE_FILTER_MARKET_CAP_TIERS.
   // Default 5 = $2B+ (was a hidden hardcoded $10B floor before being exposed as a slider).
@@ -608,7 +608,7 @@ export function WheelScanner() {
   const [step, setStep] = useState(1) // 1=Initial, 2=After fundamental scan, 3=After technical scan, 4=Relaxed results
 
   // Step 1: Dollar Amount Filtering
-  const [maxStockPrice, setMaxStockPrice] = useState([110]) // Default $110 → $11,000 total cash ($1-$1000)
+  const [maxStockPrice, setMaxStockPrice] = useState([500]) // Default $500 → $50,000 total cash ($1-$1000)
 
   const isScanning = loading // `loading` is for Step 2 (Fundamental Scan)
   // const isScanningTechnicals = technicalLoading // This is the correct state for technical scanning
