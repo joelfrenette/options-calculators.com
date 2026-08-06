@@ -118,6 +118,7 @@ async function fetchPolygonCommonStocksAllowlist(): Promise<Set<string> | null> 
 async function fetchPolygonGroupedBars(params: {
   minVolume: number
   maxPrice: number | null
+  minRangePct: number // daily (high-low)/close %, free IV proxy; 0 = no filter
   limit: number
 }): Promise<{ ticker: string; price: number; volume: number }[] | null> {
   const key = resolveApiKey("POLYGON_API_KEY")
@@ -158,17 +159,25 @@ async function fetchPolygonGroupedBars(params: {
       // Real US common stocks are 1–5 alpha chars (BRK.B etc. are represented as "BRKB"
       // in Polygon grouped bars — we handle Class-B rename downstream via DUPLICATE_TICKERS).
       const filtered = results
-        .map((r) => ({
-          ticker: (typeof r.T === "string" ? r.T : "").toUpperCase(),
-          price: Number(r.c) || 0,
-          volume: Number(r.v) || 0,
-        }))
+        .map((r) => {
+          const price = Number(r.c) || 0
+          const high = Number(r.h) || 0
+          const low = Number(r.l) || 0
+          return {
+            ticker: (typeof r.T === "string" ? r.T : "").toUpperCase(),
+            price,
+            volume: Number(r.v) || 0,
+            // Daily range % — free realized-volatility proxy for premium richness.
+            rangePct: price > 0 && high >= low ? ((high - low) / price) * 100 : 0,
+          }
+        })
         .filter((r) => {
           if (!r.ticker || r.ticker.length === 0 || r.ticker.length > 5) return false
           if (!/^[A-Z]+$/.test(r.ticker)) return false
           if (r.price <= 0 || r.volume <= 0) return false
           if (params.minVolume > 0 && r.volume < params.minVolume) return false
           if (params.maxPrice != null && r.price > params.maxPrice) return false
+          if (params.minRangePct > 0 && r.rangePct < params.minRangePct) return false
           return true
         })
 
@@ -182,7 +191,7 @@ async function fetchPolygonGroupedBars(params: {
       csFiltered.sort((a, b) => b.price * b.volume - a.price * a.volume)
       const top = csFiltered.slice(0, Math.min(1000, params.limit))
       console.log(
-        `[v0] Polygon grouped bars ${date}: ${results.length} total → ${filtered.length} pass price/vol → ${csFiltered.length} after CS allowlist (${allowlist ? "applied" : "unavailable, skipped"}) → returning top ${top.length}`,
+        `[v0] Polygon grouped bars ${date}: ${results.length} total → ${filtered.length} pass price/vol/range(≥${params.minRangePct}%) → ${csFiltered.length} after CS allowlist (${allowlist ? "applied" : "unavailable, skipped"}) → returning top ${top.length}`,
       )
       return top
     } catch (err) {
@@ -412,15 +421,20 @@ export async function GET(request: NextRequest) {
     // Step 1 dollar ceiling. Anything ≥ 1000 (or absent) is treated as "no cap".
     const maxPriceRaw = Number.parseFloat(searchParams.get("maxPrice") || "0")
     const maxPrice = maxPriceRaw > 0 && maxPriceRaw < 1000 ? maxPriceRaw : null
+    // Minimum daily range % (volatility proxy for premium richness). 0 = off.
+    const minRangePct = Math.max(0, Number.parseFloat(searchParams.get("minRangePct") || "0") || 0)
 
     console.log(
-      `[v0] Ticker screener request: minMarketCap=${minMarketCap}, minVolume=${minVolume}, maxPrice=${maxPrice ?? "none"}, limit=${limit}`,
+      `[v0] Ticker screener request: minMarketCap=${minMarketCap}, minVolume=${minVolume}, maxPrice=${maxPrice ?? "none"}, minRangePct=${minRangePct}, limit=${limit}`,
     )
 
     // Preferred: FMP stock-screener does all filtering server-side and
     // returns up to `limit` tickers pre-sorted by market cap. Requires a
     // paid FMP tier — returns null / HTTPS 403 on the free plan.
-    const fmpTickers = await fetchFMPScreener({ minMarketCap, minVolume, maxPrice, limit })
+    // FMP has no daily-range filter, so when the volatility slider is active
+    // we go straight to grouped bars (the only source that can honor it).
+    const fmpTickers =
+      minRangePct > 0 ? null : await fetchFMPScreener({ minMarketCap, minVolume, maxPrice, limit })
     if (fmpTickers && fmpTickers.length > 0) {
       console.log(`[v0] Returning ${fmpTickers.length} tickers from FMP screener`)
       return NextResponse.json({
@@ -435,7 +449,7 @@ export async function GET(request: NextRequest) {
     // sorts by dollar volume as a market-cap proxy. Skips the market-cap
     // threshold (unavailable in grouped bars); Step 3's per-ticker fundamentals
     // scan applies the real market-cap filter downstream.
-    const groupedRows = await fetchPolygonGroupedBars({ minVolume, maxPrice, limit })
+    const groupedRows = await fetchPolygonGroupedBars({ minVolume, maxPrice, minRangePct, limit })
     if (groupedRows && groupedRows.length > 0) {
       const tickers = groupedRows.map((r) => r.ticker)
       console.log(

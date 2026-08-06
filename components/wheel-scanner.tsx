@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 
-const CACHE_VERSION = "v1"
+const CACHE_VERSION = "v2" // v2: rows carry iv (real implied volatility) from Step 4 enrichment
 
 // Check if it's a weekday (Monday-Friday)
 const isWeekday = (date: Date): boolean => {
@@ -167,6 +167,11 @@ interface QualifyingStock {
   // Populated during Step 3: the names of fundamental filters this stock *didn't* pass.
   // Empty (or undefined) means strict pass; length 1–2 means "near miss" for the relaxed Step 4 fallback.
   failedFilters?: string[]
+
+  // Real implied volatility (as %) from the Polygon options snapshot, captured
+  // during Step 4 enrichment. The exact premium-richness KPI — undefined when
+  // the market is closed and greeks are estimated.
+  iv?: number
 }
 
 const MEGA_CAP_STOCKS = [
@@ -483,6 +488,20 @@ const PRE_FILTER_MARKET_CAP_TIERS = [
   { value: 250_000_000_000, label: "$250B+" },
 ] as const
 
+// Step 2 volatility (premium-richness) ladder. Values are minimum daily
+// range % ((high − low) / close) from Polygon grouped bars — a free realized-
+// volatility proxy that tracks implied volatility (and therefore option
+// premium) closely. 0 = no filter.
+const PRE_FILTER_VOLATILITY_TIERS = [
+  { value: 0, label: "Any" },
+  { value: 2, label: "2%+" },
+  { value: 3, label: "3%+" },
+  { value: 4, label: "4%+" },
+  { value: 5, label: "5%+" },
+  { value: 7, label: "7%+" },
+  { value: 10, label: "10%+" },
+] as const
+
 export function WheelScanner() {
   const [tickersToScan, setTickersToScan] = useState<string>("")
   const [minVolume, setMinVolume] = useState([2])
@@ -494,6 +513,7 @@ export function WheelScanner() {
   const [maxPE, setMaxPE] = useState([20])
 
   const [preFilterMarketCap, setPreFilterMarketCap] = useState([7]) // 12-stop scale — see PRE_FILTER_MARKET_CAP_TIERS below; default 7 = $10B+
+  const [preFilterVolatility, setPreFilterVolatility] = useState([0]) // index into PRE_FILTER_VOLATILITY_TIERS; default Any
   const [preFilterLiquidity, setPreFilterLiquidity] = useState([10]) // 10M — ensure liquidity default
   const [preFilterTopRanked, setPreFilterTopRanked] = useState([66]) // 66 = Top 50 bucket
 
@@ -520,7 +540,8 @@ export function WheelScanner() {
   const [fundamentalSortColumn, setFundamentalSortColumn] = useState<string>("ticker")
   const [fundamentalSortDirection, setFundamentalSortDirection] = useState<"asc" | "desc">("asc")
 
-  const [sortColumn, setSortColumn] = useState<keyof QualifyingStock>("yield")
+  // Default: rank finalists by annualized premium yield — the "richest premium first" view
+  const [sortColumn, setSortColumn] = useState<keyof QualifyingStock>("annualizedYield")
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc")
   // Default: shortest DTE first, then highest Yield % within each DTE group
   const [relaxedSortColumn, setRelaxedSortColumn] = useState<keyof QualifyingStock>("daysToExpiry")
@@ -1402,6 +1423,7 @@ export function WheelScanner() {
             let bid: number | undefined
             let ask: number | undefined
             let premium: number | undefined
+            let iv: number | undefined
             let priceSource = ""
 
             if (useEstimatedGreeks) {
@@ -1430,6 +1452,12 @@ export function WheelScanner() {
             } else {
               // Use actual data from snapshot
               delta = snapshot.greeks?.delta || null
+
+              // Polygon reports IV as a decimal (0.42 = 42%). Store as %.
+              const rawIV = Number(snapshot.implied_volatility)
+              if (Number.isFinite(rawIV) && rawIV > 0) {
+                iv = rawIV * 100
+              }
 
               if (snapshot.last_quote?.bid_price && snapshot.last_quote?.ask_price) {
                 bid = snapshot.last_quote.bid_price
@@ -1488,6 +1516,7 @@ export function WheelScanner() {
               expiryDate,
               bidPrice: bid,
               askPrice: ask,
+              iv,
             })
           }
 
@@ -1636,9 +1665,11 @@ export function WheelScanner() {
       const marketCapThreshold = tier.value
       const minVolumeValue = preFilterLiquidity[0] * 1000000
       const topRankedLimit = getTopRankedValue(preFilterTopRanked[0])
+      const volTier = PRE_FILTER_VOLATILITY_TIERS[preFilterVolatility[0]] ?? PRE_FILTER_VOLATILITY_TIERS[0]
 
       console.log("[v0] Step 1 Filter Parameters:")
       console.log(`  - Market Cap: ${tier.label} (${marketCapThreshold.toLocaleString()})`)
+      console.log(`  - Min Daily Range (volatility): ${volTier.label}`)
       console.log(`  - Min Volume: ${(minVolumeValue / 1000000).toFixed(1)}M`)
       console.log(`  - Top Ranked: ${getTopRankedLabel(preFilterTopRanked[0])} (limit to ${topRankedLimit} stocks)`)
 
@@ -1649,8 +1680,9 @@ export function WheelScanner() {
       // excludes tickers priced above it (previously only Step 3 filtered by price).
       const priceCap = maxStockPrice[0]
       const priceParam = priceCap > 0 && priceCap < 1000 ? `&maxPrice=${priceCap}` : ""
+      const rangeParam = volTier.value > 0 ? `&minRangePct=${volTier.value}` : ""
       const response = await fetch(
-        `/api/polygon-tickers?minMarketCap=${marketCapThreshold}&minVolume=${minVolumeValue}&limit=${topRankedLimit}${priceParam}`,
+        `/api/polygon-tickers?minMarketCap=${marketCapThreshold}&minVolume=${minVolumeValue}&limit=${topRankedLimit}${priceParam}${rangeParam}`,
       )
 
       setPreFilterProgress(50)
@@ -1740,6 +1772,14 @@ export function WheelScanner() {
       case "avgVolume":
         aValue = a.avgVolume
         bValue = b.avgVolume
+        break
+      case "atrPercent":
+        aValue = a.atrPercent
+        bValue = b.atrPercent
+        break
+      case "yield":
+        aValue = a.yield
+        bValue = b.yield
         break
       default:
         aValue = a.currentPrice
@@ -2125,10 +2165,14 @@ export function WheelScanner() {
                   <strong>Top By Market Cap:</strong> Largest companies by market capitalization from S&P 500,
                   Nasdaq-100, Dow indices (adjustable below)
                 </li>
+                <li>
+                  <strong>Min Volatility:</strong> Minimum daily price range — volatile stocks carry richer option
+                  premiums (adjustable below)
+                </li>
               </ul>
 
               {/* Step 2 Sliders */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div className="space-y-3">
                   <Label className="text-sm font-medium flex items-center gap-2">
                     Min Market Cap
@@ -2269,6 +2313,55 @@ export function WheelScanner() {
                       <span>Top 500</span>
                       <span className="text-[9px]">Top By Market Cap</span>
                       <span>Top 10</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    Min Volatility
+                    {tooltipsEnabled ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs bg-green-50 border-green-200 text-gray-900">
+                          <p className="font-semibold mb-1">Volatility Filter (Premium Richness)</p>
+                          <p className="text-sm">
+                            Minimum daily price range ((high − low) ÷ close). Volatility is what makes option premiums
+                            rich — it tracks implied volatility closely:
+                          </p>
+                          <ul className="text-sm mt-1 space-y-1">
+                            <li>
+                              <strong>Higher (4%+):</strong> Rich premiums (HOOD, SOFI, TSLA territory), bigger swings
+                            </li>
+                            <li>
+                              <strong>Any:</strong> No filter — includes calm, low-premium names
+                            </li>
+                          </ul>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : null}
+                  </Label>
+                  <div className="space-y-2 p-3 rounded-lg border border-gray-200 bg-white hover:border-primary/30 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xl font-black text-gray-900 bg-blue-100 px-3 py-1 rounded border border-blue-300">
+                        {PRE_FILTER_VOLATILITY_TIERS[preFilterVolatility[0]]?.label ?? "Any"}
+                      </span>
+                    </div>
+                    <Slider
+                      id="preFilterVolatility"
+                      value={preFilterVolatility}
+                      onValueChange={setPreFilterVolatility}
+                      min={0}
+                      max={PRE_FILTER_VOLATILITY_TIERS.length - 1}
+                      step={1}
+                      className="cursor-pointer"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>Any</span>
+                      <span className="text-xs font-semibold">Premium richness</span>
+                      <span>{PRE_FILTER_VOLATILITY_TIERS[PRE_FILTER_VOLATILITY_TIERS.length - 1].label}</span>
                     </div>
                   </div>
                 </div>
@@ -2716,6 +2809,30 @@ export function WheelScanner() {
                         )}
                       </div>
                     </th>
+                    <th
+                      className="text-right py-2 px-3 font-semibold text-gray-900 cursor-pointer hover:bg-gray-50"
+                      onClick={() => handleFundamentalSort("atrPercent")}
+                      title="Average True Range as % of price — realized volatility; higher = richer option premiums"
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        ATR %
+                        {fundamentalSortColumn === "atrPercent" && (
+                          <span className="text-xs">{fundamentalSortDirection === "asc" ? "↑" : "↓"}</span>
+                        )}
+                      </div>
+                    </th>
+                    <th
+                      className="text-right py-2 px-3 font-semibold text-gray-900 cursor-pointer hover:bg-gray-50"
+                      onClick={() => handleFundamentalSort("yield")}
+                      title="Estimated weekly put premium yield from volatility — real quotes come in Step 4"
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        Est. Yield %
+                        {fundamentalSortColumn === "yield" && (
+                          <span className="text-xs">{fundamentalSortDirection === "asc" ? "↑" : "↓"}</span>
+                        )}
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2744,6 +2861,20 @@ export function WheelScanner() {
                           {stock.roe > 0 ? `${stock.roe.toFixed(1)}%` : "0.0%"}
                         </td>
                         <td className="text-right py-2 px-3 text-gray-600">{stock.avgVolume.toFixed(1)}M</td>
+                        <td
+                          className={`text-right py-2 px-3 font-semibold ${
+                            stock.atrPercent >= 4
+                              ? "text-purple-700"
+                              : stock.atrPercent >= 2.5
+                                ? "text-purple-500"
+                                : "text-gray-600"
+                          }`}
+                        >
+                          {stock.atrPercent > 0 ? `${stock.atrPercent.toFixed(1)}%` : "-"}
+                        </td>
+                        <td className="text-right py-2 px-3 text-gray-600">
+                          {stock.yield > 0 ? `${stock.yield.toFixed(2)}%` : "-"}
+                        </td>
                       </tr>
                     )
                   })}
@@ -3305,6 +3436,13 @@ export function WheelScanner() {
                     >
                       Annual Yield % {sortColumn === "annualizedYield" && (sortDirection === "asc" ? "↑" : "↓")}
                     </th>
+                    <th
+                      className="text-right p-3 font-semibold text-green-900 cursor-pointer hover:bg-green-100"
+                      onClick={() => handleSort("iv" as keyof QualifyingStock)}
+                      title="Implied volatility from live option quotes — the premium-richness KPI"
+                    >
+                      IV % {sortColumn === "iv" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
                     {/* Reordered: Red Day, RSI, Bollinger, MACD, then rest */}
                     <th
                       className="text-center p-3 font-semibold text-green-900 cursor-pointer hover:bg-green-100"
@@ -3405,6 +3543,17 @@ export function WheelScanner() {
                           {stock.annualizedYield !== undefined && stock.annualizedYield > 0
                             ? stock.annualizedYield.toFixed(1) + "%"
                             : "N/A"}
+                        </td>
+                        <td
+                          className={`text-right p-3 font-semibold ${
+                            stock.iv !== undefined && stock.iv >= 50
+                              ? "text-purple-700"
+                              : stock.iv !== undefined && stock.iv >= 35
+                                ? "text-purple-500"
+                                : "text-gray-600"
+                          }`}
+                        >
+                          {stock.iv !== undefined && stock.iv > 0 ? `${stock.iv.toFixed(0)}%` : "-"}
                         </td>
                         <td className="text-center p-3">
                           {stock.redDay ? (
@@ -3653,6 +3802,13 @@ export function WheelScanner() {
                       {relaxedSortColumn === "annualizedYield" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
                     </th>
                     <th
+                      className="text-right p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
+                      onClick={() => handleRelaxedSort("iv" as keyof QualifyingStock)}
+                      title="Implied volatility from live option quotes — the premium-richness KPI"
+                    >
+                      IV % {relaxedSortColumn === "iv" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
                       className="text-center p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
                       onClick={() => handleRelaxedSort("daysToEarnings")}
                     >
@@ -3761,6 +3917,17 @@ export function WheelScanner() {
                           {stock.annualizedYield !== undefined && stock.annualizedYield > 0
                             ? stock.annualizedYield.toFixed(1) + "%"
                             : "N/A"}
+                        </td>
+                        <td
+                          className={`text-right p-3 font-semibold ${
+                            stock.iv !== undefined && stock.iv >= 50
+                              ? "text-purple-700"
+                              : stock.iv !== undefined && stock.iv >= 35
+                                ? "text-purple-500"
+                                : "text-gray-600"
+                          }`}
+                        >
+                          {stock.iv !== undefined && stock.iv > 0 ? `${stock.iv.toFixed(0)}%` : "-"}
                         </td>
                         <td className="text-center p-3">
                           {stock.daysToEarnings !== undefined &&
