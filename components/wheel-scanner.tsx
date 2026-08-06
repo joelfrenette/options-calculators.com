@@ -2065,8 +2065,8 @@ export function WheelScanner() {
             </div>
           </div>
 
-          {/* STEP 1: DOLLAR AMOUNT FILTERING */}
-          {step === 1 && (
+          {/* STEP 1: DOLLAR AMOUNT FILTERING — always visible so selections stay on screen after scanning */}
+          {(
             <div className="bg-emerald-50 border-2 border-emerald-300 rounded-lg p-4">
               <div className="flex items-start gap-2 mb-3">
                 <Info className="h-5 w-5 text-emerald-700 flex-shrink-0 mt-0.5" />
@@ -2181,8 +2181,8 @@ export function WheelScanner() {
             </div>
           )}
 
-          {/* STEP 2: PRE-FILTERING */}
-          {step === 1 && (
+          {/* STEP 2: PRE-FILTERING — always visible so selections stay on screen after scanning */}
+          {(
             <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
               <div className="flex items-start gap-2 mb-3">
                 <Info className="h-5 w-5 text-blue-700 flex-shrink-0 mt-0.5" />
@@ -2586,13 +2586,13 @@ export function WheelScanner() {
                     id="minROE"
                     value={minROE}
                     onValueChange={setMinROE}
-                    min={5}
+                    min={0}
                     max={20}
                     step={1}
                     className="cursor-pointer"
                   />
                   <div className="flex justify-between text-xs text-gray-500">
-                    <span>5%</span>
+                    <span>0%</span>
                     <span className="text-xs font-semibold">Quality of profit</span>
                     <span>20%</span>
                   </div>
