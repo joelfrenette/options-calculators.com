@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 
-const CACHE_VERSION = "v2" // v2: rows carry iv (real implied volatility) from Step 4 enrichment
+const CACHE_VERSION = "v3" // v3: quarterly-financials scan (real profitable-quarters count, TTM ROE/EPS, 12-stop market-cap floor)
 
 // Check if it's a weekday (Monday-Friday)
 const isWeekday = (date: Date): boolean => {
@@ -172,6 +172,10 @@ interface QualifyingStock {
   // during Step 4 enrichment. The exact premium-richness KPI — undefined when
   // the market is closed and greeks are estimated.
   iv?: number
+
+  // Consecutive profitable quarters (net income > 0) counted from the most
+  // recent quarterly filing backwards, out of up to 12 fetched.
+  profitableQuarters?: number
 }
 
 const MEGA_CAP_STOCKS = [
@@ -508,7 +512,9 @@ export function WheelScanner() {
   const [maxDebtToEquity, setMaxDebtToEquity] = useState([3]) // Default Max Debt/Eq 3.0
   const [minROE, setMinROE] = useState([10]) // Default Min ROE 10%
   const [minProfitableQuarters, setMinProfitableQuarters] = useState([4]) // Default 4 quarters
-  const [minMarketCapCategory, setMinMarketCapCategory] = useState([3])
+  // Step 3 market-cap floor — index into PRE_FILTER_MARKET_CAP_TIERS.
+  // Default 5 = $2B+ (was a hidden hardcoded $10B floor before being exposed as a slider).
+  const [minMarketCapCategory, setMinMarketCapCategory] = useState([5])
   // FIX: Declare maxPE state variable
   const [maxPE, setMaxPE] = useState([20])
 
@@ -903,7 +909,7 @@ export function WheelScanner() {
         volume: [],
         debtEquity: [],
         roe: [],
-        eps: [],
+        profitableQuarters: [],
         marketCap: [],
       }
       const skipBuckets: Record<string, string[]> = {
@@ -929,7 +935,9 @@ export function WheelScanner() {
             const snapshotRes = await fetchWithRetry(`/api/polygon-proxy?endpoint=snapshot&ticker=${ticker}`)
             await delay(apiDelay)
 
-            const financialsRes = await fetchWithRetry(`/api/polygon-proxy?endpoint=financials&ticker=${ticker}`)
+            const financialsRes = await fetchWithRetry(
+              `/api/polygon-proxy?endpoint=financials&ticker=${ticker}&timeframe=quarterly&limit=12`,
+            )
             await delay(apiDelay)
 
             const aggregatesRes = await fetchWithRetry(`/api/polygon-proxy?endpoint=aggregates&ticker=${ticker}`)
@@ -981,23 +989,39 @@ export function WheelScanner() {
             const volume = day.v || prevDay.v || 0
             const volumeInMillions = volume / 1000000
 
-            const financials = financialsData.results?.[0]?.financials || {}
-            const income_statement = financials.income_statement || {}
-            const balance_sheet = financials.balance_sheet || {}
+            // Quarterly filings, most recent first (sorted defensively by period end)
+            const qRows: any[] = (financialsData.results || [])
+              .filter((r: any) => r?.financials)
+              .sort((a: any, b: any) => String(b.end_date || "").localeCompare(String(a.end_date || "")))
 
-            const financialsCount = Object.keys(financials).length
+            const latestFinancials = qRows[0]?.financials || {}
+            const income_statement = latestFinancials.income_statement || {}
+            const balance_sheet = latestFinancials.balance_sheet || {}
+
             const hasIncome = Object.keys(income_statement).length > 0
             const hasBalance = Object.keys(balance_sheet).length > 0
             if (!hasIncome || !hasBalance) {
               console.log(
-                `[v0] ⚠️ ${ticker} - Thin financials (income=${hasIncome}, balance=${hasBalance}, sections=${financialsCount}, results.length=${financialsData.results?.length ?? 0}). Filters below will likely reject with ROE=0/EPS=0.`,
+                `[v0] ⚠️ ${ticker} - Thin financials (income=${hasIncome}, balance=${hasBalance}, quarters=${qRows.length}). Filters below will likely reject with ROE=0/EPS=0.`,
               )
               skipBuckets.thinFinancials.push(ticker)
             }
 
-            const revenues = income_statement.revenues?.value || 0
-            const net_income = income_statement.net_income_loss?.value || 0
-            const total_assets = balance_sheet.assets?.value || 0
+            // Count CONSECUTIVE profitable quarters starting from the most recent
+            // filing — this is what the "Min Profitable Quarters" slider now gates on.
+            let profitableQuarters = 0
+            for (const row of qRows) {
+              const ni = row.financials?.income_statement?.net_income_loss?.value
+              if (typeof ni === "number" && Number.isFinite(ni) && ni > 0) profitableQuarters++
+              else break
+            }
+
+            // TTM figures from the last 4 quarterly rows (graceful when fewer exist)
+            const ttmRows = qRows.slice(0, 4)
+            const net_income = ttmRows.reduce(
+              (sum: number, row: any) => sum + (row.financials?.income_statement?.net_income_loss?.value || 0),
+              0,
+            )
             const stockholders_equity = balance_sheet.equity?.value || 0
             const total_liabilities = balance_sheet.liabilities?.value || 0
 
@@ -1006,15 +1030,19 @@ export function WheelScanner() {
             const shares_outstanding =
               ticker_data?.shares_outstanding ||
               ticker_data?.weighted_shares_outstanding ||
-              financialsData.results?.[0]?.shares_outstanding ||
+              qRows[0]?.shares_outstanding ||
               basic_shares ||
               0
 
-            // Extract EPS directly from income statement (REAL DATA)
-            const eps =
-              income_statement.diluted_earnings_per_share?.value ||
-              income_statement.basic_earnings_per_share?.value ||
-              (shares_outstanding > 0 && net_income ? net_income / shares_outstanding : 0)
+            // TTM EPS = sum of the last 4 quarterly EPS figures (REAL DATA)
+            const quarterEPS = ttmRows.map((row: any) => {
+              const is = row.financials?.income_statement || {}
+              return is.diluted_earnings_per_share?.value ?? is.basic_earnings_per_share?.value ?? 0
+            })
+            let eps = quarterEPS.reduce((a: number, b: number) => a + b, 0)
+            if (!(eps > 0) && shares_outstanding > 0 && net_income) {
+              eps = net_income / shares_outstanding
+            }
 
             // Calculate Market Cap: Price × Shares Outstanding
             let marketCap = 0
@@ -1062,7 +1090,7 @@ export function WheelScanner() {
             }
 
             console.log(
-              `[v0] ${ticker}: Price=$${currentPrice.toFixed(2)}, EPS=$${eps.toFixed(4)}, PE=${peRatio.toFixed(1)}, MarketCap=$${(marketCap / 1e9).toFixed(1)}B, Vol=${volumeInMillions.toFixed(1)}M, D/E=${debtToEquity.toFixed(2)}, ROE=${roe.toFixed(1)}%${earningsDate ? `, Earnings: ${earningsDate} (${daysToEarnings}d)` : " (no earnings date)"} ${eps > 0 ? "(REAL EPS)" : "(ESTIMATED PE)"}`,
+              `[v0] ${ticker}: Price=$${currentPrice.toFixed(2)}, EPS(TTM)=$${eps.toFixed(4)}, PE=${peRatio.toFixed(1)}, MarketCap=$${(marketCap / 1e9).toFixed(1)}B, Vol=${volumeInMillions.toFixed(1)}M, D/E=${debtToEquity.toFixed(2)}, ROE=${roe.toFixed(1)}%, ProfitQtrs=${profitableQuarters}/${qRows.length}${earningsDate ? `, Earnings: ${earningsDate} (${daysToEarnings}d)` : " (no earnings date)"}`,
             )
 
             // Apply filters with REAL data from Polygon — record which ones fail so we
@@ -1087,13 +1115,19 @@ export function WheelScanner() {
               rejectionBuckets.roe.push(`${ticker}(${roe.toFixed(1)}%)`)
               failedFilters.push("roe")
             }
-            if (minProfitableQuarters[0] > 0 && eps <= 0) {
-              console.log(`[v0]   ❌ ${ticker}: EPS ${eps.toFixed(2)} <= 0 (unprofitable)`)
-              rejectionBuckets.eps.push(`${ticker}(${eps.toFixed(2)})`)
-              failedFilters.push("eps")
+            if (minProfitableQuarters[0] > 0) {
+              // Clamp to the history we actually have so a data gap (e.g. only 8
+              // filings available) can't fail a company that's clean across all of them.
+              const requiredQ = Math.min(minProfitableQuarters[0], Math.max(1, qRows.length))
+              if (profitableQuarters < requiredQ) {
+                console.log(
+                  `[v0]   ❌ ${ticker}: ${profitableQuarters} consecutive profitable quarters < ${requiredQ} required`,
+                )
+                rejectionBuckets.profitableQuarters.push(`${ticker}(${profitableQuarters}q)`)
+                failedFilters.push("profitableQuarters")
+              }
             }
-            const marketCapThresholds = [0, 300_000_000, 2_000_000_000, 10_000_000_000]
-            const minMarketCapValue = marketCapThresholds[minMarketCapCategory[0]]
+            const minMarketCapValue = PRE_FILTER_MARKET_CAP_TIERS[minMarketCapCategory[0]]?.value ?? 0
             if (minMarketCapValue > 0 && marketCap < minMarketCapValue) {
               console.log(
                 `[v0]   ❌ ${ticker}: Market Cap $${(marketCap / 1e9).toFixed(1)}B < $${(minMarketCapValue / 1e9).toFixed(1)}B`,
@@ -1157,7 +1191,7 @@ export function WheelScanner() {
               currentPrice,
               peRatio: peRatio > 0 ? Number(peRatio.toFixed(1)) : 0,
               avgVolume: Number(volumeInMillions.toFixed(2)),
-              last4EPS: eps > 0 ? [eps, eps, eps, eps] : [0, 0, 0, 0], // Use real EPS instead of placeholder
+              last4EPS: quarterEPS.length === 4 ? quarterEPS : [eps, eps, eps, eps].map((v) => v / 4), // Real per-quarter EPS when available
               sma50,
               sma100,
               sma200,
@@ -1182,6 +1216,7 @@ export function WheelScanner() {
               roe: Number(roe.toFixed(1)), // Return on Equity percentage
               debtToEquity: Number(debtToEquity.toFixed(2)), // Debt-to-Equity ratio
               failedFilters, // [] on strict pass; 1–2 entries → near miss for relaxed Step 4
+              profitableQuarters,
             }
           } catch (err) {
             console.log(`[v0] Error processing ${ticker}:`, err)
@@ -1780,6 +1815,10 @@ export function WheelScanner() {
       case "yield":
         aValue = a.yield
         bValue = b.yield
+        break
+      case "profitableQuarters":
+        aValue = a.profitableQuarters ?? 0
+        bValue = b.profitableQuarters ?? 0
         break
       default:
         aValue = a.currentPrice
@@ -2433,7 +2472,8 @@ export function WheelScanner() {
               <CardTitle className="text-xl font-bold">FUNDAMENTAL CRITERIA (Step 3)</CardTitle>
             </div>
             <CardDescription>
-              Using Twelve Data API for real fundamental metrics. All slider filters are applied with live data.
+              Using Polygon quarterly filings for real fundamental metrics. All slider filters are applied with live
+              data.
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
@@ -2448,10 +2488,15 @@ export function WheelScanner() {
                 <strong>Profitable Quarters:</strong> Min {minProfitableQuarters[0]} consecutive quarters (
                 {minProfitableQuarters[0] === 0 ? "no filter" : "consistent profitability"} - adjustable below)
               </li>
+              <li>
+                <strong>Min Market Cap:</strong>{" "}
+                {PRE_FILTER_MARKET_CAP_TIERS[minMarketCapCategory[0]]?.label ?? "Any"} company size floor (adjustable
+                below)
+              </li>
             </ul>
 
             {/* Step 3 Sliders */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="space-y-3">
                 <Label className="text-sm font-medium flex items-center gap-2">
                   Max Debt/Eq
@@ -2602,6 +2647,55 @@ export function WheelScanner() {
                   </div>
                 </div>
               </div>
+
+              <div className="space-y-3">
+                <Label className="text-sm font-medium flex items-center gap-2">
+                  Min Market Cap
+                  {tooltipsEnabled ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs bg-green-50 border-green-200 text-gray-900">
+                        <p className="font-semibold mb-1">Market Cap Floor (Step 3)</p>
+                        <p className="text-xs mb-2">
+                          <strong>What:</strong> Rejects companies below this total value (price × shares) using live
+                          Polygon data, independent of the Step 2 universe filter.
+                        </p>
+                        <p className="text-xs mb-2">
+                          <strong>Why Important:</strong> Smaller companies carry richer premiums but bigger gap risk.
+                          This floor is your final quality gate before options are priced.
+                        </p>
+                        <p className="text-xs">
+                          <strong>Lower ($500M–$2B):</strong> Admits volatile mid-caps (BE-class names).{" "}
+                          <strong>Higher ($10B+):</strong> Large caps only.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : null}
+                </Label>
+                <div className="space-y-2 p-3 rounded-lg border border-gray-200 bg-white hover:border-primary/30 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xl font-black text-gray-900 bg-blue-100 px-3 py-1 rounded border border-blue-300">
+                      {PRE_FILTER_MARKET_CAP_TIERS[minMarketCapCategory[0]]?.label ?? "Any"}
+                    </span>
+                  </div>
+                  <Slider
+                    id="minMarketCapCategory"
+                    value={minMarketCapCategory}
+                    onValueChange={setMinMarketCapCategory}
+                    min={0}
+                    max={PRE_FILTER_MARKET_CAP_TIERS.length - 1}
+                    step={1}
+                    className="cursor-pointer"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>Any</span>
+                    <span className="text-xs font-semibold">Company size floor</span>
+                    <span>{PRE_FILTER_MARKET_CAP_TIERS[PRE_FILTER_MARKET_CAP_TIERS.length - 1].label}</span>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* CHANGE: Removed the 'Max PE Ratio' slider and its related state */}
@@ -2688,7 +2782,7 @@ export function WheelScanner() {
                       {reason === "volume" && "Volume below Min Volume"}
                       {reason === "debtEquity" && "Debt/Equity above Max"}
                       {reason === "roe" && "ROE below Min ROE %"}
-                      {reason === "eps" && "EPS ≤ 0 (unprofitable / EPS field missing from Polygon)"}
+                      {reason === "profitableQuarters" && "Fewer consecutive profitable quarters than required"}
                       {reason === "marketCap" && "Market cap below Min"}
                     </span>
                     <span>{ts.length}</span>
@@ -2800,6 +2894,18 @@ export function WheelScanner() {
                     </th>
                     <th
                       className="text-right py-2 px-3 font-semibold text-gray-900 cursor-pointer hover:bg-gray-50"
+                      onClick={() => handleFundamentalSort("profitableQuarters")}
+                      title="Consecutive profitable quarters (net income > 0), most recent first, out of up to 12 filings"
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        Prof. Qtrs
+                        {fundamentalSortColumn === "profitableQuarters" && (
+                          <span className="text-xs">{fundamentalSortDirection === "asc" ? "↑" : "↓"}</span>
+                        )}
+                      </div>
+                    </th>
+                    <th
+                      className="text-right py-2 px-3 font-semibold text-gray-900 cursor-pointer hover:bg-gray-50"
                       onClick={() => handleFundamentalSort("avgVolume")}
                     >
                       <div className="flex items-center justify-end gap-1">
@@ -2859,6 +2965,9 @@ export function WheelScanner() {
                         </td>
                         <td className="text-right py-2 px-3 text-gray-600">
                           {stock.roe > 0 ? `${stock.roe.toFixed(1)}%` : "0.0%"}
+                        </td>
+                        <td className="text-right py-2 px-3 text-gray-600">
+                          {stock.profitableQuarters !== undefined ? stock.profitableQuarters : "-"}
                         </td>
                         <td className="text-right py-2 px-3 text-gray-600">{stock.avgVolume.toFixed(1)}M</td>
                         <td

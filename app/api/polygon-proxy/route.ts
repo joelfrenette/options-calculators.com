@@ -48,7 +48,13 @@ export async function GET(request: Request) {
     } else if (endpoint === "snapshot") {
       url = `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${ticker}?apiKey=${apiKey}`
     } else if (endpoint === "financials") {
-      url = `https://api.polygon.io/vX/reference/financials?ticker=${ticker}&limit=1&apiKey=${apiKey}`
+      // Optional timeframe/limit let callers pull quarterly history (e.g.
+      // timeframe=quarterly&limit=12) instead of the default single TTM row.
+      const timeframe = searchParams.get("timeframe")
+      const limitRaw = Number.parseInt(searchParams.get("limit") || "1", 10)
+      const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(20, limitRaw)) : 1
+      const timeframeParam = timeframe === "quarterly" || timeframe === "annual" ? `&timeframe=${timeframe}` : ""
+      url = `https://api.polygon.io/vX/reference/financials?ticker=${ticker}${timeframeParam}&limit=${limit}&apiKey=${apiKey}`
     } else if (endpoint === "options") {
       url = `https://api.polygon.io/v3/snapshot/options/${ticker}?apiKey=${apiKey}`
     } else if (endpoint === "options-snapshot") {
