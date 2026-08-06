@@ -1873,9 +1873,41 @@ export function WheelScanner() {
         })
       : [] // Initialize as empty array if no technical results
 
+  // Excel-style column filters for the relaxed results table. Empty string = no filter.
+  const [relaxedFilters, setRelaxedFilters] = useState({
+    ticker: "",
+    maxDTE: "",
+    minPremium: "",
+    minYield: "",
+    minAnnualYield: "",
+    minIV: "",
+  })
+  const clearRelaxedFilters = () =>
+    setRelaxedFilters({ ticker: "", maxDTE: "", minPremium: "", minYield: "", minAnnualYield: "", minIV: "" })
+
+  const filteredRelaxedResults = relaxedResults.filter((stock) => {
+    const tickerQuery = relaxedFilters.ticker.trim().toUpperCase()
+    if (tickerQuery) {
+      // Comma/space separated list; row matches if its ticker contains any token
+      const tokens = tickerQuery.split(/[\s,]+/).filter(Boolean)
+      if (tokens.length > 0 && !tokens.some((t) => stock.ticker.includes(t))) return false
+    }
+    const maxDTE = Number.parseFloat(relaxedFilters.maxDTE)
+    if (Number.isFinite(maxDTE) && (stock.daysToExpiry ?? Number.POSITIVE_INFINITY) > maxDTE) return false
+    const minPremium = Number.parseFloat(relaxedFilters.minPremium)
+    if (Number.isFinite(minPremium) && (stock.premium ?? 0) < minPremium) return false
+    const minYieldF = Number.parseFloat(relaxedFilters.minYield)
+    if (Number.isFinite(minYieldF) && (stock.yield ?? 0) < minYieldF) return false
+    const minAnnual = Number.parseFloat(relaxedFilters.minAnnualYield)
+    if (Number.isFinite(minAnnual) && (stock.annualizedYield ?? 0) < minAnnual) return false
+    const minIVF = Number.parseFloat(relaxedFilters.minIV)
+    if (Number.isFinite(minIVF) && (stock.iv ?? 0) < minIVF) return false
+    return true
+  })
+
   // Sorting logic for relaxed results.
   // Default view: shortest DTE first, then highest Yield % within each DTE group.
-  const sortedRelaxedResults = [...relaxedResults].sort((a, b) => {
+  const sortedRelaxedResults = [...filteredRelaxedResults].sort((a, b) => {
     const aVal = a[relaxedSortColumn]
     const bVal = b[relaxedSortColumn]
 
@@ -3842,16 +3874,117 @@ export function WheelScanner() {
                 <CardTitle className="text-purple-900">Step 4: Relaxed Criteria Results</CardTitle>
               </div>
               <span className="text-sm font-semibold text-purple-700 bg-purple-100 px-3 py-1 rounded-full">
-                {sortedRelaxedResults.length} {sortedRelaxedResults.length === 1 ? "option meets" : "options meet"} the
-                relaxed criteria
+                {relaxedResults.length} {relaxedResults.length === 1 ? "option meets" : "options meet"} the relaxed
+                criteria
               </span>
             </div>
             <p className="text-sm text-purple-700 mt-2">
               These stocks passed a slightly relaxed set of technical filters. Review for additional put-selling
-              opportunities. Click column headers to sort.
+              opportunities. Click column headers to sort, or narrow the list with the filters below.
             </p>
           </CardHeader>
           <CardContent className="p-0">
+            {/* Excel-style filter bar */}
+            <div className="px-4 py-3 bg-purple-50/50 border-b border-purple-100 flex flex-wrap items-end gap-3">
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="rf-ticker" className="text-[11px] font-semibold text-purple-900">
+                  Ticker(s)
+                </Label>
+                <input
+                  id="rf-ticker"
+                  type="text"
+                  placeholder="e.g. AMD, GOOGL"
+                  value={relaxedFilters.ticker}
+                  onChange={(e) => setRelaxedFilters((f) => ({ ...f, ticker: e.target.value }))}
+                  className="h-8 w-36 rounded border border-purple-200 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="rf-dte" className="text-[11px] font-semibold text-purple-900">
+                  Max DTE
+                </Label>
+                <input
+                  id="rf-dte"
+                  type="number"
+                  min="0"
+                  placeholder="any"
+                  value={relaxedFilters.maxDTE}
+                  onChange={(e) => setRelaxedFilters((f) => ({ ...f, maxDTE: e.target.value }))}
+                  className="h-8 w-20 rounded border border-purple-200 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="rf-premium" className="text-[11px] font-semibold text-purple-900">
+                  Min Premium $
+                </Label>
+                <input
+                  id="rf-premium"
+                  type="number"
+                  min="0"
+                  step="0.25"
+                  placeholder="any"
+                  value={relaxedFilters.minPremium}
+                  onChange={(e) => setRelaxedFilters((f) => ({ ...f, minPremium: e.target.value }))}
+                  className="h-8 w-24 rounded border border-purple-200 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="rf-yield" className="text-[11px] font-semibold text-purple-900">
+                  Min Yield %
+                </Label>
+                <input
+                  id="rf-yield"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  placeholder="any"
+                  value={relaxedFilters.minYield}
+                  onChange={(e) => setRelaxedFilters((f) => ({ ...f, minYield: e.target.value }))}
+                  className="h-8 w-24 rounded border border-purple-200 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="rf-annual" className="text-[11px] font-semibold text-purple-900">
+                  Min Annual %
+                </Label>
+                <input
+                  id="rf-annual"
+                  type="number"
+                  min="0"
+                  step="1"
+                  placeholder="any"
+                  value={relaxedFilters.minAnnualYield}
+                  onChange={(e) => setRelaxedFilters((f) => ({ ...f, minAnnualYield: e.target.value }))}
+                  className="h-8 w-24 rounded border border-purple-200 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="rf-iv" className="text-[11px] font-semibold text-purple-900">
+                  Min IV %
+                </Label>
+                <input
+                  id="rf-iv"
+                  type="number"
+                  min="0"
+                  step="1"
+                  placeholder="any"
+                  value={relaxedFilters.minIV}
+                  onChange={(e) => setRelaxedFilters((f) => ({ ...f, minIV: e.target.value }))}
+                  className="h-8 w-20 rounded border border-purple-200 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                />
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={clearRelaxedFilters}
+                className="h-8 text-purple-700 border-purple-300 hover:bg-purple-100"
+              >
+                Clear filters
+              </Button>
+              <span className="text-xs text-purple-700 ml-auto self-center">
+                Showing {sortedRelaxedResults.length} of {relaxedResults.length} options
+              </span>
+            </div>
             {/* Top horizontal scrollbar, synced with the table below */}
             <div
               ref={topScrollRef}
