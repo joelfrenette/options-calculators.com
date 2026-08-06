@@ -510,8 +510,8 @@ export function WheelScanner() {
   const [tickersToScan, setTickersToScan] = useState<string>("")
   const [minVolume, setMinVolume] = useState([2])
   const [maxDebtToEquity, setMaxDebtToEquity] = useState([3]) // Default Max Debt/Eq 3.0
-  const [minROE, setMinROE] = useState([10]) // Default Min ROE 10%
-  const [minProfitableQuarters, setMinProfitableQuarters] = useState([4]) // Default 4 quarters
+  const [minROE, setMinROE] = useState([5]) // Default Min ROE 5% — growth companies reinvest, so quality names often run 3-8%
+  const [minProfitableQuarters, setMinProfitableQuarters] = useState([2]) // Default 2 quarters — admits newly-profitable names (BE-class)
   // Step 3 market-cap floor — index into PRE_FILTER_MARKET_CAP_TIERS.
   // Default 5 = $2B+ (was a hidden hardcoded $10B floor before being exposed as a slider).
   const [minMarketCapCategory, setMinMarketCapCategory] = useState([5])
@@ -519,7 +519,7 @@ export function WheelScanner() {
   const [maxPE, setMaxPE] = useState([20])
 
   const [preFilterMarketCap, setPreFilterMarketCap] = useState([7]) // 12-stop scale — see PRE_FILTER_MARKET_CAP_TIERS below; default 7 = $10B+
-  const [preFilterVolatility, setPreFilterVolatility] = useState([0]) // index into PRE_FILTER_VOLATILITY_TIERS; default Any
+  const [preFilterVolatility, setPreFilterVolatility] = useState([2]) // index into PRE_FILTER_VOLATILITY_TIERS; default 3%+ (premium-richness bias)
   const [preFilterLiquidity, setPreFilterLiquidity] = useState([10]) // 10M — ensure liquidity default
   const [preFilterTopRanked, setPreFilterTopRanked] = useState([66]) // 66 = Top 50 bucket
 
@@ -574,7 +574,7 @@ export function WheelScanner() {
 
   // Step 3: Technical Analysis Filters
   const [maxRSI, setMaxRSI] = useState([50]) // Default Max RSI 50 - oversold threshold
-  const [maxStochastic, setMaxStochastic] = useState([30]) // Default Max Stochastic 30 - oversold signal
+  const [maxStochastic, setMaxStochastic] = useState([50]) // Default Max Stochastic 50 — 30 combined with the uptrend gates almost never triggers
   const [minATR, setMinATR] = useState([2]) // Default Min ATR 2% - min volatility
   const [maxATR, setMaxATR] = useState([15]) // Default Max ATR 15% - max volatility
 
@@ -583,8 +583,11 @@ export function WheelScanner() {
   const [requireAbove200SMA, setRequireAbove200SMA] = useState(true) // Above 200-day SMA
   const [requireAbove50SMA, setRequireAbove50SMA] = useState(true) // Above 50-day SMA
   const [requireGoldenCross, setRequireGoldenCross] = useState(true) // Golden Cross (50 > 200)
-  const [requireMACDBullish, setRequireMACDBullish] = useState(true) // MACD Bullish Signal
-  const [requireRedDay, setRequireRedDay] = useState(true) // Red Day Preferred
+  // MACD-bullish + red-day defaults are OFF: demanding a bullish crossover AND a
+  // down day AND oversold AND above all SMAs simultaneously left strict Step 4
+  // empty on nearly every run. Users can re-enable either for stricter entries.
+  const [requireMACDBullish, setRequireMACDBullish] = useState(false) // MACD Bullish Signal
+  const [requireRedDay, setRequireRedDay] = useState(false) // Red Day Preferred
 
   const [cacheStatus, setCacheStatus] = useState<string>("")
 
