@@ -545,6 +545,7 @@ export function WheelScanner() {
   const [showRelaxedResults, setShowRelaxedResults] = useState(false)
   const [fundamentalSortColumn, setFundamentalSortColumn] = useState<string>("ticker")
   const [fundamentalSortDirection, setFundamentalSortDirection] = useState<"asc" | "desc">("asc")
+  const [showAllFundamentals, setShowAllFundamentals] = useState(false)
 
   // Default: rank finalists by annualized premium yield — the "richest premium first" view
   const [sortColumn, setSortColumn] = useState<keyof QualifyingStock>("annualizedYield")
@@ -2945,7 +2946,7 @@ export function WheelScanner() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedFundamentalResults.slice(0, 10).map((stock, index) => {
+                  {(showAllFundamentals ? sortedFundamentalResults : sortedFundamentalResults.slice(0, 10)).map((stock, index) => {
                     const yahooChartLink = `https://finance.yahoo.com/quote/${stock.ticker}/chart`
                     return (
                       <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
@@ -2995,9 +2996,23 @@ export function WheelScanner() {
             </div>
 
             {fundamentalResults.length > 10 && (
-              <p className="text-xs text-gray-500 mt-2 text-center">
-                Showing top 10 of {fundamentalResults.length} results
-              </p>
+              <div className="mt-3 flex flex-col items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAllFundamentals((prev) => !prev)}
+                  className="text-blue-700 border-blue-300 hover:bg-blue-50"
+                >
+                  {showAllFundamentals
+                    ? "Show top 10 only"
+                    : `Show all ${fundamentalResults.length} stocks`}
+                </Button>
+                <p className="text-xs text-gray-500">
+                  {showAllFundamentals
+                    ? `Showing all ${fundamentalResults.length} results`
+                    : `Showing top 10 of ${fundamentalResults.length} results`}
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>
