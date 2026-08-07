@@ -131,28 +131,28 @@ export async function GET() {
     if (inflationPressure === "High" || (inflationPressure === "Moderate" && trend === "up")) {
       // High/Rising Inflation = Buy inflation hedges
       optionsStrategies.push({
-        name: "Long Calls on TIP (TIPS ETF)",
-        ticker: "TIP",
-        type: "Inflation Hedge",
-        rationale: `CPI at ${currentCPI.toFixed(1)}% with ${trend === "up" ? "rising" : "elevated"} trend. Treasury Inflation-Protected Securities (TIPS) outperform in high inflation environments.`,
-        entry: "Buy ATM or slightly OTM calls (0.45-0.55 delta)",
-        target: "+4-6% gain as inflation expectations rise",
-        stopLoss: "Exit if CPI trends down or loses 40% of premium",
+        name: "Bull Call Spread on XLB (Materials)",
+        ticker: "XLB",
+        type: "Inflation Beneficiary",
+        rationale: `CPI at ${currentCPI.toFixed(1)}% with ${trend === "up" ? "rising" : "elevated"} trend. Materials producers with pricing power pass rising input costs through and outperform in high inflation environments.`,
+        entry: "Buy ATM call, sell call 5-7% OTM",
+        target: "Max profit if XLB rallies above short strike",
+        stopLoss: "Exit at 50% loss or if CPI trends down",
         timeframe: "60-90 DTE, hold through next CPI release",
-        risk: "Limited to premium paid. TIPS less volatile than stocks.",
+        risk: "Defined risk. Max loss = net debit paid.",
       })
 
       optionsStrategies.push({
-        name: "Long Puts on TLT (Long Bonds)",
-        ticker: "TLT",
-        type: "Bearish Fixed Income",
+        name: "Long Puts on XLRE (Real Estate)",
+        ticker: "XLRE",
+        type: "Rate-Sensitive Sector Bearish",
         rationale:
-          "High inflation erodes bond values. Long-term Treasury bonds are most sensitive to inflation expectations.",
-        entry: "Buy ATM puts on TLT (20-year Treasury ETF)",
-        target: "3-5% decline in TLT as yields rise",
+          "High inflation pushes yields higher. Rate-sensitive sectors like real estate are hit hardest as financing costs rise.",
+        entry: "Buy ATM puts on XLRE",
+        target: "3-5% decline in XLRE as yields rise",
         stopLoss: "Exit if inflation data shows cooling trend",
         timeframe: "45-60 DTE",
-        risk: "Limited to premium. TLT can be volatile on inflation data.",
+        risk: "Limited to premium. XLRE can be volatile on inflation data.",
       })
 
       optionsStrategies.push({
@@ -169,28 +169,29 @@ export async function GET() {
       })
 
       optionsStrategies.push({
-        name: "Long Calls on GLD (Gold ETF)",
-        ticker: "GLD",
-        type: "Traditional Hedge",
-        rationale: "Gold historically performs well during inflationary periods as a store of value.",
+        name: "Long Calls on GDX (Gold Miners)",
+        ticker: "GDX",
+        type: "Gold-Industry Equity Hedge",
+        rationale:
+          "Gold-mining stocks historically perform well during inflationary periods, with operating leverage to rising gold prices.",
         entry: "Buy ATM or slightly OTM calls",
-        target: "+5-8% move in gold prices",
-        stopLoss: "Exit if gold breaks below key support",
+        target: "+5-8% move in GDX",
+        stopLoss: "Exit if GDX breaks below key support",
         timeframe: "60-90 DTE",
-        risk: "Limited to premium. Gold can be volatile short-term.",
+        risk: "Limited to premium. Gold miners can be volatile short-term.",
       })
     } else if (inflationPressure === "Low" || (inflationPressure === "Moderate" && trend === "down")) {
-      // Low/Falling Inflation = Bullish for bonds and growth stocks
+      // Low/Falling Inflation = Bullish for rate-sensitive sectors and growth stocks
       optionsStrategies.push({
-        name: "Long Calls on TLT (Long Bonds)",
-        ticker: "TLT",
-        type: "Bullish Fixed Income",
-        rationale: `CPI at ${currentCPI.toFixed(1)}% and ${trend === "down" ? "falling" : "stable"}. Declining inflation boosts bond prices as yields fall.`,
-        entry: "Buy ATM calls on TLT",
-        target: "+3-5% rally as yields decline",
+        name: "Bull Call Spread on XLRE (Real Estate)",
+        ticker: "XLRE",
+        type: "Rate-Sensitive Sector Bullish",
+        rationale: `CPI at ${currentCPI.toFixed(1)}% and ${trend === "down" ? "falling" : "stable"}. Declining inflation pulls yields down, lifting rate-sensitive sectors like real estate.`,
+        entry: "Buy ATM call, sell call 5% OTM",
+        target: "Max profit as yields decline",
         stopLoss: "Exit if CPI readings surprise higher",
         timeframe: "45-60 DTE",
-        risk: "Limited to premium paid.",
+        risk: "Defined risk. Max loss = net debit paid.",
       })
 
       optionsStrategies.push({
@@ -244,13 +245,13 @@ export async function GET() {
       })
 
       optionsStrategies.push({
-        name: "Calendar Spread on TLT",
-        ticker: "TLT",
+        name: "Calendar Spread on QQQ",
+        ticker: "QQQ",
         type: "Time Decay",
-        rationale: "Neutral inflation outlook. Profit from time decay if bonds stay flat.",
+        rationale: "Neutral inflation outlook. Profit from time decay if the index stays range-bound.",
         entry: "Sell near-term options, buy longer-term same strike",
         target: "Profit from faster near-term decay",
-        stopLoss: "Exit if TLT moves >3% either way",
+        stopLoss: "Exit if QQQ moves >3% either way",
         timeframe: "Front month 30 DTE, back month 60 DTE",
         risk: "Limited to net debit paid.",
       })

@@ -963,68 +963,56 @@ export function MarketSentiment() {
     if (score <= 24) {
       return {
         level: "Extreme Fear",
-        stocks: "50-60%",
+        stocks: "55-65%",
         options: "20-30%",
-        crypto: "5-10%",
-        gold: "5-10%",
         cash: "10-15%",
         description: "Maximum equity exposure - time to be aggressive with quality assets",
         rationale: [
           "Stocks/ETFs: Focus on quality dividend-paying stocks, S&P 500 ETFs, and beaten-down tech leaders",
           "Options: Aggressive put selling and LEAPS calls on quality names with high IV",
-          "Bitcoin/Crypto: Small allocation to BTC/ETH - typically correlates with risk-on sentiment recovery",
-          "Gold/Silver: Minimal allocation - defensive assets less needed during extreme fear",
+          "Sectors: Spread buying across sectors and broad indexes (SPY/QQQ) rather than one theme",
           "Cash: Keep 10-15% for potential further dips and margin requirements",
         ],
       }
     } else if (score <= 44) {
       return {
         level: "Fear",
-        stocks: "45-55%",
+        stocks: "50-60%",
         options: "15-25%",
-        crypto: "5-10%",
-        gold: "10-15%",
-        cash: "15-20%",
+        cash: "15-25%",
         description: "Strong equity exposure with balanced defensive positioning",
         rationale: [
           "Stocks/ETFs: Diversified portfolio across sectors, favor quality over speculation",
           "Options: Moderate put selling and credit spreads on high-quality underlyings",
-          "Bitcoin/Crypto: Maintain small position, good entry point if you believe in long-term",
-          "Gold/Silver: Increase defensive allocation as insurance against volatility",
+          "Sectors: Add defensive sector weight (XLU/XLP) as insurance against volatility",
           "Cash: Build reserves for opportunities and risk management",
         ],
       }
     } else if (score <= 55) {
       return {
         level: "Neutral",
-        stocks: "35-45%",
+        stocks: "40-50%",
         options: "10-15%",
-        crypto: "3-5%",
-        gold: "15-20%",
-        cash: "25-30%",
+        cash: "35-45%",
         description: "Balanced allocation with increased defensive positioning",
         rationale: [
           "Stocks/ETFs: Reduce exposure, favor dividend stocks and defensive sectors (utilities, consumer staples)",
           "Options: Selective put selling, tight credit spreads, consider protective puts on long positions",
-          "Bitcoin/Crypto: Reduce crypto exposure, too risky in neutral-to-greedy markets",
-          "Gold/Silver: Increase safe-haven allocation for portfolio insurance",
+          "Sectors: Rotate further into defensive sectors and gold-industry names (GDX) for insurance",
           "Cash: Build significant reserves - opportunity will come",
         ],
       }
     } else if (score <= 74) {
       return {
         level: "Greed",
-        stocks: "25-35%",
+        stocks: "30-40%",
         options: "5-10%",
-        crypto: "0-3%",
-        gold: "20-30%",
-        cash: "35-45%",
+        cash: "50-65%",
         description: "Defensive positioning with heavy cash reserves",
         rationale: [
           "Stocks/ETFs: Trim winners aggressively, hold only highest-conviction positions",
           "Options: Minimal new positions, close profitable trades early, consider protective strategies",
-          "Bitcoin/Crypto: Exit or minimize - crypto crashes hard when greed turns to fear",
-          "Gold/Silver: Maximize safe-haven allocation for protection",
+          "Sectors: What stays invested leans defensive - staples, utilities, gold-industry names (GDX)",
           "Cash: Build maximum reserves - correction likely coming",
         ],
       }
@@ -1033,15 +1021,12 @@ export function MarketSentiment() {
         level: "Extreme Greed",
         stocks: "15-25%",
         options: "0-5%",
-        crypto: "0%",
-        gold: "30-40%",
-        cash: "45-60%",
+        cash: "70-85%",
         description: "Maximum defensive positioning - prepare for correction",
         rationale: [
           "Stocks/ETFs: Minimum exposure - only hold absolute best quality defensive stocks",
           "Options: STOP new positions. Close everything profitable. Consider protective puts.",
-          "Bitcoin/Crypto: EXIT completely - crypto typically crashes 30-50% in corrections",
-          "Gold/Silver: Maximum safe-haven allocation - best protection during market crashes",
+          "Sectors: Remaining equity in defensive sectors (XLU/XLP) and gold-industry names (GDX) only",
           "Cash: Maximum reserves - you'll have amazing opportunities soon",
         ],
       }

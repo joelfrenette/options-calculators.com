@@ -132,8 +132,8 @@ function getVixLevel(vix: number): VixLevel {
 function getVixPortfolioAllocation(vixLevel: number): {
   stocks: string
   options: string
-  crypto: string
-  gold: string
+  leaps: string
+  hedges: string
   cash: string
   description: string
   rationale: string[]
@@ -143,16 +143,16 @@ function getVixPortfolioAllocation(vixLevel: number): {
     return {
       stocks: "35-45%",
       options: "10-15%",
-      crypto: "5-10%",
-      gold: "5-10%",
+      leaps: "0-5%",
+      hedges: "5-10%",
       cash: "40-50%",
       description: "Maximum caution - markets at peak complacency, crashes often follow extreme lows",
       rationale: [
         "Trim equity exposure aggressively; VIX this low historically precedes sharp corrections",
         "Limit options to defined-risk spreads only; avoid naked short puts",
         "Build large cash reserves for inevitable volatility spike buying opportunities",
-        "Gold/defensive assets as portfolio hedges against sudden reversals",
-        "Small crypto allocation only if already profitable; avoid new entries at market peaks",
+        "Tilt remaining equity toward defensive sectors (XLU/XLP) and carry index put hedges against sudden reversals",
+        "Keep LEAPS minimal; avoid adding leverage at market peaks",
       ],
     }
   } else if (vixLevel <= 15) {
@@ -160,15 +160,15 @@ function getVixPortfolioAllocation(vixLevel: number): {
     return {
       stocks: "40-50%",
       options: "10-15%",
-      crypto: "5-10%",
-      gold: "5-10%",
+      leaps: "3-5%",
+      hedges: "5-10%",
       cash: "30-40%",
       description: "Still elevated greed - cautious deployment, wait for better risk/reward setups",
       rationale: [
         "Maintain elevated cash levels; market still pricing in low volatility",
         "Selective short puts on highest-quality names only with small position sizing",
         "Continue building cash reserves for better opportunities ahead",
-        "Gold as portfolio stabilizer; crypto only as tactical satellite position",
+        "Defensive sector weight (XLU/XLP) as portfolio stabilizer; LEAPS only as small tactical positions",
         "Focus on risk management over aggressive growth",
       ],
     }
@@ -177,8 +177,8 @@ function getVixPortfolioAllocation(vixLevel: number): {
     return {
       stocks: "50-60%",
       options: "15-20%",
-      crypto: "5-10%",
-      gold: "5-10%",
+      leaps: "5-10%",
+      hedges: "3-5%",
       cash: "20-25%",
       description: "Normal volatility environment - balanced approach with regular options selling",
       rationale: [
@@ -186,7 +186,7 @@ function getVixPortfolioAllocation(vixLevel: number): {
         "Begin DCA into quality growth stocks on minor pullbacks",
         "Options premiums still attractive for income generation",
         "Maintain tactical cash buffer for opportunistic additions",
-        "Diversified exposure across asset classes for risk balance",
+        "Diversified exposure across sectors and indexes for risk balance",
       ],
     }
   } else if (vixLevel <= 25) {
@@ -194,8 +194,8 @@ function getVixPortfolioAllocation(vixLevel: number): {
     return {
       stocks: "60-70%",
       options: "15-20%",
-      crypto: "5-10%",
-      gold: "5-10%",
+      leaps: "5-10%",
+      hedges: "0-5%",
       cash: "10-15%",
       description: "Elevated fear creates opportunities - deploy dip-buying cash on pullbacks",
       rationale: [
@@ -211,8 +211,8 @@ function getVixPortfolioAllocation(vixLevel: number): {
     return {
       stocks: "65-75%",
       options: "20-25%",
-      crypto: "5-10%",
-      gold: "0-5%",
+      leaps: "5-10%",
+      hedges: "0-5%",
       cash: "5-10%",
       description: "High fear environment - aggressive buying of quality assets at discount prices",
       rationale: [
@@ -228,8 +228,8 @@ function getVixPortfolioAllocation(vixLevel: number): {
     return {
       stocks: "70-85%",
       options: "20-30%",
-      crypto: "5-10%",
-      gold: "0-5%",
+      leaps: "5-10%",
+      hedges: "0%",
       cash: "0-5%",
       description: "Maximum opportunity - panic creates generational buying moments",
       rationale: [
@@ -671,7 +671,7 @@ export function RiskCalculator() {
                     Portfolio Allocation Guidance by VIX Level
                   </CardTitle>
                   <p className="text-sm text-gray-600 mt-2 text-left">
-                    Complete allocation strategies across all volatility regimes with asset class breakdowns
+                    Complete allocation strategies across all volatility regimes — cash vs. deployed shares, LEAPS, and options
                   </p>
                 </CardHeader>
               </AccordionTrigger>
@@ -750,12 +750,12 @@ export function RiskCalculator() {
                               <div className="text-lg font-bold text-purple-900">{levelData.options}</div>
                             </div>
                             <div className="p-3 bg-orange-50 rounded border border-orange-200">
-                              <div className="text-xs font-semibold text-orange-900 uppercase mb-1">BTC/Crypto</div>
-                              <div className="text-lg font-bold text-orange-900">{levelData.crypto}</div>
+                              <div className="text-xs font-semibold text-orange-900 uppercase mb-1">LEAPS</div>
+                              <div className="text-lg font-bold text-orange-900">{levelData.leaps}</div>
                             </div>
                             <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
-                              <div className="text-xs font-semibold text-yellow-900 uppercase mb-1">Gold/Silver</div>
-                              <div className="text-lg font-bold text-yellow-900">{levelData.gold}</div>
+                              <div className="text-xs font-semibold text-yellow-900 uppercase mb-1">Hedges/Puts</div>
+                              <div className="text-lg font-bold text-yellow-900">{levelData.hedges}</div>
                             </div>
                             <div className="p-3 bg-gray-50 rounded border border-gray-300">
                               <div className="text-xs font-semibold text-gray-900 uppercase mb-1">Cash Reserve</div>

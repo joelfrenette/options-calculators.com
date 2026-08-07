@@ -252,7 +252,8 @@ check(
   "Crash Watch and Low Risk playbooks differ",
   JSON.stringify(crashPlaybook) !== JSON.stringify(calmPlaybook),
 )
-check("Crash Watch equity allocation is reduced", crashPlaybook.allocation.equities !== calmPlaybook.allocation.equities)
+check("Crash Watch deployed allocation is reduced", crashPlaybook.allocation.deployed !== calmPlaybook.allocation.deployed)
+check("Crash Watch cash allocation is raised", crashPlaybook.allocation.cash !== calmPlaybook.allocation.cash)
 
 console.log(failures === 0 ? "\nAll CCPI scoring checks passed." : `\n${failures} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)

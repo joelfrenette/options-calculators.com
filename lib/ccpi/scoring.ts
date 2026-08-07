@@ -646,10 +646,9 @@ export interface Playbook {
   bias: string
   strategies: string[]
   allocation: {
-    equities: string
-    defensive: string
     cash: string
-    alternatives: string
+    deployed: string // shares + LEAPS + short options (CSPs/CCs)
+    tilt: string // sector/index guidance for the deployed book
   }
 }
 
@@ -669,10 +668,9 @@ export function getPlaybook(regime: Regime): Playbook {
           "If selling premium at all, sell call spreads into rallies, small size",
         ],
         allocation: {
-          equities: "20-35%",
-          defensive: "20-30%",
-          cash: "30-45%",
-          alternatives: "5-10%",
+          cash: "60-80%",
+          deployed: "20-40%",
+          tilt: "What stays deployed leans defensive: utilities/staples (XLU/XLP), gold-industry names (GDX), and hedged index positions — no new short puts or LEAPS",
         },
       }
     case 4: // High Alert
@@ -685,10 +683,9 @@ export function getPlaybook(regime: Regime): Playbook {
           "Tighten stops and avoid holding through binary events (earnings, FOMC)",
         ],
         allocation: {
-          equities: "35-50%",
-          defensive: "15-25%",
-          cash: "20-35%",
-          alternatives: "5-10%",
+          cash: "40-60%",
+          deployed: "40-60%",
+          tilt: "Favor defensive sectors (XLU/XLP/XLV) and high-quality large caps; hedge index exposure (SPY/QQQ) with puts or collars",
         },
       }
     case 3: // Elevated Risk
@@ -701,10 +698,9 @@ export function getPlaybook(regime: Regime): Playbook {
           "Keep dry powder for better entries if risk escalates",
         ],
         allocation: {
-          equities: "45-60%",
-          defensive: "10-20%",
-          cash: "15-25%",
-          alternatives: "5-10%",
+          cash: "25-40%",
+          deployed: "60-75%",
+          tilt: "Quality names and broad indexes (SPY/QQQ) with added defensive sector weight (XLU/XLP); defined-risk options over naked premium",
         },
       }
     case 2: // Normal
@@ -716,10 +712,9 @@ export function getPlaybook(regime: Regime): Playbook {
           "Covered calls at normal deltas for income",
         ],
         allocation: {
-          equities: "60-80%",
-          defensive: "5-10%",
           cash: "10-20%",
-          alternatives: "5-10%",
+          deployed: "80-90%",
+          tilt: "Diversified across sectors and broad indexes (SPY/QQQ); run the wheel on quality underlyings at normal size",
         },
       }
     case 1: // Low Risk
@@ -732,10 +727,9 @@ export function getPlaybook(regime: Regime): Playbook {
           "Ladder cash-secured put expirations for steady assignment flow",
         ],
         allocation: {
-          equities: "70-85%",
-          defensive: "0-10%",
           cash: "5-15%",
-          alternatives: "5-10%",
+          deployed: "85-95%",
+          tilt: "Full sector diversification — growth, financials, industrials — plus broad indexes (SPY/QQQ); LEAPS and laddered short puts at full size",
         },
       }
   }

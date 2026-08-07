@@ -2734,7 +2734,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     Portfolio Allocation by CCPI Crash Risk Level
                   </CardTitle>
                   <p className="text-sm text-gray-600 mt-1 text-left">
-                    Recommended asset class diversification across crash risk regimes
+                    Recommended cash vs. deployed positioning across crash risk regimes — diversification via sectors and indexes
                   </p>
                 </CardHeader>
               </AccordionTrigger>
@@ -2747,17 +2747,17 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                         level: "Low Risk",
                         data: {
                           stocks: "55-65%",
-                          options: "15-20%",
-                          crypto: "8-12%",
-                          gold: "3-5%",
+                          leaps: "10-15%",
+                          shortOptions: "15-20%",
+                          hedges: "0-5%",
                           cash: "5-10%",
-                          description: "Aggressive growth allocation with maximum equity exposure",
+                          description: "Aggressive growth allocation with maximum deployment",
                           rationale: [
-                            "Deploy capital aggressively into quality tech growth stocks",
-                            "Allocate 15-20% to options strategies for leverage and income",
-                            "Hold 8-12% crypto for asymmetric upside (BTC/ETH)",
+                            "Deploy capital aggressively into quality growth stocks and broad indexes (SPY/QQQ)",
+                            "Sell cash-secured puts and covered calls (15-20%) for income and discounted entries",
+                            "Hold 10-15% in deep ITM LEAPS for leveraged upside on conviction names",
                             "Minimal cash reserves needed in low-risk environment",
-                            "Small gold allocation (3-5%) as insurance policy",
+                            "Diversify across sectors — tech, financials, industrials — rather than one theme",
                           ],
                         },
                       },
@@ -2766,16 +2766,16 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                         level: "Normal",
                         data: {
                           stocks: "45-55%",
-                          options: "12-15%",
-                          crypto: "5-8%",
-                          gold: "5-8%",
+                          leaps: "8-12%",
+                          shortOptions: "12-15%",
+                          hedges: "3-5%",
                           cash: "15-25%",
                           description: "Balanced allocation with standard risk management",
                           rationale: [
-                            "Core equity exposure via diversified ETFs and blue chips",
-                            "Use options for income generation and tactical positioning",
-                            "Reduce crypto exposure to 5-8% of portfolio",
-                            "Increase gold/silver to 5-8% for diversification",
+                            "Core equity exposure via diversified sector ETFs and blue chips",
+                            "Use short options (CSPs/CCs) for income generation and tactical entries",
+                            "Trim LEAPS to 8-12% and keep strikes conservative",
+                            "Balance growth sectors with defensive sector weight (XLU/XLP) for diversification",
                             "Build cash reserves to 15-25% for opportunities",
                           ],
                         },
@@ -2785,16 +2785,16 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                         level: "Caution",
                         data: {
                           stocks: "30-40%",
-                          options: "8-12%",
-                          crypto: "3-5%",
-                          gold: "10-15%",
+                          leaps: "3-5%",
+                          shortOptions: "5-10%",
+                          hedges: "8-12%",
                           cash: "30-40%",
                           description: "Defensive tilt with elevated cash and hedges",
                           rationale: [
-                            "Reduce equity exposure to highest-quality names only",
-                            "Shift options allocation toward hedges and put spreads",
-                            "Trim crypto to minimal allocation (3-5%)",
-                            "Increase gold/silver to 10-15% as safe haven",
+                            "Reduce equity exposure to highest-quality names; tilt toward defensive sectors (XLU/XLP)",
+                            "Shift the options book toward hedges and put spreads",
+                            "Cut LEAPS to a 3-5% core and stop adding leverage",
+                            "Add gold-industry names (GDX) and defensive index weight instead of chasing growth",
                             "Build substantial cash position (30-40%) for volatility",
                           ],
                         },
@@ -2804,16 +2804,16 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                         level: "High Alert",
                         data: {
                           stocks: "15-25%",
-                          options: "10-15%",
-                          crypto: "0-2%",
-                          gold: "15-20%",
+                          leaps: "0-2%",
+                          shortOptions: "0-5%",
+                          hedges: "10-15%",
                           cash: "50-60%",
                           description: "Capital preservation mode with heavy defensive positioning",
                           rationale: [
-                            "Minimal equity exposure - only defensive sectors (utilities, staples)",
+                            "Minimal equity exposure - only defensive sectors (utilities, staples) and gold-industry names (GDX)",
                             "Options portfolio entirely hedges and volatility plays",
-                            "Exit nearly all crypto exposure due to crash risk",
-                            "Gold allocation 15-20% as primary safe haven asset",
+                            "No new LEAPS; close or roll existing short premium down and out",
+                            "Express the defensive tilt through sector choice and cash percentage, not new asset classes",
                             "Hold 50-60% cash to deploy after market correction",
                           ],
                         },
@@ -2823,16 +2823,15 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                         level: "Crash Watch",
                         data: {
                           stocks: "5-10%",
-                          options: "10-15%",
-                          crypto: "0%",
-                          gold: "20-25%",
+                          leaps: "0%",
+                          shortOptions: "0%",
+                          hedges: "10-15%",
                           cash: "70-80%",
-                          description: "Maximum defense - cash and hard assets only",
+                          description: "Maximum defense - cash-heavy with tail hedges",
                           rationale: [
-                            "Liquidate nearly all equity exposure immediately",
+                            "Liquidate nearly all equity exposure immediately; keep only defensive sector remnants (XLU/XLP, GDX)",
                             "Options used exclusively for tail risk hedges and put spreads",
-                            "Zero crypto exposure - too correlated with risk assets",
-                            "Maximum gold/precious metals allocation (20-25%)",
+                            "Zero LEAPS and zero new short premium until the regime downgrades",
                             "Hold 70-80% cash reserves to deploy after crash",
                           ],
                         },
@@ -2882,20 +2881,20 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
 
                           <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
                             <div className="p-3 bg-blue-50 rounded border border-blue-200">
-                              <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Stocks/ETFs</div>
+                              <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Shares/ETFs</div>
                               <div className="text-lg font-bold text-blue-900">{item.data.stocks}</div>
                             </div>
                             <div className="p-3 bg-purple-50 rounded border border-purple-200">
-                              <div className="text-xs font-semibold text-purple-900 uppercase mb-1">Options</div>
-                              <div className="text-lg font-bold text-purple-900">{item.data.options}</div>
+                              <div className="text-xs font-semibold text-purple-900 uppercase mb-1">LEAPS</div>
+                              <div className="text-lg font-bold text-purple-900">{item.data.leaps}</div>
                             </div>
                             <div className="p-3 bg-orange-50 rounded border border-orange-200">
-                              <div className="text-xs font-semibold text-orange-900 uppercase mb-1">BTC/Crypto</div>
-                              <div className="text-lg font-bold text-orange-900">{item.data.crypto}</div>
+                              <div className="text-xs font-semibold text-orange-900 uppercase mb-1">Short Options (CSP/CC)</div>
+                              <div className="text-lg font-bold text-orange-900">{item.data.shortOptions}</div>
                             </div>
                             <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
-                              <div className="text-xs font-semibold text-yellow-900 uppercase mb-1">Gold/Silver</div>
-                              <div className="text-lg font-bold text-yellow-900">{item.data.gold}</div>
+                              <div className="text-xs font-semibold text-yellow-900 uppercase mb-1">Hedges/Puts</div>
+                              <div className="text-lg font-bold text-yellow-900">{item.data.hedges}</div>
                             </div>
                             <div className="p-3 bg-gray-50 rounded border border-gray-300">
                               <div className="text-xs font-semibold text-gray-900 uppercase mb-1">Cash Reserve</div>
@@ -3016,7 +3015,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                             "Buy VIX calls for crash insurance (60-90 DTE)",
                             "Long put spreads on QQQ/SPY at-the-money",
                             "Tactical long volatility trades (VXX calls)",
-                            "Gold miners (GDX) call options as diversification",
+                            "Gold miners (GDX) call options for defensive sector exposure",
                           ],
                         },
                       },

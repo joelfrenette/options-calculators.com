@@ -342,8 +342,8 @@ export function CpiInflationAnalysis() {
                     <div className="border-l-4 border-red-500 pl-3">
                       <p className="font-semibold text-red-900">High Inflation Pressure ({">"} Target + 1.5%)</p>
                       <ul className="list-disc ml-5 text-gray-700 text-xs space-y-1 mt-1">
-                        <li>Gold/commodities call spreads (inflation hedge)</li>
-                        <li>Treasury ETF put spreads (rates rising)</li>
+                        <li>Gold-miner (GDX) and materials (XLB) call spreads (inflation hedge)</li>
+                        <li>Rate-sensitive sector put spreads, e.g. real estate (XLRE), as rates rise</li>
                         <li>Growth stock put protection (multiple compression risk)</li>
                         <li>Energy sector call strategies (inflation beneficiary)</li>
                       </ul>
@@ -355,7 +355,7 @@ export function CpiInflationAnalysis() {
                       <ul className="list-disc ml-5 text-gray-700 text-xs space-y-1 mt-1">
                         <li>Defensive sector rotation (utilities, consumer staples)</li>
                         <li>Balanced portfolio collar strategies</li>
-                        <li>TIPS (inflation-protected securities) exposure</li>
+                        <li>Gold-industry (GDX) equity exposure as an inflation-aware tilt</li>
                         <li>Value stock long call spreads</li>
                       </ul>
                     </div>
@@ -364,7 +364,7 @@ export function CpiInflationAnalysis() {
                       <ul className="list-disc ml-5 text-gray-700 text-xs space-y-1 mt-1">
                         <li>Growth stock call strategies (rate cut anticipation)</li>
                         <li>Tech sector bull call spreads</li>
-                        <li>Long-duration bond call strategies</li>
+                        <li>Rate-sensitive sector call strategies (utilities XLU, real estate XLRE)</li>
                         <li>Broad market index long strategies</li>
                       </ul>
                     </div>
