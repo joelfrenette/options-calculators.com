@@ -901,6 +901,7 @@ export function WheelScanner() {
     setCurrentTicker("")
     setRejectionSummary(null)
     setNearMissFundamentals([])
+    setLandmines(null)
 
     try {
       console.log(`[v0] Step 2: Scanning ${tickers.length} stocks with Polygon API`)
@@ -1633,6 +1634,7 @@ export function WheelScanner() {
       setIsScanningTechnicals(false)
       console.log(`[v0] ✅ technicalResults state updated with ${cached.length} stocks`)
       console.log("[v0] Tickers:", cached.map((s: QualifyingStock) => s.ticker).join(", "))
+      fetchLandmines(cached)
       return
     }
 
@@ -1672,6 +1674,7 @@ export function WheelScanner() {
         `[v0] Enriched: ${enrichedStocks.length} options, After filtering: ${filteredStocks.length} pass all criteria`,
       )
       setTechnicalResults(filteredStocks)
+      fetchLandmines(filteredStocks)
 
       console.log(
         `[v0] ✅ Step 3 Complete: ${filteredStocks.length} stocks passed technical filters (and enriched with options data)`,
@@ -1885,6 +1888,54 @@ export function WheelScanner() {
   const clearRelaxedFilters = () =>
     setRelaxedFilters({ ticker: "", maxDTE: "", minPremium: "", minYield: "", minAnnualYield: "", minIV: "" })
 
+  // Landmine awareness: scheduled events (earnings, CPI, FOMC, jobs) that land
+  // BEFORE an option's expiry. Never used to filter — display-only, so the user
+  // knows when a rich premium is event-driven and needs extra research.
+  const [landmines, setLandmines] = useState<{
+    earnings: Record<string, { date: string; timing: string }[]>
+    macro: { date: string; event: string; impact: string; time: string }[]
+  } | null>(null)
+
+  const fetchLandmines = async (rows: QualifyingStock[]) => {
+    try {
+      const tickers = Array.from(new Set(rows.map((r) => r.ticker))).join(",")
+      if (!tickers) return
+      const expiries = rows.map((r) => r.expiryDate).filter(Boolean) as string[]
+      const until = expiries.length > 0 ? [...expiries].sort()[expiries.length - 1] : ""
+      const res = await fetch(`/api/landmine-check?tickers=${encodeURIComponent(tickers)}&until=${until}`)
+      if (!res.ok) {
+        console.error(`[v0] Landmine check HTTP ${res.status}`)
+        return
+      }
+      const data = await res.json()
+      // Merge (not replace): the strict and relaxed tables are fetched separately
+      // and both stay on screen — keep earnings info for every ticker seen so far.
+      setLandmines((prev) => ({
+        earnings: { ...(prev?.earnings || {}), ...(data.earnings || {}) },
+        macro: (data.macro?.length ?? 0) >= (prev?.macro?.length ?? 0) ? data.macro || [] : prev?.macro || [],
+      }))
+      console.log(
+        `[v0] Landmine data loaded: earnings for ${Object.keys(data.earnings || {}).length} tickers, ${(data.macro || []).length} macro events (${data.from} → ${data.to})`,
+      )
+    } catch (err) {
+      console.error("[v0] Landmine fetch failed:", err)
+    }
+  }
+
+  // Events scheduled on or before this option row's expiry. null = data not loaded yet.
+  const getLandminesForRow = (stock: QualifyingStock): string[] | null => {
+    if (!landmines) return null
+    if (!stock.expiryDate) return []
+    const hits: string[] = []
+    for (const e of landmines.earnings[stock.ticker] || []) {
+      if (e.date <= stock.expiryDate) hits.push(`${stock.ticker} Earnings ${e.date} (${e.timing})`)
+    }
+    for (const m of landmines.macro) {
+      if (m.date <= stock.expiryDate) hits.push(`${m.event} ${m.date} ${m.time} (${m.impact} impact)`)
+    }
+    return hits
+  }
+
   const filteredRelaxedResults = relaxedResults.filter((stock) => {
     const tickerQuery = relaxedFilters.ticker.trim().toUpperCase()
     if (tickerQuery) {
@@ -2045,6 +2096,7 @@ export function WheelScanner() {
           )
           setRelaxedResults(relaxedOptions)
           setIsEnrichingRelaxed(false)
+          fetchLandmines(relaxedOptions)
         })
         .catch((error) => {
           console.error("[v0] Error enriching relaxed results:", error)
@@ -3605,6 +3657,12 @@ export function WheelScanner() {
                     >
                       IV % {sortColumn === "iv" && (sortDirection === "asc" ? "↑" : "↓")}
                     </th>
+                    <th
+                      className="text-center p-3 font-semibold text-green-900"
+                      title="Scheduled events (earnings, CPI, FOMC, jobs report) landing BEFORE this option's expiry. A rich premium may be event-driven — hover for the list and research before selling."
+                    >
+                      Landmine ⚠
+                    </th>
                     {/* Reordered: Red Day, RSI, Bollinger, MACD, then rest */}
                     <th
                       className="text-center p-3 font-semibold text-green-900 cursor-pointer hover:bg-green-100"
@@ -3716,6 +3774,21 @@ export function WheelScanner() {
                           }`}
                         >
                           {stock.iv !== undefined && stock.iv > 0 ? `${stock.iv.toFixed(0)}%` : "-"}
+                        </td>
+                        <td className="text-center p-3">
+                          {(() => {
+                            const mines = getLandminesForRow(stock)
+                            if (mines === null) return <span className="text-gray-400 text-xs">…</span>
+                            if (mines.length === 0) return <span className="text-green-600 font-bold">—</span>
+                            return (
+                              <span
+                                className="text-amber-600 font-bold cursor-help whitespace-nowrap"
+                                title={mines.join("\n")}
+                              >
+                                ⚠ {mines.length}
+                              </span>
+                            )
+                          })()}
                         </td>
                         <td className="text-center p-3">
                           {stock.redDay ? (
@@ -4072,6 +4145,12 @@ export function WheelScanner() {
                       IV % {relaxedSortColumn === "iv" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
                     </th>
                     <th
+                      className="text-center p-3 font-semibold text-purple-900"
+                      title="Scheduled events (earnings, CPI, FOMC, jobs report) landing BEFORE this option's expiry. A rich premium may be event-driven — hover for the list and research before selling."
+                    >
+                      Landmine ⚠
+                    </th>
+                    <th
                       className="text-center p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
                       onClick={() => handleRelaxedSort("daysToEarnings")}
                     >
@@ -4191,6 +4270,21 @@ export function WheelScanner() {
                           }`}
                         >
                           {stock.iv !== undefined && stock.iv > 0 ? `${stock.iv.toFixed(0)}%` : "-"}
+                        </td>
+                        <td className="text-center p-3">
+                          {(() => {
+                            const mines = getLandminesForRow(stock)
+                            if (mines === null) return <span className="text-gray-400 text-xs">…</span>
+                            if (mines.length === 0) return <span className="text-green-600 font-bold">—</span>
+                            return (
+                              <span
+                                className="text-amber-600 font-bold cursor-help whitespace-nowrap"
+                                title={mines.join("\n")}
+                              >
+                                ⚠ {mines.length}
+                              </span>
+                            )
+                          })()}
                         </td>
                         <td className="text-center p-3">
                           {stock.daysToEarnings !== undefined &&
