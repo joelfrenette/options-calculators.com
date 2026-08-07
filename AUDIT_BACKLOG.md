@@ -112,7 +112,39 @@ Feature work, not defects. Tracked here so the audit does not lose them.
 
 ## Phase 2 findings (API contracts & health)
 
-_Pending._
+**Deliverables:** [lib/api-contracts.ts](lib/api-contracts.ts) — a contract per route
+(canary request, zod success schema, latency budget, required keys, dependent tabs) —
+and [app/api/admin/run-health-checks/route.ts](app/api/admin/run-health-checks/route.ts),
+which probes them and reports per-route pass/fail. Coverage is enforced by
+[scripts/check-contract-coverage.ts](scripts/check-contract-coverage.ts):
+**62 routes on disk, 62 contracted, 0 gaps.**
+
+The check distinguishes four outcomes rather than the pass/fail the old admin
+tooling produced. `blocked` (key absent or killed by `DISABLED_APIS`) is separated
+from `fail` (route is broken), because "TWELVE_DATA_API_KEY is unset" and "the
+route 500s" need different responses. `degraded` flags a route that answered
+correctly but over its latency budget.
+
+**Run of 2026-08-07 (local dev, no API keys configured):** 8 pass, 14 fail,
+24 blocked, 16 skipped. Every Yahoo/SEC/Quiver failure traced to
+`UNABLE_TO_VERIFY_LEAF_SIGNATURE` in the dev-server log — TLS interception on this
+machine, not a code defect. **The run must be repeated on a preview deploy with
+real keys before its results mean anything about production.**
+
+| ID | Sev | Tab / area | File:line | Finding | Fix |
+|---|---|---|---|---|---|
+| P2-1 | **P1** | COPY → Form 144, Politician Spotlight, Top Performers | [app/api/form-144/route.ts](app/api/form-144/route.ts), [app/api/politician-spotlight/route.ts](app/api/politician-spotlight/route.ts), [app/api/top-performers/route.ts](app/api/top-performers/route.ts) | **HTTP 200 with an `error` body.** All three answered `200 {"error": "fetch failed"}`. A caller checking `res.ok` sees success and renders an empty tab as though the data genuinely were empty. Same anti-pattern as P1-11's `/api/market-breadth`. Environment-independent: the status/body contract is wrong regardless of why the upstream failed. | Return a 5xx when the upstream fails. The health check now catches this class explicitly — a 200 carrying `{error}` is scored `fail`, not `pass`. |
+| P2-2 | P2 | ANALYZE → CCPI | [app/api/ccpi/cache/route.ts:3-5](app/api/ccpi/cache/route.ts:3) | The CCPI cache is a **module-level mutable variable** (`let cachedCCPIData`). On Vercel each serverless invocation may get a fresh isolate, so writes from one request are invisible to the next and inconsistent between concurrent instances. The cache mostly does not cache. (Its 404 cache-miss response is correct and is now declared `okStatuses: [404]`.) | Move to a shared store — Supabase is already connected — or delete the route and let `/api/ccpi` own its own caching. |
+| P2-3 | P3 | ops / routes | SITE_MAP.md §3 | **Orphan-route triage** (resolves P0-1). Confirmed working with no consumer: `/api/market-breadth` (but dead per P1-11 — delete), `/api/qqq-technicals` (thin wrapper over a lib that IS used — delete the route, keep the lib, per P0-3). Duplicates: `/api/scraping-bee/test` and `/api/scraping-bee/test-connection` both duplicate `/api/scraping-bee/diagnostics` and spend quota — delete both. `/api/twelve-data-proxy` vs `/api/twelvedata-proxy` (S-20) — no consumer either way; delete both unless an external caller is identified. Genuinely reachable but unused: `/api/yahoo-proxy`, `/api/fmp-proxy`, `/api/apify-proxy`, `/api/google-trends`, `/api/serper-finance`, `/api/macro-indicators`. | Each needs a keep-or-delete decision. Recommendation: delete the 6 named above; the rest carry API keys and are deployed attack surface for no benefit. |
+| P2-4 | P2 | site-wide | [lib/api-contracts.ts](lib/api-contracts.ts) | **16 of 62 routes cannot be safely probed** and are marked `skip` with a reason: 6 spend an LLM call per probe, 3 are themselves fan-out audit endpoints (probing them would double every provider's call volume), 3 mutate state or send email, 4 spend metered scraping quota. They therefore have **no automated verification at all**. | Give the LLM routes a `?dryRun=1` that exercises the request path without calling a model, so they can be contract-tested. |
+| P2-5 | P3 | tooling | [app/api/admin/run-health-checks/route.ts](app/api/admin/run-health-checks/route.ts) | Route handlers are bundled at build time, so `app/api` is not enumerable at runtime on Vercel. The endpoint's coverage report therefore relies on a **committed `KNOWN_ROUTES` list** that can drift from disk. | `scripts/check-contract-coverage.ts` fails the build on drift — wire it into CI alongside `typecheck` in Phase 4. |
+| P2-6 | P3 | ops | Local dev | Outbound HTTPS from this workstation fails certificate validation (`UNABLE_TO_VERIFY_LEAF_SIGNATURE`) for Yahoo, SEC and Quiver, so **no upstream-dependent route can be verified locally**. Combined with an empty `.env.local`, local runs can only prove routing, auth, schema wiring and error handling. | Not a repo defect. Record it so future audit sessions do not mistake it for one; do upstream verification on a preview deploy. |
+
+**Two defects in the health checker itself, found by running it and fixed:**
+it probed auth-gated admin routes without forwarding the caller's session
+(reporting five working routes as 401 failures), and it sent `symbol` to
+`/api/yahoo-proxy`, which takes `endpoint` + `ticker` (reporting a parameter
+mistake as a broken route). Both are why the run happened before the writeup.
 
 ---
 
