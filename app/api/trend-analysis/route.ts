@@ -66,7 +66,13 @@ async function fetchYahooQuote(symbol: string): Promise<YahooQuote | null> {
   }
 }
 
-async function fetchHistoricalData(symbol: string, days = 180) {
+// 320 calendar days ≈ 220 trading bars. Previously 180 (~124 bars), which is
+// fewer than the 200 bars the "200-day MA" needs — so calculateMA's short-series
+// fallback returned the LAST CLOSE as the "200-day MA" on every request, and the
+// highest-weighted signal in determineTrend compared the price to itself
+// (AUDIT_BACKLOG Phase 3, P0). lib/qqq-technicals.ts already fetches 300 days
+// for the same reason.
+async function fetchHistoricalData(symbol: string, days = 320) {
   try {
     const endDate = Math.floor(Date.now() / 1000)
     const startDate = endDate - days * 24 * 60 * 60
@@ -103,6 +109,10 @@ async function fetchHistoricalData(symbol: string, days = 180) {
 }
 
 function calculateMA(prices: number[], period: number): number {
+  // Short-series fallback returns the last close, which renders a price AS an
+  // MA. Tolerable only now that the fetch window guarantees >200 bars for every
+  // period used here; replace with null + consumer handling in the Phase 4
+  // lib/indicators.ts extraction (logged P2).
   if (prices.length < period) return prices[prices.length - 1] || 0
   const slice = prices.slice(-period)
   return slice.reduce((sum, price) => sum + price, 0) / period

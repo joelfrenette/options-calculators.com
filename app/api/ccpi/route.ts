@@ -198,7 +198,9 @@ export async function GET() {
       await fetch(new URL("/api/ccpi/cache", process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.JSON.stringify(response),
+        // Was `JSON.JSON.stringify` — a TypeError swallowed by the catch below,
+        // so the cache was never populated through this path (AUDIT_BACKLOG P3-x).
+        body: JSON.stringify(response),
       })
     } catch (cacheError) {
       console.warn("[v0] Failed to cache CCPI data:", cacheError)
@@ -380,13 +382,22 @@ async function fetchMarketData() {
     qqqSMA200Proximity: qqqData?.sma200Proximity || 0,
     qqqBollingerProximity: qqqData?.bollingerProximity || 0,
 
-    // Volatility (use AI fallback for VIX)
-    vix: alphaVantageData?.vix || vixResult.value,
-    vxn: alphaVantageData?.vxn || 19,
-    rvx: alphaVantageData?.rvx || 20,
-    atr: alphaVantageData?.atr || 35,
-    ltv: alphaVantageData?.ltv || 0.12,
-    spotVol: alphaVantageData?.spotVol || 0.22,
+    // Volatility. Priority: real FRED spot VIX (VIXCLS, fetched by
+    // fetchVIXTermStructure) → AI fallback → its baseline. Previously
+    // `alphaVantageData?.vix || vixResult.value`, where fetchAlphaVantageIndicators
+    // returned a hardcoded vix: 18 on BOTH its success and failure paths — so the
+    // flagship crash index was permanently insensitive to actual volatility: the
+    // VIX>35 crash amplifier and the VIX canaries could never fire (P0).
+    vix: (vixTermData?.source === "live" ? vixTermData.spotVIX : undefined) ?? vixResult.value,
+    // No real source exists for these four anywhere in the codebase — they are
+    // BASELINE constants, named as such instead of laundered through a fetch
+    // that pretended to supply them. Sourcing them (VXN/RVX quotes, SPY ATR from
+    // Polygon aggregates) is logged in the backlog.
+    vxn: 19,
+    rvx: 20,
+    atr: 35,
+    ltv: 0.12,
+    spotVol: 0.22,
     vixTermStructure: vixTermData?.termStructure || 1.5,
     vixTermInverted: vixTermData?.isInverted || false,
     highLowIndex: undefined,
@@ -426,7 +437,10 @@ async function fetchMarketData() {
 
     // Phase 1 indicators (use AI fallback)
     nvidiaPrice: nvidiaPriceResult.value,
-    nvidiaMomentum: fredData?.nvidiaMomentum || 50,
+    // Was read from fredData, which never carries this field — the momentum
+    // actually computed from the Alpha Vantage NVDA quote was discarded and the
+    // indicator was permanently 50 (neutral).
+    nvidiaMomentum: alphaVantageData?.nvidiaMomentum ?? 50,
     soxIndex: soxIndexResult.value,
     tedSpread: fredData?.tedSpread || 0.25,
     dxyIndex: fredData?.dxyIndex || 103,

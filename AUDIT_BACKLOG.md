@@ -155,6 +155,57 @@ mistake as a broken route). Both are why the run happened before the writeup.
 
 ---
 
+## Phase 3 findings (formula & logic verification)
+
+**Deliverable:** [FORMULAS.md](FORMULAS.md) — the complete calculation inventory
+(~80 formulas across four domains), each with reference, verdict, numeric evidence
+and fix. Produced by four parallel verification agents (indicators / option math /
+composites / fundamentals), every P0 claim re-verified against source before fixing.
+The table below carries only the headline findings; FORMULAS.md is canonical.
+
+**P0 — wrong data, fixed immediately (this commit):**
+
+| ID | Sev | Tab / area | File:line | Finding |
+|---|---|---|---|---|
+| P3-1 | **P0** | ANALYZE → CCPI | [app/api/ccpi/route.ts:384](app/api/ccpi/route.ts:384) | **The flagship crash index could not see volatility.** `fetchAlphaVantageIndicators` returned a hardcoded `vix: 18` on both its success and failure paths, so the `\|\|` chain never reached the live VIX; the VIX>35 crash amplifier and VIX canaries could never fire. Fixed: real FRED spot VIX (VIXCLS, already fetched by `fetchVIXTermStructure`) feeds first, AI fallback second; VXN/RVX/ATR/LTV/spotVol are now explicit named baselines instead of being laundered through a fetch that pretended to supply them (their real sourcing is P3-20). |
+| P3-2 | **P0** | COPY → Cluster Buys | [app/api/insider-clusters/route.ts:96](app/api/insider-clusters/route.ts:96) | Cluster dollar values priced the insider's entire post-trade **holdings** as the purchase (Finnhub `share` = holdings after; `change` = shares transacted) — ~500× overstated for large holders. Fixed to `change × price`; rows without a usable `change` are skipped. *Field semantics corroborated by the sibling route's own comment; confirm once against a live payload on preview.* |
+| P3-3 | **P0** | COPY → Insider Activity | [app/api/insider-trading/route.ts:404-416](app/api/insider-trading/route.ts:404) | Same defect as P3-2 — the code's own comment said "prefer the signed change" while the code preferred holdings; holdings (always positive) also biased the direction fallback toward "Buy". Fixed. |
+| P3-4 | **P0** | ANALYZE → Index Trend Analysis | [app/api/trend-analysis/route.ts:69](app/api/trend-analysis/route.ts:69) | **The "200-day MA" was unreachable.** The route fetched 180 calendar days (~124 trading bars), so `calculateMA(…, 200)` always returned its short-series fallback — the **last close** — and the highest-weighted signal in `determineTrend` compared the price to itself. Fixed: fetch window 180→320 days (~220 bars), matching qqq-technicals. |
+
+Also fixed while in the file: `JSON.JSON.stringify` in the CCPI cache POST (TypeError
+swallowed by its catch — the cache was never populated via this path), and
+`nvidiaMomentum` read from `fredData` which never carries it (the computed value was
+discarded; indicator was permanently neutral).
+
+**P1 — broken or ungrounded, scheduled (all detailed in FORMULAS.md §3):**
+
+| ID | Sev | Area | Finding |
+|---|---|---|---|
+| P3-10 | P1 | CCPI | Pillar 1 branch maxima sum to 90/100 and Pillar 2 to 85/100 — the pillars cannot reach their stated scale; max attainable base CCPI ≈ 92. |
+| P3-11 | P1 | CCPI | The "Fear & Greed" input is `api.alternative.me` — the **crypto** F&G index — silently scored as equity sentiment (weight 15 in Pillar 2). CNN scrape already exists in-repo. |
+| P3-12 | P1 | CCPI | S-12 answered: baselined values are averaged into the composite at **full weight**; nothing consults `apiStatus`; the one null-aware input (F&G) is excluded but not renormalized. Structural bias toward the calm-2024 constants. |
+| P3-13 | P1 | CCPI | "Certainty" score **rises as more warning canaries fire** (0→70%, 15→100%) and ignores how many inputs are baselined. `getPlaybook(regime)` ignores `regime` — recommends "Risk-On, 60-80% equities" in every regime including Crash Watch. Yield curve is scored three times (~20 CCPI points for one indicator). |
+| P3-14 | P1 | lib/vix-term-structure.ts | "1M future" = spot × 1.08 ⇒ `isInverted` is mathematically **always false** — the module's stated purpose (backwardation crash signal) cannot trigger; CCPI's 6-pt indicator instead flags calm (VIX<15) markets as risk. |
+| P3-15 | P1 | lib/unified-ai-fallback.ts | Market data (CAPE, Buffett, put/call, PMI…) "fetched" by asking LLMs for values, accepted if `> 0`, and scored identically to live data. The `> 0` filter also rejects legitimately negative series. |
+| P3-16 | P1 | ANALYZE → Panic/Euphoria | 7 of 9 "components" are algebraic transforms of VIX and SPX momentum — a VIX proxy presented as a Citi replication; `latestCitiReading: 0.72` hardcoded; weekly bars mislabeled as daily MAs; the MMF input uses retail-only WRMFSL against a total-MMF band ⇒ pegs **max euphoria** whenever the FRED key works. |
+| P3-17 | P1 | ANALYZE → FOMC | Methodology text claims "CME FedWatch … Fed Funds futures"; no futures exist anywhere in the code (heuristic rule ladder). `^FVX` used as the "2-year" yield is the CBOE **5-year** index, so the "2Y-10Y" inversion signal is 5Y-10Y. Decay factor goes negative at meeting 8+; meeting list ends Mar-2027 (crash after). |
+| P3-18 | P1 | ANALYZE → CNN F&G | Historical deltas fabricated (`lastMonthChange = score − weekAgo×1.2`, `…×2`); scrape path always reports 0 change; fallback double-counts VIX and `calculateMarketVolatility` ignores its own MA parameter. |
+| P3-19 | P1 | ANALYZE → CCPI | Remaining frozen inputs after P3-1: `bullishPercent: 58` hardcoded; ATR/VXN/RVX/LTV/spotVol named baselines with no source — each still contributes fixed points to pillar scores. Source or remove. |
+
+**P2/P3 highlights (rest in FORMULAS.md):** trend-analysis MACD guard `<26` yields
+histogram≡0 at 26-33 bars (wheel's is 34) · SMA short-series returns 0 ⇒ IPOs always
+"uptrend"/golden-cross (P3-24) · wheel-strategy-planner "premium % of stock price"
+overstated **100×** (P3-25) · learn-pmcc worked example double-counts the short-call
+credit (P3-26) · trade-walkthrough renders iron condors as a 2-leg call vertical
+(P3-27) · S-9 confirmed order-of-magnitude (est. premium ~80× overstated for OTM
+weeklies) · S-15 confirmed + inverse bug (profitable-quarters silently lowers the
+bar) · D/E is actually liabilities/equity and negative equity **passes** the debt
+gate · landmine CPI dedupe drops the second month in a window · panic-euphoria MAs
+computed on weekly bars · RSI Cutler-vs-Wilder quantified: mean 5.8 pts, oversold
+gate flips on 12.6% of windows (S-2 evidence).
+
+---
+
 ## Closed
 
 Fixed in the Phase 1 commit (`audit Phase 1: …`).
@@ -179,3 +230,11 @@ nothing sources them. **This needs a preview-deploy check before it reaches
 users** — see P2 verification note.
 
 _Not yet fixed:_ S-2 … S-20 except S-1, and P0-1 … P0-7, P1-11, P1-13, P1-14.
+
+Fixed in the Phase 3 commit (`audit Phase 3: …`):
+
+| ID | Sev | What changed | Verification |
+|---|---|---|---|
+| P3-1 | P0 | CCPI reads real FRED spot VIX (via `fetchVIXTermStructure`) instead of a constant 18 laundered through `fetchAlphaVantageIndicators`; the dead AI fallback is now second in the chain; the other five volatility fields are explicit named baselines. Also wired `nvidiaMomentum` to the value actually computed, and fixed the `JSON.JSON.stringify` cache-write TypeError. | Verified frozen paths by direct read of both return sites before editing; independently found by two of the four verification agents. Live behavior needs the preview-deploy pass. |
+| P3-2, P3-3 | P0 | Insider trade values/quantities now use Finnhub `change` (shares transacted), never `share` (post-trade holdings); rows without a usable `change` are skipped rather than valued off holdings. | Field semantics per Finnhub docs + the sibling route's own comment. Confirm against one live payload on preview. |
+| P3-4 | P0 | trend-analysis fetch window 180→320 calendar days so the 200-day MA is computable instead of silently rendering the last close as an MA. | 180d ≈ 124 trading bars < 200 (agent numeric check); `calculateMA` fallback confirmed by direct read. |
