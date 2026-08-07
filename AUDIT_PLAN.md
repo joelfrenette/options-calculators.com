@@ -1,0 +1,207 @@
+# OPTIONS-CALCULATORS.COM — Master Audit, Repair & Enhancement Plan
+
+> Created 2026-08-07. This is the working charter for the full-site audit.
+> Execute phases in order; log every finding in `AUDIT_BACKLOG.md` (create on first finding).
+> Prime directives: **REAL DATA** (no fake/placeholder/hardcoded values presented as live),
+> **VERIFIED MATH** (every formula tested against a reference), **SIMPLE CODE** (modular,
+> reusable, typed), **VISIBLE OPS** (admin sees health + cost of everything).
+
+---
+
+## 1. COMMON LANGUAGE (site taxonomy)
+
+Use these terms in every conversation, commit, and finding.
+
+**Hierarchy:** `FUNCTION → TAB → SECTION → CARD → METRIC`
+
+- **FUNCTION** — one of the three jobs the site does for a trader (top nav groups).
+- **TAB** — one tool inside a function (the sub-nav pills).
+- **SECTION** — a titled region inside a tab (e.g. "Dollar Amount Filtering (Step 1)").
+- **CARD** — one bordered box inside a section (a slider card, a results table, a gauge).
+- **METRIC** — one displayed number/badge/check with a data source and (maybe) a formula.
+
+### FUNCTION 1: DECIDE — "Should I trade this week?" (nav: ANALYZE, 10 tabs)
+| Tab | Component | Primary APIs |
+|---|---|---|
+| CCPI (flagship) | ccpi dashboard | /api/ccpi (composite: FRED, VIX, breadth, valuation via FMP, sentiment) |
+| Earnings & Economic Calendar | earnings calendar | /api/earnings-calendar (Finnhub→Polygon), /insights (AI chain) |
+| Index Trend Analysis | trend analysis | /api/trend-analysis, /api/qqq-technicals |
+| CBOE VIX Volatility Index | vix | /api/vix, /api/vix-history |
+| CNN Fear & Greed | fear-greed | CNN direct API |
+| Citibank Panic & Euphoria | panic-euphoria | /api/panic-euphoria |
+| Social Sentiment Index | social-sentiment | StockTwits + Google News composite |
+| FOMC Fed Rate Forecaster | fomc | /api/fomc-predictions |
+| BLS CPI Inflation Forecaster | cpi | /api/cpi-inflation |
+| BLS Jobs Rate Forecaster | jobs | /api/jobs-report |
+
+### FUNCTION 2: FIND — "Which trade do I make?" (nav: SCAN + COPY, 15 tabs)
+**SCAN (7):** Sell Put Scanner (flagship, 4-step funnel), Calendar Spreads, Credit Spreads,
+Iron Condors, Butterflies, LEAPS, ZEBRA.
+Primary APIs: /api/polygon-tickers, /api/polygon-proxy, /api/strategy-scanner, /api/landmine-check.
+
+**COPY (8):** Insider Activity, Cluster Buys, Form 144 Watch, Congress Trade Feed,
+Politician Spotlight, Top Performers, Hedge Fund 13F, Smart-Money ETFs.
+Primary APIs: Finnhub, SEC EDGAR, Quiver Quant, Polygon prices.
+
+### FUNCTION 3: LEARN — "How do these strategies work?" (nav: LEARN, 16 tabs)
+Wheel, CSP, CC, LEAPS, PMCC, Credit Spreads, Iron Condors, Straddles, Diagonals,
+Calendars, Butterflies, Collars, Exit Rules, Earnings EM, Greeks Calc, ROI Calc.
+Static teaching pages + pure-SVG payoff diagrams (canonical Black-Scholes) + 2 calculators.
+
+### OPS LAYER: ADMIN (auth-gated /admin)
+API keys manager, data-source status, audit monitoring, Costs tab, ad banner mgmt.
+**← The audit's biggest BUILD deliverable lives here (see Phase 5).**
+
+**Inventory totals:** 42 API routes · 53 components · 4 nav categories · 33 public tabs + admin.
+
+---
+
+## 2. QUICK HIGH-LEVEL ASSESSMENT (as of 2026-08-07)
+
+**Healthy:**
+- Zero Vercel runtime errors in recent windows; cost-optimized stack (Polygon + FMP paid, everything else free).
+- Sell Put Scanner freshly overhauled this week: real quarterly fundamentals, real IV, volatility
+  pre-filter, Landmine event-awareness, diagnostics. It is the QUALITY BAR for other tabs.
+- AI runs free via OpenRouter auto-router with refusal detection + fallback chain.
+- Kill-switch (`DISABLED_APIS`) + alias-aware key resolution in place.
+
+**Known weak spots (verified, not speculation):**
+1. **One wrong formula found already:** `calculateMACD` in wheel-scanner uses `signal = macd * 0.9`
+   — that is NOT a MACD signal line (should be 9-period EMA of the MACD series). The MACD
+   gate/column is therefore decorative at best, misleading at worst. Assume siblings
+   (other scanner components) copied it. ← exactly the "backwards math" the audit hunts.
+2. RSI uses simple averages, not Wilder's smoothing — mild deviation, verify tolerance.
+3. `wheel-scanner.tsx` is a ~4,500-line monolith; 6 other scanner components likely share
+   duplicated indicator code that must be extracted to one tested `lib/indicators.ts`.
+4. 21 pre-existing TypeScript errors (10 wheel-scanner, 11 polygon-proxy `Response.json` typing).
+5. Three hardcoded ticker universes still in code (MEGA_CAP_STOCKS ×2 in wheel-scanner —
+   now unused? — and MAJOR_INDEX_TICKERS fallback in polygon-tickers).
+6. Hidden filter gates with no UI: `minVolume` (2M), `minVolumeTechnicals`, `minYield` (1%)
+   still filter Step 3/4; `maxPE` state is dead. Expose, remove, or document each.
+7. Market-closed estimation heuristics: `estimatedIV = 0.35`, `delta = -0.5·moneyness³`,
+   `expectedMove = ATR·√(d/7)·1.5` — all invented constants. Now that real IV is captured,
+   replace expectedMove with IV-based EM: `price · IV · √(DTE/365)`. Label all estimates in UI.
+8. Landmine macro calendar is rule-based; **FOMC dates only cover Dec + Jan** (Fed meets 8×/yr).
+9. Finnhub economic calendar (free) could replace curated macro rules — evaluate.
+10. Admin Costs tab is estimate-based; **no real per-call API metering exists anywhere**.
+
+---
+
+## 3. THE PLAN — 7 phases
+
+### Phase 0 — Inventory & Ledger (half day)
+- Script `scripts/site-inventory.ts`: walk `app/api/*` + `components/*`, extract every `fetch(`
+  target, produce `SITE_MAP.md` (FUNCTION→TAB→SECTION→CARD→METRIC skeleton + API dependency graph).
+- Create `AUDIT_BACKLOG.md` seeded from §2 + §6 of this file. Every phase appends findings
+  with: severity (P0 wrong-data / P1 broken / P2 misleading / P3 debt), tab, file:line, fix.
+
+### Phase 1 — Data Integrity Sweep (1–2 days)
+Goal: **every METRIC is live, labeled estimate, or deleted.**
+- Grep hunts: `Math.random`, `mock`, `placeholder`, `sample`, `hardcoded`, `TBD`, `static`,
+  literal number arrays feeding charts, `|| 0` masking missing data as zero.
+- Classify every fallback path: (a) graceful + labeled ✅ (b) silent fake ❌ fix (c) dead ❌ delete.
+- Rule to enforce: any baseline/estimated value rendered must carry a visible badge
+  ("baseline", "estimated", "market closed") — the DataLoadGate/label pattern.
+
+### Phase 2 — API Health & Fallback Verification (1–2 days)
+- Contract test per route (42): status, JSON schema, latency budget, timeout wiring,
+  429/5xx handling, kill-switch response, fallback chain actually fires (test by
+  DISABLED_APIS simulation).
+- Deliverable: `lib/api-contracts.ts` (zod schemas) + `/api/admin/run-health-checks`
+  endpoint that probes everything with canary params — reused by the Admin page (Phase 5).
+- Dedupe: `twelve-data-proxy` vs `twelvedata-proxy` (two routes!), apify-proxy status,
+  scraping-bee status, serper — retire dead routes.
+
+### Phase 3 — Formula & Logic Verification (2–3 days) ← "no backwards math"
+- Inventory every calculation into `FORMULAS.md`: indicator math (RSI, MACD, Bollinger,
+  Stochastic, ATR, SMA/EMA), option math (yields, annualized yield, delta estimates, IV use,
+  payoff diagrams, Greeks calc, ROI calc, expected move), fundamentals (ROE TTM, D/E, PE,
+  market cap, profitable quarters), composites (CCPI weights/thresholds, sentiment composite,
+  forecaster models FOMC/CPI/Jobs).
+- For each: reference formula cited → unit test in `lib/__tests__/` with known-good vectors
+  (e.g. RSI-14 on a published series) → direction check (does bigger input move output the
+  right way?) → boundary check (0, negative, missing).
+- Fix list already known: MACD signal line, RSI smoothing, expectedMove, estimated-greeks labeling.
+- Prose audit: every tooltip/explainer states the right direction (e.g. "high IV = rich premium").
+
+### Phase 4 — Simplify & Modularize (2–3 days)
+- Extract `lib/indicators.ts` (pure, unit-tested) — all 7 scanners import it. Delete duplicates.
+- Split wheel-scanner.tsx: `components/scanner/` (Step1Card, Step2Card, Step3Card, Step4Tables,
+  useScanCache, useLandmines). Target: no file > 600 lines.
+- Kill the 21 TS errors; add `pnpm typecheck` to CI (GitHub Action: typecheck + tests on PR).
+- Consolidate shared UI: one ResultsTable with sortable/filterable columns (the Excel-filter
+  pattern from Sell Put) reused by all scanners.
+
+### Phase 5 — Admin Command Center (2–4 days) ← the big BUILD
+Single admin view answering "what is the total health and cost of this site?"
+- **Health panel:** Run-All-Tests button → Phase 2 contract checks live, per-API pass/fail +
+  latency + last-success timestamp; recent error feed; optional Resend email alert on failure.
+- **Call metering:** wrap outbound fetches in `lib/metered-fetch.ts` (provider, route, ms,
+  status) → log to Supabase table `api_calls` (Supabase already connected; free tier) →
+  daily rollups.
+- **Cost panel:** per-provider call counts × unit costs (`lib/api-costs.ts`) + editable
+  **subscription registry** (Polygon $/mo, FMP $/mo, anything else) → total monthly cost vs
+  `MONTHLY_BUDGET_TARGET`, trend chart.
+- **Data-freshness panel:** per TAB: last successful data pull, source used (primary/fallback),
+  and the estimate-badge count currently shown to users.
+
+### Phase 6 — Page-by-Page Sign-off (3–5 days, parallelizable)
+March through all 33 tabs with a fixed checklist; record sign-off in SITE_MAP.md:
+`[ ] data live/labeled · [ ] APIs verified · [ ] math verified · [ ] fallbacks fire ·
+[ ] copy accurate · [ ] errors handled · [ ] mobile · [ ] code ≤600 lines/module`
+Order: SCAN (Sell Put = template) → ANALYZE (CCPI first) → COPY → LEARN (payoff math + 2 calculators).
+
+### Phase 7 — Backlog Burn-down & Regression Guard (ongoing)
+- Work `AUDIT_BACKLOG.md` by severity; keep CI green; monthly health review via Admin page.
+
+**Suggested execution:** Phases 0–2 in the first audit session; 3–4 next; 5 as its own build
+session; 6 fanned out (can parallelize with subagents per tab); 7 standing.
+
+---
+
+## 4. ADMIN COMMAND CENTER — acceptance criteria
+- [ ] One page shows every API: status, latency, last success, fallback in use
+- [ ] One-click full health check with per-route pass/fail detail
+- [ ] Every outbound API call metered (provider, count, cost) with daily rollup
+- [ ] Subscription costs editable; total monthly cost vs budget visible
+- [ ] Error notifications surfaced (page badge; email optional via Resend)
+- [ ] No fake numbers anywhere on the admin page itself
+
+## 5. DEFINITION OF DONE (site-wide)
+- [ ] Zero unlabeled fake/placeholder/hardcoded data rendered to users
+- [ ] Every formula in FORMULAS.md with a passing unit test
+- [ ] Zero TypeScript errors; CI enforces typecheck + tests
+- [ ] Every API route has a contract test, timeout, and verified fallback
+- [ ] No component file > 600 lines; indicators/table logic shared from lib/
+- [ ] Admin page reports total health + total cost accurately
+
+## 6. STANDING BACKLOG (seed — carry into AUDIT_BACKLOG.md)
+| # | Sev | Item |
+|---|---|---|
+| 1 | P2 | MACD signal = macd×0.9 (fake signal line) in wheel-scanner + likely siblings |
+| 2 | P3 | RSI simple-average vs Wilder's smoothing |
+| 3 | P2 | FOMC dates hardcoded Dec+Jan only in lib/economic-events.ts (Fed meets 8×/yr) |
+| 4 | P3 | Evaluate Finnhub economic calendar (free) to replace curated macro rules |
+| 5 | P3 | 21 pre-existing TS errors (wheel-scanner 10, polygon-proxy 11) |
+| 6 | P3 | wheel-scanner.tsx monolith (~4,500 lines) |
+| 7 | P3 | 3 hardcoded ticker universes (MEGA_CAP_STOCKS ×2, MAJOR_INDEX_TICKERS) |
+| 8 | P2 | Hidden gates: minVolume/minVolumeTechnicals/minYield filter without UI; maxPE dead |
+| 9 | P2 | Market-closed estimates (IV 0.35, delta -0.5m³) need visible "estimated" badges |
+| 10 | P2 | expectedMove uses ATR×1.5 fudge — replace with IV-based EM (IV now captured) |
+| 11 | P3 | AAII fetch unreliable (needs Nasdaq Data Link free key) — currently baseline |
+| 12 | P3 | NYSE breadth + ETF flows on graceful baselines (intentional, revisit) |
+| 13 | P3 | Delete REDDIT_CLIENT_ID/SECRET from Vercel env (unused since Reddit removal) |
+| 14 | P3 | FMP screener 403 dormant path — gate on plan detection or document |
+| 15 | P2 | New-IPO thin financials (SPCX): show "insufficient history" not 0% ROE |
+| 16 | P3 | localStorage cache: old v1/v2 keys never cleaned up |
+| 17 | P3 | Redundant earnings-date extraction from Polygon snapshot (Landmine/Finnhub supersedes) |
+| 18 | P2 | Step numbering drift in Sell Put copy (buttons/cards/errors disagree on step numbers) |
+| 19 | P1 | No real API call metering — admin costs are estimates |
+| 20 | P3 | Duplicate routes: twelve-data-proxy vs twelvedata-proxy |
+
+## 7. KICKOFF PROMPT FOR THE AUDIT SESSION
+> Read AUDIT_PLAN.md at the repo root. Execute Phase 0 (inventory script + SITE_MAP.md +
+> AUDIT_BACKLOG.md seeded from §6), then Phase 1 (data-integrity sweep), then Phase 2
+> (API contract tests + health-check endpoint). Log every finding in AUDIT_BACKLOG.md
+> with severity/tab/file:line/fix. Commit per phase. Do not change user-facing behavior
+> without noting it; P0 wrong-data findings get fixed immediately.
