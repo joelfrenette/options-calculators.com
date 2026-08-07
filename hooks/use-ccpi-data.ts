@@ -2,9 +2,9 @@
 
 import { useState, useCallback, useEffect, useMemo } from "react"
 import type { CCPIData, HistoricalData } from "@/lib/ccpi/types"
-import { fetchCCPI, fetchExecutiveSummary, fetchHistory, refreshCCPIData } from "@/lib/ccpi/api"
+import { fetchCCPI, fetchCCPIHistory, fetchExecutiveSummary, refreshCCPIData } from "@/lib/ccpi/api"
 import { getCachedData, setCachedData, hasFreshCache } from "@/lib/ccpi/cache"
-import { log } from "@/lib/ccpi/logger"
+import { logError } from "@/lib/ccpi/logger"
 
 interface CCPIState {
   data: CCPIData | null
@@ -52,7 +52,7 @@ export function useCCPIData(): UseCCPIDataReturn {
       // Check cache first
       const cached = getCachedData()
       if (cached && hasFreshCache()) {
-        log("Using cached CCPI data")
+        console.log("[v0] Using cached CCPI data")
         setState((prev) => ({
           ...prev,
           data: cached,
@@ -76,7 +76,7 @@ export function useCCPIData(): UseCCPIDataReturn {
       await loadHistoryAndSummary(data)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to load CCPI data"
-      log("Error loading initial data:", errorMessage)
+      logError("Error loading initial data", errorMessage)
       setState((prev) => ({
         ...prev,
         loading: false,
@@ -88,10 +88,10 @@ export function useCCPIData(): UseCCPIDataReturn {
   const loadHistoryAndSummary = async (data: CCPIData) => {
     // Load history
     try {
-      const history = await fetchHistory()
+      const history = await fetchCCPIHistory()
       setState((prev) => ({ ...prev, history }))
     } catch (err) {
-      log("Error loading history:", err)
+      logError("Error loading history", err)
     }
 
     // Load executive summary
@@ -104,7 +104,7 @@ export function useCCPIData(): UseCCPIDataReturn {
         summaryLoading: false,
       }))
     } catch (err) {
-      log("Error loading executive summary:", err)
+      logError("Error loading executive summary", err)
       setState((prev) => ({
         ...prev,
         summaryLoading: false,
@@ -122,16 +122,9 @@ export function useCCPIData(): UseCCPIDataReturn {
     }))
 
     try {
-      const data = await refreshCCPIData({
-        onProgress: (progress, status) => {
-          setState((prev) => ({
-            ...prev,
-            refreshProgress: progress,
-            refreshStatus: status,
-          }))
-        },
-        forceRefresh,
-      })
+      // refreshCCPIData takes no options; the previously passed onProgress/forceRefresh
+      // object was silently ignored at runtime, so omitting it is behavior-identical.
+      const { data } = await refreshCCPIData()
 
       setState((prev) => ({
         ...prev,
@@ -156,7 +149,7 @@ export function useCCPIData(): UseCCPIDataReturn {
       }, 2000)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to refresh data"
-      log("Error refreshing:", errorMessage)
+      logError("Error refreshing", errorMessage)
       setState((prev) => ({
         ...prev,
         isRefreshing: false,

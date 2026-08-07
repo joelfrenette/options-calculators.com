@@ -58,19 +58,35 @@ import { fetchMarketDataWithGrok } from "./grok-market-data"
  * Prioritizes speed while maintaining accuracy with multiple fallbacks.
  */
 
+/**
+ * Per-metric plausibility window. The previous acceptance filter was `value > 0`,
+ * which (a) rejected legitimately negative/zero series like the 10Y-2Y yield
+ * curve, and (b) accepted wildly hallucinated positives (AUDIT P3-15). Each
+ * getter now declares the range a sane value for its metric must fall in.
+ */
+export interface PlausibleRange {
+  min: number
+  max: number
+}
+
+function isPlausible(value: number | null, range: PlausibleRange): value is number {
+  return value !== null && Number.isFinite(value) && value >= range.min && value <= range.max
+}
+
 export async function fetchWithAIFallback(
   indicatorName: string,
   grokFunc: () => Promise<number | null>,
   groqLLMFunc: () => Promise<number | null>,
   anthropicFunc: () => Promise<number | null>,
   openaiFunc: () => Promise<number | null>,
+  range: PlausibleRange,
   baselineValue: number,
 ): Promise<{ value: number; source: "grok" | "groq" | "anthropic" | "openai" | "baseline" }> {
   console.log(`[v0] AI Fallback: Fetching ${indicatorName}...`)
 
   try {
     const grokValue = await grokFunc()
-    if (grokValue !== null && !isNaN(grokValue) && grokValue > 0) {
+    if (isPlausible(grokValue, range)) {
       console.log(`[v0] ✓ ${indicatorName}: Using Grok xAI (${grokValue})`)
       return { value: grokValue, source: "grok" }
     }
@@ -80,7 +96,7 @@ export async function fetchWithAIFallback(
 
   try {
     const groqLLMValue = await groqLLMFunc()
-    if (groqLLMValue !== null && !isNaN(groqLLMValue) && groqLLMValue > 0) {
+    if (isPlausible(groqLLMValue, range)) {
       console.log(`[v0] ⚠ ${indicatorName}: Falling back to Groq Llama (${groqLLMValue})`)
       return { value: groqLLMValue, source: "groq" }
     }
@@ -91,7 +107,7 @@ export async function fetchWithAIFallback(
   // Fallback to Anthropic Claude (SLOWER - typically 5-8 seconds)
   try {
     const anthropicValue = await anthropicFunc()
-    if (anthropicValue !== null && !isNaN(anthropicValue) && anthropicValue > 0) {
+    if (isPlausible(anthropicValue, range)) {
       console.log(`[v0] ⚠ ${indicatorName}: Falling back to Anthropic Claude (${anthropicValue})`)
       return { value: anthropicValue, source: "anthropic" }
     }
@@ -102,7 +118,7 @@ export async function fetchWithAIFallback(
   // Fallback to OpenAI GPT-4o (SLOWEST - typically 10-15 seconds)
   try {
     const openaiValue = await openaiFunc()
-    if (openaiValue !== null && !isNaN(openaiValue) && openaiValue > 0) {
+    if (isPlausible(openaiValue, range)) {
       console.log(`[v0] ⚠ ${indicatorName}: Falling back to OpenAI GPT-4o (${openaiValue})`)
       return { value: openaiValue, source: "openai" }
     }
@@ -125,6 +141,7 @@ export async function getShillerCAPE(): Promise<{
     fetchShillerCAPEWithGroqLLM,
     fetchShillerCAPEWithAnthropic,
     fetchShillerCAPEWithOpenAI,
+    { min: 5, max: 60 },
     30,
   )
 }
@@ -139,6 +156,7 @@ export async function getShortInterest(): Promise<{
     fetchShortInterestWithGroqLLM,
     fetchShortInterestWithAnthropic,
     fetchShortInterestWithOpenAI,
+    { min: 0.2, max: 20 },
     1.8,
   )
 }
@@ -153,6 +171,7 @@ export async function getMag7Concentration(): Promise<{
     fetchMag7ConcentrationWithGroqLLM,
     fetchMag7ConcentrationWithAnthropic,
     fetchMag7ConcentrationWithOpenAI,
+    { min: 20, max: 80 },
     55,
   )
 }
@@ -167,6 +186,7 @@ export async function getQQQPE(): Promise<{
     fetchQQQPEWithGroqLLM,
     fetchQQQPEWithAnthropic,
     fetchQQQPEWithOpenAI,
+    { min: 10, max: 60 },
     32,
   )
 }
@@ -181,6 +201,7 @@ export async function getBuffettIndicator(): Promise<{
     fetchBuffettIndicatorWithGroqLLM,
     fetchBuffettIndicatorWithAnthropic,
     fetchBuffettIndicatorWithOpenAI,
+    { min: 50, max: 300 },
     180,
   )
 }
@@ -195,6 +216,7 @@ export async function getPutCallRatio(): Promise<{
     fetchPutCallRatioWithGroqLLM,
     fetchPutCallRatioWithAnthropic,
     fetchPutCallRatioWithOpenAI,
+    { min: 0.3, max: 2.5 },
     0.95,
   )
 }
@@ -210,6 +232,7 @@ export async function getAAIIBullish(): Promise<{
     fetchAAIIBullishWithGroqLLM,
     fetchAAIIBullishWithAnthropic,
     fetchAAIIBullishWithOpenAI,
+    { min: 5, max: 80 },
     35,
   )
 }
@@ -224,6 +247,7 @@ export async function getVIX(): Promise<{
     fetchVIXWithGroqLLM,
     fetchVIXWithAnthropic,
     fetchVIXWithOpenAI,
+    { min: 5, max: 100 },
     18,
   )
 }
@@ -238,6 +262,7 @@ export async function getNVIDIAPrice(): Promise<{
     fetchNVIDIAPriceWithGroqLLM,
     fetchNVIDIAPriceWithAnthropic,
     fetchNVIDIAPriceWithOpenAI,
+    { min: 10, max: 5000 },
     800,
   )
 }
@@ -252,6 +277,7 @@ export async function getSOXIndex(): Promise<{
     fetchSOXIndexWithGroqLLM,
     fetchSOXIndexWithAnthropic,
     fetchSOXIndexWithOpenAI,
+    { min: 1000, max: 20000 },
     5000,
   )
 }
@@ -266,6 +292,7 @@ export async function getISMPMI(): Promise<{
     fetchISMPMIWithGroqLLM,
     fetchISMPMIWithAnthropic,
     fetchISMPMIWithOpenAI,
+    { min: 30, max: 70 },
     48,
   )
 }
@@ -280,6 +307,7 @@ export async function getSPXPE(): Promise<{
     fetchSPXPEWithGroqLLM,
     fetchSPXPEWithAnthropic,
     fetchSPXPEWithOpenAI,
+    { min: 5, max: 50 },
     22.5,
   )
 }
@@ -294,6 +322,7 @@ export async function getFearGreed(): Promise<{
     fetchFearGreedWithGroqLLM,
     fetchFearGreedWithAnthropic,
     fetchFearGreedWithOpenAI,
+    { min: 0, max: 100 },
     50,
   )
 }
@@ -308,6 +337,7 @@ export async function getYieldCurve(): Promise<{
     fetchYieldCurveWithGroqLLM,
     fetchYieldCurveWithAnthropic,
     fetchYieldCurveWithOpenAI,
+    { min: -3, max: 3 },
     0.25,
   )
 }

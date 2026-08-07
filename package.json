@@ -7,7 +7,7 @@
     "dev": "next dev",
     "check": "pnpm typecheck && pnpm check:formulas && pnpm check:contracts",
     "check:contracts": "node scripts/check-contract-coverage.ts",
-    "check:formulas": "node scripts/check-black-scholes.ts && node scripts/check-macd.ts",
+    "check:formulas": "node scripts/check-black-scholes.ts && node scripts/check-macd.ts && node scripts/check-indicators.ts && node scripts/check-ccpi-scoring.ts",
     "inventory": "node scripts/site-inventory.ts",
     "lint": "eslint .",
     "start": "next start",

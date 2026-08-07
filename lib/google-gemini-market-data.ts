@@ -41,7 +41,7 @@ Respond with ONLY the number, nothing else.`
     const { text } = await generateText({
       model: google('gemini-2.0-flash-exp'),
       prompt,
-      maxTokens: 50,
+      maxOutputTokens: 50,
       temperature: 0.1 // Low temperature for factual data
     })
     

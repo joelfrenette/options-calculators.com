@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Sparkles, Bot, User, Send, Loader2, TrendingUp, Target, DollarSign, AlertTriangle } from "lucide-react"
 
 interface ScenarioContext {
-  type: "earnings" | "insider" | "jobs" | "strategy" | "economic"
+  type: "earnings" | "insider" | "jobs" | "jobs_forecast" | "jobs_trading" | "sentiment" | "strategy" | "economic"
   // Core fields - at least one way to identify the scenario
   title?: string
   details?: string

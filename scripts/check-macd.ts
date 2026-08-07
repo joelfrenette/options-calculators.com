@@ -4,12 +4,15 @@
  *
  * Run: node scripts/check-macd.ts
  *
- * The scanner's calculateMACD/calculateEMA are closures inside the component, so
- * they are re-implemented here verbatim. Phase 4 extracts them to lib/indicators.ts
- * and these become real unit tests.
+ * Phase 4: the fixed implementation now lives in lib/indicators.ts (imported
+ * below) — the four per-file copies were deleted. The OLD defective variant is
+ * kept inline here as the counter-example the degeneracy proof runs against.
  */
 
-const ema = (prices: number[], period: number): number => {
+import { ema as libEma, macd as libMacd } from "../lib/indicators.ts"
+
+/** The old first-price-seeded EMA the defective scanner used. */
+const oldEma = (prices: number[], period: number): number => {
   if (prices.length === 0) return 0
   const k = 2 / (period + 1)
   let e = prices[0]
@@ -20,21 +23,8 @@ const ema = (prices: number[], period: number): number => {
 /** The old implementation: signal = macd * 0.9 */
 const macdOld = (closes: number[]) => {
   if (closes.length < 26) return { macd: 0, signal: 0, histogram: 0 }
-  const macd = ema(closes, 12) - ema(closes, 26)
+  const macd = oldEma(closes, 12) - oldEma(closes, 26)
   const signal = macd * 0.9
-  return { macd, signal, histogram: macd - signal }
-}
-
-/** The fix: signal = 9-period EMA of the MACD series */
-const macdNew = (closes: number[]) => {
-  if (closes.length < 34) return { macd: 0, signal: 0, histogram: 0 }
-  const series: number[] = []
-  for (let i = 26; i <= closes.length; i++) {
-    const w = closes.slice(0, i)
-    series.push(ema(w, 12) - ema(w, 26))
-  }
-  const macd = series[series.length - 1]
-  const signal = ema(series, 9)
   return { macd, signal, histogram: macd - signal }
 }
 
@@ -65,30 +55,50 @@ check(
   "confirms the old MACD column carried no information beyond the MACD line's sign",
 )
 
-// 2. The new signal is NOT a restatement of the sign — it disagrees somewhere.
+// 2. The lib signal is NOT a restatement of the sign — it disagrees somewhere.
 let disagreements = 0
 for (let n = 34; n <= series.length; n++) {
   const w = series.slice(0, n)
-  const { macd, signal } = macdNew(w)
-  if (macd > signal !== macd > 0) disagreements++
+  const res = libMacd(w)
+  if (res === null) continue
+  if (res.macd > res.signal !== res.macd > 0) disagreements++
 }
-check("new signal disagrees with sign(macd) somewhere", disagreements > 0, `${disagreements} bars differ`)
+check("lib signal disagrees with sign(macd) somewhere", disagreements > 0, `${disagreements} bars differ`)
 
-// 3. On a steady uptrend the MACD line leads the signal line (bullish crossover state).
-const up = Array.from({ length: 120 }, (_, i) => 100 + i)
-const upRes = macdNew(up)
-check("steady uptrend → macd above signal", upRes.macd > upRes.signal, `macd ${upRes.macd.toFixed(4)} vs signal ${upRes.signal.toFixed(4)}`)
+// 3. In a fresh uptrend the MACD line leads the signal line (bullish crossover
+// state). Note: the trend must be FRESH — on a pure linear ramp the SMA-seeded
+// EMAs sit exactly at steady state from the seed onward, so macd ≡ signal
+// identically (correct math, but it makes a strict inequality vacuous). A flat
+// stretch followed by the trend gives the signal line something to lag behind.
+const up = [...Array.from({ length: 40 }, () => 100), ...Array.from({ length: 30 }, (_, i) => 100 + i)]
+const upRes = libMacd(up)
+check(
+  "fresh uptrend → macd above signal",
+  upRes !== null && upRes.macd > upRes.signal,
+  upRes === null ? "null" : `macd ${upRes.macd.toFixed(4)} vs signal ${upRes.signal.toFixed(4)}`,
+)
 
-// 4. On a steady downtrend the MACD line lags the signal line.
-const down = Array.from({ length: 120 }, (_, i) => 220 - i)
-const downRes = macdNew(down)
-check("steady downtrend → macd below signal", downRes.macd < downRes.signal, `macd ${downRes.macd.toFixed(4)} vs signal ${downRes.signal.toFixed(4)}`)
+// 4. In a fresh downtrend the MACD line lags the signal line.
+const down = [...Array.from({ length: 40 }, () => 220), ...Array.from({ length: 30 }, (_, i) => 220 - i)]
+const downRes = libMacd(down)
+check(
+  "fresh downtrend → macd below signal",
+  downRes !== null && downRes.macd < downRes.signal,
+  downRes === null ? "null" : `macd ${downRes.macd.toFixed(4)} vs signal ${downRes.signal.toFixed(4)}`,
+)
 
 // 5. Histogram identity holds.
-check("histogram = macd - signal", Math.abs(upRes.histogram - (upRes.macd - upRes.signal)) < 1e-12)
+check(
+  "histogram = macd - signal",
+  upRes !== null && Math.abs(upRes.histogram - (upRes.macd - upRes.signal)) < 1e-12,
+)
 
-// 6. Guard: too little history returns zeros rather than a half-seeded signal.
-check("under 34 bars → zeros", macdNew(series.slice(0, 30)).signal === 0)
+// 6. Guard: too little history returns null rather than a half-seeded signal
+// (the lib's null-not-zero contract — callers must fail-safe).
+check("under 34 bars → null", libMacd(series.slice(0, 30)) === null)
+
+// 7. The lib EMA seeds with the SMA of the first `period` values.
+check("lib EMA seed = SMA of first `period` values", libEma([1, 2, 3, 4, 5], 5) === 3)
 
 console.log(failures === 0 ? "\nAll MACD checks passed." : `\n${failures} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)

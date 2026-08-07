@@ -1,5 +1,7 @@
 export const runtime = "edge"
 
+import { NextResponse } from "next/server"
+
 import { getApiKey } from "@/lib/api-keys"
 
 export async function GET(request: Request) {
@@ -8,13 +10,13 @@ export async function GET(request: Request) {
   const symbol = searchParams.get("symbol")
 
   if (!endpoint || !symbol) {
-    return Response.json({ error: "Missing endpoint or symbol" }, { status: 400 })
+    return NextResponse.json({ error: "Missing endpoint or symbol" }, { status: 400 })
   }
 
   const TWELVE_DATA_API_KEY = getApiKey("TWELVE_DATA_API_KEY")
 
   if (!TWELVE_DATA_API_KEY) {
-    return Response.json({ error: "TwelveData API key not configured" }, { status: 500 })
+    return NextResponse.json({ error: "TwelveData API key not configured" }, { status: 500 })
   }
 
   try {
@@ -31,17 +33,17 @@ export async function GET(request: Request) {
     if (!response.ok) {
       const errorText = await response.text()
       console.error("[v0] Twelve Data API error:", response.status, errorText)
-      return Response.json(
+      return NextResponse.json(
         { error: `API request failed: ${response.status}`, details: errorText },
         { status: response.status },
       )
     }
 
     const data = await response.json()
-    return Response.json(data)
+    return NextResponse.json(data)
   } catch (error) {
     console.error("[v0] Twelve Data proxy error:", error)
-    return Response.json(
+    return NextResponse.json(
       { error: "Failed to fetch data", details: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },
     )

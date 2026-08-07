@@ -1,3 +1,5 @@
+import { NextResponse } from "next/server"
+
 import { getApiKey } from "@/lib/api-keys"
 import { fetchApifyYahooFinance } from "@/lib/apify-yahoo-finance"
 
@@ -6,20 +8,21 @@ export async function GET(request: Request) {
   const ticker = searchParams.get("ticker")
 
   if (!ticker) {
-    return Response.json({ error: "Ticker symbol is required" }, { status: 400 })
+    return NextResponse.json({ error: "Ticker symbol is required" }, { status: 400 })
   }
 
   try {
     const result = await fetchApifyYahooFinance(ticker)
     
-    if (result.error) {
-      return Response.json(result, { status: 500 })
+    // Narrow the success/error union returned by fetchApifyYahooFinance
+    if ("error" in result && result.error) {
+      return NextResponse.json(result, { status: 500 })
     }
     
-    return Response.json(result)
+    return NextResponse.json(result)
   } catch (error) {
     console.error("[v0] Apify proxy error:", error)
-    return Response.json({ 
+    return NextResponse.json({ 
       error: "Failed to fetch from Apify",
       dataSource: "apify-proxy-error",
       timestamp: new Date().toISOString()

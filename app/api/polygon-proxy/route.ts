@@ -1,3 +1,5 @@
+import { NextResponse } from "next/server"
+
 export const runtime = "edge"
 
 const FETCH_TIMEOUT_MS = 15000 // 15 second timeout
@@ -27,17 +29,17 @@ export async function GET(request: Request) {
   const ticker = searchParams.get("ticker")
 
   if (!endpoint) {
-    return Response.json({ error: "Missing endpoint" }, { status: 400 })
+    return NextResponse.json({ error: "Missing endpoint" }, { status: 400 })
   }
 
   if (endpoint !== "options-chain" && endpoint !== "options-chain-snapshot" && !ticker) {
-    return Response.json({ error: "Missing ticker" }, { status: 400 })
+    return NextResponse.json({ error: "Missing ticker" }, { status: 400 })
   }
 
   const apiKey = getApiKey("POLYGON_API_KEY")
 
   if (!apiKey) {
-    return Response.json({ error: "Polygon API key not configured" }, { status: 500 })
+    return NextResponse.json({ error: "Polygon API key not configured" }, { status: 500 })
   }
 
   try {
@@ -62,7 +64,7 @@ export async function GET(request: Request) {
       const underlying = searchParams.get("underlying")
 
       if (!underlying) {
-        return Response.json({ error: "Missing underlying ticker for options-snapshot" }, { status: 400 })
+        return NextResponse.json({ error: "Missing underlying ticker for options-snapshot" }, { status: 400 })
       }
 
       // Correct format: /v3/snapshot/options/{underlyingAsset}/{optionContract}
@@ -72,7 +74,7 @@ export async function GET(request: Request) {
       const optionType = searchParams.get("option_type") || "put"
 
       if (!ticker || !expiryDate) {
-        return Response.json({ error: "Missing ticker or expiry_date for options-chain-snapshot" }, { status: 400 })
+        return NextResponse.json({ error: "Missing ticker or expiry_date for options-chain-snapshot" }, { status: 400 })
       }
 
       // Use the snapshot endpoint that returns all options with greeks and quotes
@@ -82,7 +84,7 @@ export async function GET(request: Request) {
       const optionType = searchParams.get("option_type") || "put"
 
       if (!ticker) {
-        return Response.json({ error: "Missing ticker for options-chain" }, { status: 400 })
+        return NextResponse.json({ error: "Missing ticker for options-chain" }, { status: 400 })
       }
 
       // If expiry_date provided, search for that exact date using gte/lte range
@@ -99,7 +101,7 @@ export async function GET(request: Request) {
       url = `https://api.polygon.io/v3/reference/options/contracts?underlying_ticker=${ticker}&contract_type=${optionType}${dateParams}&limit=250&apiKey=${apiKey}`
     } else if (endpoint === "options-expiries") {
       if (!ticker) {
-        return Response.json({ error: "Missing ticker for options-expiries" }, { status: 400 })
+        return NextResponse.json({ error: "Missing ticker for options-expiries" }, { status: 400 })
       }
 
       const today = new Date().toISOString().split("T")[0]
@@ -123,12 +125,12 @@ export async function GET(request: Request) {
 
       if (response.status === 429) {
         console.error("[v0] Polygon API rate limit hit for", ticker, "-", errorText.substring(0, 100))
-        return Response.json({ error: "Rate limit exceeded", ticker, status: 429 }, { status: 429 })
+        return NextResponse.json({ error: "Rate limit exceeded", ticker, status: 429 }, { status: 429 })
       }
 
       console.error("[v0] Polygon API error:", response.status, errorText.substring(0, 200))
 
-      return Response.json(
+      return NextResponse.json(
         {
           error: `Polygon API error: ${response.status}`,
           details: errorText.substring(0, 200),
@@ -140,11 +142,11 @@ export async function GET(request: Request) {
     }
 
     const data = await response.json()
-    return Response.json(data)
+    return NextResponse.json(data)
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
     console.error(`[v0] Polygon proxy error for ${ticker} (${endpoint}):`, errorMessage)
-    return Response.json(
+    return NextResponse.json(
       {
         error: "Failed to fetch from Polygon API",
         details: errorMessage,

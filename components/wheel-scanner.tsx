@@ -11,6 +11,14 @@ import React from "react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
+import {
+  sma,
+  rsi as calcRSI,
+  macd as calcMACD,
+  bollinger as calcBollinger,
+  stochasticK as calcStochastic,
+  atr as calcATR,
+} from "@/lib/indicators"
 
 const CACHE_VERSION = "v3" // v3: quarterly-financials scan (real profitable-quarters count, TTM ROE/EPS, 12-stop market-cap floor)
 
@@ -125,15 +133,18 @@ interface QualifyingStock {
   peRatio: number
   avgVolume: number
   last4EPS: number[]
-  sma50: number
-  sma100: number
-  sma200: number
-  uptrend: boolean
-  rsi: number
-  bollingerPosition: string
-  macdSignal: string
-  stochastic: number
-  atr: number
+  // Indicator fields are null when the price history is too short to compute
+  // them (lib/indicators.ts contract) — gates fail-safe and the UI shows ✗/—,
+  // never a fabricated 0. Kills the false Golden Cross on IPOs (FORMULAS.md §1).
+  sma50: number | null
+  sma100: number | null
+  sma200: number | null
+  uptrend: boolean // false when either SMA is null ("unknown" never passes the golden-cross gate)
+  rsi: number | null
+  bollingerPosition: string // "Below" | "Lower Half" | "Upper Half" | "—" (insufficient history)
+  macdSignal: string // "Bullish" | "Bearish" | "—" (insufficient history)
+  stochastic: number | null
+  atr: number | null
   atrPercent: number
   putStrike: number
   premium?: number // This will be updated with real option premium
@@ -638,123 +649,10 @@ export function WheelScanner() {
     return fetch(url)
   }
 
-  const calculateSMA = (prices: number[], period: number): number => {
-    if (prices.length < period) return 0
-    const slice = prices.slice(-period)
-    return slice.reduce((sum, price) => sum + price, 0) / period
-  }
-
-  const calculateRSI = (closes: number[], period = 14): number => {
-    if (closes.length < period + 1) return 50
-
-    const changes: number[] = []
-    for (let i = 1; i < closes.length; i++) {
-      changes.push(closes[i] - closes[i - 1])
-    }
-
-    const recentChanges = changes.slice(-period)
-    const gains = recentChanges.filter((c) => c > 0)
-    const losses = recentChanges.filter((c) => c < 0).map((c) => Math.abs(c))
-
-    const avgGain = gains.length > 0 ? gains.reduce((a, b) => a + b, 0) / period : 0
-    const avgLoss = losses.length > 0 ? losses.reduce((a, b) => a + b, 0) / period : 0
-
-    if (avgLoss === 0) return 100
-    const rs = avgGain / avgLoss
-    return 100 - 100 / (1 + rs)
-  }
-
-  const calculateBollingerBands = (closes: number[], period = 20): { upper: number; middle: number; lower: number } => {
-    if (closes.length < period) return { upper: 0, middle: 0, lower: 0 }
-
-    const slice = closes.slice(-period)
-    const middle = slice.reduce((sum, price) => sum + price, 0) / period
-    const variance = slice.reduce((sum, price) => sum + Math.pow(price - middle, 2), 0) / period
-    const stdDev = Math.sqrt(variance)
-
-    return {
-      upper: middle + 2 * stdDev,
-      middle,
-      lower: middle - 2 * stdDev,
-    }
-  }
-
-  /**
-   * MACD(12, 26, 9).
-   *
-   * The signal line is the 9-period EMA of the MACD *series*, which requires
-   * recomputing MACD at each historical point — not a scaled copy of the current
-   * MACD value.
-   *
-   * This previously read `signal = macd * 0.9`. Because the only consumer tests
-   * `macd > signal`, that collapsed to `sign(macd)` for every input: a positive
-   * MACD was always "Bullish" and a negative one always "Bearish", so the MACD
-   * gate and column restated the MACD line's sign while presenting themselves as
-   * a crossover signal (AUDIT_BACKLOG S-1). Mirrors the correct implementation
-   * already in app/api/trend-analysis/route.ts.
-   */
-  const calculateMACD = (closes: number[]): { macd: number; signal: number; histogram: number } => {
-    // 26 bars for the first MACD value, plus 8 more so the 9-period signal EMA
-    // has a full window to seed from.
-    if (closes.length < 34) return { macd: 0, signal: 0, histogram: 0 }
-
-    const macdSeries: number[] = []
-    for (let i = 26; i <= closes.length; i++) {
-      const window = closes.slice(0, i)
-      macdSeries.push(calculateEMA(window, 12) - calculateEMA(window, 26))
-    }
-
-    const macd = macdSeries[macdSeries.length - 1]
-    const signal = calculateEMA(macdSeries, 9)
-    const histogram = macd - signal
-
-    return { macd, signal, histogram }
-  }
-
-  const calculateEMA = (prices: number[], period: number): number => {
-    if (prices.length === 0) return 0
-    const k = 2 / (period + 1)
-    let ema = prices[0]
-
-    for (let i = 1; i < prices.length; i++) {
-      ema = prices[i] * k + ema * (1 - k)
-    }
-
-    return ema
-  }
-
-  const calculateStochastic = (closes: number[], highs: number[], lows: number[], period = 14): number => {
-    if (closes.length < period || highs.length < period || lows.length < period) return 50
-
-    const recentCloses = closes.slice(-period)
-    const recentHighs = highs.slice(-period)
-    const recentLows = lows.slice(-period)
-
-    const currentClose = recentCloses[recentCloses.length - 1]
-    const highestHigh = Math.max(...recentHighs)
-    const lowestLow = Math.min(...recentLows)
-
-    if (highestHigh === lowestLow) return 50
-
-    return ((currentClose - lowestLow) / (highestHigh - lowestLow)) * 100
-  }
-
-  const calculateATR = (highs: number[], lows: number[], closes: number[], period = 14): number => {
-    if (highs.length < period + 1) return 0
-
-    const trueRanges: number[] = []
-    for (let i = 1; i < highs.length; i++) {
-      const high = highs[i]
-      const low = lows[i]
-      const prevClose = closes[i - 1]
-
-      const tr = Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose))
-      trueRanges.push(tr)
-    }
-
-    const recentTR = trueRanges.slice(-period)
-    return recentTR.reduce((sum, tr) => sum + tr, 0) / period
-  }
+  // Technical indicators (SMA/RSI/Bollinger/MACD/Stochastic/ATR) now come from
+  // the shared lib/indicators.ts (Phase 4 extraction). All of them return null
+  // on insufficient history — see the compute site in the fundamental scan for
+  // the fail-safe handling.
 
   // Extract earnings data from Polygon snapshot
   const extractEarningsData = (tickerData: any, currentPrice: number, atrPercent: number) => {
@@ -1174,18 +1072,30 @@ export function WheelScanner() {
             const highs = historicalData.map((bar: any) => bar.h).filter((h: number) => h != null)
             const lows = historicalData.map((bar: any) => bar.l).filter((l: number) => l != null)
 
-            const sma50 = calculateSMA(closes, 50)
-            const sma100 = calculateSMA(closes, 100)
-            const sma200 = calculateSMA(closes, 200)
-            const rsi = calculateRSI(closes, 14)
-            const bb = calculateBollingerBands(closes, 20)
+            // lib/indicators.ts: every indicator is null when the history is too
+            // short — null NEVER becomes 0 (a 0 SMA made `sma50 > sma200` always
+            // true for IPOs → false Golden Cross, FORMULAS.md §1).
+            const sma50 = sma(closes, 50)
+            const sma100 = sma(closes, 100)
+            const sma200 = sma(closes, 200)
+            const rsi = calcRSI(closes, 14)
+            const bb = calcBollinger(closes, 20)
             const bbPosition =
-              currentPrice <= bb.lower ? "Below" : currentPrice <= bb.middle ? "Lower Half" : "Upper Half"
-            const macd = calculateMACD(closes)
-            const macdSignal = macd.macd > macd.signal ? "Bullish" : "Bearish"
-            const stochastic = calculateStochastic(closes, highs, lows, 14)
-            const atr = calculateATR(highs, lows, closes, 14)
-            const atrPercent = atr > 0 ? (atr / currentPrice) * 100 : 2.5
+              bb === null
+                ? "—"
+                : currentPrice <= bb.lower
+                  ? "Below"
+                  : currentPrice <= bb.middle
+                    ? "Lower Half"
+                    : "Upper Half"
+            const macd = calcMACD(closes)
+            const macdSignal = macd === null ? "—" : macd.macd > macd.signal ? "Bullish" : "Bearish"
+            const stochastic = calcStochastic(closes, highs, lows, 14)
+            const atr = calcATR(highs, lows, closes, 14)
+            // atrPercent keeps its pre-existing 2.5% placeholder when ATR is
+            // unknown — it feeds the premium ESTIMATE (already labeled as such),
+            // not a pass/fail gate on real data.
+            const atrPercent = atr !== null && atr > 0 ? (atr / currentPrice) * 100 : 2.5
             const redDay = closes.length >= 2 && closes[closes.length - 1] < closes[closes.length - 2]
 
             const {
@@ -1203,7 +1113,11 @@ export function WheelScanner() {
               premiumMultiplier = 1.5 + ((14 - finalDaysToEarnings) / 14) * 0.3
             }
 
-            const estimatedPremium = atr * 0.4 * Math.sqrt(daysToExpiration / 7) * premiumMultiplier
+            // When ATR is unknown, derive the dollar ATR from the same 2.5%
+            // placeholder atrPercent already falls back to, so the labeled
+            // estimate stays internally consistent (previously null→0 zeroed it).
+            const atrForEstimate = atr ?? (atrPercent / 100) * currentPrice
+            const estimatedPremium = atrForEstimate * 0.4 * Math.sqrt(daysToExpiration / 7) * premiumMultiplier
             const yieldPercent = putStrike > 0 ? (estimatedPremium / putStrike) * 100 : 0
             const volatilityAdjustedYield = yieldPercent * (1 + (atrPercent - 2) * 0.1)
             const finalYield = Math.max(0.5, Math.min(5, volatilityAdjustedYield))
@@ -1222,18 +1136,20 @@ export function WheelScanner() {
               sma50,
               sma100,
               sma200,
-              uptrend: sma50 > sma200,
-              rsi: Number(rsi.toFixed(1)),
+              // Null SMA = "unknown" — an unknown trend must NOT pass the
+              // golden-cross gate (the old 0-SMA made this always true for IPOs).
+              uptrend: sma50 !== null && sma200 !== null && sma50 > sma200,
+              rsi: rsi !== null ? Number(rsi.toFixed(1)) : null,
               bollingerPosition: bbPosition,
               macdSignal,
-              stochastic: Number(stochastic.toFixed(1)),
-              atr: Number(atr.toFixed(2)),
+              stochastic: stochastic !== null ? Number(stochastic.toFixed(1)) : null,
+              atr: atr !== null ? Number(atr.toFixed(2)) : null,
               atrPercent: Number(atrPercent.toFixed(2)),
               putStrike: Number(putStrike.toFixed(2)),
               premium: Number(estimatedPremium.toFixed(2)),
               yield: Number(finalYield.toFixed(2)),
               delta: estimatedDelta,
-              deltaSource: "estimated", // Default to estimated for fundamental scan
+              deltaSource: "estimated" as const, // Default to estimated for fundamental scan
               marketCap: marketCap > 0 ? Number((marketCap / 1_000_000_000).toFixed(1)) : 0, // Store market cap in billions
               redDay,
               earningsDate: stockEarningsDate, // Use real earnings date
@@ -1254,7 +1170,7 @@ export function WheelScanner() {
         })
 
         const batchResults = await Promise.all(batchPromises)
-        const validResults = batchResults.filter((r): r is QualifyingStock => r !== null)
+        const validResults = batchResults.filter((r) => r !== null)
         // Only stocks that passed every filter belong in the strict results;
         // near-misses (1–2 failed filters) are held aside for the relaxed Step 4 fallback.
         for (const s of validResults) {
@@ -1786,16 +1702,18 @@ export function WheelScanner() {
   }
 
   const checkTechnicalCriteria = (stock: QualifyingStock) => {
-    // FIX: Ensure all criteria are correctly checked and return boolean
+    // Null indicator = insufficient history = the gate FAILS-SAFE (a stock with
+    // an unknown RSI/SMA cannot pass a filter that requires knowing it).
     const criteria = {
-      rsiCheck: stock.rsi <= maxRSI[0],
-      stochasticCheck: stock.stochastic <= maxStochastic[0],
-      sma200Check: !requireAbove200SMA || (stock.sma200 > 0 && stock.currentPrice >= stock.sma200),
-      sma50Check: !requireAbove50SMA || (stock.sma50 > 0 && stock.currentPrice >= stock.sma50),
+      rsiCheck: stock.rsi !== null && stock.rsi <= maxRSI[0],
+      stochasticCheck: stock.stochastic !== null && stock.stochastic <= maxStochastic[0],
+      sma200Check: !requireAbove200SMA || (stock.sma200 !== null && stock.currentPrice >= stock.sma200),
+      sma50Check: !requireAbove50SMA || (stock.sma50 !== null && stock.currentPrice >= stock.sma50),
       goldenCrossCheck: !requireGoldenCross || stock.uptrend,
       macdCheck: !requireMACDBullish || stock.macdSignal === "Bullish",
       atrCheck: stock.atrPercent >= minATR[0] && stock.atrPercent <= maxATR[0],
-      bollingerCheck: !requireBollingerBands || stock.bollingerPosition !== "Upper Half",
+      bollingerCheck:
+        !requireBollingerBands || stock.bollingerPosition === "Below" || stock.bollingerPosition === "Lower Half",
       redDayCheck: !requireRedDay || stock.redDay,
       // FIX: Add yield check to criteria
       yieldCheck: stock.yield >= minYield[0],
@@ -2043,15 +1961,17 @@ export function WheelScanner() {
 
   // Helper function to evaluate all technical criteria for relaxed results table
   const evaluateCriteria = (stock: QualifyingStock) => {
+    // Same fail-safe null handling as checkTechnicalCriteria above.
     return {
-      rsiCheck: stock.rsi <= maxRSI[0],
-      sma200Check: !requireAbove200SMA || (stock.sma200 > 0 && stock.currentPrice >= stock.sma200),
-      sma50Check: !requireAbove50SMA || (stock.sma50 > 0 && stock.currentPrice >= stock.sma50),
+      rsiCheck: stock.rsi !== null && stock.rsi <= maxRSI[0],
+      sma200Check: !requireAbove200SMA || (stock.sma200 !== null && stock.currentPrice >= stock.sma200),
+      sma50Check: !requireAbove50SMA || (stock.sma50 !== null && stock.currentPrice >= stock.sma50),
       goldenCrossCheck: !requireGoldenCross || stock.uptrend,
       macdCheck: !requireMACDBullish || stock.macdSignal === "Bullish",
-      stochasticCheck: stock.stochastic <= maxStochastic[0],
+      stochasticCheck: stock.stochastic !== null && stock.stochastic <= maxStochastic[0],
       atrCheck: stock.atrPercent >= minATR[0] && stock.atrPercent <= maxATR[0],
-      bollingerCheck: !requireBollingerBands || stock.bollingerPosition !== "Upper Half",
+      bollingerCheck:
+        !requireBollingerBands || stock.bollingerPosition === "Below" || stock.bollingerPosition === "Lower Half",
       redDayCheck: !requireRedDay || stock.redDay,
       yieldCheck: stock.yield >= minYield[0],
       volumeCheck: stock.avgVolume >= minVolumeTechnicals[0],
@@ -3817,7 +3737,7 @@ export function WheelScanner() {
                           )}
                         </td>
                         <td className="text-center p-3">
-                          {stock.rsi !== undefined && stock.rsi < 40 ? (
+                          {stock.rsi !== null && stock.rsi < 40 ? (
                             <span className="text-green-600 font-bold text-lg">✓</span>
                           ) : (
                             <span className="text-red-600 font-bold text-lg">✗</span>
@@ -3838,14 +3758,14 @@ export function WheelScanner() {
                           )}
                         </td>
                         <td className="text-center p-3">
-                          {stock.uptrend && stock.sma50 > stock.sma200 ? (
+                          {stock.uptrend ? (
                             <span className="text-green-600 font-bold text-lg">✓</span>
                           ) : (
                             <span className="text-red-600 font-bold text-lg">✗</span>
                           )}
                         </td>
                         <td className="text-center p-3">
-                          {stock.stochastic !== undefined && stock.stochastic < 25 ? (
+                          {stock.stochastic !== null && stock.stochastic < 25 ? (
                             <span className="text-green-600 font-bold text-lg">✓</span>
                           ) : (
                             <span className="text-red-600 font-bold text-lg">✗</span>
@@ -3859,21 +3779,21 @@ export function WheelScanner() {
                           )}
                         </td>
                         <td className="text-center p-3">
-                          {stock.sma50 !== undefined && stock.currentPrice < stock.sma50 ? (
+                          {stock.sma50 !== null && stock.currentPrice < stock.sma50 ? (
                             <span className="text-green-600 font-bold text-lg">✓</span>
                           ) : (
                             <span className="text-red-600 font-bold text-lg">✗</span>
                           )}
                         </td>
                         <td className="text-center p-3">
-                          {stock.sma100 !== undefined && stock.currentPrice < stock.sma100 ? (
+                          {stock.sma100 !== null && stock.currentPrice < stock.sma100 ? (
                             <span className="text-green-600 font-bold text-lg">✓</span>
                           ) : (
                             <span className="text-red-600 font-bold text-lg">✗</span>
                           )}
                         </td>
                         <td className="text-center p-3">
-                          {stock.sma200 !== undefined && stock.currentPrice < stock.sma200 ? (
+                          {stock.sma200 !== null && stock.currentPrice < stock.sma200 ? (
                             <span className="text-green-600 font-bold text-lg">✓</span>
                           ) : (
                             <span className="text-red-600 font-bold text-lg">✗</span>
@@ -4348,7 +4268,7 @@ export function WheelScanner() {
                           )}
                         </td>
                         <td className="text-center p-3">
-                          {stock.rsi !== undefined && stock.rsi < maxRSI[0] ? (
+                          {stock.rsi !== null && stock.rsi < maxRSI[0] ? (
                             <span className="text-green-600 font-bold text-lg">✓</span>
                           ) : (
                             <span className="text-red-600 font-bold text-lg">✗</span>
@@ -4362,14 +4282,14 @@ export function WheelScanner() {
                           )}
                         </td>
                         <td className="text-center p-3">
-                          {stock.uptrend && stock.sma50 > stock.sma200 ? (
+                          {stock.uptrend ? (
                             <span className="text-green-600 font-bold text-lg">✓</span>
                           ) : (
                             <span className="text-red-600 font-bold text-lg">✗</span>
                           )}
                         </td>
                         <td className="text-center p-3">
-                          {stock.stochastic !== undefined && stock.stochastic < 25 ? (
+                          {stock.stochastic !== null && stock.stochastic < 25 ? (
                             <span className="text-green-600 font-bold text-lg">✓</span>
                           ) : (
                             <span className="text-red-600 font-bold text-lg">✗</span>
@@ -4383,21 +4303,21 @@ export function WheelScanner() {
                           )}
                         </td>
                         <td className="text-center p-3">
-                          {stock.sma50 !== undefined && stock.currentPrice < stock.sma50 ? (
+                          {stock.sma50 !== null && stock.currentPrice < stock.sma50 ? (
                             <span className="text-green-600 font-bold text-lg">✓</span>
                           ) : (
                             <span className="text-red-600 font-bold text-lg">✗</span>
                           )}
                         </td>
                         <td className="text-center p-3">
-                          {stock.sma100 !== undefined && stock.currentPrice < stock.sma100 ? (
+                          {stock.sma100 !== null && stock.currentPrice < stock.sma100 ? (
                             <span className="text-green-600 font-bold text-lg">✓</span>
                           ) : (
                             <span className="text-red-600 font-bold text-lg">✗</span>
                           )}
                         </td>
                         <td className="text-center p-3">
-                          {stock.sma200 !== undefined && stock.currentPrice > stock.sma200 ? (
+                          {stock.sma200 !== null && stock.currentPrice > stock.sma200 ? (
                             <span className="text-green-600 font-bold text-lg">✓</span>
                           ) : (
                             <span className="text-red-600 font-bold text-lg">✗</span>

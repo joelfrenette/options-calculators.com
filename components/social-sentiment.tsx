@@ -649,9 +649,10 @@ export function SocialSentiment() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {(data?.recommended_strategies && data?.recommended_strategies.length > 0
                   ? data?.recommended_strategies
-                  : data?.global_social_sentiment >= 60
+                  : // `?? 0` preserves the prior runtime behavior (undefined fell through to the last branch)
+                    (data?.global_social_sentiment ?? 0) >= 60
                     ? ["Sell call credit spreads", "Protective puts on longs", "Iron condors on high IV"]
-                    : data?.global_social_sentiment >= 40
+                    : (data?.global_social_sentiment ?? 0) >= 40
                       ? ["Iron condors on indices", "Calendar spreads", "Covered calls"]
                       : ["Bull put spreads at support", "Cash-secured puts", "Long calls on quality names"]
                 ).map((strategy, idx) => (
