@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { Metric, PricingProvenance } from "@/components/pricing-provenance"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -41,16 +42,22 @@ interface CalendarSpreadSetup {
   qualityScore?: number
   breakeven: { low: number; high: number }
   beta: number
-  historicalVolatility: number
-  ivSkew: number
-  priceStability: number
-  marketCap: string
-  daysNoEarnings: number
+  atmIV: number
+  // historicalVolatility, ivSkew and priceStability were all functions of beta
+  // dressed up as independent measurements; the scanner has no second-expiry IV
+  // and no realised-vol series, so all three are withheld (AUDIT_BACKLOG P1-6).
+  historicalVolatility: number | null
+  ivSkew: number | null
+  priceStability: number | null
+  marketCap: string | null
+  /** Days until the next earnings report (Finnhub). Null when unknown — never "safe". */
+  daysNoEarnings: number | null
+  earningsDate: string | null
   thetaAdvantage: number
-  signal: "strong" | "moderate" | "speculative"
+  signal: "strong" | "moderate" | "speculative" | null
   reason: string
-  dataSource?: string
-  isLive?: boolean
+  pricingModel?: string
+  quoteType?: string
 }
 
 export function CalendarSpreadScanner() {
@@ -82,12 +89,12 @@ export function CalendarSpreadScanner() {
 
   // Risk-adjusted rank: reward profitability (return on capital) and penalize risk
   // (low price stability). Prefer the API quality score when it is available.
+  // Prefer the API's composite quality score, which now blends only measured or
+  // modelled inputs. The old local fallback multiplied return on capital by
+  // priceStability — a value derived from beta — so it double-counted beta.
   const rankScore = (s: CalendarSpreadSetup) => {
-    const roc = s.returnOnCapital ?? (s.debit > 0 ? (s.maxProfit / s.debit) * 100 : 0)
-    const stability = s.priceStability ?? 0
     if (s.qualityScore != null) return s.qualityScore
-    // Blend: profitability scaled by how "calm"/low-risk the underlying is.
-    return roc * (stability / 100)
+    return s.returnOnCapital ?? (s.debit > 0 ? (s.maxProfit / s.debit) * 100 : 0)
   }
 
   const filteredSetups = spreads
@@ -95,8 +102,10 @@ export function CalendarSpreadScanner() {
       if (maxDebit < 5000 && s.debit * 100 > maxDebit) return false
       if (spreadType !== "all" && s.type !== spreadType) return false
       if (s.beta > maxBeta) return false
-      if (s.historicalVolatility > maxHV) return false
-      if (s.priceStability < minStability) return false
+      // historicalVolatility and priceStability are no longer produced (they were
+      // restatements of beta). Rows are not excluded on data that does not exist.
+      if (s.historicalVolatility !== null && s.historicalVolatility > maxHV) return false
+      if (s.priceStability !== null && s.priceStability < minStability) return false
       return true
     })
     .sort((a, b) => rankScore(b) - rankScore(a))
@@ -166,7 +175,7 @@ export function CalendarSpreadScanner() {
     )
   }
 
-  const getSignalBadge = (signal: string) => {
+  const getSignalBadge = (signal: string | null) => {
     switch (signal) {
       case "strong":
         return (
@@ -182,13 +191,15 @@ export function CalendarSpreadScanner() {
             Moderate
           </Badge>
         )
-      default:
+      case "speculative":
         return (
           <Badge className="bg-orange-100 text-orange-800 border-orange-300">
             <Clock className="w-3 h-3 mr-1" />
             Speculative
           </Badge>
         )
+      default:
+        return null
     }
   }
 
@@ -212,25 +223,11 @@ export function CalendarSpreadScanner() {
                 <Calendar className="w-5 h-5 text-indigo-500" />
                 Calendar Spread Scanner
                 <InfoTooltip content="Finds stocks ideal for calendar spreads - a strategy where you sell a near-term option and buy a longer-term option at the same strike. You profit from the faster time decay of the front-month option while the back-month holds value." />
-                {isLiveData ? (
-                  <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-300">
-                    <Wifi className="w-3 h-3 mr-1" />
-                    LIVE
-                  </Badge>
-                ) : spreads.length > 0 ? (
-                  <Badge variant="outline" className="ml-2 bg-yellow-50 text-yellow-700 border-yellow-300">
-                    <WifiOff className="w-3 h-3 mr-1" />
-                    Cached
-                  </Badge>
-                ) : null}
+                
               </CardTitle>
               <CardDescription>
                 Time decay strategies on stable, low-volatility stocks
-                {lastUpdated && (
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    Updated: {new Date(lastUpdated).toLocaleTimeString()}
-                  </span>
-                )}
+                <PricingProvenance className="mt-2" lastUpdated={lastUpdated ? new Date(lastUpdated).toLocaleTimeString() : null} />
               </CardDescription>
             </div>
             <div className="flex items-center gap-3">
@@ -460,7 +457,9 @@ export function CalendarSpreadScanner() {
                         Historical Vol
                         <InfoTooltip content="How much the stock has actually moved recently. Lower HV stocks are more predictable and better for calendar spreads." />
                       </div>
-                      <div className="font-medium">{setup.historicalVolatility.toFixed(1)}%</div>
+                      <div className="font-medium">
+                        <Metric value={setup.historicalVolatility} digits={1} suffix="%" unavailableLabel="not measured" />
+                      </div>
                     </div>
                   </div>
 
@@ -469,32 +468,50 @@ export function CalendarSpreadScanner() {
                     <div>
                       <div className="text-xs text-indigo-600 font-medium flex items-center">
                         IV Skew
-                        <InfoTooltip content="The difference between front-month IV and back-month IV. POSITIVE is favorable - it means you're selling more expensive options than you're buying. This 'volatility edge' increases your profit potential." />
+                        <InfoTooltip content="The difference between front-month IV and back-month IV. Positive is favorable — you would be selling richer options than you buy. Not currently measured: the scanner reads one at-the-money IV, so a front-vs-back comparison needs a second expiry it does not yet fetch." />
                       </div>
-                      <div className={`font-medium ${setup.ivSkew > 0 ? "text-green-600" : "text-red-600"}`}>
-                        {setup.ivSkew > 0 ? "+" : ""}
-                        {setup.ivSkew.toFixed(1)}%
+                      <div
+                        className={`font-medium ${
+                          setup.ivSkew === null ? "" : setup.ivSkew > 0 ? "text-green-600" : "text-red-600"
+                        }`}
+                      >
+                        {setup.ivSkew !== null && setup.ivSkew > 0 ? "+" : ""}
+                        <Metric value={setup.ivSkew} digits={1} suffix="%" unavailableLabel="needs a second expiry" />
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {setup.ivSkew > 0 ? "Favorable" : "Unfavorable"}
+                        {setup.ivSkew === null ? "not measured" : setup.ivSkew > 0 ? "Favorable" : "Unfavorable"}
                       </div>
                     </div>
                     <div>
                       <div className="text-xs text-indigo-600 font-medium flex items-center">
                         Price Stability
-                        <InfoTooltip content="Percentage of time the stock stayed within a narrow trading range over the past 30 days. 80%+ is excellent - means the stock tends to stay put, which is exactly what calendars need." />
+                        <InfoTooltip content="How tightly the stock has held a range. Not currently measured — the previous figure was computed from beta alone, so it restated beta rather than observing the price series. Beta is shown above." />
                       </div>
-                      <div className="font-medium">{setup.priceStability}%</div>
-                      <div className="text-xs text-muted-foreground">30-day range</div>
+                      <div className="font-medium">
+                        <Metric value={setup.priceStability} digits={0} suffix="%" unavailableLabel="not measured" />
+                      </div>
+                      <div className="text-xs text-muted-foreground">not measured</div>
                     </div>
                     <div>
                       <div className="text-xs text-indigo-600 font-medium flex items-center">
                         Days to Earnings
-                        <InfoTooltip content="How many days until the company reports earnings. Avoid holding calendars through earnings - the big price moves can destroy the position. 45+ days is safe." />
+                        <InfoTooltip content="Days until the company reports earnings, from Finnhub's calendar. Avoid holding a calendar through earnings — the move can destroy the position. The verdict below compares this against the short leg's expiry." />
                       </div>
-                      <div className="font-medium">{setup.daysNoEarnings > 90 ? "90+" : setup.daysNoEarnings}d</div>
+                      <div className="font-medium">
+                        {setup.daysNoEarnings === null ? (
+                          <span className="text-gray-400" title="earnings date unavailable">
+                            —
+                          </span>
+                        ) : (
+                          `${setup.daysNoEarnings > 90 ? "90+" : setup.daysNoEarnings}d`
+                        )}
+                      </div>
                       <div className="text-xs text-muted-foreground">
-                        {setup.daysNoEarnings > 45 ? "Safe" : "Watch out"}
+                        {setup.daysNoEarnings === null
+                          ? "date unavailable"
+                          : setup.daysNoEarnings > setup.nearDte
+                            ? "clear of short leg"
+                            : "inside short leg"}
                       </div>
                     </div>
                     <div>

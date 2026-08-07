@@ -1,99 +1,122 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { resolveApiKey } from "@/lib/api-keys"
+import { calculateDelta as bsDelta, calculateOptionPrice, probabilityBetween, probabilityOTM } from "@/lib/black-scholes"
 
-const POLYGON_API_KEY = process.env.POLYGON_API_KEY
-const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY
+// Resolved through lib/api-keys so the DISABLED_APIS kill switch and the
+// alias-aware lookup apply to this route too (AUDIT_BACKLOG P1-12).
+const POLYGON_API_KEY = resolveApiKey("POLYGON_API_KEY")
+const FINNHUB_API_KEY = resolveApiKey("FINNHUB_API_KEY")
 
-// ========== FALLBACK PRICES FOR WHEN API FAILS ==========
-const FALLBACK_PRICES: Record<string, number> = {
-  SPY: 595,
-  QQQ: 510,
-  IWM: 235,
-  AAPL: 235,
-  MSFT: 430,
-  NVDA: 145,
-  TSLA: 350,
-  AMD: 140,
-  META: 580,
-  AMZN: 210,
-  GOOGL: 175,
-  JPM: 240,
-  COST: 920,
-  NFLX: 900,
-}
+/**
+ * Annualised risk-free rate for every Black-Scholes call in this route.
+ *
+ * Constant, and therefore an approximation — it is not read from the live curve.
+ * Delta and probability are only mildly sensitive to r over the 30–400 day
+ * horizons quoted here, but it IS an assumption, so it is surfaced in the
+ * response as `assumptions.riskFreeRate` rather than buried.
+ * TODO(Phase 3): source from FRED DGS3MO, which /api/cpi-inflation already reads.
+ */
+const RISK_FREE_RATE = 0.045
+
+/** How near the money a contract must be to count toward the ATM IV average. */
+const ATM_BAND = 0.05
 
 // ========== LIVE DATA HELPER FUNCTIONS ==========
 
-// Fetch current stock price from Polygon
-async function getStockPrice(ticker: string): Promise<{ price: number; isLive: boolean }> {
+/**
+ * Previous close from Polygon.
+ *
+ * Returns null when the price cannot be established. Callers MUST skip the
+ * ticker rather than substitute a placeholder: the previous implementation fell
+ * back to a table of prices frozen at authoring time (SPY 595, NVDA 145, …) and
+ * to a literal $100 for anything unlisted, then computed strikes, breakevens and
+ * dollar returns off that invented price (AUDIT_BACKLOG P1-9).
+ */
+async function getStockPrice(ticker: string): Promise<{ price: number; asOf: string } | null> {
+  if (!POLYGON_API_KEY) return null
   try {
-    if (!POLYGON_API_KEY) {
-      return { price: FALLBACK_PRICES[ticker] || 100, isLive: false }
-    }
-
     const res = await fetch(`https://api.polygon.io/v2/aggs/ticker/${ticker}/prev?apiKey=${POLYGON_API_KEY}`, {
       next: { revalidate: 60 },
+      signal: AbortSignal.timeout(8000),
     })
-    if (!res.ok) {
-      return { price: FALLBACK_PRICES[ticker] || 100, isLive: false }
-    }
+    if (!res.ok) return null
     const data = await res.json()
-    const livePrice = data.results?.[0]?.c
-    if (livePrice) {
-      return { price: livePrice, isLive: true }
-    }
-    return { price: FALLBACK_PRICES[ticker] || 100, isLive: false }
+    const bar = data.results?.[0]
+    if (!bar || typeof bar.c !== "number" || bar.c <= 0) return null
+    return { price: bar.c, asOf: new Date(bar.t ?? Date.now()).toISOString() }
   } catch {
-    return { price: FALLBACK_PRICES[ticker] || 100, isLive: false }
+    return null
   }
 }
 
-// Fetch IV data estimate from Polygon options
-async function getIVData(
-  ticker: string,
-  price: number,
-): Promise<{ ivRank: number; currentIV: number; historicalIV: number; isLive: boolean }> {
+export interface IVSnapshot {
+  /** ATM implied volatility as a DECIMAL — 0.28 means 28%. Measured, not guessed. */
+  atmIV: number
+  /** Contracts the average was taken over; a confidence signal for the UI. */
+  sampleSize: number
+  /** Expiry the IV was measured at, ISO date. */
+  expiration: string
+  /** Days to that expiry. */
+  dte: number
+}
+
+/**
+ * Real ATM implied volatility from Polygon's options snapshot.
+ *
+ * The previous implementation called `/v3/reference/options/contracts` — a
+ * metadata endpoint carrying no volatility field at all — with `limit=5`, then
+ * computed `IV = 30 + contracts.length * 2`, yielding one of {30,32,34,36,38}
+ * according to how many contracts happened to match a strike filter, and
+ * reported it as `isLive: true`. That number drove the credit, probability,
+ * breakeven, IV skew, quality score and signal of six public tabs
+ * (AUDIT_BACKLOG P1-1).
+ *
+ * This reads `implied_volatility` from the snapshot endpoint — the same one
+ * app/api/polygon-proxy already uses for the Sell Put Scanner — and averages
+ * contracts within ATM_BAND of the money at the nearest sensible expiry.
+ *
+ * Returns null when the chain is unavailable or carries no IV. There is
+ * deliberately no fallback: there is no honest way to guess a stock's implied
+ * volatility, so callers omit the row instead.
+ */
+async function getIVData(ticker: string, price: number): Promise<IVSnapshot | null> {
+  if (!POLYGON_API_KEY || !(price > 0)) return null
   try {
-    if (!POLYGON_API_KEY) {
-      const baseIV = ticker === "SPY" ? 15 : ticker === "QQQ" ? 20 : ticker === "IWM" ? 22 : 35
-      const ivRank = ticker === "SPY" ? 25 : ticker === "QQQ" ? 30 : ticker === "IWM" ? 45 : 55
-      return { ivRank, currentIV: baseIV, historicalIV: baseIV * 0.9, isLive: false }
-    }
-
-    // Get ATM options to estimate IV
-    const strikePrice = Math.round(price / 5) * 5
-    const expDate = getNextFriday(30)
-
     const res = await fetch(
-      `https://api.polygon.io/v3/reference/options/contracts?underlying_ticker=${ticker}&strike_price=${strikePrice}&expiration_date=${expDate}&limit=5&apiKey=${POLYGON_API_KEY}`,
-      { next: { revalidate: 300 } },
+      `https://api.polygon.io/v3/snapshot/options/${ticker}?contract_type=call&limit=250&apiKey=${POLYGON_API_KEY}`,
+      { next: { revalidate: 300 }, signal: AbortSignal.timeout(10000) },
     )
-
-    if (!res.ok) {
-      const baseIV = ticker === "SPY" ? 15 : ticker === "QQQ" ? 20 : ticker === "IWM" ? 22 : 35
-      const ivRank = ticker === "SPY" ? 25 : ticker === "QQQ" ? 30 : ticker === "IWM" ? 45 : 60
-      return { ivRank, currentIV: baseIV, historicalIV: baseIV * 0.9, isLive: false }
-    }
+    if (!res.ok) return null
 
     const data = await res.json()
-    const contracts = data.results || []
+    const contracts: any[] = data.results || []
+    if (contracts.length === 0) return null
 
-    // Default IV estimates if no contracts found
-    if (contracts.length === 0) {
-      const baseIV = ticker === "SPY" ? 15 : ticker === "QQQ" ? 20 : ticker === "IWM" ? 22 : 35
-      return { ivRank: 35, currentIV: baseIV, historicalIV: baseIV * 0.85, isLive: false }
-    }
+    // Nearest expiry at least a week out. The front week's IV is noisy and is not
+    // representative of the ~30-day horizon these scanners quote.
+    const minExpiry = new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10)
+    const dated = contracts.filter((c) => (c.details?.expiration_date ?? "") >= minExpiry)
+    if (dated.length === 0) return null
+    const expiration: string = dated.reduce(
+      (best: string, c: any) => (c.details.expiration_date < best ? c.details.expiration_date : best),
+      dated[0].details.expiration_date as string,
+    )
 
-    // Estimate IV from contract count and activity
-    const avgIV = 30 + contracts.length * 2
-    return {
-      ivRank: Math.min(100, Math.max(0, Math.floor((avgIV / 60) * 100))),
-      currentIV: avgIV,
-      historicalIV: avgIV * 0.85,
-      isLive: true,
-    }
+    const atm = dated.filter((c) => {
+      if (c.details?.expiration_date !== expiration) return false
+      const strike = Number(c.details?.strike_price)
+      const iv = Number(c.implied_volatility)
+      return Number.isFinite(strike) && Number.isFinite(iv) && iv > 0 && Math.abs(strike - price) / price <= ATM_BAND
+    })
+    if (atm.length === 0) return null
+
+    const atmIV = atm.reduce((sum, c) => sum + Number(c.implied_volatility), 0) / atm.length
+    if (!(atmIV > 0)) return null
+
+    const dte = Math.max(1, Math.round((new Date(expiration).getTime() - Date.now()) / 86400_000))
+    return { atmIV, sampleSize: atm.length, expiration, dte }
   } catch {
-    const baseIV = ticker === "SPY" ? 15 : ticker === "QQQ" ? 20 : ticker === "IWM" ? 22 : 35
-    return { ivRank: 40, currentIV: baseIV, historicalIV: baseIV * 0.85, isLive: false }
+    return null
   }
 }
 
@@ -116,6 +139,43 @@ async function getUpcomingEarnings(): Promise<any[]> {
     return data.earningsCalendar || []
   } catch {
     return []
+  }
+}
+
+/**
+ * Next earnings date per ticker, over the coming quarter.
+ *
+ * Replaces `Math.random() * 60 + 30` in the calendar-spread generator, which
+ * drove a user-facing "Safe" / "Watch out" earnings-risk verdict
+ * (AUDIT_BACKLOG P1-6). One batched call rather than one per ticker.
+ *
+ * Tickers absent from the map have no known earnings date — callers must render
+ * "unknown", not "safe".
+ */
+async function getEarningsDateMap(tickers: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>()
+  if (!FINNHUB_API_KEY || tickers.length === 0) return map
+
+  try {
+    const from = new Date().toISOString().slice(0, 10)
+    const to = new Date(Date.now() + 100 * 86400_000).toISOString().slice(0, 10)
+    const res = await fetch(
+      `https://finnhub.io/api/v1/calendar/earnings?from=${from}&to=${to}&token=${FINNHUB_API_KEY}`,
+      { next: { revalidate: 3600 }, signal: AbortSignal.timeout(10000) },
+    )
+    if (!res.ok) return map
+
+    const data = await res.json()
+    const wanted = new Set(tickers)
+    for (const row of data.earningsCalendar ?? []) {
+      if (!wanted.has(row.symbol) || !row.date) continue
+      // Keep the earliest upcoming date per ticker.
+      const existing = map.get(row.symbol)
+      if (!existing || row.date < existing) map.set(row.symbol, row.date)
+    }
+    return map
+  } catch {
+    return map
   }
 }
 
@@ -157,51 +217,102 @@ async function getCompanyProfile(ticker: string): Promise<{ name: string; market
   }
 }
 
-// Calculate option delta approximation
-function calculateDelta(
+/**
+ * Option delta from Black-Scholes N(d1).
+ *
+ * Replaces a linear approximation `0.5 + moneyness / (2·IV·√t)` that had no
+ * drift term and clipped at ±1 (AUDIT_BACKLOG P1-8).
+ *
+ * @param iv implied volatility as a DECIMAL (0.28 = 28%)
+ */
+function optionDelta(
   stockPrice: number,
   strikePrice: number,
   daysToExpiry: number,
   iv: number,
   isCall: boolean,
-): number {
-  const moneyness = (stockPrice - strikePrice) / stockPrice
-  const timeDecay = Math.sqrt(daysToExpiry / 365)
-  const ivFactor = iv / 100 || 0.3
-
-  let delta = 0.5 + moneyness / (2 * ivFactor * timeDecay)
-  delta = Math.max(-1, Math.min(1, delta))
-
-  return isCall ? delta : delta - 1
+): number | null {
+  return bsDelta(
+    {
+      stockPrice,
+      strikePrice,
+      timeToExpiry: daysToExpiry / 365,
+      volatility: iv,
+      riskFreeRate: RISK_FREE_RATE,
+    },
+    isCall,
+  )
 }
 
-// Calculate credit spread premium estimate
-function estimateCreditSpreadPremium(
+/**
+ * Vertical credit spread priced from Black-Scholes off measured IV.
+ *
+ * The previous implementation invented the credit as
+ * `width × (IV/100) × √(dte/365) × (1 − 2·otm%) × 0.3` — the 0.3 and the linear
+ * OTM haircut had no basis — and derived "probability" from the linear delta,
+ * then clamped it into 50–95 so a computed sub-50% probability displayed as 50%
+ * (AUDIT_BACKLOG P1-7).
+ *
+ * Now: price both legs, credit = short leg − long leg, and probability of profit
+ * = the risk-neutral probability the short strike expires out of the money.
+ * Returns null if any leg cannot be priced.
+ *
+ * Note this is a *theoretical* mid price, not a live quote — it will differ from
+ * a fillable bid/ask by the spread. Callers must label it accordingly.
+ */
+function priceCreditSpread(
   stockPrice: number,
   shortStrike: number,
   longStrike: number,
   dte: number,
   iv: number,
   isPut: boolean,
-): { credit: number; maxLoss: number; probability: number } {
+): { credit: number; maxLoss: number; probability: number } | null {
+  const timeToExpiry = dte / 365
+  const common = { stockPrice, timeToExpiry, volatility: iv, riskFreeRate: RISK_FREE_RATE }
+
+  const shortLeg = calculateOptionPrice({ ...common, strikePrice: shortStrike }, !isPut)
+  const longLeg = calculateOptionPrice({ ...common, strikePrice: longStrike }, !isPut)
+  const pop = probabilityOTM({ ...common, strikePrice: shortStrike }, !isPut)
+  if (shortLeg === null || longLeg === null || pop === null) return null
+
+  const credit = shortLeg - longLeg
+  // A non-positive credit means the structure is not a credit spread at these
+  // strikes — drop it rather than flooring it to a token $0.10 as before.
+  if (!(credit > 0)) return null
+
   const width = Math.abs(shortStrike - longStrike)
-  const otmPercent = isPut ? (stockPrice - shortStrike) / stockPrice : (shortStrike - stockPrice) / stockPrice
-
-  const ivFactor = iv / 100 || 0.3
-  const timeFactor = Math.sqrt(dte / 365)
-  const premiumRate = ivFactor * timeFactor * (1 - otmPercent * 2)
-
-  const credit = Math.max(0.1, width * premiumRate * 0.3)
-  const maxLoss = width - credit
-
-  const delta = Math.abs(calculateDelta(stockPrice, shortStrike, dte, iv, !isPut))
-  const probability = Math.round((1 - delta) * 100)
-
   return {
     credit: Math.round(credit * 100) / 100,
-    maxLoss: Math.round(maxLoss * 100) / 100,
-    probability: Math.min(95, Math.max(50, probability)),
+    maxLoss: Math.round((width - credit) * 100) / 100,
+    probability: Math.round(pop * 100),
   }
+}
+
+/**
+ * Field-level provenance stamped onto every setup priced by this route.
+ *
+ * Replaces the old single `isLive` boolean, which was sourced from "did the
+ * stock-price fetch return 200" and rendered as a green "Live Data" badge over
+ * tables whose other columns were fabricated (AUDIT_BACKLOG P1-10).
+ *
+ * `priceSource` and `ivSource` are measured; `pricingModel` is derived. Rows
+ * only exist at all when both measured inputs were obtained, so these are
+ * constants rather than per-row flags — but they are explicit in the payload so
+ * the UI states what the numbers are rather than implying a live quote.
+ */
+const PRICING_PROVENANCE = {
+  priceSource: "polygon:prev-close",
+  ivSource: "polygon:options-snapshot",
+  pricingModel: "black-scholes",
+  /** True only for values read from a venue. Model output is not a quote. */
+  isLive: false,
+  quoteType: "theoretical-mid",
+} as const
+
+/** Round to 2dp, preserving null so "no value" never becomes 0. */
+function round2(v: number | null): number | null {
+  return v === null ? null : Math.round(v * 100) / 100
 }
 
 // Helper functions
@@ -232,22 +343,21 @@ function formatDate(dateStr: string): string {
 
 async function generateCreditSpreads(tickers: string[]) {
   const setups = []
-  let hasLiveData = false
 
   for (const ticker of tickers) {
-    const { price, isLive: priceIsLive } = await getStockPrice(ticker)
+    const quote = await getStockPrice(ticker)
+    if (!quote) continue // no verified price → no row (P1-9)
+    const price = quote.price
 
     const [ivData, profile] = await Promise.all([getIVData(ticker, price), getCompanyProfile(ticker)])
-
-    const isLive = priceIsLive && ivData.isLive
-    if (isLive) hasLiveData = true
+    if (!ivData) continue // no measured IV → nothing here can be priced (P1-1)
 
     // Bull put spread (below current price)
     const putShortStrike = Math.floor((price * 0.95) / 5) * 5
     const putLongStrike = putShortStrike - 5
-    const putSpread = estimateCreditSpreadPremium(price, putShortStrike, putLongStrike, 30, ivData.currentIV, true)
+    const putSpread = priceCreditSpread(price, putShortStrike, putLongStrike, 30, ivData.atmIV, true)
 
-    if (putSpread.probability >= 65) {
+    if (putSpread && putSpread.probability >= 65) {
       setups.push({
         ticker,
         company: profile?.name || ticker,
@@ -259,30 +369,27 @@ async function generateCreditSpreads(tickers: string[]) {
         credit: putSpread.credit,
         maxLoss: putSpread.maxLoss,
         probability: putSpread.probability,
-        ivRank: ivData.ivRank,
-        delta: Math.round(calculateDelta(price, putShortStrike, 30, ivData.currentIV, false) * 100) / 100,
+        // ivRank removed: a true IV rank needs 52 weeks of IV history this route
+        // does not fetch. The old value was (fabricatedIV/60)*100 (P1-1, P1-3).
+        ivRank: null,
+        atmIV: Math.round(ivData.atmIV * 1000) / 10, // percent, measured
+        delta: round2(optionDelta(price, putShortStrike, 30, ivData.atmIV, false)),
         riskReward: `1:${(putSpread.maxLoss / putSpread.credit).toFixed(1)}`,
         signal: putSpread.probability >= 80 ? "strong" : putSpread.probability >= 70 ? "moderate" : "speculative",
-        reason: `Support at $${putShortStrike}, IV Rank ${ivData.ivRank}%`,
-        dataSource: isLive ? "polygon+calculated" : "estimated",
-        isLive,
+        reason: `Short put at $${putShortStrike}, ${(ivData.atmIV * 100).toFixed(0)}% ATM IV`,
+        ...PRICING_PROVENANCE,
       })
     }
 
-    // Bear call spread (above current price) - only for higher IV
-    if (ivData.ivRank >= 40) {
+    // Bear call spread (above current price) — only when IV is elevated enough
+    // that selling calls is worth it. Previously gated on the fabricated ivRank;
+    // now gated on measured ATM IV.
+    if (ivData.atmIV >= 0.3) {
       const callShortStrike = Math.ceil((price * 1.05) / 5) * 5
       const callLongStrike = callShortStrike + 5
-      const callSpread = estimateCreditSpreadPremium(
-        price,
-        callShortStrike,
-        callLongStrike,
-        30,
-        ivData.currentIV,
-        false,
-      )
+      const callSpread = priceCreditSpread(price, callShortStrike, callLongStrike, 30, ivData.atmIV, false)
 
-      if (callSpread.probability >= 65) {
+      if (callSpread && callSpread.probability >= 65) {
         setups.push({
           ticker,
           company: profile?.name || ticker,
@@ -294,13 +401,13 @@ async function generateCreditSpreads(tickers: string[]) {
           credit: callSpread.credit,
           maxLoss: callSpread.maxLoss,
           probability: callSpread.probability,
-          ivRank: ivData.ivRank,
-          delta: Math.round(calculateDelta(price, callShortStrike, 30, ivData.currentIV, true) * 100) / 100,
+          ivRank: null,
+          atmIV: Math.round(ivData.atmIV * 1000) / 10,
+          delta: round2(optionDelta(price, callShortStrike, 30, ivData.atmIV, true)),
           riskReward: `1:${(callSpread.maxLoss / callSpread.credit).toFixed(1)}`,
           signal: callSpread.probability >= 80 ? "strong" : callSpread.probability >= 70 ? "moderate" : "speculative",
-          reason: `Resistance at $${callShortStrike}, elevated IV`,
-          dataSource: isLive ? "polygon+calculated" : "estimated",
-          isLive,
+          reason: `Short call at $${callShortStrike}, ${(ivData.atmIV * 100).toFixed(0)}% ATM IV`,
+          ...PRICING_PROVENANCE,
         })
       }
     }
@@ -313,25 +420,40 @@ async function generateIronCondors(tickers: string[]) {
   const setups = []
 
   for (const ticker of tickers) {
-    const { price, isLive: priceIsLive } = await getStockPrice(ticker)
+    const quote = await getStockPrice(ticker)
+    if (!quote) continue
+    const price = quote.price
 
     const [ivData, profile] = await Promise.all([getIVData(ticker, price), getCompanyProfile(ticker)])
+    if (!ivData) continue
 
-    if (ivData.ivRank < 25) continue
-
-    const isLive = priceIsLive && ivData.isLive
+    // Condors want elevated IV. Gated on measured ATM IV; was the fabricated ivRank.
+    if (ivData.atmIV < 0.2) continue
 
     const putShort = Math.floor((price * 0.93) / 5) * 5
     const putLong = putShort - 5
     const callShort = Math.ceil((price * 1.07) / 5) * 5
     const callLong = callShort + 5
 
-    const putSpread = estimateCreditSpreadPremium(price, putShort, putLong, 30, ivData.currentIV, true)
-    const callSpread = estimateCreditSpreadPremium(price, callShort, callLong, 30, ivData.currentIV, false)
+    const putSpread = priceCreditSpread(price, putShort, putLong, 30, ivData.atmIV, true)
+    const callSpread = priceCreditSpread(price, callShort, callLong, 30, ivData.atmIV, false)
+    if (!putSpread || !callSpread) continue
 
     const totalCredit = putSpread.credit + callSpread.credit
     const maxLoss = 5 - totalCredit
-    const probability = Math.round((putSpread.probability / 100) * (callSpread.probability / 100) * 100)
+
+    // Probability both short strikes expire OTM — i.e. the underlying finishes
+    // inside the condor's body. Computed jointly from the terminal distribution.
+    // The old code multiplied the two one-sided probabilities as if they were
+    // independent events, which double-counts: they are perfectly dependent
+    // (one underlying, one terminal price).
+    const inRange = probabilityBetween(
+      { stockPrice: price, timeToExpiry: 30 / 365, volatility: ivData.atmIV, riskFreeRate: RISK_FREE_RATE },
+      putShort,
+      callShort,
+    )
+    if (inRange === null) continue
+    const probability = Math.round(inRange * 100)
 
     if (probability >= 55) {
       setups.push({
@@ -344,13 +466,13 @@ async function generateIronCondors(tickers: string[]) {
         totalCredit: Math.round(totalCredit * 100) / 100,
         maxLoss: Math.round(maxLoss * 100) / 100,
         probability,
-        ivRank: ivData.ivRank,
+        ivRank: null,
+        atmIV: Math.round(ivData.atmIV * 1000) / 10,
         expectedRange: { low: putShort, high: callShort },
         width: 5,
         signal: probability >= 70 ? "strong" : probability >= 60 ? "moderate" : "speculative",
-        reason: `Range $${putShort}-$${callShort}, IV Rank ${ivData.ivRank}%`,
-        dataSource: isLive ? "polygon+finnhub" : "estimated",
-        isLive,
+        reason: `Range $${putShort}-$${callShort}, ${(ivData.atmIV * 100).toFixed(0)}% ATM IV`,
+        ...PRICING_PROVENANCE,
       })
     }
   }
@@ -362,44 +484,39 @@ async function generateHighIVWatchlist(tickers: string[]) {
   const candidates = []
 
   for (const ticker of tickers) {
-    const { price, isLive: priceIsLive } = await getStockPrice(ticker)
+    const quote = await getStockPrice(ticker)
+    if (!quote) continue
+    const price = quote.price
 
     const [ivData, profile] = await Promise.all([getIVData(ticker, price), getCompanyProfile(ticker)])
-
-    const isLive = priceIsLive && ivData.isLive
-
-    const hvRatio = ivData.currentIV / ivData.historicalIV
-
-    let recommendation: "sell-premium" | "buy-premium" | "neutral" = "neutral"
-    let reason = "IV at fair value"
-
-    if (ivData.ivRank >= 70) {
-      recommendation = "sell-premium"
-      reason = `High IV Rank (${ivData.ivRank}%) - premium selling opportunity`
-    } else if (ivData.ivRank <= 20) {
-      recommendation = "buy-premium"
-      reason = `Low IV Rank (${ivData.ivRank}%) - consider buying protection`
-    }
+    if (!ivData) continue
 
     candidates.push({
       ticker,
       company: profile?.name || ticker,
       price: Math.round(price * 100) / 100,
-      ivRank: ivData.ivRank,
-      ivPercentile: Math.min(100, ivData.ivRank + 5),
-      currentIV: ivData.currentIV,
-      historicalIV: ivData.historicalIV,
-      hvRatio: Math.round(hvRatio * 100) / 100,
+      // ivRank / ivPercentile need 52 weeks of IV history this route does not
+      // fetch. The old values were (fabricatedIV/60)*100 and ivRank+5 (P1-1).
+      // Without them there is no honest "is IV high for THIS stock" verdict,
+      // so the recommendation is withheld rather than guessed.
+      ivRank: null,
+      ivPercentile: null,
+      atmIV: Math.round(ivData.atmIV * 1000) / 10,
+      ivSampleSize: ivData.sampleSize,
+      ivExpiration: ivData.expiration,
+      historicalIV: null,
+      hvRatio: null,
       catalyst: null,
       daysToEvent: null,
-      recommendation,
-      reason,
-      dataSource: isLive ? "polygon+finnhub" : "estimated",
-      isLive,
+      recommendation: null,
+      reason: `ATM IV ${(ivData.atmIV * 100).toFixed(1)}% at ${ivData.expiration} (${ivData.sampleSize} contracts). IV rank requires history not yet collected.`,
+      ...PRICING_PROVENANCE,
     })
   }
 
-  return candidates.sort((a, b) => b.ivRank - a.ivRank)
+  // Ranked by absolute measured IV — the only IV fact available. This is not the
+  // same as "IV is high relative to its own history"; the UI must not claim it is.
+  return candidates.sort((a, b) => b.atmIV - a.atmIV)
 }
 
 async function generateEarningsPlays() {
@@ -431,31 +548,39 @@ async function generateEarningsPlays() {
     const ticker = earning.symbol
     if (!majorTickers.includes(ticker)) continue
 
-    const { price, isLive: priceIsLive } = await getStockPrice(ticker)
+    const quote = await getStockPrice(ticker)
+    if (!quote) continue
+    const price = quote.price
 
     const [ivData, profile] = await Promise.all([getIVData(ticker, price), getCompanyProfile(ticker)])
-
-    const isLive = priceIsLive && ivData.isLive
+    if (!ivData) continue
 
     const earningsDate = earning.date
     const daysToEarnings = Math.ceil((new Date(earningsDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
 
     if (daysToEarnings < 1 || daysToEarnings > 14) continue
 
-    const expectedMovePercent = (ivData.currentIV / 100) * Math.sqrt(1 / 365) * 100
-    const expectedMove = (price * expectedMovePercent) / 100
-    const straddlePrice = expectedMove * 1.1
-
-    let strategy: "straddle" | "strangle" | "iron-condor" = "straddle"
-    let signal: "strong" | "moderate" | "speculative" = "moderate"
-
-    if (ivData.ivRank >= 70) {
-      strategy = "iron-condor"
-      signal = "strong"
-    } else if (ivData.ivRank <= 40) {
-      strategy = "straddle"
-      signal = "strong"
+    // One-session expected move: S · IV · √(1/365). The straddle is priced from
+    // the model at the ATM strike rather than the previous `expectedMove * 1.1`.
+    const expectedMove = price * ivData.atmIV * Math.sqrt(1 / 365)
+    const expectedMovePercent = (expectedMove / price) * 100
+    const atmStrike = Math.round(price / 5) * 5
+    const straddleParams = {
+      stockPrice: price,
+      strikePrice: atmStrike,
+      timeToExpiry: Math.max(daysToEarnings, 1) / 365,
+      volatility: ivData.atmIV,
+      riskFreeRate: RISK_FREE_RATE,
     }
+    const callLeg = calculateOptionPrice(straddleParams, true)
+    const putLeg = calculateOptionPrice(straddleParams, false)
+    const straddlePrice = callLeg !== null && putLeg !== null ? callLeg + putLeg : null
+
+    // Strategy selection previously keyed off the fabricated ivRank. Without IV
+    // history there is no basis to call IV "elevated", so no strategy or
+    // conviction is asserted — the measured expected move is shown instead.
+    const strategy = null
+    const signal = null
 
     plays.push({
       ticker,
@@ -466,16 +591,18 @@ async function generateEarningsPlays() {
       price: Math.round(price * 100) / 100,
       expectedMove: Math.round(expectedMove * 100) / 100,
       expectedMovePercent: Math.round(expectedMovePercent * 10) / 10,
-      ivRank: ivData.ivRank,
-      historicalBeat: 70,
-      avgPostEarningsMove: Math.round(expectedMovePercent * 1.2 * 10) / 10,
-      straddlePrice: Math.round(straddlePrice * 100) / 100,
+      ivRank: null,
+      atmIV: Math.round(ivData.atmIV * 1000) / 10,
+      // Was a hardcoded 70% "historical beat rate" for every ticker, and an
+      // avg post-earnings move of expectedMove × 1.2. Neither had a source (P1-9).
+      historicalBeat: null,
+      avgPostEarningsMove: null,
+      straddlePrice: round2(straddlePrice),
       strategy,
-      direction: "neutral",
+      direction: null,
       signal,
-      thesis: ivData.ivRank >= 70 ? "Elevated IV - consider selling premium" : "Fair IV - straddle may be underpriced",
-      dataSource: isLive ? "finnhub+polygon+calculated" : "estimated",
-      isLive,
+      thesis: `${(ivData.atmIV * 100).toFixed(0)}% ATM IV implies a ±$${expectedMove.toFixed(2)} (${expectedMovePercent.toFixed(1)}%) one-day move.`,
+      ...PRICING_PROVENANCE,
     })
   }
 
@@ -486,45 +613,59 @@ async function generateWheelCandidates(tickers: string[]) {
   const candidates = []
 
   for (const ticker of tickers) {
-    const { price, isLive: priceIsLive } = await getStockPrice(ticker)
+    const quote = await getStockPrice(ticker)
+    if (!quote) continue
+    const price = quote.price
 
     const [ivData, profile] = await Promise.all([getIVData(ticker, price), getCompanyProfile(ticker)])
-
-    const isLive = priceIsLive && ivData.isLive
+    if (!ivData) continue
 
     const putStrike = Math.floor((price * 0.92) / 5) * 5
-    const spread = estimateCreditSpreadPremium(price, putStrike, putStrike - 5, 30, ivData.currentIV, true)
+    const dte = 30
+    // A cash-secured put is a single short leg, not a spread. Price it directly
+    // rather than through the spread helper.
+    const putPremium = calculateOptionPrice(
+      {
+        stockPrice: price,
+        strikePrice: putStrike,
+        timeToExpiry: dte / 365,
+        volatility: ivData.atmIV,
+        riskFreeRate: RISK_FREE_RATE,
+      },
+      false,
+    )
+    if (putPremium === null || !(putPremium > 0)) continue
 
     const cashRequired = putStrike * 100
-    const monthlyReturn = (spread.credit * 100) / cashRequired
-    const annualizedReturn = monthlyReturn * 12 * 100
+    const periodReturn = (putPremium * 100) / cashRequired
+    const annualizedReturn = periodReturn * (365 / dte) * 100
 
+    // Market-cap tiers only — this is a SIZE band, not a fundamentals grade. The
+    // field was previously called "fundamentals" and rendered as an A+/B grade,
+    // implying balance-sheet analysis that never happened.
     const marketCap = profile?.marketCap || 0
-    const fundamentals = marketCap > 100000 ? "A+" : marketCap > 50000 ? "A" : marketCap > 10000 ? "B+" : "B"
-
-    let signal: "strong" | "moderate" | "speculative" = "moderate"
-    if (fundamentals.startsWith("A") && annualizedReturn >= 15 && annualizedReturn <= 35) {
-      signal = "strong"
-    } else if (annualizedReturn > 40) {
-      signal = "speculative"
-    }
+    const sizeTier =
+      marketCap > 100000 ? "mega-cap" : marketCap > 50000 ? "large-cap" : marketCap > 10000 ? "mid-cap" : "small-cap"
 
     candidates.push({
       ticker,
       company: profile?.name || ticker,
       price: Math.round(price * 100) / 100,
       putStrike,
-      putPremium: spread.credit,
-      putDte: 30,
+      putPremium: round2(putPremium),
+      putDte: dte,
       annualizedReturn: Math.round(annualizedReturn * 10) / 10,
-      ivRank: ivData.ivRank,
-      divYield: 0,
+      ivRank: null,
+      atmIV: Math.round(ivData.atmIV * 1000) / 10,
+      divYield: null, // never sourced; was hardcoded 0, indistinguishable from a real 0%
       cashRequired,
-      signal,
-      fundamentals,
-      reason: `${fundamentals} fundamentals, ${annualizedReturn.toFixed(1)}% annualized at $${putStrike} strike`,
-      dataSource: isLive ? "polygon+finnhub+calculated" : "estimated",
-      isLive,
+      // Conviction previously keyed off the market-cap grade plus a fabricated
+      // premium. Withheld until real fundamentals are wired (S-15 / Phase 3).
+      signal: null,
+      sizeTier,
+      fundamentals: null,
+      reason: `${annualizedReturn.toFixed(1)}% annualized at $${putStrike} on ${(ivData.atmIV * 100).toFixed(0)}% ATM IV (${sizeTier}).`,
+      ...PRICING_PROVENANCE,
     })
   }
 
@@ -592,34 +733,6 @@ const CALENDAR_COMPANY_NAMES: Record<string, string> = {
   IYR: "iShares U.S. Real Estate ETF",
 }
 
-const CALENDAR_FALLBACK_PRICES: Record<string, number> = {
-  KO: 62,
-  PG: 168,
-  JNJ: 155,
-  VZ: 42,
-  PEP: 160,
-  WMT: 92,
-  XLU: 75,
-  XLP: 82,
-  MCD: 295,
-  CL: 95,
-  SO: 88,
-  DUK: 108,
-  T: 23,
-  UNH: 580,
-  SPY: 595,
-  MO: 56,
-  PM: 118,
-  MDLZ: 66,
-  MRK: 98,
-  ABBV: 178,
-  COST: 880,
-  HD: 360,
-  LMT: 460,
-  XLV: 150,
-  IYR: 95,
-}
-
 // Beta values for calendar spread candidates (lower = more stable)
 const STOCK_BETAS: Record<string, number> = {
   KO: 0.55,
@@ -652,34 +765,17 @@ const STOCK_BETAS: Record<string, number> = {
 async function generateCalendarSpreads(tickers: string[] = CALENDAR_SPREAD_TICKERS): Promise<any[]> {
   const calendarSpreads: any[] = []
 
+  // One Finnhub call for the whole batch rather than one per ticker.
+  const earningsByTicker = await getEarningsDateMap(tickers.slice(0, 25))
+
   for (const ticker of tickers.slice(0, 25)) {
     try {
-      // Get price data with fallback
-      let price = CALENDAR_FALLBACK_PRICES[ticker] || 100
-      let isLive = false
+      const quote = await getStockPrice(ticker)
+      if (!quote) continue // was: a price table frozen at authoring time, else $100
+      const price = quote.price
 
-      try {
-        const priceData = await getStockPrice(ticker)
-        if (priceData && priceData.price) {
-          price = priceData.price
-          isLive = priceData.isLive || false
-        }
-      } catch (priceError) {
-        console.error(`[Calendar Spreads] Price fetch error for ${ticker}:`, priceError)
-        // Continue with fallback price
-      }
-
-      // Get IV data with fallback
-      let ivData = { currentIV: 20, historicalIV: 18, ivRank: 45, isLive: false }
-      try {
-        const fetchedIvData = await getIVData(ticker, price)
-        if (fetchedIvData) {
-          ivData = fetchedIvData
-        }
-      } catch (ivError) {
-        console.error(`[Calendar Spreads] IV data error for ${ticker}:`, ivError)
-        // Continue with fallback IV data
-      }
+      const ivData = await getIVData(ticker, price)
+      if (!ivData) continue // was: a hardcoded {currentIV: 20, ivRank: 45} stand-in
 
       // Calculate calendar spread setup
       const atmStrike = Math.round(price / 5) * 5
@@ -689,68 +785,94 @@ async function generateCalendarSpreads(tickers: string[] = CALENDAR_SPREAD_TICKE
       const nearExp = getNextFriday(nearDte)
       const farExp = getNextFriday(farDte)
 
-      // Calendar spread specific calculations
       const beta = STOCK_BETAS[ticker] || 0.7
-      const historicalVolatility = ivData.historicalIV || beta * 20 + 5 // Estimate based on beta
 
-      // IV Skew: front month IV minus back month IV (positive = favorable for calendars)
-      const frontIV = ivData.currentIV * 1.05 // Front month typically slightly higher
-      const backIV = ivData.currentIV * 0.95
-      const ivSkew = frontIV - backIV
+      // Both legs are priced off the single measured ATM IV. The previous code
+      // manufactured a term structure by multiplying that IV by 1.05 and 0.95,
+      // then reported the 10% gap it had just invented as the "IV skew" the
+      // strategy depends on. We do not have a second expiry's IV here, so the
+      // skew is reported as null rather than fabricated.
+      const iv = ivData.atmIV
+      const ivSkew = null
 
-      // Price stability score (simulated based on beta and HV)
-      const priceStability = Math.round(100 - beta * 20 - historicalVolatility * 0.5)
+      const legParams = {
+        stockPrice: price,
+        strikePrice: atmStrike,
+        volatility: iv,
+        riskFreeRate: RISK_FREE_RATE,
+      }
+      const nearPremium = calculateOptionPrice({ ...legParams, timeToExpiry: nearDte / 365 }, true)
+      const farPremium = calculateOptionPrice({ ...legParams, timeToExpiry: farDte / 365 }, true)
+      if (nearPremium === null || farPremium === null) continue
 
-      // Days to earnings (simulate - stable stocks typically have predictable schedules)
-      const daysNoEarnings = Math.floor(Math.random() * 60) + 30
+      const debit = farPremium - nearPremium
+      if (!(debit > 0)) continue // not a debit calendar at these strikes
+
+      // At the near expiry the short leg is worth ~0 at the strike and the long
+      // leg retains (farDte - nearDte) of time value, priced at the same IV.
+      const farResidualValue = calculateOptionPrice(
+        { ...legParams, timeToExpiry: (farDte - nearDte) / 365 },
+        true,
+      )
+      if (farResidualValue === null) continue
+      const maxProfit = farResidualValue - debit
+      if (!(maxProfit > 0)) continue
+      const returnOnCapital = (maxProfit / debit) * 100
+
+      // Real earnings date from Finnhub — replaces `Math.random() * 60 + 30`,
+      // which drove a literal "Safe" / "Watch out" verdict (AUDIT_BACKLOG P1-6).
+      const earningsDate = earningsByTicker.get(ticker) ?? null
+      const daysNoEarnings = earningsDate
+        ? Math.max(0, Math.ceil((new Date(earningsDate).getTime() - Date.now()) / 86400_000))
+        : null
 
       // Theta advantage ratio (near-term decays faster)
       const thetaAdvantage = 2.5 + (nearDte < 30 ? 0.5 : 0)
 
-      // Calculate debit and max profit
-      const nearPremium = price * (frontIV / 100) * Math.sqrt(nearDte / 365) * 0.4
-      const farPremium = price * (backIV / 100) * Math.sqrt(farDte / 365) * 0.4
-      const debit = Math.max(0.5, farPremium - nearPremium)
-      // Max profit at front-month expiry ≈ remaining extrinsic value of the back-month
-      // option (priced at the front IV) minus the net debit paid. A larger IV skew and a
-      // bigger theta advantage both widen the achievable profit.
-      const farResidualValue = price * (frontIV / 100) * Math.sqrt((farDte - nearDte) / 365) * 0.4
-      const maxProfit = Math.max(0.1, farResidualValue - debit)
-      // Return on capital: the real profitability metric for a debit spread
-      const returnOnCapital = (maxProfit / debit) * 100
+      // Breakeven range: 1-sigma move over the near leg's life, at measured IV.
+      const breakevenRange = price * iv * Math.sqrt(nearDte / 365)
 
-      // Breakeven range
-      const breakevenRange = price * (historicalVolatility / 100) * Math.sqrt(nearDte / 365)
+      // Price stability was `100 - beta*20 - HV*0.5` where HV was itself derived
+      // from beta — a restatement of beta on a 0-100 scale, presented as an
+      // independent "stability" measurement. Reported as beta instead.
+      const priceStability = null
+      const historicalVolatility = null
 
-      // Determine signal strength
-      let signal: "strong" | "moderate" | "speculative" = "moderate"
-      let reason = ""
-
-      if (beta < 0.6 && historicalVolatility < 25 && ivSkew > 0 && priceStability > 75) {
+      // Signal now rests on facts we actually hold: return on capital, the
+      // measured beta band, and whether earnings land inside the near leg. The
+      // previous version keyed off HV and priceStability, both of which were
+      // functions of beta, so it read three "independent" checks off one number.
+      const earningsInsideNearLeg = daysNoEarnings !== null && daysNoEarnings <= nearDte
+      let signal: "strong" | "moderate" | "speculative"
+      if (earningsInsideNearLeg) {
+        signal = "speculative"
+      } else if (beta < 0.6 && returnOnCapital >= 20) {
         signal = "strong"
-        reason = `Ideal calendar candidate: Very low beta (${beta.toFixed(2)}), low volatility (${historicalVolatility.toFixed(0)}%), favorable IV skew, and excellent price stability. Stock has traded in a tight range, maximizing theta capture.`
-      } else if (beta < 0.8 && historicalVolatility < 35 && priceStability > 65) {
+      } else if (beta < 0.8 && returnOnCapital >= 10) {
         signal = "moderate"
-        reason = `Good calendar setup: Moderate beta (${beta.toFixed(2)}) with acceptable volatility. Price has been relatively stable. Watch for any upcoming catalysts that could disrupt the range.`
       } else {
         signal = "speculative"
-        reason = `Higher risk calendar: Beta of ${beta.toFixed(2)} and ${historicalVolatility.toFixed(0)}% HV suggest more price movement. Consider tighter timeframes or skip if looking for pure theta plays.`
       }
+
+      const earningsNote =
+        daysNoEarnings === null
+          ? "Earnings date unavailable."
+          : earningsInsideNearLeg
+            ? `Earnings in ${daysNoEarnings}d — inside the ${nearDte}d short leg.`
+            : `Earnings in ${daysNoEarnings}d — clear of the ${nearDte}d short leg.`
+      const reason = `${returnOnCapital.toFixed(0)}% return on capital at ${(iv * 100).toFixed(0)}% ATM IV, beta ${beta.toFixed(2)}. ${earningsNote}`
 
       // Type is driven by trend, not chance: a stock trading above its ATM strike leans
       // bullish (call calendar); at/below leans defensive (put calendar).
       const type = price >= atmStrike ? "call" : "put"
 
-      // Composite quality score: rewards profitability (ROC, theta edge, favorable IV skew)
-      // and penalizes risk (beta, historical volatility, low price stability). Higher = a
-      // more profitable AND lower-risk setup, so the best candidates sort to the top.
+      // Ranking score built only from values that were measured or modelled.
+      // Dropped the ivSkew and priceStability terms — both were invented inputs.
       const qualityScore =
-        Math.min(returnOnCapital, 100) * 0.4 + // profitability (capped so outliers don't dominate)
+        Math.min(returnOnCapital, 100) * 0.6 + // profitability, capped so outliers don't dominate
         thetaAdvantage * 8 + // time-decay edge
-        Math.max(0, ivSkew) * 4 + // favorable volatility skew
-        priceStability * 0.5 + // range stability (risk)
-        (1.5 - beta) * 20 - // lower beta rewarded (risk)
-        historicalVolatility * 0.6 // lower HV rewarded (risk)
+        (1.5 - beta) * 20 - // lower beta rewarded
+        (earningsInsideNearLeg ? 40 : 0) // event risk inside the short leg
 
       calendarSpreads.push({
         ticker,
@@ -771,16 +893,17 @@ async function generateCalendarSpreads(tickers: string[] = CALENDAR_SPREAD_TICKE
           high: Math.round((price + breakevenRange) * 100) / 100,
         },
         beta,
-        historicalVolatility: Math.round(historicalVolatility * 10) / 10,
-        ivSkew: Math.round(ivSkew * 10) / 10,
-        priceStability: Math.min(95, Math.max(50, priceStability)),
-        marketCap: ticker === "SPY" ? "$550B ETF" : "$50B+",
+        atmIV: Math.round(iv * 1000) / 10,
+        historicalVolatility,
+        ivSkew,
+        priceStability,
+        marketCap: null, // was the literal string "$50B+" for every non-SPY ticker
         daysNoEarnings,
+        earningsDate,
         thetaAdvantage: Math.round(thetaAdvantage * 10) / 10,
         signal,
         reason,
-        dataSource: isLive ? "Polygon.io (live)" : "Estimated",
-        isLive,
+        ...PRICING_PROVENANCE,
       })
     } catch (error) {
       console.error(`[Calendar Spreads] Error processing ${ticker}:`, error)
@@ -794,8 +917,8 @@ async function generateCalendarSpreads(tickers: string[] = CALENDAR_SPREAD_TICKE
     if (b.qualityScore !== a.qualityScore) {
       return b.qualityScore - a.qualityScore
     }
-    const signalOrder = { strong: 0, moderate: 1, speculative: 2 }
-    return signalOrder[a.signal] - signalOrder[b.signal]
+    const signalOrder: Record<string, number> = { strong: 0, moderate: 1, speculative: 2 }
+    return (signalOrder[a.signal] ?? 99) - (signalOrder[b.signal] ?? 99)
   })
 }
 
@@ -840,77 +963,121 @@ async function generateButterflies(tickers: string[]): Promise<any[]> {
   const butterflies: any[] = []
   const expDate = getNextFriday(35)
 
+  const dte = 35
+
   for (const ticker of tickers) {
     try {
-      const priceData = await getStockPrice(ticker)
-      const price = priceData?.price || FALLBACK_PRICES[ticker] || 100
-      const ivData = await getIVData(ticker)
+      const quote = await getStockPrice(ticker)
+      if (!quote) continue
+      const price = quote.price
+      // Previously called as getIVData(ticker) — the price argument was omitted,
+      // so the ATM strike came out NaN and this generator ALWAYS took the
+      // fabricated fallback path, never the (already broken) live one.
+      const ivData = await getIVData(ticker, price)
+      if (!ivData) continue
 
-      // Generate standard butterfly
       const middleStrike = Math.round(price / 5) * 5
       const wingWidth = Math.round((price * 0.03) / 5) * 5 || 5
 
-      butterflies.push({
-        ticker,
-        company: priceData?.company || COMPANY_NAMES[ticker] || ticker,
-        type: "call",
-        structure: "standard",
-        lowerStrike: middleStrike - wingWidth,
-        middleStrike,
-        upperStrike: middleStrike + wingWidth,
-        currentPrice: price,
-        expiration: expDate,
-        dte: 35,
-        cost: wingWidth * 0.35,
-        maxProfit: wingWidth - wingWidth * 0.35,
-        maxLoss: wingWidth * 0.35,
-        breakeven: {
-          low: middleStrike - wingWidth + wingWidth * 0.35,
-          high: middleStrike + wingWidth - wingWidth * 0.35,
-        },
-        ivRank: ivData?.ivRank || 35 + Math.random() * 40,
-        ivPercentile: ivData?.ivPercentile || 40 + Math.random() * 35,
-        wingWidth: { lower: wingWidth, upper: wingWidth },
-        probabilityOfProfit: 25 + Math.random() * 20,
-        riskRewardRatio: 0.35 / 0.65,
-        distanceToProfit: ((middleStrike - price) / price) * 100,
-        signal: ivData?.ivRank > 50 ? "strong" : ivData?.ivRank > 30 ? "moderate" : "speculative",
-        reason: `High IV rank (${(ivData?.ivRank || 45).toFixed(0)}%) makes selling premium attractive. Price near middle strike.`,
-        isLive: priceData?.isLive || false,
-      })
+      const leg = {
+        stockPrice: price,
+        timeToExpiry: dte / 365,
+        volatility: ivData.atmIV,
+        riskFreeRate: RISK_FREE_RATE,
+      }
+      const priceAt = (strike: number, isCall: boolean) => calculateOptionPrice({ ...leg, strikePrice: strike }, isCall)
+      const range = { stockPrice: price, timeToExpiry: dte / 365, volatility: ivData.atmIV, riskFreeRate: RISK_FREE_RATE }
+      const ivPct = Math.round(ivData.atmIV * 1000) / 10
 
-      // Generate broken wing butterfly
+      // ---- Standard long call butterfly: +1 lower, -2 middle, +1 upper.
+      // Cost was `wingWidth * 0.35` — an invented 35% of the wing — with maxProfit,
+      // maxLoss and both breakevens all derived from that constant, and a
+      // riskRewardRatio hardcoded to 0.35/0.65 for every row on every ticker.
+      const lowerC = priceAt(middleStrike - wingWidth, true)
+      const midC = priceAt(middleStrike, true)
+      const upperC = priceAt(middleStrike + wingWidth, true)
+      if (lowerC !== null && midC !== null && upperC !== null) {
+        const cost = lowerC - 2 * midC + upperC
+        if (cost > 0) {
+          const maxProfit = wingWidth - cost
+          const beLow = middleStrike - wingWidth + cost
+          const beHigh = middleStrike + wingWidth - cost
+          const pop = probabilityBetween(range, beLow, beHigh)
+
+          butterflies.push({
+            ticker,
+            company: COMPANY_NAMES[ticker] || ticker,
+            type: "call",
+            structure: "standard",
+            lowerStrike: middleStrike - wingWidth,
+            middleStrike,
+            upperStrike: middleStrike + wingWidth,
+            currentPrice: round2(price),
+            expiration: expDate,
+            dte,
+            cost: round2(cost),
+            maxProfit: round2(maxProfit),
+            maxLoss: round2(cost),
+            breakeven: { low: round2(beLow), high: round2(beHigh) },
+            ivRank: null, // needs 52w IV history (P1-1/P1-3)
+            ivPercentile: null,
+            atmIV: ivPct,
+            wingWidth: { lower: wingWidth, upper: wingWidth },
+            probabilityOfProfit: pop === null ? null : Math.round(pop * 1000) / 10,
+            riskRewardRatio: round2(maxProfit / cost),
+            distanceToProfit: round2(((middleStrike - price) / price) * 100),
+            signal: null, // was keyed off the fabricated ivRank
+            reason: `Profit zone $${beLow.toFixed(2)}–$${beHigh.toFixed(2)} at ${ivPct}% ATM IV. Max profit if pinned at $${middleStrike}.`,
+            ...PRICING_PROVENANCE,
+          })
+        }
+      }
+
+      // ---- Broken-wing put butterfly: +1 far lower, -2 middle, +1 near upper.
+      // Was a flat -0.5 "credit" on every ticker regardless of price or IV.
       const bwbLowerWidth = wingWidth
       const bwbUpperWidth = wingWidth * 2
+      const farP = priceAt(middleStrike - bwbUpperWidth, false)
+      const midP = priceAt(middleStrike, false)
+      const nearP = priceAt(middleStrike + bwbLowerWidth, false)
+      if (farP !== null && midP !== null && nearP !== null) {
+        const netDebit = farP - 2 * midP + nearP
+        const credit = -netDebit
+        const maxProfit = bwbLowerWidth + credit
+        const maxLoss = bwbUpperWidth - bwbLowerWidth - credit
+        const beLow = middleStrike - bwbUpperWidth + maxLoss
+        const beHigh = middleStrike + bwbLowerWidth
+        const pop = probabilityBetween(range, beLow, beHigh)
 
-      butterflies.push({
-        ticker,
-        company: priceData?.company || COMPANY_NAMES[ticker] || ticker,
-        type: "put",
-        structure: "broken-wing",
-        lowerStrike: middleStrike - bwbUpperWidth,
-        middleStrike,
-        upperStrike: middleStrike + bwbLowerWidth,
-        currentPrice: price,
-        expiration: expDate,
-        dte: 35,
-        cost: -0.5, // Credit
-        maxProfit: bwbLowerWidth + 0.5,
-        maxLoss: bwbUpperWidth - bwbLowerWidth - 0.5,
-        breakeven: {
-          low: middleStrike - bwbUpperWidth + (bwbUpperWidth - bwbLowerWidth - 0.5),
-          high: middleStrike + bwbLowerWidth,
-        },
-        ivRank: ivData?.ivRank || 35 + Math.random() * 40,
-        ivPercentile: ivData?.ivPercentile || 40 + Math.random() * 35,
-        wingWidth: { lower: bwbUpperWidth, upper: bwbLowerWidth },
-        probabilityOfProfit: 55 + Math.random() * 15,
-        riskRewardRatio: (bwbUpperWidth - bwbLowerWidth - 0.5) / (bwbLowerWidth + 0.5),
-        distanceToProfit: ((price - middleStrike) / price) * 100,
-        signal: ivData?.ivRank > 50 ? "strong" : "moderate",
-        reason: `BWB collected credit with bullish bias. Risk shifted to downside. High IV rank favorable.`,
-        isLive: priceData?.isLive || false,
-      })
+        if (maxProfit > 0 && maxLoss > 0) {
+          butterflies.push({
+            ticker,
+            company: COMPANY_NAMES[ticker] || ticker,
+            type: "put",
+            structure: "broken-wing",
+            lowerStrike: middleStrike - bwbUpperWidth,
+            middleStrike,
+            upperStrike: middleStrike + bwbLowerWidth,
+            currentPrice: round2(price),
+            expiration: expDate,
+            dte,
+            cost: round2(netDebit),
+            maxProfit: round2(maxProfit),
+            maxLoss: round2(maxLoss),
+            breakeven: { low: round2(beLow), high: round2(beHigh) },
+            ivRank: null,
+            ivPercentile: null,
+            atmIV: ivPct,
+            wingWidth: { lower: bwbUpperWidth, upper: bwbLowerWidth },
+            probabilityOfProfit: pop === null ? null : Math.round(pop * 1000) / 10,
+            riskRewardRatio: round2(maxProfit / maxLoss),
+            distanceToProfit: round2(((price - middleStrike) / price) * 100),
+            signal: null,
+            reason: `${credit >= 0 ? `Net credit $${credit.toFixed(2)}` : `Net debit $${netDebit.toFixed(2)}`} at ${ivPct}% ATM IV. Risk shifted below $${middleStrike - bwbUpperWidth}.`,
+            ...PRICING_PROVENANCE,
+          })
+        }
+      }
     } catch (err) {
       console.error(`[Butterfly] Error for ${ticker}:`, err)
     }
@@ -969,49 +1136,68 @@ async function generateLEAPS(tickers: string[]): Promise<any[]> {
   const leaps: any[] = []
   const expDate = getNextFriday(400) // ~13 months out
 
+  const dte = 400
+
   for (const ticker of tickers) {
     try {
-      const priceData = await getStockPrice(ticker)
-      const price = priceData?.price || FALLBACK_PRICES[ticker] || 100
-      const fund = fundamentals[ticker] || {
-        epsGrowth: 8,
-        debtEquity: 0.8,
-        priceBook: 8,
-        sector: "Other",
-        rating: "Hold",
-      }
+      const quote = await getStockPrice(ticker)
+      if (!quote) continue
+      const price = quote.price
+      const ivData = await getIVData(ticker, price)
+      if (!ivData) continue
+
+      // `fundamentals` is a hand-maintained table with no refresh date and no
+      // source. Only surfaced for tickers actually present in it — the previous
+      // default handed every unlisted ticker 8% EPS growth, 0.8 D/E and a "Hold"
+      // rating, then printed those invented figures in the reason string.
+      const fund = fundamentals[ticker] ?? null
 
       // Deep ITM call for stock replacement
       const strike = Math.round((price * 0.8) / 5) * 5
-      const intrinsic = price - strike
-      const extrinsic = price * 0.08 // ~8% time value for LEAPS
-      const premium = intrinsic + extrinsic
-      const delta = 0.75 + Math.random() * 0.15
+      const bs = {
+        stockPrice: price,
+        strikePrice: strike,
+        timeToExpiry: dte / 365,
+        volatility: ivData.atmIV,
+        riskFreeRate: RISK_FREE_RATE,
+      }
+      // Premium was intrinsic + a flat 8% of spot; delta was 0.75 + random()*0.15
+      // and was also printed into the reason sentence and used as a user filter
+      // (AUDIT_BACKLOG P1-5). Both now come from Black-Scholes at measured IV.
+      const premium = calculateOptionPrice(bs, true)
+      const delta = bsDelta(bs, true)
+      if (premium === null || delta === null || !(premium > 0)) continue
+
+      const intrinsic = Math.max(0, price - strike)
+      const extrinsic = premium - intrinsic
 
       leaps.push({
         ticker,
-        company: priceData?.company || COMPANY_NAMES[ticker] || ticker,
+        company: COMPANY_NAMES[ticker] || ticker,
         type: "call",
         strike,
-        currentPrice: price,
+        currentPrice: round2(price),
         expiration: expDate,
-        dte: 400,
-        premium,
-        delta,
-        intrinsicValue: intrinsic,
-        extrinsicValue: extrinsic,
-        breakeven: strike + premium,
-        epsGrowth: fund.epsGrowth,
-        debtToEquity: fund.debtEquity,
-        priceToBook: fund.priceBook,
-        marketCap: price > 300 ? "$1T+" : price > 100 ? "$100B+" : "$50B+",
-        sector: fund.sector,
-        analystRating: fund.rating,
-        leverageRatio: price / premium,
-        annualizedCost: (extrinsic / price) * 100 * (365 / 400),
-        signal: fund.rating.includes("Strong") ? "strong" : fund.rating === "Buy" ? "moderate" : "speculative",
-        reason: `${fund.epsGrowth.toFixed(1)}% EPS growth, ${fund.debtEquity.toFixed(2)} D/E ratio. Deep ITM for stock replacement with ${delta.toFixed(2)} delta.`,
-        isLive: priceData?.isLive || false,
+        dte,
+        premium: round2(premium),
+        delta: Math.round(delta * 1000) / 1000,
+        atmIV: Math.round(ivData.atmIV * 1000) / 10,
+        intrinsicValue: round2(intrinsic),
+        extrinsicValue: round2(extrinsic),
+        breakeven: round2(strike + premium),
+        epsGrowth: fund?.epsGrowth ?? null,
+        debtToEquity: fund?.debtEquity ?? null,
+        priceToBook: fund?.priceBook ?? null,
+        // Was a price-derived string ("$1T+" if price > 300) — share price says
+        // nothing about market cap. Withheld until getCompanyProfile is wired in.
+        marketCap: null,
+        sector: fund?.sector ?? null,
+        analystRating: fund?.rating ?? null,
+        leverageRatio: round2(price / premium),
+        annualizedCost: round2((extrinsic / price) * 100 * (365 / dte)),
+        signal: null, // was derived from the unsourced analyst rating
+        reason: `${delta.toFixed(2)} delta at ${(ivData.atmIV * 100).toFixed(0)}% ATM IV. $${extrinsic.toFixed(2)} time value = ${((extrinsic / price) * 100 * (365 / dte)).toFixed(1)}% annualized cost of leverage.`,
+        ...PRICING_PROVENANCE,
       })
     } catch (err) {
       console.error(`[LEAPS] Error for ${ticker}:`, err)
@@ -1049,48 +1235,72 @@ async function generateZEBRA(tickers: string[]): Promise<any[]> {
   const zebras: any[] = []
   const expDate = getNextFriday(90)
 
+  const dte = 90
+
   for (const ticker of tickers) {
     try {
-      const priceData = await getStockPrice(ticker)
-      const price = priceData?.price || FALLBACK_PRICES[ticker] || 100
+      const quote = await getStockPrice(ticker)
+      if (!quote) continue
+      const price = quote.price
+      const ivData = await getIVData(ticker, price)
+      if (!ivData) continue
 
       // ZEBRA: Buy 2 deep ITM calls, sell 1 ATM call
       const longStrike = Math.round((price * 0.85) / 5) * 5
       const shortStrike = Math.round(price / 5) * 5
 
-      const longPremium = price - longStrike + price * 0.02 // Intrinsic + small extrinsic
-      const shortPremium = price * 0.04 // ATM premium
+      const bs = {
+        stockPrice: price,
+        timeToExpiry: dte / 365,
+        volatility: ivData.atmIV,
+        riskFreeRate: RISK_FREE_RATE,
+      }
+      // Legs were priced as "intrinsic + 2% of spot" and "4% of spot"; the
+      // position delta was the hardcoded literal 100 with a comment asserting
+      // the arithmetic rather than doing it.
+      const longPremium = calculateOptionPrice({ ...bs, strikePrice: longStrike }, true)
+      const shortPremium = calculateOptionPrice({ ...bs, strikePrice: shortStrike }, true)
+      const longDelta = bsDelta({ ...bs, strikePrice: longStrike }, true)
+      const shortDelta = bsDelta({ ...bs, strikePrice: shortStrike }, true)
+      if (longPremium === null || shortPremium === null || longDelta === null || shortDelta === null) continue
+
       const netDebit = longPremium * 2 - shortPremium
+      if (!(netDebit > 0)) continue
 
-      const delta = 100 // 2 * 0.85 delta - 1 * 0.50 delta ≈ 100
-      const extrinsicPaid = price * 0.02 * 2 - shortPremium
-
-      const stockScore = 5 + Math.random() * 4
-      const trend = Math.random() > 0.3 ? "bullish" : Math.random() > 0.5 ? "neutral" : "bearish"
+      // Position delta in share-equivalents: 2 long calls minus 1 short call.
+      const positionDelta = (2 * longDelta - shortDelta) * 100
+      const longIntrinsic = Math.max(0, price - longStrike)
+      const shortIntrinsic = Math.max(0, price - shortStrike)
+      const extrinsicPaid = 2 * (longPremium - longIntrinsic) - (shortPremium - shortIntrinsic)
 
       zebras.push({
         ticker,
-        company: priceData?.company || COMPANY_NAMES[ticker] || ticker,
+        company: COMPANY_NAMES[ticker] || ticker,
         type: "call",
         longStrike,
         shortStrike,
-        currentPrice: price,
+        currentPrice: round2(price),
         expiration: expDate,
-        dte: 90,
-        netDebit,
+        dte,
+        netDebit: round2(netDebit),
         maxProfit: "Unlimited",
-        maxLoss: netDebit,
-        breakeven: longStrike + netDebit / 2,
-        delta,
-        extrinsicPaid: Math.max(0, extrinsicPaid),
-        stockScore: Math.round(stockScore * 10) / 10,
-        optionVolume: 5000 + Math.random() * 50000,
-        trend,
-        distanceToBreakeven: ((longStrike + netDebit / 2 - price) / price) * 100,
-        leverageRatio: price / netDebit,
-        signal: stockScore >= 7 && trend === "bullish" ? "strong" : stockScore >= 5 ? "moderate" : "speculative",
-        reason: `Stock score ${stockScore.toFixed(1)}/10 with ${trend} trend. ZEBRA provides ~100 delta with defined risk of $${netDebit.toFixed(2)}.`,
-        isLive: priceData?.isLive || false,
+        maxLoss: round2(netDebit),
+        breakeven: round2(longStrike + netDebit / 2),
+        delta: Math.round(positionDelta),
+        atmIV: Math.round(ivData.atmIV * 1000) / 10,
+        extrinsicPaid: round2(extrinsicPaid),
+        // stockScore, trend and optionVolume were Math.random(). stockScore's
+        // tooltip described it as measuring "revenue growth, earnings, balance
+        // sheet strength, analyst ratings" (AUDIT_BACKLOG P1-4). No fundamentals
+        // or volume feed is wired here, so all three are withheld.
+        stockScore: null,
+        optionVolume: null,
+        trend: null,
+        distanceToBreakeven: round2(((longStrike + netDebit / 2 - price) / price) * 100),
+        leverageRatio: round2(price / netDebit),
+        signal: null, // was a function of the two random values above
+        reason: `${Math.round(positionDelta)} position delta for $${netDebit.toFixed(2)} debit at ${(ivData.atmIV * 100).toFixed(0)}% ATM IV. $${Math.max(0, extrinsicPaid).toFixed(2)} of time value paid.`,
+        ...PRICING_PROVENANCE,
       })
     } catch (err) {
       console.error(`[ZEBRA] Error for ${ticker}:`, err)
@@ -1127,8 +1337,25 @@ export async function GET(request: NextRequest) {
   try {
     const results: Record<string, any> = {
       timestamp: new Date().toISOString(),
-      dataSource: "polygon.io + finnhub.io + calculated",
-      isLive: !!POLYGON_API_KEY, // Indicate if live data is available
+      dataSource: "polygon.io + finnhub.io + black-scholes",
+      // `isLive` was `!!POLYGON_API_KEY` — i.e. "a key is configured" — and the
+      // scanner tabs rendered it as a green "Live Data" badge over tables whose
+      // numbers were fabricated (AUDIT_BACKLOG P1-10). Provenance is now stated
+      // per field on each row; this block says what the payload actually is.
+      provenance: {
+        underlyingPrice: "polygon:prev-close (measured)",
+        impliedVolatility: "polygon:options-snapshot ATM average (measured)",
+        earningsDates: FINNHUB_API_KEY ? "finnhub:calendar (measured)" : "unavailable",
+        premiumsGreeksProbabilities: "black-scholes model output (derived, not a tradeable quote)",
+      },
+      assumptions: {
+        riskFreeRate: RISK_FREE_RATE,
+        dividendYield: 0,
+        atmBand: ATM_BAND,
+      },
+      // Rows are omitted entirely when their measured inputs are unavailable, so
+      // an empty array means "could not be established", never "none found".
+      incomplete: !POLYGON_API_KEY,
     }
 
     if (type === "all" || type === "credit-spreads") {

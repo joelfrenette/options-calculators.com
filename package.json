@@ -5,6 +5,7 @@
   "scripts": {
     "build": "next build",
     "dev": "next dev",
+    "check:formulas": "node scripts/check-black-scholes.ts && node scripts/check-macd.ts",
     "inventory": "node scripts/site-inventory.ts",
     "lint": "eslint .",
     "start": "next start",

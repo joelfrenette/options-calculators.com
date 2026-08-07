@@ -679,14 +679,33 @@ export function WheelScanner() {
     }
   }
 
+  /**
+   * MACD(12, 26, 9).
+   *
+   * The signal line is the 9-period EMA of the MACD *series*, which requires
+   * recomputing MACD at each historical point — not a scaled copy of the current
+   * MACD value.
+   *
+   * This previously read `signal = macd * 0.9`. Because the only consumer tests
+   * `macd > signal`, that collapsed to `sign(macd)` for every input: a positive
+   * MACD was always "Bullish" and a negative one always "Bearish", so the MACD
+   * gate and column restated the MACD line's sign while presenting themselves as
+   * a crossover signal (AUDIT_BACKLOG S-1). Mirrors the correct implementation
+   * already in app/api/trend-analysis/route.ts.
+   */
   const calculateMACD = (closes: number[]): { macd: number; signal: number; histogram: number } => {
-    if (closes.length < 26) return { macd: 0, signal: 0, histogram: 0 }
+    // 26 bars for the first MACD value, plus 8 more so the 9-period signal EMA
+    // has a full window to seed from.
+    if (closes.length < 34) return { macd: 0, signal: 0, histogram: 0 }
 
-    const ema12 = calculateEMA(closes, 12)
-    const ema26 = calculateEMA(closes, 26)
-    const macd = ema12 - ema26
+    const macdSeries: number[] = []
+    for (let i = 26; i <= closes.length; i++) {
+      const window = closes.slice(0, i)
+      macdSeries.push(calculateEMA(window, 12) - calculateEMA(window, 26))
+    }
 
-    const signal = macd * 0.9
+    const macd = macdSeries[macdSeries.length - 1]
+    const signal = calculateEMA(macdSeries, 9)
     const histogram = macd - signal
 
     return { macd, signal, histogram }

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { Metric, PricingProvenance } from "@/components/pricing-provenance"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -24,19 +25,22 @@ interface LEAPSSetup {
   intrinsicValue: number
   extrinsicValue: number
   breakeven: number
-  // LEAPS specific KPIs
-  epsGrowth: number // 5-year EPS growth rate
-  debtToEquity: number
-  priceToBook: number
-  marketCap: string
-  sector: string
-  analystRating: "Strong Buy" | "Buy" | "Hold" | "Sell"
-  leverageRatio: number // Effective leverage vs stock
-  annualizedCost: number // Cost per year as % of stock price
-  signal: "strong" | "moderate" | "speculative"
+  // LEAPS specific KPIs. Fundamentals come from a hand-maintained table with no
+  // refresh date, so they are null for any ticker not in it rather than
+  // defaulting to invented figures (AUDIT_BACKLOG P1-9).
+  epsGrowth: number | null // 5-year EPS growth rate
+  debtToEquity: number | null
+  priceToBook: number | null
+  marketCap: string | null
+  sector: string | null
+  analystRating: "Strong Buy" | "Buy" | "Hold" | "Sell" | null
+  atmIV: number
+  leverageRatio: number | null // Effective leverage vs stock
+  annualizedCost: number | null // Cost per year as % of stock price
+  signal: "strong" | "moderate" | "speculative" | null
   reason: string
-  dataSource?: string
-  isLive?: boolean
+  pricingModel?: string
+  quoteType?: string
 }
 
 // Fundamentally strong stocks good for LEAPS
@@ -97,7 +101,10 @@ export function LEAPSScanner() {
   // Risk-adjusted rank: reward is capital efficiency (leverage × stock-likeness
   // delta), divided by the annualized "rent" cost of the time value. Higher =
   // more stock-like leverage per unit of carrying cost.
-  const rankScore = (s: LEAPSSetup) => (s.leverageRatio * Math.abs(s.delta)) / Math.max(s.annualizedCost, 0.1)
+  const rankScore = (s: LEAPSSetup) =>
+    s.leverageRatio === null || s.annualizedCost === null
+      ? -1 // unrankable rows sort last rather than scoring as zero
+      : (s.leverageRatio * Math.abs(s.delta)) / Math.max(s.annualizedCost, 0.1)
 
   const filteredSetups = setups
     .filter((s) => {
@@ -105,7 +112,9 @@ export function LEAPSScanner() {
       if (maxDebit < 5000 && s.premium * 100 > maxDebit) return false
       if (optionType !== "all" && s.type !== optionType) return false
       if (s.dte < minDTE) return false
-      if (s.debtToEquity > maxDebtEquity) return false
+      // A ticker with no D/E on file is not silently treated as 0 (which would
+      // always pass); it is excluded when the user has tightened the filter.
+      if (s.debtToEquity === null ? maxDebtEquity < 3 : s.debtToEquity > maxDebtEquity) return false
       if (Math.abs(s.delta) < minDelta) return false
       return true
     })
@@ -161,18 +170,21 @@ export function LEAPSScanner() {
     )
   }
 
-  const getSignalBadge = (signal: string) => {
+  const getSignalBadge = (signal: string | null) => {
     switch (signal) {
       case "strong":
         return <Badge className="bg-green-100 text-green-800 border-green-200">Strong</Badge>
       case "moderate":
         return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Moderate</Badge>
-      default:
+      case "speculative":
         return <Badge className="bg-orange-100 text-orange-800 border-orange-200">Speculative</Badge>
+      default:
+        // Conviction withheld — was derived from an unsourced analyst rating.
+        return null
     }
   }
 
-  const getRatingBadge = (rating: string) => {
+  const getRatingBadge = (rating: string | null) => {
     switch (rating) {
       case "Strong Buy":
         return <Badge className="bg-green-600 text-white">Strong Buy</Badge>
@@ -180,8 +192,11 @@ export function LEAPSScanner() {
         return <Badge className="bg-green-100 text-green-800">Buy</Badge>
       case "Hold":
         return <Badge className="bg-gray-100 text-gray-800">Hold</Badge>
-      default:
+      case "Sell":
         return <Badge className="bg-red-100 text-red-800">Sell</Badge>
+      default:
+        // No rating on file — "Sell" would be a claim, not a blank.
+        return null
     }
   }
 
@@ -214,15 +229,7 @@ export function LEAPSScanner() {
           {/* Status Bar */}
           <div className="flex items-center justify-between mb-4 text-sm">
             <div className="flex items-center gap-4">
-              {isLiveData ? (
-                <span className="flex items-center gap-1 text-green-600">
-                  <Wifi className="h-4 w-4" /> Live Data
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-gray-500">
-                  <WifiOff className="h-4 w-4" /> Estimated Data
-                </span>
-              )}
+              <PricingProvenance />
               {lastUpdated && <span className="text-gray-500">Updated: {lastUpdated}</span>}
             </div>
             <span className="text-gray-500">{filteredSetups.length} setups found</span>
@@ -366,7 +373,8 @@ export function LEAPSScanner() {
                           {getSignalBadge(setup.signal)}
                         </div>
                         <p className="text-sm text-gray-500">
-                          {setup.company} • {setup.sector}
+                          {setup.company}
+                          {setup.sector ? ` • ${setup.sector}` : ""}
                         </p>
                       </div>
                       <div className="text-right">
@@ -427,14 +435,18 @@ export function LEAPSScanner() {
                           Leverage
                           <InfoTooltip content="How much stock exposure you get per dollar invested compared to buying shares. 3x leverage means you control 3x more stock value than your investment. Example: $10,000 in LEAPS might give you exposure to $30,000 worth of stock. Higher leverage = more profit potential but also more risk if wrong." />
                         </p>
-                        <p className="font-semibold">{setup.leverageRatio.toFixed(1)}x</p>
+                        <p className="font-semibold">
+                          <Metric value={setup.leverageRatio} digits={1} suffix="x" />
+                        </p>
                       </div>
                       <div>
                         <p className="text-gray-500 flex items-center">
                           Ann. Cost
                           <InfoTooltip content="The yearly 'cost' of using LEAPS instead of stock, expressed as a percentage of the stock price. A 3% annual cost means you're paying 3% per year in time decay for the leverage benefit. Compare this to margin interest rates (6-8%) - LEAPS can be cheaper! Lower is better." />
                         </p>
-                        <p className="font-semibold">{setup.annualizedCost.toFixed(1)}%</p>
+                        <p className="font-semibold">
+                          <Metric value={setup.annualizedCost} digits={1} suffix="%" />
+                        </p>
                       </div>
                     </div>
 
@@ -444,9 +456,13 @@ export function LEAPSScanner() {
                           EPS Growth
                           <InfoTooltip content="5-year Earnings Per Share growth rate. This shows if the company is actually making more money over time. 10%+ annual growth is solid. 15%+ is excellent. Negative growth is a red flag for LEAPS - you're betting the stock will be higher in 1-2 years, so you need a growing company." />
                         </p>
-                        <p className={`font-semibold ${setup.epsGrowth >= 10 ? "text-green-600" : ""}`}>
-                          {setup.epsGrowth > 0 ? "+" : ""}
-                          {setup.epsGrowth.toFixed(1)}%
+                        <p
+                          className={`font-semibold ${
+                            setup.epsGrowth !== null && setup.epsGrowth >= 10 ? "text-green-600" : ""
+                          }`}
+                        >
+                          {setup.epsGrowth !== null && setup.epsGrowth > 0 ? "+" : ""}
+                          <Metric value={setup.epsGrowth} digits={1} suffix="%" unavailableLabel="not on file for this ticker" />
                         </p>
                       </div>
                       <div>
@@ -455,9 +471,17 @@ export function LEAPSScanner() {
                           <InfoTooltip content="Debt-to-Equity ratio measures financial health. Under 0.5 = very safe (green). 0.5-1.0 = normal. Over 1.5 = concerning (red). High-debt companies are riskier for LEAPS because they may struggle in recessions or if interest rates rise, hurting the stock price over your holding period." />
                         </p>
                         <p
-                          className={`font-semibold ${setup.debtToEquity < 0.5 ? "text-green-600" : setup.debtToEquity > 1.5 ? "text-red-600" : ""}`}
+                          className={`font-semibold ${
+                            setup.debtToEquity === null
+                              ? ""
+                              : setup.debtToEquity < 0.5
+                                ? "text-green-600"
+                                : setup.debtToEquity > 1.5
+                                  ? "text-red-600"
+                                  : ""
+                          }`}
                         >
-                          {setup.debtToEquity.toFixed(2)}
+                          <Metric value={setup.debtToEquity} digits={2} unavailableLabel="not on file for this ticker" />
                         </p>
                       </div>
                       <div>
@@ -465,14 +489,18 @@ export function LEAPSScanner() {
                           P/B Ratio
                           <InfoTooltip content="Price-to-Book ratio compares stock price to the company's net assets. A P/B of 3 means you're paying $3 for every $1 of book value. Lower P/B can indicate value (or problems). Higher P/B often means investors expect strong growth. For LEAPS, compare P/B to peers in the same industry." />
                         </p>
-                        <p className="font-semibold">{setup.priceToBook.toFixed(1)}</p>
+                        <p className="font-semibold">
+                          <Metric value={setup.priceToBook} digits={1} unavailableLabel="not on file for this ticker" />
+                        </p>
                       </div>
                       <div>
                         <p className="text-gray-500 flex items-center">
                           Market Cap
-                          <InfoTooltip content="The total market value of the company (share price × shares outstanding). Larger market cap ($100B+) = more stable, less volatile. Smaller cap = more growth potential but more risk. For LEAPS, large caps are safer; mid-caps offer more upside if you're confident in your thesis." />
+                          <InfoTooltip content="The total market value of the company (share price × shares outstanding). Not currently sourced — the previous value was inferred from share price alone, which says nothing about market cap." />
                         </p>
-                        <p className="font-semibold">{setup.marketCap}</p>
+                        <p className="font-semibold">
+                          {setup.marketCap ?? <span className="text-gray-400" title="not sourced">—</span>}
+                        </p>
                       </div>
                     </div>
 

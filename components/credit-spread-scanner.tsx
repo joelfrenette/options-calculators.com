@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { Metric, PricingProvenance } from "@/components/pricing-provenance"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { TrendingUp, TrendingDown, Info, Loader2, Target, DollarSign, AlertTriangle, Filter } from "lucide-react"
@@ -21,14 +22,18 @@ interface SpreadSetup {
   dte: number
   credit: number
   maxLoss: number
+  /** Risk-neutral probability the short strike expires OTM, as a percent. */
   probability: number
-  ivRank: number
-  delta: number
+  /** Null: a real IV rank needs 52w of IV history (AUDIT_BACKLOG P1-1). */
+  ivRank: number | null
+  /** Measured at-the-money implied volatility, percent. */
+  atmIV: number
+  delta: number | null
   riskReward: string
-  signal: "strong" | "moderate" | "speculative"
+  signal: "strong" | "moderate" | "speculative" | null
   reason: string
-  dataSource?: string
-  isLive?: boolean
+  pricingModel?: string
+  quoteType?: string
 }
 
 export function CreditSpreadScanner() {
@@ -127,7 +132,7 @@ export function CreditSpreadScanner() {
     )
   }
 
-  const getSignalBadge = (signal: string) => {
+  const getSignalBadge = (signal: string | null) => {
     switch (signal) {
       case "strong":
         return (
@@ -143,13 +148,15 @@ export function CreditSpreadScanner() {
             Moderate
           </Badge>
         )
-      default:
+      case "speculative":
         return (
           <Badge className="bg-orange-100 text-orange-800 border-orange-300">
             <Filter className="w-3 h-3 mr-1" />
             Speculative
           </Badge>
         )
+      default:
+        return null
     }
   }
 
@@ -163,25 +170,11 @@ export function CreditSpreadScanner() {
                 <Target className="w-5 h-5 text-blue-500" />
                 Credit Spread Scanner
                 <InfoTooltip content="Credit spreads are defined-risk options strategies that collect premium by selling a higher-probability option and buying a further OTM option for protection. Bull put spreads profit when stock stays above the short strike; bear call spreads profit when stock stays below." />
-                {isLiveData ? (
-                  <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-300">
-                    <TrendingUp className="w-3 h-3 mr-1" />
-                    LIVE
-                  </Badge>
-                ) : setups.length > 0 ? (
-                  <Badge variant="outline" className="ml-2 bg-yellow-50 text-yellow-700 border-yellow-300">
-                    <TrendingDown className="w-3 h-3 mr-1" />
-                    Cached
-                  </Badge>
-                ) : null}
+                
               </CardTitle>
               <CardDescription>
                 High-probability bull put and bear call spreads
-                {lastUpdated && (
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    Updated: {new Date(lastUpdated).toLocaleTimeString()}
-                  </span>
-                )}
+                <PricingProvenance className="mt-2" lastUpdated={lastUpdated ? new Date(lastUpdated).toLocaleTimeString() : null} />
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
@@ -338,7 +331,9 @@ export function CreditSpreadScanner() {
                       Delta
                       <InfoTooltip content="Delta of the short strike. Lower delta (0.15-0.30) means higher probability of profit but smaller credit." />
                     </div>
-                    <div className="font-medium">{setup.delta.toFixed(2)}</div>
+                    <div className="font-medium">
+                      <Metric value={setup.delta} digits={2} />
+                    </div>
                   </div>
                   <div>
                     <div className="text-xs text-muted-foreground flex items-center">
@@ -348,8 +343,10 @@ export function CreditSpreadScanner() {
                     <div className="font-medium">{setup.riskReward}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-muted-foreground">Data Source</div>
-                    <div className="font-medium text-xs">{setup.dataSource || "API"}</div>
+                    <div className="text-xs text-muted-foreground">ATM IV</div>
+                    <div className="font-medium text-xs">
+                      <Metric value={setup.atmIV} digits={1} suffix="%" />
+                    </div>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">

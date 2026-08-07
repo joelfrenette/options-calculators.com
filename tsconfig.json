@@ -23,5 +23,6 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "//": "scripts/ holds standalone Node tools run via `node scripts/x.ts` (native type stripping). They import with explicit .ts extensions, which the Next bundler config disallows, and they are not part of the app build.",
+  "exclude": ["node_modules", "scripts"]
 }

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { Metric, PricingProvenance } from "@/components/pricing-provenance"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -27,17 +28,21 @@ interface ButterflySetup {
   maxProfit: number
   maxLoss: number
   breakeven: { low: number; high: number }
-  // Butterfly specific KPIs
-  ivRank: number
-  ivPercentile: number
+  // Butterfly specific KPIs.
+  // ivRank/ivPercentile are null until 52 weeks of IV history is collected —
+  // they were previously fabricated (AUDIT_BACKLOG P1-3). atmIV is measured.
+  ivRank: number | null
+  ivPercentile: number | null
+  atmIV: number
   wingWidth: { lower: number; upper: number }
-  probabilityOfProfit: number
-  riskRewardRatio: number
-  distanceToProfit: number // % from current price to profit zone
-  signal: "strong" | "moderate" | "speculative"
+  /** Risk-neutral probability of finishing inside the profit zone, as a percent. */
+  probabilityOfProfit: number | null
+  riskRewardRatio: number | null
+  distanceToProfit: number | null // % from current price to profit zone
+  signal: "strong" | "moderate" | "speculative" | null
   reason: string
-  dataSource?: string
-  isLive?: boolean
+  pricingModel?: string
+  quoteType?: string
 }
 
 // Tickers good for butterflies - high IV rank, range-bound
@@ -90,8 +95,11 @@ export function ButterflyScanner() {
 
   // Risk-adjusted rank: reward (max profit vs capital at risk) weighted by the
   // probability of landing in the profit zone. Higher = better.
+  // Rows without a probability rank last rather than being scored as zero, so a
+  // missing value never masquerades as a bad setup.
   const rankScore = (s: ButterflySetup) => {
     const rewardToRisk = s.maxLoss > 0 ? s.maxProfit / s.maxLoss : 0
+    if (s.probabilityOfProfit === null) return -1
     return rewardToRisk * (s.probabilityOfProfit / 100)
   }
 
@@ -101,7 +109,9 @@ export function ButterflyScanner() {
       if (maxDebit < 5000 && s.maxLoss * 100 > maxDebit) return false
       if (butterflyType !== "all" && s.structure !== butterflyType) return false
       if (optionType !== "all" && s.type !== optionType) return false
-      if (s.ivRank < minIVRank) return false
+      // Filter on measured ATM IV. The old `s.ivRank < minIVRank` compared
+      // against a fabricated rank, so the slider filtered on noise.
+      if (s.atmIV < minIVRank) return false
       if (s.dte > maxDTE) return false
       return true
     })
@@ -160,14 +170,19 @@ export function ButterflyScanner() {
     )
   }
 
-  const getSignalBadge = (signal: string) => {
+  // Conviction is withheld (null) rather than defaulted: the previous signal was
+  // derived from a fabricated IV rank, and "Speculative" is a claim, not an
+  // absence of one, so falling through to it would keep asserting something.
+  const getSignalBadge = (signal: string | null) => {
     switch (signal) {
       case "strong":
         return <Badge className="bg-green-100 text-green-800 border-green-200">Strong</Badge>
       case "moderate":
         return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Moderate</Badge>
-      default:
+      case "speculative":
         return <Badge className="bg-orange-100 text-orange-800 border-orange-200">Speculative</Badge>
+      default:
+        return null
     }
   }
 
@@ -262,26 +277,30 @@ export function ButterflyScanner() {
               R:R Ratio
               <InfoTooltip content="Risk-to-Reward Ratio. A ratio of 0.5:1 means you risk $0.50 to potentially make $1.00 - excellent odds! Lower ratios are better. Butterflies often have very attractive R:R because the max profit can be 3-10x the debit paid. The catch? You need to be right about where the stock lands." />
             </p>
-            <p className="font-semibold">{setup.riskRewardRatio.toFixed(1)}:1</p>
+            <p className="font-semibold">
+              <Metric value={setup.riskRewardRatio} digits={1} suffix=":1" />
+            </p>
           </div>
         </div>
 
         <div className="grid grid-cols-4 gap-3 text-sm mb-3">
           <div>
             <p className="text-gray-500 flex items-center">
-              IV Rank
-              <InfoTooltip content="Shows if options are cheap or expensive compared to the past year. Since you're selling 2 middle options and buying 2 wings, higher IV Rank helps - the sold options bring in more credit, reducing your net cost. Look for 40%+ IV Rank for better entries." />
+              ATM IV
+              <InfoTooltip content="At-the-money implied volatility, averaged across the nearest option chain. Higher IV means the options you sell at the middle strike bring in more credit, reducing your net cost. Note this is the raw IV level, not an IV Rank — ranking IV against its own past year requires volatility history this scanner does not yet collect." />
             </p>
-            <p className={`font-semibold ${setup.ivRank >= 50 ? "text-green-600" : "text-gray-600"}`}>
-              {setup.ivRank}%
+            <p className={`font-semibold ${setup.atmIV >= 50 ? "text-green-600" : "text-gray-600"}`}>
+              <Metric value={setup.atmIV} digits={1} suffix="%" />
             </p>
           </div>
           <div>
             <p className="text-gray-500 flex items-center">
               POP
-              <InfoTooltip content="Probability of Profit - your estimated chance of making any money on this trade. Butterflies typically have 20-35% POP because the stock needs to land in a specific zone. This is a LOTTERY TICKET strategy - low probability but high payout when it hits." />
+              <InfoTooltip content="Probability of Profit — the risk-neutral chance the stock finishes between the two breakevens at expiration, calculated from the measured implied volatility. Butterflies typically land in the 20-35% range because the stock must finish in a narrow zone. This is what option prices imply, not a forecast." />
             </p>
-            <p className="font-semibold">{setup.probabilityOfProfit}%</p>
+            <p className="font-semibold">
+              <Metric value={setup.probabilityOfProfit} digits={1} suffix="%" />
+            </p>
           </div>
           <div>
             <p className="text-gray-500 flex items-center">
@@ -295,7 +314,9 @@ export function ButterflyScanner() {
               Distance
               <InfoTooltip content="How far the stock currently is from your middle strike (profit target), as a percentage. 0% = already at target. +3% = stock needs to rise 3%. -2% = stock needs to fall 2%. Closer to zero = better starting position for your butterfly." />
             </p>
-            <p className="font-semibold">{setup.distanceToProfit.toFixed(1)}%</p>
+            <p className="font-semibold">
+              <Metric value={setup.distanceToProfit} digits={1} suffix="%" />
+            </p>
           </div>
         </div>
 
@@ -361,15 +382,7 @@ export function ButterflyScanner() {
           {/* Status Bar */}
           <div className="flex items-center justify-between mb-4 text-sm">
             <div className="flex items-center gap-4">
-              {isLiveData ? (
-                <span className="flex items-center gap-1 text-green-600">
-                  <Wifi className="h-4 w-4" /> Live Data
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-gray-500">
-                  <WifiOff className="h-4 w-4" /> Estimated Data
-                </span>
-              )}
+              <PricingProvenance />
               {lastUpdated && <span className="text-gray-500">Updated: {lastUpdated}</span>}
             </div>
             <span className="text-gray-500">{filteredSetups.length} setups found</span>
