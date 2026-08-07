@@ -32,6 +32,8 @@ interface IndicatorDetail {
     fallbackChain: string[]
     currentSource: string
     status: "live" | "aiFallback" | "baseline" | "failed"
+    updateFrequency?: string
+    methodology?: string
   }
   canaryThresholds: {
     medium: string
@@ -82,8 +84,9 @@ export function CcpiAuditAdmin() {
       ccpi: {
         baseCCPI: ccpi.baseCCPI || ccpi.ccpi,
         finalCCPI: ccpi.ccpi,
-        formula: "CCPI = (Momentum × 0.35) + (Risk Appetite × 0.30) + (Valuation × 0.15) + (Macro × 0.20)",
-        executiveSummary: `The Comprehensive Crash Prediction Index (CCPI) aggregates risk across four critical market dimensions. Each pillar contributes a weighted score (0-100), where higher scores indicate elevated crash risk. The base CCPI score is then amplified by extreme crash conditions to produce the final score ranging from 0 (low risk) to 100 (extreme crash risk).`,
+        formula:
+          "CCPI = (Momentum × 0.35) + (Risk Appetite × 0.30) + (Valuation × 0.15) + (Macro × 0.20), renormalized over pillars with sufficient data",
+        executiveSummary: `The Comprehensive Crash Prediction Index (CCPI) aggregates risk across four critical market dimensions. Each pillar contributes a weighted score (0-100), where higher scores indicate elevated crash risk. A pillar with insufficient live/AI-sourced data reports null and the composite renormalizes over the remaining pillars. The base CCPI score is then amplified by extreme crash conditions to produce the final score ranging from 0 (low risk) to 100 (extreme crash risk).`,
         validation: validateCCPI(ccpi),
         weights: {
           momentum: 35,
@@ -100,19 +103,20 @@ export function CcpiAuditAdmin() {
         formula: "Final CCPI = Base CCPI + Crash Amplifier Bonus (capped at 100)",
         executiveSummary: `The Crash Amplifier system adds bonus points (+0 to +100) to the base CCPI when extreme conditions occur. These bonuses capture acute crash catalysts like single-day crashes (QQQ -6% = +25 points), major support breaks (QQQ below 50-day SMA = +20), or panic spikes (VIX >35 = +20). Currently: Base ${ccpi.baseCCPI || ccpi.ccpi} + Bonus ${ccpi.totalBonus || 0} = Final ${ccpi.ccpi}`,
         triggers: [
-          { condition: "QQQ drops ≥6% in 1 day", bonus: "+25 points (replaces by +40 if ≥9%)" },
+          { condition: "QQQ drops ≥6% in 1 day", bonus: "+25 points (replaced by +40 if ≥9%)" },
           { condition: "QQQ drops ≥9% in 1 day", bonus: "+40 points" },
           { condition: "QQQ breaks below 50-day SMA", bonus: "+20 points" },
           { condition: "VIX spikes above 35", bonus: "+20 points" },
           { condition: "Put/Call ratio exceeds 1.3", bonus: "+15 points (extreme hedging)" },
-          { condition: "Yield curve inverts (negative)", bonus: "+15 points" },
+          // Yield-curve amplifier removed: the curve is scored once in the Macro
+          // pillar and slow-moving inversion is not an acute crash event (P3-13).
         ],
       },
       canaries: {
-        total: 38,
+        total: ccpi.totalIndicators || 29,
         active: ccpi.activeCanaries,
         formula: "Count of indicators breaching medium or high risk thresholds",
-        executiveSummary: `Canary signals are binary warnings triggered when individual indicators cross predefined thresholds. ${ccpi.activeCanaries} of 38 indicators are currently flashing warning signals.`,
+        executiveSummary: `Canary signals are binary warnings triggered when individual indicators cross predefined thresholds. ${ccpi.activeCanaries} of ${ccpi.totalIndicators || 29} scored indicators are currently flashing warning signals.`,
         severityLevels: {
           high: "Critical breach requiring immediate attention",
           medium: "Elevated risk requiring monitoring",
@@ -146,11 +150,11 @@ export function CcpiAuditAdmin() {
       name: "Pillar 1 - Momentum & Technical",
       weight: 35,
       score: ccpi.pillars.momentum,
-      formula: "Momentum = Σ(Indicator Score × Weight) / 100, capped at 100",
+      formula: "Momentum = (Raw Points / Scored Weight) × 100, renormalized over live/AI-backed indicators",
       calculation:
-        "16 indicators with explicit weights: NVIDIA (6%), SOX (6%), QQQ Daily Return (8%), QQQ Consecutive Down (5%), QQQ Below SMA20 (5%), QQQ Below SMA50 (7%), QQQ Below SMA200 (10%), QQQ Bollinger (6%), VIX (9%), VXN (7%), RVX (5%), VIX Term (6%), ATR (5%), LTV (5%), Bullish % (5%), Yield Curve (5%)",
+        "10 indicators with maxima summing to 100: NVIDIA (9), SOX (9), QQQ Daily Return (12), QQQ Consecutive Down (7), QQQ Below SMA20 (7), QQQ Below SMA50 (10), QQQ Below SMA200 (15), QQQ Bollinger (9), VIX (13), VIX Term Structure (9). Baseline-tier or missing indicators are excluded and the pillar renormalizes; below 40 scored weight the pillar reports no score.",
       executiveSummary:
-        "Momentum pillar captures price action deterioration, technical breakdown, and volatility spikes. Heavy weighting on critical support levels (SMA50/200) and fear gauges (VIX/VXN). Scores rise dramatically when QQQ breaks key moving averages or volatility explodes above panic thresholds.",
+        "Momentum pillar captures price action deterioration, technical breakdown, and volatility spikes. Heavy weighting on critical support levels (SMA50/200) and the VIX complex. Scores rise dramatically when QQQ breaks key moving averages or volatility explodes above panic thresholds. (VXN, RVX, ATR, LTV, and Bullish % were removed in the provenance rework — they were unsourced baseline constants.)",
       validation: `Pillar score ${ccpi.pillars.momentum}/100. ${ccpi.pillars.momentum > 70 ? "🔴 EXTREME RISK" : ccpi.pillars.momentum > 50 ? "🟡 ELEVATED RISK" : "🟢 NORMAL"}`,
       indicators: [
         {
@@ -314,122 +318,20 @@ export function CcpiAuditAdmin() {
           },
         },
         {
-          name: "VXN (Nasdaq Volatility)",
-          formula: "Nasdaq Fear = QQQ 30-day implied volatility from options",
+          name: "VIX Term Structure (VIX3M / VIX)",
+          formula: "Term Structure = 3-Month VIX (VIX3M) / Spot VIX — ratio convention, normal contango ≈ 1.08",
           executiveSummary:
-            "VXN specifically tracks tech sector fear. More sensitive to AI/growth stock panic than broad market VIX.",
-          currentValue: ccpi.indicators.vxn.toFixed(1),
-          ranges: {
-            safe: "Below 15",
-            warning: "15-25",
-            danger: "Above 25 (tech panic if >35)",
-          },
-          dataSources: getDataSourceForIndicator("VIX Term Structure", dataSources),
-          canaryThresholds: {
-            medium: "VXN > 25",
-            high: "VXN > 35 (Nasdaq panic)",
-          },
-        },
-        {
-          name: "RVX (Russell 2000 Volatility)",
-          formula: "Small-cap Fear = Russell 2000 30-day implied volatility",
-          executiveSummary:
-            "RVX tracks small-cap stress. Often leads broader market volatility as small caps are more sensitive to economic changes.",
-          currentValue: ccpi.indicators.rvx.toFixed(1),
-          ranges: {
-            safe: "Below 18",
-            warning: "18-25",
-            danger: "Above 25 (small-cap stress)",
-          },
-          dataSources: getDataSourceForIndicator("VIX Term Structure", dataSources),
-          canaryThresholds: {
-            medium: "RVX > 25",
-            high: "RVX > 35 (small-cap panic)",
-          },
-        },
-        {
-          name: "VIX Term Structure (Spot/1M)",
-          formula: "Term Structure = 1-Month VIX / Spot VIX (normal > 1.0)",
-          executiveSummary:
-            "Term structure shows market's fear timeline. Inversion (ratio < 1.0) means immediate fear exceeds future expectations - classic crash signal.",
+            "Term structure shows the market's fear timeline. Backwardation (ratio < 1.0) means immediate fear exceeds future expectations - classic crash signal. Both legs come from FRED.",
           currentValue: `${ccpi.indicators.vixTermStructure.toFixed(2)} ${ccpi.indicators.vixTermInverted ? "(INVERTED - FEAR)" : ""}`,
           ranges: {
-            safe: "Above 1.2 (normal contango)",
-            warning: "0.8-1.2 (flattening)",
-            danger: "Below 0.8 (backwardation - immediate fear)",
+            safe: "Above 1.05 (normal contango, baseline ~1.08)",
+            warning: "1.00-1.05 (flattening)",
+            danger: "Below 1.00 (backwardation - immediate fear; <0.95 severe)",
           },
           dataSources: getDataSourceForIndicator("VIX Term Structure", dataSources),
           canaryThresholds: {
-            medium: "Ratio < 1.2 (flattening)",
-            high: "Ratio < 0.8 or inverted (fear spike)",
-          },
-        },
-        {
-          name: "ATR - Average True Range",
-          formula: "Volatility = 14-day average of daily high-low ranges",
-          executiveSummary:
-            "ATR measures actual price volatility. Rising ATR indicates unstable, whipsaw markets prone to crashes.",
-          currentValue: ccpi.indicators.atr.toFixed(1),
-          ranges: {
-            safe: "Below 25 (stable)",
-            warning: "25-40 (elevated volatility)",
-            danger: "Above 40 (extreme instability if >50)",
-          },
-          dataSources: getDataSourceForIndicator("VIX Term Structure", dataSources),
-          canaryThresholds: {
-            medium: "ATR > 40",
-            high: "ATR > 50 (extreme volatility)",
-          },
-        },
-        {
-          name: "LTV - Long-term Volatility",
-          formula: "Sustained Volatility = 90-day rolling standard deviation of returns",
-          executiveSummary:
-            "LTV captures persistent instability. High LTV means volatility is structural, not transient.",
-          currentValue: `${(ccpi.indicators.ltv * 100).toFixed(1)}%`,
-          ranges: {
-            safe: "Below 10% (calm)",
-            warning: "10-15% (elevated)",
-            danger: "Above 15% (sustained instability if >20%)",
-          },
-          dataSources: getDataSourceForIndicator("VIX Term Structure", dataSources),
-          canaryThresholds: {
-            medium: "LTV > 15%",
-            high: "LTV > 20% (chronic instability)",
-          },
-        },
-        {
-          name: "Bullish Percent Index",
-          formula: "Breadth = % of stocks on Point & Figure buy signals",
-          executiveSummary:
-            "Measures market participation. Extremes (>70% or <30%) indicate overbought/oversold conditions ripe for reversals.",
-          currentValue: `${ccpi.indicators.bullishPercent}%`,
-          ranges: {
-            safe: "40-60% (healthy)",
-            warning: "60-70% or 30-40% (stretched)",
-            danger: "Above 70% (overbought) or Below 30% (oversold)",
-          },
-          dataSources: getDataSourceForIndicator("QQQ Technicals", dataSources),
-          canaryThresholds: {
-            medium: ">60% or <40%",
-            high: ">70% (overbought danger) or <30% (panic)",
-          },
-        },
-        {
-          name: "Yield Curve (10Y-2Y)",
-          formula: "Recession Signal = 10-Year Treasury Yield - 2-Year Treasury Yield",
-          executiveSummary:
-            "Inverted yield curve (negative spread) has preceded every recession since 1950. Market prices in future economic weakness.",
-          currentValue: `${ccpi.indicators.yieldCurve > 0 ? "+" : ""}${ccpi.indicators.yieldCurve.toFixed(2)}%`,
-          ranges: {
-            safe: "Above 0% (normal curve)",
-            warning: "0% to -0.5% (inverted)",
-            danger: "Below -0.5% (deep inversion - recession signal)",
-          },
-          dataSources: getDataSourceForIndicator("FRED Macro", dataSources),
-          canaryThresholds: {
-            medium: "Curve inverted (-0.2% to -0.5%)",
-            high: "Deep inversion (< -0.5%)",
+            medium: "Ratio < 1.0 (mild backwardation)",
+            high: "Ratio < 0.95 (severe backwardation)",
           },
         },
       ],
@@ -441,9 +343,9 @@ export function CcpiAuditAdmin() {
       name: "Pillar 2 - Risk Appetite & Volatility",
       weight: 30,
       score: ccpi.pillars.riskAppetite,
-      formula: "Risk Appetite = Σ(Indicator Score × Weight) / 100, capped at 100",
+      formula: "Risk Appetite = (Raw Points / Scored Weight) × 100, renormalized over live/AI-backed indicators",
       calculation:
-        "8 indicators: Put/Call (18%), Fear & Greed (15%), AAII Bullish (16%), Short Interest (13%), ATR (10%), LTV (10%), Bullish % (10%), Yield Curve (8%)",
+        "4 indicators with maxima summing to 100: Put/Call (29), Fear & Greed (24), AAII Bullish (26), Short Interest (21). A null Fear & Greed is excluded AND renormalized rather than silently deflating the pillar. (ATR, LTV, Bullish %, and the duplicate Yield Curve entry were removed in the provenance rework.)",
       executiveSummary:
         "Risk appetite pillar detects euphoria (complacency) and panic (capitulation) through sentiment and positioning indicators. Low put/call ratios and high bullish sentiment signal dangerous complacency, while extreme fear can be contrarian opportunity.",
       validation: `Pillar score ${ccpi.pillars.riskAppetite}/100. ${ccpi.pillars.riskAppetite > 70 ? "🔴 EXTREME COMPLACENCY" : ccpi.pillars.riskAppetite > 50 ? "🟡 ELEVATED RISK" : "🟢 HEALTHY"}`,
@@ -528,73 +430,6 @@ export function CcpiAuditAdmin() {
           canaryThresholds: {
             medium: ">5% (increased bearish positioning)",
             high: ">8% (extreme bearish stress)",
-          },
-        },
-        {
-          name: "ATR - Average True Range",
-          formula: "Market Choppiness = 14-day average of (High - Low)",
-          executiveSummary:
-            "High ATR indicates nervous, unstable markets with large intraday swings - precursor to crashes.",
-          currentValue: ccpi.indicators.atr.toFixed(1),
-          ranges: {
-            safe: "Below 30",
-            warning: "30-40",
-            danger: "Above 40 (extreme if >50)",
-          },
-          dataSources: getDataSourceForIndicator("VIX Term Structure", dataSources),
-          canaryThresholds: {
-            medium: ">40",
-            high: ">50 (panic-level volatility)",
-          },
-        },
-        {
-          name: "LTV - Long-term Volatility",
-          formula: "Chronic Instability = 90-day rolling volatility",
-          executiveSummary: "Persistent high volatility indicates structural market problems, not transient shocks.",
-          currentValue: `${(ccpi.indicators.ltv * 100).toFixed(1)}%`,
-          ranges: {
-            safe: "Below 12%",
-            warning: "12-15%",
-            danger: "Above 15% (sustained stress if >20%)",
-          },
-          dataSources: getDataSourceForIndicator("VIX Term Structure", dataSources),
-          canaryThresholds: {
-            medium: ">15%",
-            high: ">20% (structural instability)",
-          },
-        },
-        {
-          name: "Bullish Percent Index",
-          formula: "Market Breadth = % of stocks on buy signals",
-          executiveSummary:
-            "Extreme readings indicate overbought (>70%) or oversold (<30%) conditions prone to sharp reversals.",
-          currentValue: `${ccpi.indicators.bullishPercent}%`,
-          ranges: {
-            safe: "40-60%",
-            warning: "30-40% or 60-70%",
-            danger: "Below 30% (oversold) or Above 70% (overbought)",
-          },
-          dataSources: getDataSourceForIndicator("QQQ Technicals", dataSources),
-          canaryThresholds: {
-            medium: "<40% or >60%",
-            high: "<30% or >70%",
-          },
-        },
-        {
-          name: "Yield Curve (10Y-2Y)",
-          formula: "Recession Indicator = 10Y Treasury - 2Y Treasury",
-          executiveSummary:
-            "Inverted yield curve signals loss of confidence in near-term economy, often preceding recessions and market crashes.",
-          currentValue: `${ccpi.indicators.yieldCurve.toFixed(2)}%`,
-          ranges: {
-            safe: "Above 0%",
-            warning: "0% to -0.5%",
-            danger: "Below -0.5% (deep inversion)",
-          },
-          dataSources: getDataSourceForIndicator("FRED Macro", dataSources),
-          canaryThresholds: {
-            medium: "Inverted (<0%)",
-            high: "Deep inversion (<-0.5%)",
           },
         },
       ],
@@ -742,9 +577,9 @@ export function CcpiAuditAdmin() {
       name: "Pillar 4 - Macro (20% weight)",
       weight: 20,
       score: ccpi.pillars.macro,
-      formula: "Macro = Σ(Indicator Score × Weight) / 100, capped at 100",
+      formula: "Macro = (Raw Points / Scored Weight) × 100, renormalized over live/AI-backed indicators",
       calculation:
-        "7 indicators: TED Spread (15%), DXY Dollar Index (14%), ISM PMI (18%), Fed Funds Rate (17%), Fed Reverse Repo (13%), Junk Bond Spread (12%), US Debt-to-GDP (11%)",
+        "8 indicators with maxima summing to 100: TED Spread (13), DXY Dollar Index (12), ISM PMI (15), Fed Funds Rate (15), Fed Reverse Repo (11), Junk Bond Spread (10), US Debt-to-GDP (10), Yield Curve (14). The 10Y-2Y yield curve is scored once, here — its former duplicates in Pillars 1 and 2 and the crash-amplifier bonus were removed.",
       executiveSummary:
         "Macro pillar captures systemic economic and financial conditions. Banking stress (TED spread), policy tightness (Fed funds), and credit stress (junk spreads) signal macro headwinds that can trigger crashes.",
       validation: `Pillar score ${ccpi.pillars.macro}/100. ${ccpi.pillars.macro > 70 ? "🔴 MACRO CRISIS" : ccpi.pillars.macro > 50 ? "🟡 RESTRICTIVE" : "🟢 STABLE"}`,
@@ -866,6 +701,23 @@ export function CcpiAuditAdmin() {
           canaryThresholds: {
             medium: ">110%",
             high: ">130% (fiscal crisis risk)",
+          },
+        },
+        {
+          name: "Yield Curve (10Y-2Y)",
+          formula: "Recession Signal = 10-Year Treasury Yield - 2-Year Treasury Yield",
+          executiveSummary:
+            "Inverted yield curve (negative spread) has preceded every recession since 1950. Scored once, in this pillar (max 14 points).",
+          currentValue: `${ccpi.indicators.yieldCurve > 0 ? "+" : ""}${ccpi.indicators.yieldCurve.toFixed(2)}%`,
+          ranges: {
+            safe: "Above 0% (normal curve)",
+            warning: "0% to -0.5% (inverted)",
+            danger: "Below -0.5% (deep inversion - recession signal)",
+          },
+          dataSources: getDataSourceForIndicator("FRED Macro", dataSources),
+          canaryThresholds: {
+            medium: "Curve inverted (-0.2% to -0.5%)",
+            high: "Deep inversion (< -0.5%)",
           },
         },
       ],
@@ -1033,7 +885,7 @@ ${idx + 1}. **${ind.name}**
             CCPI Audit - Complete Transparency
           </h2>
           <p className="text-sm text-gray-600 mt-1">
-            Full formulas, thresholds, data sources, and validation for all 38 indicators across 4 pillars
+            Full formulas, thresholds, data sources, and validation for all 29 scored indicators across 4 pillars
           </p>
         </div>
         <div className="flex gap-2">

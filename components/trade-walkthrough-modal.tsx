@@ -159,9 +159,27 @@ function parseSetup(setup: string, flow: StrategyFlow) {
   let width = 0
   const legs: Leg[] = []
 
+  // Iron-condor style "550/545 – 580/585": a put spread below price and a call
+  // spread above it. Two slash-pairs of strikes → four legs. Handled before the
+  // generic vertical branch, which would otherwise misread the first two numbers
+  // as a 2-leg call vertical.
+  const condor = text.match(
+    /(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*[–—-]\s*(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/,
+  )
   // Explicit "Buy ... Sell ..." phrasing (collars, diagonals).
   const explicit = text.match(/(buy|sell)\s+[^,]*?(\d+(?:\.\d+)?)\s*(put|call|p|c)?/gi)
-  if (explicit && explicit.length >= 2) {
+  if (condor) {
+    // Sort the four strikes: lowest two form the put wing, highest two the call wing.
+    const sorted = [Number(condor[1]), Number(condor[2]), Number(condor[3]), Number(condor[4])].sort((a, b) => a - b)
+    const [putLong, putShort, callShort, callLong] = sorted
+    width = Math.max(putShort - putLong, callLong - callShort)
+    legs.push({ side: "SELL", qty: 1, strike: putShort, right: "PUT", label: `Sell ${putShort} PUT` })
+    legs.push({ side: "BUY", qty: 1, strike: putLong, right: "PUT", label: `Buy ${putLong} PUT` })
+    legs.push({ side: "SELL", qty: 1, strike: callShort, right: "CALL", label: `Sell ${callShort} CALL` })
+    legs.push({ side: "BUY", qty: 1, strike: callLong, right: "CALL", label: `Buy ${callLong} CALL` })
+    // Leave shortStrike/longStrike null: the 2-leg vertical chain mockup does not
+    // apply — the generic chain screen renders all four legs instead.
+  } else if (explicit && explicit.length >= 2) {
     explicit.forEach((seg) => {
       const side = /buy/i.test(seg) ? "BUY" : "SELL"
       const strikeMatch = seg.match(/(\d+(?:\.\d+)?)/)
@@ -736,7 +754,7 @@ function ScreenMockup({
             </div>
             <div className="rounded bg-[#11182a] p-2">
               <p className="text-[9px] uppercase text-gray-400">BP Effect</p>
-              <p className="font-bold text-white">{width > 0 ? `≈ $${width}00` : "See ticket"}</p>
+              <p className="font-bold text-white">{width > 0 ? `≈ $${(width * 100).toLocaleString()}` : "See ticket"}</p>
             </div>
           </div>
         </div>

@@ -32,14 +32,14 @@ export interface CCPIData {
   crashAmplifiers?: Array<{ reason: string; points: number }>
   totalBonus?: number
   certainty: number
-  // NOTE: since the P3 provenance rework the API reports null for a pillar
-  // whose scored weight fell below the minimum (see lib/ccpi/scoring.ts).
-  // Typed as number here pending the dashboard's null-handling pass.
+  // Null when a pillar's scored weight fell below the minimum after baseline
+  // exclusion (see lib/ccpi/scoring.ts) — the dashboard renders "insufficient
+  // data" for null and the composite renormalizes over the scored pillars.
   pillars: {
-    momentum: number // Pillar 1 - Momentum & Technical (35%)
-    riskAppetite: number // Pillar 2 - Risk Appetite & Volatility (30%)
-    valuation: number // Pillar 3 - Valuation (15%)
-    macro: number // Pillar 4 - Macro (20%)
+    momentum: number | null // Pillar 1 - Momentum & Technical (35%)
+    riskAppetite: number | null // Pillar 2 - Risk Appetite & Volatility (30%)
+    valuation: number | null // Pillar 3 - Valuation (15%)
+    macro: number | null // Pillar 4 - Macro (20%)
   }
   regime: {
     level: number

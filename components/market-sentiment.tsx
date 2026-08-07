@@ -90,8 +90,8 @@ interface SentimentData {
   industry?: string
 }
 
-const RefreshIcon = () => (
-  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+const RefreshIcon = ({ className = "h-4 w-4" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -101,8 +101,8 @@ const RefreshIcon = () => (
   </svg>
 )
 
-const InfoIcon = () => (
-  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+const InfoIcon = ({ className = "h-4 w-4" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -112,8 +112,8 @@ const InfoIcon = () => (
   </svg>
 )
 
-const BarChartIcon = () => (
-  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+const BarChartIcon = ({ className = "h-5 w-5" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -123,32 +123,32 @@ const BarChartIcon = () => (
   </svg>
 )
 
-const ActivityIcon = () => (
-  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+const ActivityIcon = ({ className = "h-5 w-5" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
   </svg>
 )
 
-const TrendingUpIcon = () => (
-  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+const TrendingUpIcon = ({ className = "h-3 w-3" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
   </svg>
 )
 
-const TrendingDownIcon = () => (
-  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+const TrendingDownIcon = ({ className = "h-3 w-3" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
   </svg>
 )
 
-const MinusIcon = () => (
-  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+const MinusIcon = ({ className = "h-3 w-3" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
   </svg>
 )
 
-const TargetIcon = () => (
-  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+const TargetIcon = ({ className = "h-5 w-5" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -158,8 +158,8 @@ const TargetIcon = () => (
   </svg>
 )
 
-const DollarSignIcon = () => (
-  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+const DollarSignIcon = ({ className = "h-5 w-5" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -169,8 +169,8 @@ const DollarSignIcon = () => (
   </svg>
 )
 
-const ShieldIcon = () => (
-  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+const ShieldIcon = ({ className = "h-5 w-5" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -180,8 +180,8 @@ const ShieldIcon = () => (
   </svg>
 )
 
-const LightbulbIcon = () => (
-  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+const LightbulbIcon = ({ className = "h-5 w-5" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -565,7 +565,7 @@ export function MarketSentiment() {
       return { data: [], dates: [], label: "" }
     }
 
-    const { spy, vix, dates } = marketData.chartData
+    const { spy, vix, date: dates } = marketData.chartData
 
     console.log(
       "[v0] Available chart data - SPY points:",

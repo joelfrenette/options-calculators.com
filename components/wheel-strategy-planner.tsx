@@ -52,12 +52,13 @@ export function WheelStrategyPlanner() {
   const targetIncomeNum = Number.parseFloat(targetWeeklyIncome) || 0
 
   // Calculate suggested CSP parameters
-  const maxContracts = Math.floor(capitalNum / (stockPriceNum * 100))
-  const requiredPremiumPerContract = targetIncomeNum / maxContracts
-  const requiredPremiumPercent = (requiredPremiumPerContract / stockPriceNum) * 100
+  const maxContracts = stockPriceNum > 0 ? Math.floor(capitalNum / (stockPriceNum * 100)) : 0
+  const requiredPremiumPerContract = maxContracts > 0 ? targetIncomeNum / maxContracts : 0
+  // Premium is per-contract dollars (100 shares); convert to per-share before comparing to stock price
+  const requiredPremiumPercent = stockPriceNum > 0 ? (requiredPremiumPerContract / 100 / stockPriceNum) * 100 : 0
 
   // Suggested strikes (typically 5-10% OTM for CSPs)
-  const suggestedStrikes = []
+  const suggestedStrikes: number[] = []
   if (stockPriceNum > 0) {
     for (let i = 0.95; i >= 0.85; i -= 0.025) {
       const strike = Math.round(stockPriceNum * i)
@@ -67,12 +68,12 @@ export function WheelStrategyPlanner() {
     }
   }
 
-  // Assignment zone (within 5% of strike)
+  // Assignment zone: assignment happens when the stock is at or below the strike at expiry
   const assignmentZone =
     suggestedStrikes.length > 0
       ? {
           lower: Math.round(suggestedStrikes[0] * 0.95),
-          upper: Math.round(suggestedStrikes[0] * 1.05),
+          upper: suggestedStrikes[0],
         }
       : null
 
@@ -277,7 +278,7 @@ export function WheelStrategyPlanner() {
                   <p className="text-xs text-gray-600 mb-1">Total Weekly Income</p>
                   <p className="text-xl font-bold text-primary">${targetIncomeNum.toFixed(2)}</p>
                   <p className="text-xs text-gray-500">
-                    {((targetIncomeNum / capitalNum) * 100).toFixed(2)}% weekly return
+                    {(capitalNum > 0 ? (targetIncomeNum / capitalNum) * 100 : 0).toFixed(2)}% weekly return
                   </p>
                 </div>
               </div>
@@ -317,7 +318,9 @@ export function WheelStrategyPlanner() {
                   <p className="text-2xl font-bold text-gray-900">
                     ${assignmentZone.lower} - ${assignmentZone.upper}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">Within 5% of ${suggestedStrikes[0]} strike</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    At or below the ${suggestedStrikes[0]} strike (shown to 5% below)
+                  </p>
                 </div>
                 <div className="text-sm text-gray-600 space-y-1">
                   <p>• Be prepared to own {maxContracts * 100} shares</p>

@@ -21,7 +21,10 @@ async function getYahooCrumbAndCookies() {
       },
     })
 
-    const setCookieHeaders = initResponse.headers.getSetCookie?.() || []
+    // getSetCookie is available at runtime (Node 18.14+/undici) but missing from the
+    // TS DOM lib in use — type it explicitly instead of relying on lib typings.
+    const headersWithSetCookie = initResponse.headers as Headers & { getSetCookie?: () => string[] }
+    const setCookieHeaders: string[] = headersWithSetCookie.getSetCookie?.() || []
     const cookies = setCookieHeaders
       .map((cookie) => cookie.split(";")[0])
       .filter((c) => c)
