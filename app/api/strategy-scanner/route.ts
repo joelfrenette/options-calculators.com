@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { resolveApiKey } from "@/lib/api-keys"
 import { calculateDelta as bsDelta, calculateOptionPrice, probabilityBetween, probabilityOTM } from "@/lib/black-scholes"
+import { meteredFetch } from "@/lib/metered-fetch"
 
 // Resolved through lib/api-keys so the DISABLED_APIS kill switch and the
 // alias-aware lookup apply to this route too (AUDIT_BACKLOG P1-12).
@@ -35,9 +36,10 @@ const ATM_BAND = 0.05
 async function getStockPrice(ticker: string): Promise<{ price: number; asOf: string } | null> {
   if (!POLYGON_API_KEY) return null
   try {
-    const res = await fetch(`https://api.polygon.io/v2/aggs/ticker/${ticker}/prev?apiKey=${POLYGON_API_KEY}`, {
+    const res = await meteredFetch("polygon", `https://api.polygon.io/v2/aggs/ticker/${ticker}/prev?apiKey=${POLYGON_API_KEY}`, {
       next: { revalidate: 60 },
       signal: AbortSignal.timeout(8000),
+      routeTag: "strategy-scanner",
     })
     if (!res.ok) return null
     const data = await res.json()
@@ -89,9 +91,10 @@ async function getIVData(ticker: string, price: number): Promise<IVSnapshot | nu
     // every scanner row was withheld (found live on staging, 2026-08-07).
     const minExpiry = new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10)
     const maxExpiry = new Date(Date.now() + 45 * 86400_000).toISOString().slice(0, 10)
-    const res = await fetch(
+    const res = await meteredFetch(
+      "polygon",
       `https://api.polygon.io/v3/snapshot/options/${ticker}?contract_type=call&expiration_date.gte=${minExpiry}&expiration_date.lte=${maxExpiry}&limit=250&apiKey=${POLYGON_API_KEY}`,
-      { next: { revalidate: 300 }, signal: AbortSignal.timeout(10000) },
+      { next: { revalidate: 300 }, signal: AbortSignal.timeout(10000), routeTag: "strategy-scanner" },
     )
     if (!res.ok) return null
 
@@ -137,9 +140,10 @@ async function getUpcomingEarnings(): Promise<any[]> {
     const fromDate = today.toISOString().split("T")[0]
     const toDate = twoWeeksLater.toISOString().split("T")[0]
 
-    const res = await fetch(
+    const res = await meteredFetch(
+      "finnhub",
       `https://finnhub.io/api/v1/calendar/earnings?from=${fromDate}&to=${toDate}&token=${FINNHUB_API_KEY}`,
-      { next: { revalidate: 3600 } },
+      { next: { revalidate: 3600 }, routeTag: "strategy-scanner" },
     )
     if (!res.ok) return []
     const data = await res.json()
@@ -166,9 +170,10 @@ async function getEarningsDateMap(tickers: string[]): Promise<Map<string, string
   try {
     const from = new Date().toISOString().slice(0, 10)
     const to = new Date(Date.now() + 100 * 86400_000).toISOString().slice(0, 10)
-    const res = await fetch(
+    const res = await meteredFetch(
+      "finnhub",
       `https://finnhub.io/api/v1/calendar/earnings?from=${from}&to=${to}&token=${FINNHUB_API_KEY}`,
-      { next: { revalidate: 3600 }, signal: AbortSignal.timeout(10000) },
+      { next: { revalidate: 3600 }, signal: AbortSignal.timeout(10000), routeTag: "strategy-scanner" },
     )
     if (!res.ok) return map
 
@@ -210,8 +215,9 @@ async function getCompanyProfile(ticker: string): Promise<{ name: string; market
   }
 
   try {
-    const res = await fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${ticker}&token=${FINNHUB_API_KEY}`, {
+    const res = await meteredFetch("finnhub", `https://finnhub.io/api/v1/stock/profile2?symbol=${ticker}&token=${FINNHUB_API_KEY}`, {
       next: { revalidate: 86400 },
+      routeTag: "strategy-scanner",
     })
     if (!res.ok) return { name: COMPANY_NAMES[ticker] || ticker, marketCap: 0 }
     const data = await res.json()

@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getApiKey, resolveApiKey } from "@/lib/api-keys"
+import { meteredFetch } from "@/lib/metered-fetch"
 
 export const runtime = "edge"
 export const dynamic = "force-dynamic"
@@ -32,7 +33,7 @@ async function fetchFMPScreener(params: {
   console.log(`[v0] FMP screener request: ${url.replace(key, "API_KEY")}`)
 
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(15000) })
+    const res = await meteredFetch("fmp", url, { signal: AbortSignal.timeout(15000), routeTag: "polygon-tickers" })
     if (!res.ok) {
       console.error(`[v0] FMP screener HTTP ${res.status}`)
       return null
@@ -82,7 +83,7 @@ async function fetchPolygonCommonStocksAllowlist(): Promise<Set<string> | null> 
   for (let page = 0; page < 6; page++) {
     // hard cap at 6 pages (6000 CS tickers) to stay under the edge budget.
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
+      const res = await meteredFetch("polygon", url, { signal: AbortSignal.timeout(8000), routeTag: "polygon-tickers" })
       if (!res.ok) {
         console.log(`[v0] CS allowlist page ${page} HTTP ${res.status}`)
         break
@@ -143,7 +144,7 @@ async function fetchPolygonGroupedBars(params: {
     const url = `https://api.polygon.io/v2/aggs/grouped/locale/us/market/stocks/${date}?adjusted=true&apiKey=${key}`
     console.log(`[v0] Polygon grouped bars: trying date=${date}`)
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(12000) })
+      const res = await meteredFetch("polygon", url, { signal: AbortSignal.timeout(12000), routeTag: "polygon-tickers" })
       if (!res.ok) {
         console.log(`[v0] Polygon grouped bars ${date} HTTP ${res.status}`)
         continue
@@ -473,8 +474,9 @@ export async function GET(request: NextRequest) {
           const controller = new AbortController()
           const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
-          const response = await fetch(url, {
+          const response = await meteredFetch("polygon", url, {
             signal: controller.signal,
+            routeTag: "polygon-tickers",
           })
 
           clearTimeout(timeoutId)

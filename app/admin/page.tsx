@@ -25,6 +25,7 @@ import {
   Key,
   Shield,
   DollarSign,
+  HeartPulse,
 } from "lucide-react"
 import { ApiKeysManager } from "@/components/api-keys-manager"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -34,6 +35,7 @@ import { AIStatusAdmin } from "@/components/ai-status-admin"
 import { RemainingSiteAudit } from "@/components/remaining-site-audit"
 import { FullSystemAudit } from "@/components/admin/full-system-audit"
 import { CostsUsageAdmin } from "@/components/costs-usage-admin"
+import { HealthCheckPanel } from "@/components/admin/health-check-panel"
 
 interface ApiStatus {
   name: string
@@ -205,13 +207,20 @@ ${auditResults.issues.length === 0 ? "✓ No fake data detected\n✓ No random n
 
         {/* Main Tabs */}
         <Tabs defaultValue="full-audit" className="w-full" onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-10 gap-1 bg-slate-800 p-1 h-auto mb-6">
+          <TabsList className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-11 gap-1 bg-slate-800 p-1 h-auto mb-6">
             <TabsTrigger
               value="full-audit"
               className="text-slate-200 data-[state=active]:bg-green-600 data-[state=active]:text-white text-xs md:text-sm"
             >
               <Shield className="h-4 w-4 mr-1 md:mr-2" />
               <span className="hidden md:inline">Full</span> Audit
+            </TabsTrigger>
+            <TabsTrigger
+              value="health"
+              className="text-slate-200 data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-xs md:text-sm"
+            >
+              <HeartPulse className="h-4 w-4 mr-1 md:mr-2" />
+              Health
             </TabsTrigger>
             <TabsTrigger
               value="costs"
@@ -280,6 +289,10 @@ ${auditResults.issues.length === 0 ? "✓ No fake data detected\n✓ No random n
 
           <TabsContent value="full-audit">
             <FullSystemAudit />
+          </TabsContent>
+
+          <TabsContent value="health">
+            <HealthCheckPanel />
           </TabsContent>
 
           <TabsContent value="costs">

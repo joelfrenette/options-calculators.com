@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { meteredFetch } from "@/lib/metered-fetch"
 
 export const runtime = "edge"
 
@@ -9,7 +10,7 @@ async function fetchWithTimeout(url: string, timeoutMs: number = FETCH_TIMEOUT_M
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
-    const response = await fetch(url, { signal: controller.signal })
+    const response = await meteredFetch("polygon", url, { signal: controller.signal, routeTag: "polygon-proxy" })
     clearTimeout(timeoutId)
     return response
   } catch (error) {

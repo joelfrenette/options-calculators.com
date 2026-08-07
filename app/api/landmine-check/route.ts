@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { resolveApiKey } from "@/lib/api-keys"
 import { generateCuratedEconomicEvents } from "@/lib/economic-events"
+import { meteredFetch } from "@/lib/metered-fetch"
 
 export const runtime = "edge"
 export const dynamic = "force-dynamic"
@@ -49,9 +50,14 @@ export async function GET(request: NextRequest) {
   let earningsSource = "unavailable"
   if (finnhubKey) {
     try {
-      const res = await fetch(`https://finnhub.io/api/v1/calendar/earnings?from=${from}&to=${to}&token=${finnhubKey}`, {
-        signal: AbortSignal.timeout(10000),
-      })
+      const res = await meteredFetch(
+        "finnhub",
+        `https://finnhub.io/api/v1/calendar/earnings?from=${from}&to=${to}&token=${finnhubKey}`,
+        {
+          signal: AbortSignal.timeout(10000),
+          routeTag: "landmine-check",
+        },
+      )
       if (res.ok) {
         const data = await res.json()
         const rows: any[] = data.earningsCalendar || []
