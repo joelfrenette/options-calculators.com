@@ -2,7 +2,7 @@
 // Centralized console logging with consistent formatting
 
 import type { CCPIData } from "./types"
-import { calculateCCPI, countActiveWarnings } from "./calculations"
+import { calculateCCPI, countActiveWarnings, formatPillarContribution } from "./calculations"
 
 /**
  * Logs CCPI data load summary
@@ -28,14 +28,18 @@ export function logCCPIDataLoaded(data: CCPIData): void {
  * Logs pillar breakdown with weighted contributions
  */
 export function logPillarBreakdown(data: CCPIData): void {
+  // formatPillarContribution is null-aware (a pillar is null when excluded for
+  // insufficient scored weight) and renormalizes like the scoring core.
   console.log("Pillar Breakdown (weighted contribution to CCPI):")
-  console.log("  Momentum:", data.pillars.momentum, "× 35% =", (data.pillars.momentum * 0.35).toFixed(1))
-  console.log("  Risk Appetite:", data.pillars.riskAppetite, "× 30% =", (data.pillars.riskAppetite * 0.3).toFixed(1))
-  console.log("  Valuation:", data.pillars.valuation, "× 15% =", (data.pillars.valuation * 0.15).toFixed(1))
-  console.log("  Macro:", data.pillars.macro, "× 20% =", (data.pillars.macro * 0.2).toFixed(1))
+  console.log(formatPillarContribution(data.pillars))
 
   const calculatedCCPI = calculateCCPI(data.pillars)
-  console.log("  Calculated CCPI:", calculatedCCPI.toFixed(1), "| API CCPI:", data.ccpi)
+  console.log(
+    "  Calculated CCPI:",
+    calculatedCCPI === null ? "n/a (no scoreable pillars)" : calculatedCCPI.toFixed(1),
+    "| API CCPI:",
+    data.ccpi,
+  )
 }
 
 /**

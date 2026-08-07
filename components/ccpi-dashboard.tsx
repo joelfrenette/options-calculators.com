@@ -7,11 +7,11 @@ import { Info, Sparkles } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { TrendingDown, AlertTriangle, Activity, DollarSign, BarChart3, Users } from "lucide-react"
+import { TrendingDown, AlertTriangle, Activity, DollarSign, BarChart3 } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Download } from "lucide-react"
 
-import type { CCPIData, HistoricalData } from "@/lib/ccpi/types"
+import type { CCPIData, CCPIPillarProvenance, HistoricalData } from "@/lib/ccpi/types"
 import { getReadableColor, getRegimeZone, sortCanaries, countActiveWarnings } from "@/lib/ccpi/calculations"
 import { saveCCPIToCache, loadCCPIFromCache, saveHistoryToCache } from "@/lib/ccpi/cache"
 import { REFRESH_STATUS_MESSAGES } from "@/lib/ccpi/constants"
@@ -319,6 +319,33 @@ function getCrashAmplifierTooltip(reason: string): string {
   return "Crash amplifiers are extreme technical signals that historically appear before or during major market corrections. When active, they add bonus points to the CCPI score because they significantly increase the probability of further downside."
 }
 
+/**
+ * Compact per-pillar data-provenance summary (added by the P3 scoring rework).
+ * Shows how much of the pillar's 100-point weight actually scored, how much of
+ * that was live vs AI-estimated, and which indicators were excluded.
+ */
+function PillarProvenanceLine({ prov }: { prov?: CCPIPillarProvenance }) {
+  if (!prov) return null
+  return (
+    <p className="text-xs text-muted-foreground border-l-2 border-blue-200 pl-2">
+      Scored {prov.scoredMax}/100 weight · {prov.liveMax} live · {prov.aiMax} AI-est
+      {prov.excluded.length > 0 ? ` · excluded: ${prov.excluded.join(", ")}` : ""}
+    </p>
+  )
+}
+
+/**
+ * Pillar score display. A pillar is null when less than the minimum scored
+ * weight was backed by live/AI data — render an explicit "insufficient data"
+ * state instead of 0 or NaN.
+ */
+function PillarScore({ score }: { score: number | null }) {
+  if (score === null || !Number.isFinite(score)) {
+    return <span className="text-sm font-semibold text-gray-500 italic">Insufficient data</span>
+  }
+  return <span className="text-2xl font-bold text-blue-600">{Math.round(score)}/100</span>
+}
+
 export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
   const [data, setData] = useState<CCPIData | null>(null)
   const [history, setHistory] = useState<HistoricalData | null>(null)
@@ -335,21 +362,6 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
   const [cacheTimestamp, setCacheTimestamp] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
 
-  const pillarData = useMemo(() => {
-    if (!data) return []
-    return [
-      { name: "Pillar 1 - Momentum & Technical", value: data.pillars.momentum, weight: "35%", icon: Activity },
-      {
-        name: "Pillar 2 - Risk Appetite & Volatility",
-        value: data.pillars.riskAppetite,
-        weight: "30%",
-        icon: TrendingDown,
-      },
-      { name: "Pillar 3 - Valuation", value: data.pillars.valuation, weight: "15%", icon: DollarSign },
-      { name: "Pillar 4 - Macro", value: data.pillars.macro, weight: "20%", icon: Users },
-    ]
-  }, [data])
-
   const ccpiScore = useMemo(() => (data ? Math.round(data.ccpi) : 0), [data])
   const zone = useMemo(() => getRegimeZone(ccpiScore), [ccpiScore])
   const regimeColor = useMemo(() => getReadableColor(zone.color), [zone.color])
@@ -362,8 +374,8 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
 
       const summaryPayload = {
         ccpi: Math.round(ccpiData.ccpi),
-        certainty: ccpiData.confidence || 0,
-        activeCanaries: ccpiData.canaries ? ccpiData.canaries.filter((c) => c.active).length : 0,
+        certainty: ccpiData.certainty || 0,
+        activeCanaries: ccpiData.canaries ? countActiveWarnings(ccpiData.canaries) : 0,
         totalIndicators: ccpiData.canaries ? ccpiData.canaries.length : 0,
         regime: ccpiData.regime || { name: "Unknown", description: "Unknown" },
         pillars: ccpiData.pillars || { momentum: 0, riskAppetite: 0, valuation: 0, macro: 0 },
@@ -476,7 +488,8 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
     if (!loaded) return
 
     const loadInitialData = async () => {
-      const cached = loadCCPIFromCache()
+      // Older cache entries may carry the executive summary alongside CCPIData.
+      const cached = loadCCPIFromCache() as (CCPIData & { executiveSummary?: string }) | null
       if (cached) {
         setData(cached)
         setFromCache(true)
@@ -532,6 +545,18 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
   if (!data) {
     return null
   }
+
+  // Since the P3 provenance rework the API reports null for a pillar whose
+  // scored weight fell below the minimum (lib/ccpi/types.ts still types
+  // pillars as number pending its own pass) — never render 0 for missing data.
+  const pillarScores = data.pillars as unknown as {
+    momentum: number | null
+    riskAppetite: number | null
+    valuation: number | null
+    macro: number | null
+  }
+  // Narrowed once so indicator blocks don't each re-check for undefined.
+  const indicators: Record<string, any> = data.indicators ?? {}
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -659,11 +684,11 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
               </div>
 
               <div className="text-center p-6 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600 mb-2">Certainty Score</p>
+                <p className="text-sm text-gray-600 mb-2">Data Quality</p>
                 <div className="flex items-center justify-center gap-2">
                   <p className="text-5xl font-bold text-blue-600">{data.certainty}%</p>
                 </div>
-                <p className="text-xs text-gray-500">Signal consistency & alignment</p>
+                <p className="text-xs text-gray-500">Share of scoring weight backed by live data (AI estimates count half)</p>
               </div>
 
               <div className="text-center p-6 bg-gray-50 rounded-lg">
@@ -768,8 +793,9 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <>
                       <p>
                         <span className="font-semibold text-green-700">Regime: {data.regime.name}</span> - With{" "}
-                        {countActiveWarnings(data.canaries)} of {data.totalIndicators || 34} warning signals active and{" "}
-                        {data.certainty}% certainty, the market is in a {data.ccpi <= 19 ? "low-risk" : "normal"} state.
+                        {countActiveWarnings(data.canaries)} of {data.totalIndicators || 29} warning signals active and{" "}
+                        {data.certainty}% data quality, the market is in a {data.ccpi <= 19 ? "low-risk" : "normal"}{" "}
+                        state.
                       </p>
                       <div className="bg-green-50 p-3 rounded border border-green-200">
                         <p className="font-semibold text-green-800">Recommended Strategies This Week:</p>
@@ -785,7 +811,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <>
                       <p>
                         <span className="font-semibold text-yellow-700">Regime: {data.regime.name}</span> - With{" "}
-                        {countActiveWarnings(data.canaries)} of {data.totalIndicators || 34} warning signals active,
+                        {countActiveWarnings(data.canaries)} of {data.totalIndicators || 29} warning signals active,
                         elevated caution is warranted. Monitor for regime shift.
                       </p>
                       <div className="bg-yellow-50 p-3 rounded border border-yellow-200">
@@ -802,7 +828,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     <>
                       <p>
                         <span className="font-semibold text-red-700">Regime: {data.regime.name}</span> - With{" "}
-                        {countActiveWarnings(data.canaries)} of {data.totalIndicators || 34} warning signals active and
+                        {countActiveWarnings(data.canaries)} of {data.totalIndicators || 29} warning signals active and
                         CCPI at {data.ccpi}, extreme caution required.
                       </p>
                       <div className="bg-red-50 p-3 rounded border border-red-200">
@@ -913,7 +939,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className="text-3xl font-bold text-orange-600 cursor-help">
-                    {activeCanariesCount}/{data.totalIndicators || 34}
+                    {activeCanariesCount}/{data.totalIndicators || 29}
                   </div>
                 </TooltipTrigger>
                 <TooltipContent
@@ -922,7 +948,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 >
                   <p className="text-sm">
                     <strong>
-                      {activeCanariesCount} out of {data.totalIndicators || 34}
+                      {activeCanariesCount} out of {data.totalIndicators || 29}
                     </strong>{" "}
                     warning signals are currently active.
                     <br />
@@ -957,7 +983,9 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                       badgeColor: "bg-yellow-600 text-white",
                       label: "MEDIUM RISK",
                     },
-                  }[canary.severity]
+                    // Low-severity canaries are filtered out above; map them to
+                    // medium so the lookup is total for the type system.
+                  }[canary.severity === "high" ? "high" : "medium"]
 
                   const uniqueKey = `${canary.signal}-${i}`
 
@@ -1027,18 +1055,25 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 <div className="flex items-center gap-2">
                   <Activity className="h-5 w-5 text-cyan-600" />
                   <span className="text-lg font-semibold">Pillar 1 - Momentum & Technical</span>
-                  <span className="text-sm text-gray-600">Weight: 35% | 12 indicators</span>
+                  <span className="text-sm text-gray-600">Weight: 35% | 10 indicators</span>
                 </div>
-                <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.momentum)}/100</span>
+                <PillarScore score={pillarScores.momentum} />
               </div>
             </AccordionTrigger>
             <AccordionContent>
               <div className="space-y-6 pt-4">
+                <PillarProvenanceLine prov={data.provenance?.momentum} />
+                {pillarScores.momentum === null && (
+                  <p className="text-sm text-gray-600 italic">
+                    Insufficient live/AI-sourced data to score this pillar — its weight is renormalized across the
+                    remaining pillars.
+                  </p>
+                )}
                 {/* NVIDIA Momentum Score */}
-                {data.indicators?.nvidiaPrice !== undefined && data.indicators?.nvidiaMomentum !== undefined && (
+                {indicators.nvidiaPrice !== undefined && indicators.nvidiaMomentum !== undefined && (
                   <CCPIIndicator
                     label="NVIDIA Price Momentum (Tech Bellwether)"
-                    value={`$${data.indicators.nvidiaPrice.toFixed(0)} | ${data.indicators.nvidiaMomentum}/100`}
+                    value={`$${indicators.nvidiaPrice.toFixed(0)} | ${indicators.nvidiaMomentum}/100`}
                     thresholds={{
                       low: { value: 0, label: "Falling: <20 (Tech crash risk)" },
                       mid: { value: 50, label: "Neutral: 40-60" },
@@ -1063,10 +1098,10 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 )}
 
                 {/* SOX Semiconductor Index */}
-                {data.indicators?.soxIndex !== undefined && (
+                {indicators.soxIndex !== undefined && (
                   <CCPIIndicator
                     label="SOX Semiconductor Index (Chip Sector Health)"
-                    value={data.indicators.soxIndex.toFixed(0)}
+                    value={indicators.soxIndex.toFixed(0)}
                     thresholds={{
                       low: { value: 4000, label: "Weak: <4500" },
                       mid: { value: 5000, label: "Baseline: 5000" },
@@ -1092,12 +1127,12 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 )}
 
                 {/* QQQ Daily Return */}
-                {data.indicators?.qqqDailyReturn !== undefined && (
+                {indicators.qqqDailyReturn !== undefined && (
                   <CCPIIndicator
                     label="QQQ Daily Return (5× downside amplifier)"
-                    value={data.indicators.qqqDailyReturn}
+                    value={indicators.qqqDailyReturn}
                     valueColor={
-                      Number.parseFloat(data.indicators.qqqDailyReturn) > 0 ? "text-green-600" : "text-red-600"
+                      Number.parseFloat(indicators.qqqDailyReturn) > 0 ? "text-green-600" : "text-red-600"
                     }
                     thresholds={{
                       low: { value: -2, label: "Down: <-1%" },
@@ -1123,10 +1158,10 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 )}
 
                 {/* Consecutive Down Days */}
-                {data.indicators?.qqqConsecDown !== undefined && (
+                {indicators.qqqConsecDown !== undefined && (
                   <CCPIIndicator
                     label="QQQ Consecutive Down Days"
-                    value={`${data.indicators.qqqConsecDown} days`}
+                    value={`${indicators.qqqConsecDown} days`}
                     thresholds={{
                       low: { value: 0, label: "Healthy: 0-1 days" },
                       mid: { value: 2.5, label: "Warning: 2-3 days" },
@@ -1151,14 +1186,14 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 )}
 
                 {/* Below SMA20 */}
-                {data.indicators?.qqqBelowSMA20 !== undefined && (
+                {indicators.qqqBelowSMA20 !== undefined && (
                   <CCPIBooleanIndicator
                     label="QQQ Below 20-Day SMA"
-                    value={data.indicators.qqqBelowSMA20}
-                    proximity={data.indicators?.qqqSMA20Proximity || 0}
+                    value={indicators.qqqBelowSMA20}
+                    proximity={indicators.qqqSMA20Proximity || 0}
                     additionalInfo={
-                      data.indicators?.qqqSMA20Proximity !== undefined
-                        ? `${data.indicators.qqqSMA20Proximity.toFixed(0)}% proximity`
+                      indicators.qqqSMA20Proximity !== undefined
+                        ? `${indicators.qqqSMA20Proximity.toFixed(0)}% proximity`
                         : undefined
                     }
                     thresholds={{
@@ -1183,14 +1218,14 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 )}
 
                 {/* Below SMA50 */}
-                {data.indicators?.qqqBelowSMA50 !== undefined && (
+                {indicators.qqqBelowSMA50 !== undefined && (
                   <CCPIBooleanIndicator
                     label="QQQ Below 50-Day SMA"
-                    value={data.indicators.qqqBelowSMA50}
-                    proximity={data.indicators?.qqqSMA50Proximity || 0}
+                    value={indicators.qqqBelowSMA50}
+                    proximity={indicators.qqqSMA50Proximity || 0}
                     additionalInfo={
-                      data.indicators?.qqqSMA50Proximity !== undefined
-                        ? `${data.indicators.qqqSMA50Proximity.toFixed(0)}% proximity`
+                      indicators.qqqSMA50Proximity !== undefined
+                        ? `${indicators.qqqSMA50Proximity.toFixed(0)}% proximity`
                         : undefined
                     }
                     thresholds={{
@@ -1215,14 +1250,14 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 )}
 
                 {/* Below SMA200 */}
-                {data.indicators?.qqqBelowSMA200 !== undefined && (
+                {indicators.qqqBelowSMA200 !== undefined && (
                   <CCPIBooleanIndicator
                     label="QQQ Below 200-Day SMA"
-                    value={data.indicators.qqqBelowSMA200}
-                    proximity={data.indicators?.qqqSMA200Proximity || 0}
+                    value={indicators.qqqBelowSMA200}
+                    proximity={indicators.qqqSMA200Proximity || 0}
                     additionalInfo={
-                      data.indicators?.qqqSMA200Proximity !== undefined
-                        ? `${data.indicators.qqqSMA200Proximity.toFixed(0)}% proximity`
+                      indicators.qqqSMA200Proximity !== undefined
+                        ? `${indicators.qqqSMA200Proximity.toFixed(0)}% proximity`
                         : undefined
                     }
                     thresholds={{
@@ -1247,7 +1282,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 )}
 
                 {/* Below Bollinger Band (Lower) */}
-                {data.indicators?.qqqBelowBollinger !== undefined && (
+                {indicators.qqqBelowBollinger !== undefined && (
                   <div className="space-y-2">
                     {/* Added tooltip to QQQ Below Bollinger Band indicator */}
                     <div className="flex items-center justify-between text-sm">
@@ -1283,25 +1318,25 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                         )}
                       </span>
                       <div className="flex items-center gap-2">
-                        {data.indicators?.qqqBollingerProximity !== undefined && (
+                        {indicators.qqqBollingerProximity !== undefined && (
                           <span className="text-xs font-semibold text-orange-600">
-                            {data.indicators.qqqBollingerProximity.toFixed(0)}% proximity
+                            {indicators.qqqBollingerProximity.toFixed(0)}% proximity
                           </span>
                         )}
                         <span
-                          className={`font-bold ${data.indicators.qqqBelowBollinger ? "text-red-600" : "text-green-600"}`}
+                          className={`font-bold ${indicators.qqqBelowBollinger ? "text-red-600" : "text-green-600"}`}
                         >
-                          {data.indicators.qqqBelowBollinger ? "YES - OVERSOLD" : "NO"}
+                          {indicators.qqqBelowBollinger ? "YES - OVERSOLD" : "NO"}
                         </span>
                       </div>
                     </div>
-                    {Number.isFinite(data.indicators?.qqqBollingerProximity) ? (
+                    {Number.isFinite(indicators.qqqBollingerProximity) ? (
                       <div className="relative w-full h-3 rounded-full overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                         <div
                           className="absolute inset-0 bg-gray-200"
                           style={{
-                            marginLeft: `${Math.min(100, Math.max(0, data.indicators.qqqBollingerProximity as number))}%`,
+                            marginLeft: `${Math.min(100, Math.max(0, indicators.qqqBollingerProximity as number))}%`,
                           }}
                         />
                       </div>
@@ -1320,64 +1355,8 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                   </div>
                 )}
 
-                {/* Death Cross */}
-                {data.indicators?.qqqDeathCross !== undefined && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium flex items-center gap-1">
-                        QQQ Death Cross (SMA50 {"<"} SMA200)
-                        {tooltipsEnabled && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-red-50 border-red-200">
-                              <p className="font-semibold mb-1">Death Cross</p>
-                              <p className="text-sm">
-                                A death cross occurs when the 50-day moving average crosses below the 200-day moving
-                                average, signaling long-term bearish momentum.
-                              </p>
-                              <ul className="text-sm mt-1 space-y-1">
-                                <li>
-                                  <strong>NO (Golden Cross):</strong> 50-day above 200-day = Bullish trend, low risk
-                                </li>
-                                <li>
-                                  <strong>YES (Death Cross):</strong> 50-day below 200-day = Bearish trend, high crash
-                                  risk
-                                </li>
-                              </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Death crosses historically precede extended market declines and
-                                crashes
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </span>
-                      <span
-                        className={`font-bold ${data.indicators.qqqDeathCross ? "text-red-600" : "text-green-600"}`}
-                      >
-                        {data.indicators.qqqDeathCross ? "YES - DANGER" : "NO"}
-                      </span>
-                    </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-red-500" />
-                      <div
-                        className="absolute inset-0 bg-gray-200"
-                        style={{
-                          marginLeft: data.indicators.qqqDeathCross ? "100%" : "0%",
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Golden Cross: Bullish</span>
-                      <span>Death Cross: Bearish</span>
-                    </div>
-                  </div>
-                )}
-
                 {/* VIX */}
-                {data.indicators.vix !== undefined && (
+                {indicators.vix !== undefined && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
@@ -1411,14 +1390,14 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{data.indicators.vix.toFixed(1)}</span>
+                      <span className="font-bold">{indicators.vix.toFixed(1)}</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, (data.indicators.vix / 50) * 100)}%`,
+                          marginLeft: `${Math.min(100, (indicators.vix / 50) * 100)}%`,
                         }}
                       />
                     </div>
@@ -1430,119 +1409,12 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                   </div>
                 )}
 
-                {/* VXN */}
-                {data.indicators.vxn !== undefined && (
+                {/* VIX Term Structure — RATIO convention: VIX3M / spot VIX */}
+                {indicators.vixTermStructure !== undefined && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
-                        VXN (Nasdaq Volatility)
-                        {tooltipsEnabled && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-1">VXN - Nasdaq Volatility</p>
-                              <p className="text-sm">
-                                Measures expected volatility in the Nasdaq-100, tracking tech sector fear levels.
-                              </p>
-                              <ul className="text-sm mt-1 space-y-1">
-                                <li>
-                                  <strong>{"<"}15:</strong> Calm tech market, low risk
-                                </li>
-                                <li>
-                                  <strong>15-25:</strong> Elevated volatility, caution
-                                </li>
-                                <li>
-                                  <strong>{">"}35:</strong> Tech panic mode, crash risk
-                                </li>
-                              </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> High VXN signals tech sector instability and selloff risk
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </span>
-                      <span className="font-bold">{data.indicators.vxn.toFixed(1)}</span>
-                    </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                      <div
-                        className="absolute inset-0 bg-gray-200"
-                        style={{
-                          marginLeft: `${Math.min(100, (data.indicators.vxn / 50) * 100)}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Calm: {"<"}15</span>
-                      <span>Elevated: 15-25</span>
-                      <span>Panic: {">"}35</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* RVX */}
-                {data.indicators.rvx !== undefined && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium flex items-center gap-1">
-                        RVX (Russell 2000 Volatility)
-                        {tooltipsEnabled && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-1">RVX - Russell 2000 Volatility</p>
-                              <p className="text-sm">
-                                Measures expected volatility in small-cap stocks (Russell 2000), indicating broader
-                                market stress.
-                              </p>
-                              <ul className="text-sm mt-1 space-y-1">
-                                <li>
-                                  <strong>{"<"}18:</strong> Low small-cap volatility, stable
-                                </li>
-                                <li>
-                                  <strong>18-25:</strong> Normal volatility range
-                                </li>
-                                <li>
-                                  <strong>{">"}30:</strong> High stress, crash risk for small caps
-                                </li>
-                              </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Small-cap volatility often signals broader market instability
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </span>
-                      <span className="font-bold">{data.indicators.rvx.toFixed(1)}</span>
-                    </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                      <div
-                        className="absolute inset-0 bg-gray-200"
-                        style={{
-                          marginLeft: `${Math.min(100, (data.indicators.rvx / 50) * 100)}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Low: {"<"}18</span>
-                      <span>Normal: 18-25</span>
-                      <span>High: {">"}30</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* VIX Term Structure */}
-                {data.indicators.vixTermStructure !== undefined && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium flex items-center gap-1">
-                        VIX Term Structure (Spot/1M)
+                        VIX Term Structure (VIX3M / VIX)
                         {tooltipsEnabled && (
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -1551,167 +1423,45 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                             <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
                               <p className="font-semibold mb-1">VIX Term Structure</p>
                               <p className="text-sm">
-                                Ratio of spot VIX to 1-month VIX futures. Measures market structure and fear dynamics.
+                                Ratio of 3-month VIX (VIX3M) to spot VIX. Normal markets sit in contango (ratio around
+                                1.08); a ratio below 1.0 means near-term fear exceeds longer-dated fear.
                               </p>
                               <ul className="text-sm mt-1 space-y-1">
                                 <li>
-                                  <strong>{">"}1.5:</strong> Contango - calm market, low risk (good)
+                                  <strong>{">"}1.05:</strong> Normal contango - calm market, low risk (good)
                                 </li>
                                 <li>
-                                  <strong>1.0-1.2:</strong> Normal structure, moderate risk
+                                  <strong>1.00-1.05:</strong> Flattening curve, watch closely
                                 </li>
                                 <li>
-                                  <strong>{"<"}1.0:</strong> Backwardation - panic, high crash risk (bad)
+                                  <strong>{"<"}1.00:</strong> Backwardation - near-term panic, high crash risk (bad)
                                 </li>
                               </ul>
                               <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Backwardation signals extreme fear and imminent crash risk
+                                <strong>Impact:</strong> Backwardation (ratio below 1.0) signals acute fear and elevated
+                                crash risk; below 0.95 is severe
                               </p>
                             </TooltipContent>
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{data.indicators.vixTermStructure.toFixed(2)}</span>
+                      <span className="font-bold">{indicators.vixTermStructure.toFixed(2)}</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, Math.max(0, ((2.0 - data.indicators.vixTermStructure) / 1.5) * 100))}%`,
+                          // Ratio scale: 1.15+ (healthy contango) = 0% risk on the left,
+                          // 1.00 (flat) = midpoint, 0.85 or lower (severe backwardation) = 100%.
+                          marginLeft: `${Math.min(100, Math.max(0, ((1.15 - indicators.vixTermStructure) / 0.3) * 100))}%`,
                         }}
                       />
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
-                      <span className="text-green-600">Contango: {">"}1.5 (Safe)</span>
-                      <span>Normal: 1.0-1.2</span>
-                      <span className="text-red-600">Backwardation: {"<"}1.0 (FEAR)</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* ATR - Average True Range */}
-                {data.indicators.atr !== undefined && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">ATR - Average True Range</span>
-                      <span className="font-bold">{data.indicators.atr.toFixed(1)}</span>
-                    </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                      <div
-                        className="absolute inset-0 bg-gray-200"
-                        style={{
-                          marginLeft: `${Math.min(100, (data.indicators.atr / 60) * 100)}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Low Vol: {"<"}25</span>
-                      <span>Normal: 25-40</span>
-                      <span>High Vol: {">"}50</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* LTV - Long-term Volatility */}
-                {data.indicators.ltv !== undefined && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">LTV - Long-term Volatility</span>
-                      <span className="font-bold">{(data.indicators.ltv * 100).toFixed(1)}%</span>
-                    </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                      <div
-                        className="absolute inset-0 bg-gray-200"
-                        style={{
-                          marginLeft: `${Math.min(100, (data.indicators.ltv / 0.3) * 100)}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Stable: {"<"}10%</span>
-                      <span>Normal: 10-15%</span>
-                      <span>Elevated: {">"}20%</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Bullish Percent Index */}
-                {data.indicators.bullishPercent !== undefined && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">Bullish Percent Index</span>
-                      <span className="font-bold">{data.indicators.bullishPercent}%</span>
-                    </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                      <div
-                        className="absolute inset-0 bg-gray-200"
-                        style={{
-                          marginLeft: `${data.indicators.bullishPercent}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Oversold: {"<"}30%</span>
-                      <span>Normal: 30-50%</span>
-                      <span>Overbought: {">"}70%</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Yield Curve - moved to Risk Appetite */}
-                {data.indicators.yieldCurve !== undefined && (
-                  <div className="space-y-2">
-                    {/* Added tooltip to Yield Curve indicator */}
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium flex items-center gap-1">
-                        Yield Curve (10Y-2Y)
-                        {tooltipsEnabled && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
-                              <p className="font-semibold mb-1">Yield Curve (10Y-2Y) Spread</p>
-                              <p className="text-sm">Difference between 10-year and 2-year Treasury yields.</p>
-                              <ul className="text-sm mt-1 space-y-1">
-                                <li>
-                                  <strong>{">"} 0.5%:</strong> Steep curve, healthy economy, low risk
-                                </li>
-                                <li>
-                                  <strong>0-0.5%:</strong> Flat curve, slowing growth, moderate risk
-                                </li>
-                                <li>
-                                  <strong>{"<"} 0% (Inverted):</strong> Inverted curve, recession signal, high crash
-                                  risk
-                                </li>
-                              </ul>
-                              <p className="text-xs mt-2">
-                                <strong>Impact:</strong> Inverted yield curve has historically preceded recessions and
-                                market crashes
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </span>
-                      <span className="font-bold">{data.indicators.yieldCurve.toFixed(2)}%</span>
-                    </div>
-                    <div className="relative w-full h-3 rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-red-500" />
-                      <div
-                        className="absolute inset-0 bg-gray-200"
-                        style={{
-                          marginLeft: `${Math.min(100, Math.max(0, 100 - ((data.indicators.yieldCurve + 1) / 2) * 100))}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Normal: {">"}0.5%</span>
-                      <span>Flat: 0-0.5%</span>
-                      <span>Inverted: {"<"}0%</span>
+                      <span className="text-green-600">Contango: {">"}1.05 (Safe)</span>
+                      <span>Flat: 1.00</span>
+                      <span className="text-red-600">Backwardation: {"<"}1.00 (FEAR)</span>
                     </div>
                   </div>
                 )}
@@ -1726,15 +1476,22 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 <div className="flex items-center gap-2">
                   <TrendingDown className="h-5 w-5 text-orange-600" />
                   <span className="text-lg font-semibold">Pillar 2 - Risk Appetite & Volatility</span>
-                  <span className="text-sm text-gray-600">Weight: 30% | 8 indicators</span>
+                  <span className="text-sm text-gray-600">Weight: 30% | 4 indicators</span>
                 </div>
-                <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.riskAppetite)}/100</span>
+                <PillarScore score={pillarScores.riskAppetite} />
               </div>
             </AccordionTrigger>
             <AccordionContent>
               <div className="space-y-6 pt-4">
+                <PillarProvenanceLine prov={data.provenance?.riskAppetite} />
+                {pillarScores.riskAppetite === null && (
+                  <p className="text-sm text-gray-600 italic">
+                    Insufficient live/AI-sourced data to score this pillar — its weight is renormalized across the
+                    remaining pillars.
+                  </p>
+                )}
                 {/* Put/Call Ratio */}
-                {data.indicators.putCallRatio !== undefined && (
+                {indicators.putCallRatio !== undefined && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
@@ -1769,7 +1526,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{data.indicators.putCallRatio.toFixed(2)}</span>
+                      <span className="font-bold">{indicators.putCallRatio.toFixed(2)}</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
@@ -1779,7 +1536,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                           // Convention: good (low crash risk) on the LEFT/green, bad on the RIGHT/red.
                           // A HIGH put/call ratio = fear/hedging = lower crash risk (left/green).
                           // A LOW put/call ratio = complacency = high crash risk (right/red).
-                          marginLeft: `${Math.min(100, Math.max(0, 100 - ((data.indicators.putCallRatio - 0.5) / 1.0) * 100))}%`,
+                          marginLeft: `${Math.min(100, Math.max(0, 100 - ((indicators.putCallRatio - 0.5) / 1.0) * 100))}%`,
                         }}
                       />
                     </div>
@@ -1792,7 +1549,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 )}
 
                 {/* AAII Bullish Sentiment */}
-                {data.indicators.aaiiBullish !== undefined && (
+                {indicators.aaiiBullish !== undefined && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
@@ -1826,14 +1583,14 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{data.indicators.aaiiBullish.toFixed(1)}%</span>
+                      <span className="font-bold">{indicators.aaiiBullish.toFixed(1)}%</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, Math.max(0, (data.indicators.aaiiBullish / 70) * 100))}%`,
+                          marginLeft: `${Math.min(100, Math.max(0, (indicators.aaiiBullish / 70) * 100))}%`,
                         }}
                       />
                     </div>
@@ -1846,7 +1603,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 )}
 
                 {/* AAII Bearish Sentiment */}
-                {data.indicators.aaiiBearish !== undefined && (
+                {indicators.aaiiBearish !== undefined && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
@@ -1880,7 +1637,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{data.indicators.aaiiBearish.toFixed(1)}%</span>
+                      <span className="font-bold">{indicators.aaiiBearish.toFixed(1)}%</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
@@ -1890,7 +1647,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                           // Convention: good (low crash risk) on the LEFT/green, bad on the RIGHT/red.
                           // HIGH bearishness = extreme fear = contrarian buy / lower crash risk (left/green).
                           // LOW bearishness = complacency = higher crash risk (right/red).
-                          marginLeft: `${Math.min(100, Math.max(0, 100 - (data.indicators.aaiiBearish / 60) * 100))}%`,
+                          marginLeft: `${Math.min(100, Math.max(0, 100 - (indicators.aaiiBearish / 60) * 100))}%`,
                         }}
                       />
                     </div>
@@ -1903,7 +1660,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 )}
 
                 {/* AAII Spread (Bull-Bear) */}
-                {data.indicators.aaiiSpread !== undefined && (
+                {indicators.aaiiSpread !== undefined && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
@@ -1937,10 +1694,10 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                         )}
                       </span>
                       <span
-                        className={`font-bold ${data.indicators.aaiiSpread > 0 ? "text-green-600" : "text-red-600"}`}
+                        className={`font-bold ${indicators.aaiiSpread > 0 ? "text-green-600" : "text-red-600"}`}
                       >
-                        {data.indicators.aaiiSpread > 0 ? "+" : ""}
-                        {data.indicators.aaiiSpread.toFixed(1)}
+                        {indicators.aaiiSpread > 0 ? "+" : ""}
+                        {indicators.aaiiSpread.toFixed(1)}
                       </span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
@@ -1948,7 +1705,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.aaiiSpread + 40) / 80) * 100))}%`,
+                          marginLeft: `${Math.min(100, Math.max(0, ((indicators.aaiiSpread + 40) / 80) * 100))}%`,
                         }}
                       />
                     </div>
@@ -1961,7 +1718,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 )}
 
                 {/* Fear & Greed Index */}
-                {data.indicators.fearGreedIndex !== undefined && (
+                {indicators.fearGreedIndex !== undefined && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
@@ -1999,14 +1756,14 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{data.indicators.fearGreedIndex}/100</span>
+                      <span className="font-bold">{indicators.fearGreedIndex}/100</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, data.indicators.fearGreedIndex)}%`,
+                          marginLeft: `${Math.min(100, indicators.fearGreedIndex)}%`,
                         }}
                       />
                     </div>
@@ -2019,7 +1776,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 )}
 
                 {/* High Yield Spread */}
-                {data.indicators.highYieldSpread !== undefined && (
+                {indicators.highYieldSpread !== undefined && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-1">
@@ -2053,14 +1810,14 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{data.indicators.highYieldSpread.toFixed(2)}%</span>
+                      <span className="font-bold">{indicators.highYieldSpread.toFixed(2)}%</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.highYieldSpread - 2) / 6) * 100))}%`,
+                          marginLeft: `${Math.min(100, Math.max(0, ((indicators.highYieldSpread - 2) / 6) * 100))}%`,
                         }}
                       />
                     </div>
@@ -2085,13 +1842,20 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                   <span className="text-lg font-semibold">Pillar 3 - Valuation & Market Structure</span>
                   <span className="text-sm text-gray-600">Weight: 15% | 7 indicators</span>
                 </div>
-                <span className="text-2xl font-bold text-blue-600">{Math.round(data.pillars.valuation)}/100</span>
+                <PillarScore score={pillarScores.valuation} />
               </div>
             </AccordionTrigger>
             <AccordionContent>
               <div className="space-y-6 pt-4">
+                <PillarProvenanceLine prov={data.provenance?.valuation} />
+                {pillarScores.valuation === null && (
+                  <p className="text-sm text-gray-600 italic">
+                    Insufficient live/AI-sourced data to score this pillar — its weight is renormalized across the
+                    remaining pillars.
+                  </p>
+                )}
                 {/* S&P 500 P/E */}
-                {data.indicators.spxPE !== undefined && (
+                {indicators.spxPE !== undefined && (
                   <div className="space-y-2">
                     {/* Added tooltip to S&P 500 P/E indicator */}
                     <div className="flex items-center justify-between text-sm">
@@ -2124,26 +1888,26 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{data.indicators.spxPE}</span>
+                      <span className="font-bold">{indicators.spxPE}</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, ((data.indicators.spxPE - 10) / 15) * 100)}%`,
+                          marginLeft: `${Math.min(100, ((indicators.spxPE - 10) / 15) * 100)}%`,
                         }}
                       />
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>Historical Median: 16</span>
-                      <span>Current: {data.indicators.spxPE}</span>
+                      <span>Current: {indicators.spxPE}</span>
                     </div>
                   </div>
                 )}
 
                 {/* P/S Ratio */}
-                {data.indicators.spxPS !== undefined && (
+                {indicators.spxPS !== undefined && (
                   <div className="space-y-2">
                     {/* Added tooltip to S&P 500 P/S indicator */}
                     <div className="flex items-center justify-between text-sm">
@@ -2176,14 +1940,14 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{data.indicators.spxPS}</span>
+                      <span className="font-bold">{indicators.spxPS}</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, ((data.indicators.spxPS - 1) / 2) * 100)}%`,
+                          marginLeft: `${Math.min(100, ((indicators.spxPS - 1) / 2) * 100)}%`,
                         }}
                       />
                     </div>
@@ -2195,7 +1959,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 )}
 
                 {/* Buffett Indicator */}
-                {data.indicators.buffettIndicator !== undefined && (
+                {indicators.buffettIndicator !== undefined && (
                   <div className="space-y-2">
                     {/* Added tooltip to Buffett Indicator */}
                     <div className="flex items-center justify-between text-sm">
@@ -2231,14 +1995,14 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{data.indicators.buffettIndicator.toFixed(0)}%</span>
+                      <span className="font-bold">{indicators.buffettIndicator.toFixed(0)}%</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, Math.max(0, (data.indicators.buffettIndicator - 80) / 1.6))}%`,
+                          marginLeft: `${Math.min(100, Math.max(0, (indicators.buffettIndicator - 80) / 1.6))}%`,
                         }}
                       />
                     </div>
@@ -2251,7 +2015,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                   </div>
                 )}
 
-                {data.indicators.qqqPE !== undefined && (
+                {indicators.qqqPE !== undefined && (
                   <div className="space-y-2">
                     {/* Added tooltip to QQQ P/E indicator */}
                     <div className="flex items-center justify-between text-sm">
@@ -2287,14 +2051,14 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{data.indicators.qqqPE.toFixed(1)}</span>
+                      <span className="font-bold">{indicators.qqqPE.toFixed(1)}</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, ((data.indicators.qqqPE - 15) / 30) * 100)}%`,
+                          marginLeft: `${Math.min(100, ((indicators.qqqPE - 15) / 30) * 100)}%`,
                         }}
                       />
                     </div>
@@ -2306,7 +2070,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                   </div>
                 )}
 
-                {data.indicators.mag7Concentration !== undefined && (
+                {indicators.mag7Concentration !== undefined && (
                   <div className="space-y-2">
                     {/* Added tooltip to Magnificent 7 Concentration */}
                     <div className="flex items-center justify-between text-sm">
@@ -2341,14 +2105,14 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{data.indicators.mag7Concentration.toFixed(1)}%</span>
+                      <span className="font-bold">{indicators.mag7Concentration.toFixed(1)}%</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, ((data.indicators.mag7Concentration - 40) / 30) * 100)}%`,
+                          marginLeft: `${Math.min(100, ((indicators.mag7Concentration - 40) / 30) * 100)}%`,
                         }}
                       />
                     </div>
@@ -2360,7 +2124,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                   </div>
                 )}
 
-                {data.indicators.shillerCAPE !== undefined && (
+                {indicators.shillerCAPE !== undefined && (
                   <div className="space-y-2">
                     {/* Added tooltip to Shiller CAPE Ratio */}
                     <div className="flex items-center justify-between text-sm">
@@ -2396,14 +2160,14 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{data.indicators.shillerCAPE.toFixed(1)}</span>
+                      <span className="font-bold">{indicators.shillerCAPE.toFixed(1)}</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, ((data.indicators.shillerCAPE - 15) / 25) * 100)}%`,
+                          marginLeft: `${Math.min(100, ((indicators.shillerCAPE - 15) / 25) * 100)}%`,
                         }}
                       />
                     </div>
@@ -2415,7 +2179,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                   </div>
                 )}
 
-                {data.indicators.equityRiskPremium !== undefined && (
+                {indicators.equityRiskPremium !== undefined && (
                   <div className="space-y-2">
                     {/* Added tooltip to Equity Risk Premium */}
                     <div className="flex items-center justify-between text-sm">
@@ -2449,14 +2213,14 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{data.indicators.equityRiskPremium.toFixed(2)}%</span>
+                      <span className="font-bold">{indicators.equityRiskPremium.toFixed(2)}%</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, Math.max(0, ((6 - data.indicators.equityRiskPremium) / 6) * 100))}%`,
+                          marginLeft: `${Math.min(100, Math.max(0, ((6 - indicators.equityRiskPremium) / 6) * 100))}%`,
                         }}
                       />
                     </div>
@@ -2478,15 +2242,22 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 <div className="flex items-center gap-2">
                   <BarChart3 className="h-5 w-5 text-purple-600" />
                   <span className="text-lg font-semibold">Pillar 4 - Macro</span>
-                  <span className="text-sm text-gray-600">Weight: 20% | 7 indicators</span>
+                  <span className="text-sm text-gray-600">Weight: 20% | 8 indicators</span>
                 </div>
-                <span className="text-2xl font-bold text-blue-600">{data.pillars.macro}/100</span>
+                <PillarScore score={pillarScores.macro} />
               </div>
             </AccordionTrigger>
             <AccordionContent className="pb-4">
               <div className="space-y-6 pt-4">
+                <PillarProvenanceLine prov={data.provenance?.macro} />
+                {pillarScores.macro === null && (
+                  <p className="text-sm text-gray-600 italic">
+                    Insufficient live/AI-sourced data to score this pillar — its weight is renormalized across the
+                    remaining pillars.
+                  </p>
+                )}
                 {/* TED Spread */}
-                {data.indicators?.tedSpread !== undefined && (
+                {indicators.tedSpread !== undefined && (
                   <div className="space-y-2">
                     {/* Added tooltip to TED Spread indicator */}
                     <div className="flex items-center justify-between text-sm">
@@ -2522,14 +2293,14 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{data.indicators.tedSpread.toFixed(2)}%</span>
+                      <span className="font-bold">{indicators.tedSpread.toFixed(2)}%</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, (data.indicators.tedSpread / 1.5) * 100)}%`,
+                          marginLeft: `${Math.min(100, (indicators.tedSpread / 1.5) * 100)}%`,
                         }}
                       />
                     </div>
@@ -2542,7 +2313,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 )}
 
                 {/* US Dollar Index (DXY) */}
-                {data.indicators?.dxyIndex !== undefined && (
+                {indicators.dxyIndex !== undefined && (
                   <div className="space-y-2">
                     {/* Added tooltip to DXY Index */}
                     <div className="flex items-center justify-between text-sm">
@@ -2575,14 +2346,14 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{data.indicators.dxyIndex.toFixed(1)}</span>
+                      <span className="font-bold">{indicators.dxyIndex.toFixed(1)}</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.dxyIndex - 90) / 30) * 100))}%`,
+                          marginLeft: `${Math.min(100, Math.max(0, ((indicators.dxyIndex - 90) / 30) * 100))}%`,
                         }}
                       />
                     </div>
@@ -2595,7 +2366,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 )}
 
                 {/* ISM Manufacturing PMI */}
-                {data.indicators?.ismPMI !== undefined && (
+                {indicators.ismPMI !== undefined && (
                   <div className="space-y-2">
                     {/* Added tooltip to ISM Manufacturing PMI */}
                     <div className="flex items-center justify-between text-sm">
@@ -2628,14 +2399,14 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{data.indicators.ismPMI.toFixed(1)}</span>
+                      <span className="font-bold">{indicators.ismPMI.toFixed(1)}</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, Math.max(0, 100 - ((data.indicators.ismPMI - 40) / 20) * 100))}%`,
+                          marginLeft: `${Math.min(100, Math.max(0, 100 - ((indicators.ismPMI - 40) / 20) * 100))}%`,
                         }}
                       />
                     </div>
@@ -2648,7 +2419,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 )}
 
                 {/* Fed Funds Rate */}
-                {data.indicators.fedFundsRate !== undefined && (
+                {indicators.fedFundsRate !== undefined && (
                   <div className="space-y-2">
                     {/* Added tooltip to Fed Funds Rate */}
                     <div className="flex items-center justify-between text-sm">
@@ -2683,14 +2454,14 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{data.indicators.fedFundsRate}%</span>
+                      <span className="font-bold">{indicators.fedFundsRate}%</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, (data.indicators.fedFundsRate / 6) * 100)}%`,
+                          marginLeft: `${Math.min(100, (indicators.fedFundsRate / 6) * 100)}%`,
                         }}
                       />
                     </div>
@@ -2703,7 +2474,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 )}
 
                 {/* Fed Reverse Repo */}
-                {data.indicators?.fedReverseRepo !== undefined && (
+                {indicators.fedReverseRepo !== undefined && (
                   <div className="space-y-2">
                     {/* Added tooltip to Fed Reverse Repo */}
                     <div className="flex items-center justify-between text-sm">
@@ -2736,14 +2507,14 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">${data.indicators.fedReverseRepo.toFixed(0)}B</span>
+                      <span className="font-bold">${indicators.fedReverseRepo.toFixed(0)}B</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, (data.indicators.fedReverseRepo / 2500) * 100)}%`,
+                          marginLeft: `${Math.min(100, (indicators.fedReverseRepo / 2500) * 100)}%`,
                         }}
                       />
                     </div>
@@ -2756,7 +2527,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 )}
 
                 {/* Junk Bond Spread - moved to Macro */}
-                {data.indicators.junkSpread !== undefined && (
+                {indicators.junkSpread !== undefined && (
                   <div className="space-y-2">
                     {/* Added tooltip to Junk Bond Spread */}
                     <div className="flex items-center justify-between text-sm">
@@ -2791,14 +2562,14 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{data.indicators.junkSpread.toFixed(2)}%</span>
+                      <span className="font-bold">{indicators.junkSpread.toFixed(2)}%</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, ((data.indicators.junkSpread - 2) / 8) * 100)}%`,
+                          marginLeft: `${Math.min(100, ((indicators.junkSpread - 2) / 8) * 100)}%`,
                         }}
                       />
                     </div>
@@ -2811,7 +2582,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 )}
 
                 {/* US Debt-to-GDP */}
-                {data.indicators.debtToGDP !== undefined && (
+                {indicators.debtToGDP !== undefined && (
                   <div className="space-y-2">
                     {/* Added tooltip to US Debt-to-GDP */}
                     <div className="flex items-center justify-between text-sm">
@@ -2844,14 +2615,14 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                           </Tooltip>
                         )}
                       </span>
-                      <span className="font-bold">{data.indicators.debtToGDP.toFixed(1)}%</span>
+                      <span className="font-bold">{indicators.debtToGDP.toFixed(1)}%</span>
                     </div>
                     <div className="relative w-full h-3 rounded-full overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
                       <div
                         className="absolute inset-0 bg-gray-200"
                         style={{
-                          marginLeft: `${Math.min(100, Math.max(0, ((data.indicators.debtToGDP - 60) / 80) * 100))}%`,
+                          marginLeft: `${Math.min(100, Math.max(0, ((indicators.debtToGDP - 60) / 80) * 100))}%`,
                         }}
                       />
                     </div>
@@ -2859,6 +2630,59 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                       <span>Healthy: {"<"}90%</span>
                       <span>Elevated: 100-120%</span>
                       <span>Danger: {">"}130%</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Yield Curve — scored once, in Macro (P3-13) */}
+                {indicators.yieldCurve !== undefined && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium flex items-center gap-1">
+                        Yield Curve (10Y-2Y)
+                        {tooltipsEnabled && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs bg-blue-50 border-blue-200">
+                              <p className="font-semibold mb-1">Yield Curve (10Y-2Y) Spread</p>
+                              <p className="text-sm">Difference between 10-year and 2-year Treasury yields.</p>
+                              <ul className="text-sm mt-1 space-y-1">
+                                <li>
+                                  <strong>{">"} 0.5%:</strong> Steep curve, healthy economy, low risk
+                                </li>
+                                <li>
+                                  <strong>0-0.5%:</strong> Flat curve, slowing growth, moderate risk
+                                </li>
+                                <li>
+                                  <strong>{"<"} 0% (Inverted):</strong> Inverted curve, recession signal, high crash
+                                  risk
+                                </li>
+                              </ul>
+                              <p className="text-xs mt-2">
+                                <strong>Impact:</strong> Inverted yield curve has historically preceded recessions and
+                                market crashes
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
+                      <span className="font-bold">{indicators.yieldCurve.toFixed(2)}%</span>
+                    </div>
+                    <div className="relative w-full h-3 rounded-full overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-red-500" />
+                      <div
+                        className="absolute inset-0 bg-gray-200"
+                        style={{
+                          marginLeft: `${Math.min(100, Math.max(0, 100 - ((indicators.yieldCurve + 1) / 2) * 100))}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-600">
+                      <span>Normal: {">"}0.5%</span>
+                      <span>Flat: 0-0.5%</span>
+                      <span>Inverted: {"<"}0%</span>
                     </div>
                   </div>
                 )}
@@ -2889,8 +2713,10 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
             </div>
           </div>
           <p className="text-xs text-blue-700 mt-3">
-            Final CCPI = Σ(Pillar Score × Weight). Pillar 3 now includes 7 valuation & market structure indicators: S&P
-            P/E, S&P P/S, Buffett Indicator, QQQ P/E, Mag7 Concentration, Shiller CAPE, and Equity Risk Premium.
+            Final CCPI = Σ(Pillar Score × Weight), renormalized over the pillars with sufficient live/AI data. 29 scored
+            indicators across 4 pillars: 10 momentum, 4 risk appetite, 7 valuation (S&P P/E, S&P P/S, Buffett Indicator,
+            QQQ P/E, Mag7 Concentration, Shiller CAPE, Equity Risk Premium), and 8 macro (incl. the 10Y-2Y yield curve,
+            scored once here).
           </p>
         </div>
 
@@ -2908,7 +2734,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                     Portfolio Allocation by CCPI Crash Risk Level
                   </CardTitle>
                   <p className="text-sm text-gray-600 mt-1 text-left">
-                    Recommended asset class diversification across crash risk regimes
+                    Recommended cash vs. deployed positioning across crash risk regimes — diversification via sectors and indexes
                   </p>
                 </CardHeader>
               </AccordionTrigger>
@@ -2921,17 +2747,17 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                         level: "Low Risk",
                         data: {
                           stocks: "55-65%",
-                          options: "15-20%",
-                          crypto: "8-12%",
-                          gold: "3-5%",
+                          leaps: "10-15%",
+                          shortOptions: "15-20%",
+                          hedges: "0-5%",
                           cash: "5-10%",
-                          description: "Aggressive growth allocation with maximum equity exposure",
+                          description: "Aggressive growth allocation with maximum deployment",
                           rationale: [
-                            "Deploy capital aggressively into quality tech growth stocks",
-                            "Allocate 15-20% to options strategies for leverage and income",
-                            "Hold 8-12% crypto for asymmetric upside (BTC/ETH)",
+                            "Deploy capital aggressively into quality growth stocks and broad indexes (SPY/QQQ)",
+                            "Sell cash-secured puts and covered calls (15-20%) for income and discounted entries",
+                            "Hold 10-15% in deep ITM LEAPS for leveraged upside on conviction names",
                             "Minimal cash reserves needed in low-risk environment",
-                            "Small gold allocation (3-5%) as insurance policy",
+                            "Diversify across sectors — tech, financials, industrials — rather than one theme",
                           ],
                         },
                       },
@@ -2940,16 +2766,16 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                         level: "Normal",
                         data: {
                           stocks: "45-55%",
-                          options: "12-15%",
-                          crypto: "5-8%",
-                          gold: "5-8%",
+                          leaps: "8-12%",
+                          shortOptions: "12-15%",
+                          hedges: "3-5%",
                           cash: "15-25%",
                           description: "Balanced allocation with standard risk management",
                           rationale: [
-                            "Core equity exposure via diversified ETFs and blue chips",
-                            "Use options for income generation and tactical positioning",
-                            "Reduce crypto exposure to 5-8% of portfolio",
-                            "Increase gold/silver to 5-8% for diversification",
+                            "Core equity exposure via diversified sector ETFs and blue chips",
+                            "Use short options (CSPs/CCs) for income generation and tactical entries",
+                            "Trim LEAPS to 8-12% and keep strikes conservative",
+                            "Balance growth sectors with defensive sector weight (XLU/XLP) for diversification",
                             "Build cash reserves to 15-25% for opportunities",
                           ],
                         },
@@ -2959,16 +2785,16 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                         level: "Caution",
                         data: {
                           stocks: "30-40%",
-                          options: "8-12%",
-                          crypto: "3-5%",
-                          gold: "10-15%",
+                          leaps: "3-5%",
+                          shortOptions: "5-10%",
+                          hedges: "8-12%",
                           cash: "30-40%",
                           description: "Defensive tilt with elevated cash and hedges",
                           rationale: [
-                            "Reduce equity exposure to highest-quality names only",
-                            "Shift options allocation toward hedges and put spreads",
-                            "Trim crypto to minimal allocation (3-5%)",
-                            "Increase gold/silver to 10-15% as safe haven",
+                            "Reduce equity exposure to highest-quality names; tilt toward defensive sectors (XLU/XLP)",
+                            "Shift the options book toward hedges and put spreads",
+                            "Cut LEAPS to a 3-5% core and stop adding leverage",
+                            "Add gold-industry names (GDX) and defensive index weight instead of chasing growth",
                             "Build substantial cash position (30-40%) for volatility",
                           ],
                         },
@@ -2978,16 +2804,16 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                         level: "High Alert",
                         data: {
                           stocks: "15-25%",
-                          options: "10-15%",
-                          crypto: "0-2%",
-                          gold: "15-20%",
+                          leaps: "0-2%",
+                          shortOptions: "0-5%",
+                          hedges: "10-15%",
                           cash: "50-60%",
                           description: "Capital preservation mode with heavy defensive positioning",
                           rationale: [
-                            "Minimal equity exposure - only defensive sectors (utilities, staples)",
+                            "Minimal equity exposure - only defensive sectors (utilities, staples) and gold-industry names (GDX)",
                             "Options portfolio entirely hedges and volatility plays",
-                            "Exit nearly all crypto exposure due to crash risk",
-                            "Gold allocation 15-20% as primary safe haven asset",
+                            "No new LEAPS; close or roll existing short premium down and out",
+                            "Express the defensive tilt through sector choice and cash percentage, not new asset classes",
                             "Hold 50-60% cash to deploy after market correction",
                           ],
                         },
@@ -2997,16 +2823,15 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                         level: "Crash Watch",
                         data: {
                           stocks: "5-10%",
-                          options: "10-15%",
-                          crypto: "0%",
-                          gold: "20-25%",
+                          leaps: "0%",
+                          shortOptions: "0%",
+                          hedges: "10-15%",
                           cash: "70-80%",
-                          description: "Maximum defense - cash and hard assets only",
+                          description: "Maximum defense - cash-heavy with tail hedges",
                           rationale: [
-                            "Liquidate nearly all equity exposure immediately",
+                            "Liquidate nearly all equity exposure immediately; keep only defensive sector remnants (XLU/XLP, GDX)",
                             "Options used exclusively for tail risk hedges and put spreads",
-                            "Zero crypto exposure - too correlated with risk assets",
-                            "Maximum gold/precious metals allocation (20-25%)",
+                            "Zero LEAPS and zero new short premium until the regime downgrades",
                             "Hold 70-80% cash reserves to deploy after crash",
                           ],
                         },
@@ -3056,20 +2881,20 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
 
                           <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
                             <div className="p-3 bg-blue-50 rounded border border-blue-200">
-                              <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Stocks/ETFs</div>
+                              <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Shares/ETFs</div>
                               <div className="text-lg font-bold text-blue-900">{item.data.stocks}</div>
                             </div>
                             <div className="p-3 bg-purple-50 rounded border border-purple-200">
-                              <div className="text-xs font-semibold text-purple-900 uppercase mb-1">Options</div>
-                              <div className="text-lg font-bold text-purple-900">{item.data.options}</div>
+                              <div className="text-xs font-semibold text-purple-900 uppercase mb-1">LEAPS</div>
+                              <div className="text-lg font-bold text-purple-900">{item.data.leaps}</div>
                             </div>
                             <div className="p-3 bg-orange-50 rounded border border-orange-200">
-                              <div className="text-xs font-semibold text-orange-900 uppercase mb-1">BTC/Crypto</div>
-                              <div className="text-lg font-bold text-orange-900">{item.data.crypto}</div>
+                              <div className="text-xs font-semibold text-orange-900 uppercase mb-1">Short Options (CSP/CC)</div>
+                              <div className="text-lg font-bold text-orange-900">{item.data.shortOptions}</div>
                             </div>
                             <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
-                              <div className="text-xs font-semibold text-yellow-900 uppercase mb-1">Gold/Silver</div>
-                              <div className="text-lg font-bold text-yellow-900">{item.data.gold}</div>
+                              <div className="text-xs font-semibold text-yellow-900 uppercase mb-1">Hedges/Puts</div>
+                              <div className="text-lg font-bold text-yellow-900">{item.data.hedges}</div>
                             </div>
                             <div className="p-3 bg-gray-50 rounded border border-gray-300">
                               <div className="text-xs font-semibold text-gray-900 uppercase mb-1">Cash Reserve</div>
@@ -3190,7 +3015,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                             "Buy VIX calls for crash insurance (60-90 DTE)",
                             "Long put spreads on QQQ/SPY at-the-money",
                             "Tactical long volatility trades (VXX calls)",
-                            "Gold miners (GDX) call options as diversification",
+                            "Gold miners (GDX) call options for defensive sector exposure",
                           ],
                         },
                       },
@@ -3325,7 +3150,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
             variant="outline"
             size="sm"
             onClick={() => {
-              const summary = `CCPI Weekly Outlook\n\n${data.summary.headline}\n\n${data.summary.bullets.join("\n")}\n\nCCPI Score: ${data.ccpi}\nCertainty: ${data.certainty}\nRegime: ${data.regime.name}\n\nGenerated: ${new Date(data.timestamp).toLocaleString()}`
+              const summary = `CCPI Weekly Outlook\n\n${data.summary.headline}\n\n${data.summary.bullets.join("\n")}\n\nCCPI Score: ${data.ccpi}\nData quality: ${data.certainty}%\nRegime: ${data.regime.name}\n\nGenerated: ${new Date(data.timestamp).toLocaleString()}`
               navigator.clipboard.writeText(summary)
               alert("Summary copied to clipboard!")
             }}
@@ -3347,14 +3172,16 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
         onClose={() => setIsChatOpen(false)}
         ccpiContext={{
           ccpi: data?.ccpi || 0,
-          certainty: data?.confidence || 0,
+          certainty: data?.certainty || 0,
           regime: data?.regime || { name: "Unknown", description: "" },
           pillars: data?.pillars || { momentum: 0, riskAppetite: 0, valuation: 0, macro: 0 },
-          activeWarnings: data?.canaries?.filter((c) => c.active).length || 0,
+          activeWarnings: data ? countActiveWarnings(data.canaries) : 0,
           totalIndicators: data?.canaries?.length || 0,
           crashAmplifiers: data?.crashAmplifiers?.map((ca) => ca.reason) || [],
           activeSignals:
-            data?.canaries?.filter((c) => c.active).map((c) => ({ name: c.signal, severity: c.severity })) || [],
+            data?.canaries
+              ?.filter((c) => c.severity === "high" || c.severity === "medium")
+              .map((c) => ({ name: c.signal, severity: c.severity })) || [],
         }}
       />
     </TooltipProvider>

@@ -260,8 +260,8 @@ const STRATEGIES = {
     badge: "Hedged Strategy",
     badgeColor: "bg-yellow-100 text-yellow-800",
     stats: {
-      maxProfit: "Call Strike – Stock Price + Put Premium",
-      maxLoss: "Stock Price – Put Strike – Net Premium",
+      maxProfit: "Call Strike – Stock Price – Net Premium Paid",
+      maxLoss: "Stock Price – Put Strike + Net Premium Paid",
       probability: "High protection, capped upside",
       bestMarket: "Uncertain, want protection",
       idealIV: "Any (hedging priority)",
@@ -504,11 +504,20 @@ const STRATEGIES = {
 // reflects how the strategy is typically constructed.
 // ===========================================================================
 
-function sample(minPrice: number, maxPrice: number, steps: number, payoff: (s: number) => number) {
-  return Array.from({ length: steps }, (_, i) => {
+// `kinks` are the strikes (payoff corners): they are merged into the sample set
+// so every kink lands exactly on a sample and the chart spline can't round it off.
+function sample(minPrice: number, maxPrice: number, steps: number, payoff: (s: number) => number, kinks: number[] = []) {
+  const xs = new Set<number>()
+  for (let i = 0; i < steps; i++) {
     const x = minPrice + ((maxPrice - minPrice) * i) / (steps - 1)
-    return { x: Math.round(x * 100) / 100, y: Math.round(payoff(x) * 100) / 100 }
-  })
+    xs.add(Math.round(x * 100) / 100)
+  }
+  for (const k of kinks) {
+    if (k > minPrice && k < maxPrice) xs.add(Math.round(k * 100) / 100)
+  }
+  return Array.from(xs)
+    .sort((a, b) => a - b)
+    .map((x) => ({ x, y: Math.round(payoff(x) * 100) / 100 }))
 }
 
 // Bull put spread (credit): short put K_short, long put K_long (K_long < K_short).
@@ -525,7 +534,7 @@ function generateCreditSpreadPayoff() {
     if (S <= K_long) return (K_long - K_short + credit) * 100
     return (S - K_short + credit) * 100
   }
-  return sample(85, 115, 100, payoff)
+  return sample(85, 115, 100, payoff, [K_long, K_short])
 }
 
 // Iron Condor: bull put spread + bear call spread. Net credit = c.
@@ -541,7 +550,7 @@ function generateIronCondorPayoff() {
     const callPnL = S <= callShort ? 0 : -Math.min(S - callShort, callLong - callShort)
     return (credit + putPnL + callPnL) * 100
   }
-  return sample(85, 115, 100, payoff)
+  return sample(85, 115, 100, payoff, [putLong, putShort, callShort, callLong])
 }
 
 // Calendar spread (call). Pay a debit; max profit at the short strike at
@@ -562,7 +571,7 @@ function generateCalendarPayoff() {
     const longTotal = Math.max(0, S - K) + longTimePremium
     return (longTotal - shortIntrinsic - debit) * 100
   }
-  return sample(85, 115, 100, payoff)
+  return sample(85, 115, 100, payoff, [K])
 }
 
 // Long Call Butterfly: long 1 call K1, short 2 calls K2, long 1 call K3 (K1<K2<K3).
@@ -574,7 +583,7 @@ function generateButterflyPayoff() {
   const debit = 1.0
   const c = (S: number, k: number) => Math.max(0, S - k)
   const payoff = (S: number) => (c(S, K1) - 2 * c(S, K2) + c(S, K3) - debit) * 100
-  return sample(85, 115, 100, payoff)
+  return sample(85, 115, 100, payoff, [K1, K2, K3])
 }
 
 // Collar: long 100 shares at entry P0, long put K_p, short call K_c (K_p < P0 < K_c).
@@ -590,7 +599,7 @@ function generateCollarPayoff() {
     const callObligation = Math.max(0, S - K_call)
     return (stockPnL + putPayoff - callObligation - netDebit) * 100
   }
-  return sample(80, 130, 100, payoff)
+  return sample(80, 130, 100, payoff, [K_put, K_call])
 }
 
 // Diagonal call spread: long deep-ITM long-dated call (LEAPS) + short
@@ -608,7 +617,7 @@ function generateDiagonalPayoff() {
     const shortObligation = Math.max(0, S - K_short)
     return (longTotal - longCost - shortObligation + shortPremium) * 100
   }
-  return sample(75, 125, 100, payoff)
+  return sample(75, 125, 100, payoff, [K_long, K_short])
 }
 
 // Long straddle: long 1 call + long 1 put, both at K. Cost = total premium p.
@@ -616,7 +625,7 @@ function generateStraddlePayoff() {
   const K = 100
   const totalPremium = 5
   const payoff = (S: number) => (Math.max(0, S - K) + Math.max(0, K - S) - totalPremium) * 100
-  return sample(80, 120, 100, payoff)
+  return sample(80, 120, 100, payoff, [K])
 }
 
 // The Wheel — there's no single-expiration payoff (it's a cycle), so we
@@ -627,7 +636,7 @@ function generateWheelPayoff() {
   const K = 50
   const premium = 2 // $ per share for the put
   const payoff = (S: number) => (premium - Math.max(0, K - S)) * 100
-  return sample(30, 70, 100, payoff)
+  return sample(30, 70, 100, payoff, [K])
 }
 
 interface StrategySetup {

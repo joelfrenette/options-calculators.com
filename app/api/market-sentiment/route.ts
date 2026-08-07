@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { resolveApiKey } from "@/lib/api-keys"
+import { sma } from "@/lib/indicators"
 
 /**
  * COMPREHENSIVE DATA SOURCE ANALYSIS & FALLBACK STRATEGY
@@ -40,12 +41,10 @@ async function fetchYahooData(symbol: string, range = "1mo", timeout = 10000) {
   }
 }
 
-// Helper function to calculate simple moving average
-function calculateSMA(prices: number[], period: number): number {
-  if (prices.length < period) return prices.reduce((sum, p) => sum + p, 0) / prices.length
-  const slice = prices.slice(-period)
-  return slice.reduce((sum, price) => sum + price, 0) / slice.length
-}
+// SMA comes from the shared lib/indicators.ts (Phase 4). It returns null on
+// short history — the old local copy silently averaged whatever bars were
+// available, presenting a partial-window mean as the "125-day MA". Null is
+// handled at the call sites below (neutral-50 component scores).
 
 /**
  * CNN Fear & Greed Scale (0-100):
@@ -241,11 +240,17 @@ async function calculateFallbackIndex() {
     // Extract live prices
     const currentVix = vixData.meta.regularMarketPrice
     const vixPrices = vixData.indicators.quote[0].close.filter((p: number) => p !== null)
-    const vix50DayMA = calculateSMA(vixPrices, 50)
+    // Null MA (insufficient history) → the dependent component scores neutral
+    // 50 (this file's established invalid-data pattern, cf. calculateStock-
+    // Strength / calculateSafeHavenDemand) and the derived displays read as a
+    // 0% deviation — never a partial-window mean dressed up as the real MA.
+    const vix50DayMANullable = sma(vixPrices, 50)
+    const vix50DayMA = vix50DayMANullable ?? currentVix
 
     const currentSpy = spyData.meta.regularMarketPrice
     const spyPrices = spyData.indicators.quote[0].close.filter((p: number) => p !== null)
-    const spy125DayMA = calculateSMA(spyPrices, 125)
+    const spy125DayMANullable = sma(spyPrices, 125)
+    const spy125DayMA = spy125DayMANullable ?? currentSpy
     const spyVolumes = spyData.indicators.quote[0].volume.filter((v: number) => v !== null)
 
     const hygPrices = hygData.indicators.quote[0].close.filter((p: number) => p !== null)
@@ -302,11 +307,12 @@ async function calculateFallbackIndex() {
       `[v0]   Raw score calculation: 50 + (${percentAboveMA.toFixed(2)} * 5) = ${(50 + percentAboveMA * 5).toFixed(1)}`,
     )
 
-    const i1_marketMomentum = calculateMarketMomentum(currentSpy, spy125DayMA)
+    // Neutral 50 when the underlying MA could not be computed (null-aware)
+    const i1_marketMomentum = spy125DayMANullable !== null ? calculateMarketMomentum(currentSpy, spy125DayMA) : 50
 
     const i2_stockStrength = calculateStockStrength(nyseHighs, nyseLows)
     const i3_stockBreadth = calculateStockBreadth(volumeRatios, priceChanges)
-    const i4_putCallRatio = calculatePutCallRatio(currentVix, vix50DayMA)
+    const i4_putCallRatio = vix50DayMANullable !== null ? calculatePutCallRatio(currentVix, vix50DayMA) : 50
     const i5_marketVolatility = calculateMarketVolatility(currentVix, vix50DayMA)
     const i6_safeHavenDemand = calculateSafeHavenDemand(spy20DayReturn, tlt20DayReturn)
     const i7_junkBondDemand = calculateJunkBondDemand(hyg20DayReturn, tlt20DayReturn)
@@ -385,7 +391,12 @@ async function calculateFallbackIndex() {
     return {
       overallScore: finalScore,
       sentiment,
-      trend: (finalScore > yesterdayScore + 1 ? "up" : finalScore < yesterdayScore - 1 ? "down" : "neutral") as const,
+      trend:
+        finalScore > yesterdayScore + 1
+          ? ("up" as const)
+          : finalScore < yesterdayScore - 1
+            ? ("down" as const)
+            : ("neutral" as const),
       yesterdayChange: isFinite(finalScore - yesterdayScore) ? Math.round((finalScore - yesterdayScore) * 10) / 10 : 0,
       lastWeekChange: isFinite(finalScore - weekAgoScore) ? Math.round((finalScore - weekAgoScore) * 10) / 10 : 0,
       lastMonthChange: isFinite(finalScore - weekAgoScore * 1.2)
@@ -880,7 +891,7 @@ export async function GET(request: Request) {
       overallScore: cnnScore,
       sentiment: cnnSentiment,
       lastUpdated: new Date().toISOString(),
-      trend: (cnnScore > 50 ? "up" : cnnScore < 50 ? "down" : "neutral") as const,
+      trend: cnnScore > 50 ? ("up" as const) : cnnScore < 50 ? ("down" as const) : ("neutral" as const),
       yesterdayChange,
       lastWeekChange,
       lastMonthChange,

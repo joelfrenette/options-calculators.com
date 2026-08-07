@@ -73,10 +73,17 @@ export async function GET(request: Request) {
     const rawTrades: FinnhubInsider[] = Array.isArray(payload?.data) ? payload.data : []
 
     // Filter to OPEN-MARKET BUYS only (transactionCode === "P") in window.
+    //
+    // Finnhub field semantics: `change` = shares TRANSACTED (signed);
+    // `share` = shares HELD AFTER the transaction. This previously filtered and
+    // valued on `share`, i.e. it priced the insider's entire post-trade position
+    // as if it were the purchase — a 10k-share buy by a 5M-share holder showed
+    // ~500× the real dollar value (AUDIT_BACKLOG P3, P0). Rows without a usable
+    // `change` are skipped: the transacted size is unknowable from holdings.
     const buysByTicker = new Map<string, FinnhubInsider[]>()
     for (const t of rawTrades) {
       if (t.transactionCode !== "P") continue // only true purchases
-      if (!t.share || t.share <= 0) continue
+      if (!t.change || t.change <= 0) continue
       const td = new Date(t.transactionDate).getTime()
       if (!td || isNaN(td) || td < cutoffMs) continue
       const arr = buysByTicker.get(t.symbol) || []
@@ -92,8 +99,8 @@ export async function GET(request: Request) {
       const buyers = trades.map((t) => ({
         name: t.name || "Unknown",
         title: t.position || "Insider",
-        shares: t.share,
-        value: t.share * (t.transactionPrice || 0),
+        shares: t.change, // shares transacted, not post-trade holdings
+        value: t.change * (t.transactionPrice || 0),
         date: t.transactionDate,
       }))
       const totalDollarValue = buyers.reduce((s, b) => s + b.value, 0)

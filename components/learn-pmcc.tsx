@@ -94,8 +94,8 @@ export function LearnPMCC() {
           "Buy one $80 LEAPS call (Jan 2027) for $2,500. This is your 'stock'.",
           "Sell one 30-day $105 call for $2.00 → broker credits $200. Total cash out: $2,500 − $200 = $2,300.",
           "If AAPL is below $105 at 30 days: short call expires worthless. Keep $200. Sell another short call. Repeat for ~$200/month → $2,400/yr on $2,300 capital = ~104% gross yield (before adjusting for the LEAPS decay).",
-          "If AAPL closes at $110 at 30 days: short call assigned. Your LEAPS is worth roughly ($110 − $80) × 100 = $3,000 intrinsic. Short call payout = ($110 − $105) × 100 = $500. Net: $3,000 − $500 − $2,300 entry + $200 short premium ≈ $400 profit (8.7% on $2,300).",
-          "If AAPL crashes to $70 in 30 days: short call expires worthless (+$200). LEAPS is roughly worth $10 of extrinsic value left = $1,000. Loss ≈ $2,300 − $1,000 + $200 = $1,100 paper loss (vs. $3,000 on 100 shares).",
+          "If AAPL closes at $110 at 30 days: short call assigned. Your LEAPS is worth roughly ($110 − $80) × 100 = $3,000 intrinsic. Short call payout = ($110 − $105) × 100 = $500. Net: $3,000 − $500 − $2,300 net entry (the $200 credit is already in that number) = $200 profit (8.7% on $2,300).",
+          "If AAPL crashes to $70 in 30 days: short call expires worthless — that $200 credit is already inside your $2,300 net entry. LEAPS is roughly worth $10 of extrinsic value left = $1,000. Loss ≈ $2,300 − $1,000 = $1,300 paper loss (vs. $3,000 on 100 shares).",
         ],
         outcome:
           "PMCC magnifies BOTH yield-on-capital and losses vs. a plain Covered Call. The right stock makes it shine. The wrong stock will hurt much faster than holding shares.",

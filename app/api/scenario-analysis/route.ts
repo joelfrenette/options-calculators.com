@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server"
 import { generateWithFallback } from "@/lib/ai-providers"
 
 export async function POST(request: Request) {
@@ -5,7 +6,7 @@ export async function POST(request: Request) {
     const { question, context } = await request.json()
 
     if (!question) {
-      return Response.json({ error: "Question is required" }, { status: 400 })
+      return NextResponse.json({ error: "Question is required" }, { status: 400 })
     }
 
     const systemPrompt = `You are an expert financial analyst specializing in options trading and market analysis.
@@ -35,14 +36,14 @@ Please provide:
       maxTokens: 2000,
     })
 
-    return Response.json({
+    return NextResponse.json({
       analysis: result.text,
       provider: result.provider,
       model: result.model,
     })
   } catch (error) {
     console.error("[AI] Scenario analysis error:", error instanceof Error ? error.message : error)
-    return Response.json(
+    return NextResponse.json(
       {
         error: "Failed to generate scenario analysis",
         details: error instanceof Error ? error.message : "Unknown error",

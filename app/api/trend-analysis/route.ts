@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { sma, rsi as calcRSI, macd as calcMACD, bollinger as calcBollinger, atr as calcATR } from "@/lib/indicators"
 
 export const dynamic = "force-dynamic"
 
@@ -66,7 +67,13 @@ async function fetchYahooQuote(symbol: string): Promise<YahooQuote | null> {
   }
 }
 
-async function fetchHistoricalData(symbol: string, days = 180) {
+// 320 calendar days ≈ 220 trading bars. Previously 180 (~124 bars), which is
+// fewer than the 200 bars the "200-day MA" needs — so calculateMA's short-series
+// fallback returned the LAST CLOSE as the "200-day MA" on every request, and the
+// highest-weighted signal in determineTrend compared the price to itself
+// (AUDIT_BACKLOG Phase 3, P0). lib/qqq-technicals.ts already fetches 300 days
+// for the same reason.
+async function fetchHistoricalData(symbol: string, days = 320) {
   try {
     const endDate = Math.floor(Date.now() / 1000)
     const startDate = endDate - days * 24 * 60 * 60
@@ -102,105 +109,11 @@ async function fetchHistoricalData(symbol: string, days = 180) {
   }
 }
 
-function calculateMA(prices: number[], period: number): number {
-  if (prices.length < period) return prices[prices.length - 1] || 0
-  const slice = prices.slice(-period)
-  return slice.reduce((sum, price) => sum + price, 0) / period
-}
-
-function calculateBollingerBands(
-  prices: number[],
-  period = 20,
-  stdDev = 2,
-): { upper: number; middle: number; lower: number } {
-  if (prices.length < period) {
-    const lastPrice = prices[prices.length - 1] || 0
-    return { upper: lastPrice, middle: lastPrice, lower: lastPrice }
-  }
-
-  const slice = prices.slice(-period)
-  const middle = slice.reduce((sum, price) => sum + price, 0) / period
-
-  // Calculate standard deviation
-  const squaredDiffs = slice.map((price) => Math.pow(price - middle, 2))
-  const variance = squaredDiffs.reduce((sum, diff) => sum + diff, 0) / period
-  const standardDeviation = Math.sqrt(variance)
-
-  const upper = middle + stdDev * standardDeviation
-  const lower = middle - stdDev * standardDeviation
-
-  return { upper, middle, lower }
-}
-
-function calculateRSI(prices: number[], period = 14): number {
-  if (prices.length < period + 1) return 50
-
-  const changes = []
-  for (let i = 1; i < prices.length; i++) {
-    changes.push(prices[i] - prices[i - 1])
-  }
-
-  const recentChanges = changes.slice(-period)
-  const gains = recentChanges.filter((c) => c > 0)
-  const losses = recentChanges.filter((c) => c < 0).map((c) => Math.abs(c))
-
-  const avgGain = gains.length > 0 ? gains.reduce((sum, g) => sum + g, 0) / period : 0
-  const avgLoss = losses.length > 0 ? losses.reduce((sum, l) => sum + l, 0) / period : 0
-
-  if (avgLoss === 0) return 100
-  const rs = avgGain / avgLoss
-  return 100 - 100 / (1 + rs)
-}
-
-function calculateMACD(prices: number[]): { macd: number; signal: number; histogram: number } {
-  if (prices.length < 26) return { macd: 0, signal: 0, histogram: 0 }
-
-  const ema12 = calculateEMA(prices, 12)
-  const ema26 = calculateEMA(prices, 26)
-  const macd = ema12 - ema26
-
-  // Calculate signal line (9-period EMA of MACD)
-  const macdValues = []
-  for (let i = 26; i <= prices.length; i++) {
-    const slice = prices.slice(0, i)
-    const e12 = calculateEMA(slice, 12)
-    const e26 = calculateEMA(slice, 26)
-    macdValues.push(e12 - e26)
-  }
-  const signal = calculateEMA(macdValues, 9)
-  const histogram = macd - signal
-
-  return { macd, signal, histogram }
-}
-
-function calculateEMA(prices: number[], period: number): number {
-  if (prices.length < period) return prices[prices.length - 1] || 0
-
-  const multiplier = 2 / (period + 1)
-  let ema = prices.slice(0, period).reduce((sum, price) => sum + price, 0) / period
-
-  for (let i = period; i < prices.length; i++) {
-    ema = (prices[i] - ema) * multiplier + ema
-  }
-
-  return ema
-}
-
-function calculateATR(data: any[], period = 14): number {
-  if (data.length < period + 1) return 0
-
-  const trueRanges = []
-  for (let i = 1; i < data.length; i++) {
-    const high = data[i].high
-    const low = data[i].low
-    const prevClose = data[i - 1].price
-    const tr = Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose))
-    trueRanges.push(tr)
-  }
-
-  const recentTR = trueRanges.slice(-period)
-  return recentTR.reduce((sum, tr) => sum + tr, 0) / period
-}
+// All indicators come from the shared lib/indicators.ts (Phase 4 extraction).
+// Every one of them returns null on insufficient history — the old local
+// copies' fallbacks (last close AS the MA, bands collapsed to the last price,
+// zeros from a degenerate <26-bar MACD signal) are gone: null propagates and
+// each consumer below treats "unknown" as a non-vote / null response field.
 
 function calculateSupportResistance(data: any[], currentPrice: number) {
   const prices = data.map((d) => d.price)
@@ -231,27 +144,47 @@ function calculateSupportResistance(data: any[], currentPrice: number) {
   }
 }
 
-function calculateMomentumStrength(prices: number[], volumes: number[], rsi: number, macd: number): number {
-  // Calculate price momentum (rate of change over 20 days)
-  const priceChange = ((prices[prices.length - 1] - prices[prices.length - 20]) / prices[prices.length - 20]) * 100
+/**
+ * The MACD term of the momentum composite, normalized by price
+ * (FORMULAS.md §1): the old `macd * 3` was in RAW price points, so for
+ * SPX-priced series it pinned at ±15 and carried no information. Now the MACD
+ * line is expressed as a % of price before weighting; cap stays ±15.
+ * Null MACD (insufficient history) contributes 0.
+ */
+function macdContribution(macdLine: number | null, price: number): number {
+  if (macdLine === null || price <= 0) return 0
+  const macdPct = (macdLine / price) * 100
+  return Math.max(-15, Math.min(15, macdPct * 3))
+}
+
+function calculateMomentumStrength(
+  prices: number[],
+  volumes: number[],
+  rsi: number | null,
+  macd: number | null,
+): number {
+  // Price momentum (rate of change over 20 days) — guard <20 bars (was NaN)
+  const priceChange =
+    prices.length >= 20
+      ? ((prices[prices.length - 1] - prices[prices.length - 20]) / prices[prices.length - 20]) * 100
+      : 0
 
   // Calculate volume trend
   const recentVolume = volumes.slice(-10).reduce((sum, v) => sum + v, 0) / 10
   const olderVolume = volumes.slice(-30, -10).reduce((sum, v) => sum + v, 0) / 20
-  const volumeTrend = ((recentVolume - olderVolume) / olderVolume) * 100
+  const volumeTrend = olderVolume > 0 ? ((recentVolume - olderVolume) / olderVolume) * 100 : 0
 
   // Combine indicators into strength score (0-100, where higher = more bullish)
   let strength = 50 // neutral baseline
 
-  // RSI contribution (±20 points)
-  // RSI > 50 is bullish, adds to score; RSI < 50 is bearish, subtracts from score
-  if (rsi > 50) strength += ((rsi - 50) / 50) * 20
-  else if (rsi < 50) strength -= ((50 - rsi) / 50) * 20
+  // RSI contribution (±20 points) — null RSI (insufficient history) contributes 0
+  if (rsi !== null) {
+    if (rsi > 50) strength += ((rsi - 50) / 50) * 20
+    else if (rsi < 50) strength -= ((50 - rsi) / 50) * 20
+  }
 
-  // MACD contribution (±15 points)
-  // Positive MACD is bullish; negative is bearish
-  if (macd > 0) strength += Math.min(macd * 3, 15)
-  else if (macd < 0) strength -= Math.min(Math.abs(macd) * 3, 15)
+  // MACD contribution (±15 points), normalized by price — see macdContribution
+  strength += macdContribution(macd, prices[prices.length - 1] ?? 0)
 
   // Price momentum contribution (±10 points)
   // Positive price change is bullish; negative is bearish
@@ -267,11 +200,11 @@ function calculateMomentumStrength(prices: number[], volumes: number[], rsi: num
 
 function determineTrend(
   currentPrice: number,
-  ma20: number,
-  ma50: number,
-  ma200: number,
-  rsi: number,
-  macd: { macd: number; signal: number; histogram: number },
+  ma20: number | null,
+  ma50: number | null,
+  ma200: number | null,
+  rsi: number | null,
+  macd: { macd: number; signal: number; histogram: number } | null,
   momentumStrength: number,
   volumeRatio: number,
 ): {
@@ -284,19 +217,30 @@ function determineTrend(
   let bearishSignals = 0
   let totalSignals = 0
 
-  // MA alignment (3 points)
-  if (currentPrice > ma20 && ma20 > ma50 && ma50 > ma200) bullishSignals += 3
-  else if (currentPrice < ma20 && ma20 < ma50 && ma50 < ma200) bearishSignals += 3
+  // MA alignment (3 points). Any null MA = alignment unknown → contributes 0
+  // points either way (the old fallback compared the price to itself and
+  // always voted). The denominator keeps its 3 points, dragging confidence
+  // toward Neutral — fail-safe for short histories.
+  if (ma20 !== null && ma50 !== null && ma200 !== null) {
+    if (currentPrice > ma20 && ma20 > ma50 && ma50 > ma200) bullishSignals += 3
+    else if (currentPrice < ma20 && ma20 < ma50 && ma50 < ma200) bearishSignals += 3
+  }
   totalSignals += 3
 
-  // RSI (1 point)
-  if (rsi > 55) bullishSignals++
-  else if (rsi < 45) bearishSignals++
+  // RSI (1 point) — null = no vote
+  if (rsi !== null) {
+    if (rsi > 55) bullishSignals++
+    else if (rsi < 45) bearishSignals++
+  }
   totalSignals++
 
-  // MACD (2 points)
-  if (macd.macd > macd.signal && macd.histogram > 0) bullishSignals += 2
-  else if (macd.macd < macd.signal && macd.histogram < 0) bearishSignals += 2
+  // MACD (2 points) — null = no vote. `histogram > 0` was the same condition
+  // as `macd > signal` stated twice (histogram ≡ macd − signal), so the
+  // redundant clause is dropped (FORMULAS.md §1).
+  if (macd !== null) {
+    if (macd.macd > macd.signal) bullishSignals += 2
+    else if (macd.macd < macd.signal) bearishSignals += 2
+  }
   totalSignals += 2
 
   // Momentum strength (2 points) - Fixed: now using corrected scale where higher = more bullish
@@ -398,7 +342,10 @@ export async function GET() {
       console.log(`[v0] Processing ${item.name} (${item.symbol})`)
 
       const quote = await fetchYahooQuote(item.symbol)
-      const historical = await fetchHistoricalData(item.symbol, 180)
+      // No explicit day-count override: the 180 previously passed here silently
+      // defeated the 320-day default the fetch window was raised to (~220
+      // trading bars, enough for the 200-day MA — see fetchHistoricalData).
+      const historical = await fetchHistoricalData(item.symbol)
 
       if (!quote || historical.length === 0) {
         console.log(`[v0] ${item.name} - No quote or historical data available`)
@@ -439,39 +386,49 @@ export async function GET() {
         `[v0] ${item.name} - Volume ratio: ${volumeRatio.toFixed(2)}x (${currentVolume.toLocaleString()} / ${avgVolume.toLocaleString()})`,
       )
 
-      // Calculate all indicators
-      const ma20 = calculateMA(prices, 20)
-      const ma50 = calculateMA(prices, 50)
-      const ma200 = calculateMA(prices, 200)
-      const rsi = calculateRSI(prices)
-      const macd = calculateMACD(prices)
-      const atr = calculateATR(historical)
-      const momentumStrength = calculateMomentumStrength(prices, volumes, rsi, macd.macd)
+      // Calculate all indicators (lib/indicators.ts — null on short history;
+      // nulls propagate to the response instead of masquerading as prices)
+      const highsArr = historical.map((h: any) => h.high)
+      const lowsArr = historical.map((h: any) => h.low)
+      const ma20 = sma(prices, 20)
+      const ma50 = sma(prices, 50)
+      const ma200 = sma(prices, 200)
+      const rsi = calcRSI(prices)
+      const macd = calcMACD(prices)
+      const atr = calcATR(highsArr, lowsArr, prices)
+      const momentumStrength = calculateMomentumStrength(prices, volumes, rsi, macd?.macd ?? null)
       const { support, resistance, allSupport, allResistance } = calculateSupportResistance(historical, currentPrice)
       const trendAnalysis = determineTrend(currentPrice, ma20, ma50, ma200, rsi, macd, momentumStrength, volumeRatio)
+      // Null ATR (needs 15 bars — practically unreachable with the 320-day
+      // fetch) → 0-width volatility term: targets collapse to support/
+      // resistance geometry, and the response's `atr` field stays null.
       const priceTargets = calculatePriceTargets(
         currentPrice,
         trendAnalysis.trend,
-        atr,
+        atr ?? 0,
         support,
         resistance,
         momentumStrength,
       )
 
-      const priceChange = ((prices[prices.length - 1] - prices[prices.length - 20]) / prices[prices.length - 20]) * 100
-      const recentVolume = volumes.slice(-10).reduce((sum, v) => sum + v, 0) / 10
-      const olderVolume = volumes.slice(-30, -10).reduce((sum, v) => sum + v, 0) / 20
-      const volumeTrend = ((recentVolume - olderVolume) / olderVolume) * 100
+      const priceChange =
+        prices.length >= 20
+          ? ((prices[prices.length - 1] - prices[prices.length - 20]) / prices[prices.length - 20]) * 100
+          : 0
+      const recentVolume = volumes.slice(-10).reduce((sum: number, v: number) => sum + v, 0) / 10
+      const olderVolume = volumes.slice(-30, -10).reduce((sum: number, v: number) => sum + v, 0) / 20
+      const volumeTrend = olderVolume > 0 ? ((recentVolume - olderVolume) / olderVolume) * 100 : 0
 
       const indicatorContributions = {
         rsi: {
           value: rsi,
-          contribution: rsi > 50 ? ((rsi - 50) / 50) * 20 : -((50 - rsi) / 50) * 20,
+          contribution: rsi === null ? 0 : rsi > 50 ? ((rsi - 50) / 50) * 20 : -((50 - rsi) / 50) * 20,
           weight: 20,
         },
         macd: {
-          value: macd.macd,
-          contribution: macd.macd > 0 ? Math.min(macd.macd * 3, 15) : -Math.min(Math.abs(macd.macd) * 3, 15),
+          value: macd?.macd ?? null,
+          // Normalized by price — mirrors calculateMomentumStrength exactly
+          contribution: macdContribution(macd?.macd ?? null, currentPrice),
           weight: 15,
         },
         priceChange: {
@@ -488,15 +445,17 @@ export async function GET() {
 
       const historicalWithMA = historical.slice(-60).map((h: any, i: number) => {
         const pricesUpToIndex = prices.slice(0, historical.length - 60 + i + 1)
-        const bollingerBands = calculateBollingerBands(pricesUpToIndex, 20, 2)
+        const bollingerBands = calcBollinger(pricesUpToIndex, 20, 2)
         return {
+          // Null MAs/bands (not enough bars yet at that point in time) render
+          // as chart gaps — the old fallback drew a fake "MA" hugging the price.
           date: h.date,
           price: h.price,
-          ma20: calculateMA(pricesUpToIndex, 20),
-          ma50: calculateMA(pricesUpToIndex, 50),
-          ma200: calculateMA(pricesUpToIndex, 200),
-          bollingerUpper: bollingerBands.upper,
-          bollingerLower: bollingerBands.lower,
+          ma20: sma(pricesUpToIndex, 20),
+          ma50: sma(pricesUpToIndex, 50),
+          ma200: sma(pricesUpToIndex, 200),
+          bollingerUpper: bollingerBands?.upper ?? null,
+          bollingerLower: bollingerBands?.lower ?? null,
           forecast: null, // No forecast in historical section
           support: support,
           resistance: resistance,
@@ -544,9 +503,9 @@ export async function GET() {
         ma50,
         ma200,
         rsi,
-        macd: macd.macd,
-        macdSignal: macd.signal,
-        macdHistogram: macd.histogram,
+        macd: macd?.macd ?? null,
+        macdSignal: macd?.signal ?? null,
+        macdHistogram: macd?.histogram ?? null,
         atr,
         volumeRatio,
         momentumStrength,

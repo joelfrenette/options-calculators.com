@@ -312,16 +312,16 @@ export function FomcPredictions() {
       })
 
       strategies.push({
-        name: "Long Puts on TLT",
-        ticker: "TLT",
-        type: "Directional Bearish",
+        name: "Long Calls on IWM",
+        ticker: "IWM",
+        type: "Directional Bullish",
         rationale:
-          "Rate cuts often lead to steeper yield curve. Long-term bonds may sell off if market expects inflation. Counter-intuitive but profitable trade.",
-        entry: "Buy ATM puts on TLT (20-year Treasury ETF)",
-        target: "2-4% decline in TLT as long yields rise",
-        stopLoss: "Exit if TLT breaks above resistance or loses 40% of premium",
+          "Small caps carry more floating-rate debt than large caps, so they benefit most directly when rates fall. Historically strong reaction to cut cycles.",
+        entry: "Buy slightly OTM calls (0.40-0.50 delta)",
+        target: "+4-6% rally in small caps",
+        stopLoss: "Exit if IWM breaks below support or loses 40% of premium",
         timeframe: `Hold through ${meeting.date} announcement`,
-        risk: "Limited to premium. TLT can be volatile around Fed decisions.",
+        risk: "Limited to premium. Small caps can be volatile around Fed decisions.",
       })
 
       strategies.push({
@@ -364,16 +364,16 @@ export function FomcPredictions() {
       })
 
       strategies.push({
-        name: "Long Calls on TLT",
-        ticker: "TLT",
-        type: "Safe Haven Play",
+        name: "Long Calls on XLP (Consumer Staples)",
+        ticker: "XLP",
+        type: "Defensive Sector Play",
         rationale:
-          "Rate hikes increase recession risk. Flight to safety often boosts long-term Treasuries despite higher short-term rates.",
-        entry: "Buy ATM calls on TLT",
-        target: "+3-5% rally in long-term bonds",
-        stopLoss: "Exit if TLT breaks below support",
+          "Rate hikes increase recession risk. Money rotates into defensive staples with pricing power when growth expectations fall.",
+        entry: "Buy ATM calls on XLP",
+        target: "+3-5% relative outperformance in staples",
+        stopLoss: "Exit if XLP breaks below support",
         timeframe: `Through ${meeting.date} + 1 week`,
-        risk: "Limited to premium. Bond volatility can spike.",
+        risk: "Limited to premium. Defensive sectors move slowly; size accordingly.",
       })
 
       strategies.push({
@@ -569,7 +569,7 @@ export function FomcPredictions() {
                 <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
                   <Target className="h-5 w-5 text-primary" />
                   Fed Rate Decision Predictor
-                  <InfoTooltip content="The Federal Reserve sets interest rates to control inflation and employment. Rate hikes slow the economy (bearish for stocks), while rate cuts stimulate growth (bullish). Options traders can profit from rate decisions by trading Treasury ETFs and rate-sensitive sectors." />
+                  <InfoTooltip content="The Federal Reserve sets interest rates to control inflation and employment. Rate hikes slow the economy (bearish for stocks), while rate cuts stimulate growth (bullish). Options traders can profit from rate decisions by trading rate-sensitive sectors and index options." />
                 </CardTitle>
                 <CardDescription className="mt-1">
                   AI-powered predictions using Fed Funds futures and economic data
@@ -1155,7 +1155,7 @@ export function FomcPredictions() {
                     <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
                       <Target className="h-6 w-6 text-primary" />
                       Rate-Based Options Strategies
-                      <InfoTooltip content="These strategies are designed for the current rate environment. Rate cut expectations favor growth stocks and bonds. Rate hike expectations favor banks and value stocks. Uncertainty favors volatility strategies like straddles." />
+                      <InfoTooltip content="These strategies are designed for the current rate environment. Rate cut expectations favor growth stocks, small caps, and rate-sensitive sectors. Rate hike expectations favor banks and value stocks. Uncertainty favors volatility strategies like straddles." />
                     </CardTitle>
                     <CardDescription className="text-base">
                       Actionable trades based on {nextMeeting?.prediction} prediction with{" "}

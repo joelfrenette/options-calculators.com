@@ -1,3 +1,5 @@
+import { sma, bollinger } from "@/lib/indicators"
+
 export async function fetchQQQTechnicals() {
   const POLYGON_API_KEY = process.env.POLYGON_API_KEY
   
@@ -61,44 +63,26 @@ export async function fetchQQQTechnicals() {
       }
     }
     
-    let sma20 = currentPrice
-    let sma50 = currentPrice
-    let sma200 = currentPrice
-    let hasSMA20 = false
-    let hasSMA50 = false
-    let hasSMA200 = false
-    
-    if (prices.length >= 20) {
-      sma20 = prices.slice(-20).reduce((a: number, b: number) => a + b, 0) / 20
-      hasSMA20 = true
-    }
-      
-    if (prices.length >= 50) {
-      sma50 = prices.slice(-50).reduce((a: number, b: number) => a + b, 0) / 50
-      hasSMA50 = true
-    }
-      
-    if (prices.length >= 200) {
-      sma200 = prices.slice(-200).reduce((a: number, b: number) => a + b, 0) / 200
-      hasSMA200 = true
-    }
-    
+    // SMA/Bollinger internals now come from the shared lib/indicators.ts
+    // (Phase 4). The lib returns null on short history, which maps 1:1 onto
+    // this module's existing hasSMA* guards — external behavior (currentPrice
+    // fallbacks, danger heuristics, return shape) is unchanged.
+    const sma20Value = sma(prices, 20)
+    const sma50Value = sma(prices, 50)
+    const sma200Value = sma(prices, 200)
+    const hasSMA20 = sma20Value !== null
+    const hasSMA50 = sma50Value !== null
+    const hasSMA200 = sma200Value !== null
+    const sma20 = sma20Value ?? currentPrice
+    const sma50 = sma50Value ?? currentPrice
+    const sma200 = sma200Value ?? currentPrice
+
     console.log(`[v0] Calculated SMAs: 20d=$${sma20.toFixed(2)}, 50d=$${sma50.toFixed(2)}, 200d=$${sma200.toFixed(2)}`)
-    
-    let bollingerLower = sma20
-    let bollingerUpper = sma20
-    let belowBollingerBand = false
-    
-    if (hasSMA20) {
-      const last20Prices = prices.slice(-20)
-      const squaredDiffs = last20Prices.map((price: number) => Math.pow(price - sma20, 2))
-      const variance = squaredDiffs.reduce((a: number, b: number) => a + b, 0) / 20
-      const stdDev = Math.sqrt(variance)
-      
-      bollingerLower = sma20 - (2 * stdDev)
-      bollingerUpper = sma20 + (2 * stdDev)
-      belowBollingerBand = currentPrice < bollingerLower
-    }
+
+    const bands = bollinger(prices, 20, 2)
+    const bollingerLower = bands?.lower ?? sma20
+    const bollingerUpper = bands?.upper ?? sma20
+    const belowBollingerBand = bands !== null && currentPrice < bands.lower
     
     const belowSMA20 = hasSMA20 ? currentPrice < sma20 : false
     const belowSMA50 = hasSMA50 ? currentPrice < sma50 : false

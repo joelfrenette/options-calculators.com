@@ -83,8 +83,8 @@ export async function GET(request: Request) {
 
     if (!res.ok) {
       // Quiver's free public feed sometimes rate-limits or 401s briefly.
-      // Always return 200 so the client doesn't blow up — surface the upstream
-      // status in the body and an empty trades array (UI shows "no matches").
+      // Return 502 (Bad Gateway) so the transport matches the error body —
+      // upstream status is surfaced in the body alongside an empty trades array.
       return NextResponse.json(
         {
           success: false,
@@ -97,7 +97,7 @@ export async function GET(request: Request) {
           trades: [],
           generatedAt: new Date().toISOString(),
         },
-        { status: 200 },
+        { status: 502 },
       )
     }
 

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { Metric, PricingProvenance } from "@/components/pricing-provenance"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Slider } from "@/components/ui/slider"
@@ -20,14 +21,18 @@ interface CondorSetup {
   dte: number
   totalCredit: number
   maxLoss: number
+  /** Risk-neutral probability the underlying finishes inside the body, percent. */
   probability: number
-  ivRank: number
+  /** Null: a real IV rank needs 52w of IV history (AUDIT_BACKLOG P1-1). */
+  ivRank: number | null
+  /** Measured at-the-money implied volatility, percent. */
+  atmIV: number
   expectedRange: { low: number; high: number }
   width: number
-  signal: "strong" | "moderate" | "speculative"
+  signal: "strong" | "moderate" | "speculative" | null
   reason: string
-  dataSource?: string
-  isLive?: boolean
+  pricingModel?: string
+  quoteType?: string
 }
 
 export function IronCondorScanner() {
@@ -70,7 +75,9 @@ export function IronCondorScanner() {
       if (maxMargin < 5000 && s.maxLoss * 100 > maxMargin) return false
       if (s.probability < minProbability[0]) return false
       if (s.dte > maxDte[0]) return false
-      if (s.ivRank < minIvRank[0]) return false
+      // Filter on measured ATM IV; ivRank is null until IV history is collected
+      // and the old value it replaced was fabricated (AUDIT_BACKLOG P1-1).
+      if (s.atmIV < minIvRank[0]) return false
       return true
     })
     .sort((a, b) => rankScore(b) - rankScore(a))
@@ -126,7 +133,7 @@ export function IronCondorScanner() {
     )
   }
 
-  const getSignalBadge = (signal: string) => {
+  const getSignalBadge = (signal: string | null) => {
     switch (signal) {
       case "strong":
         return (
@@ -142,13 +149,15 @@ export function IronCondorScanner() {
             Moderate
           </Badge>
         )
-      default:
+      case "speculative":
         return (
           <Badge className="bg-orange-100 text-orange-800 border-orange-300">
             <Zap className="w-3 h-3 mr-1" />
             Speculative
           </Badge>
         )
+      default:
+        return null
     }
   }
 
@@ -162,25 +171,11 @@ export function IronCondorScanner() {
                 <Layers className="w-5 h-5 text-amber-500" />
                 Iron Condor Scanner
                 <InfoTooltip content="This scanner finds stocks ideal for iron condor trades - a strategy that profits when the stock stays within a price range. You collect premium from both sides and keep it if the stock doesn't move too much." />
-                {isLiveData ? (
-                  <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-300">
-                    <Wifi className="w-3 h-3 mr-1" />
-                    LIVE
-                  </Badge>
-                ) : setups.length > 0 ? (
-                  <Badge variant="outline" className="ml-2 bg-yellow-50 text-yellow-700 border-yellow-300">
-                    <WifiOff className="w-3 h-3 mr-1" />
-                    Cached
-                  </Badge>
-                ) : null}
+                
               </CardTitle>
               <CardDescription>
                 Range-bound income strategies with defined risk
-                {lastUpdated && (
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    Updated: {new Date(lastUpdated).toLocaleTimeString()}
-                  </span>
-                )}
+                <PricingProvenance className="mt-2" lastUpdated={lastUpdated ? new Date(lastUpdated).toLocaleTimeString() : null} />
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
@@ -348,8 +343,10 @@ export function IronCondorScanner() {
                       <div className="font-medium">${setup.width}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground">Data Source</div>
-                      <div className="font-medium text-xs">{setup.dataSource || "API"}</div>
+                      <div className="text-xs text-muted-foreground">ATM IV</div>
+                      <div className="font-medium text-xs">
+                        <Metric value={setup.atmIV} digits={1} suffix="%" />
+                      </div>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">

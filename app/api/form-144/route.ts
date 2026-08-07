@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     if (!res.ok) {
       return NextResponse.json(
         { success: false, message: `SEC EDGAR returned HTTP ${res.status}.`, filings: [] },
-        { status: 200 },
+        { status: 502 },
       )
     }
     const xml = await res.text()
@@ -69,7 +69,7 @@ export async function GET(request: Request) {
   } catch (err) {
     return NextResponse.json(
       { success: false, error: err instanceof Error ? err.message : "unknown", filings: [] },
-      { status: 200 },
+      { status: 502 },
     )
   }
 }

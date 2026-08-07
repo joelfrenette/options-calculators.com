@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { Metric, PricingProvenance } from "@/components/pricing-provenance"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -27,12 +28,16 @@ interface ZEBRASetup {
   // ZEBRA specific KPIs
   delta: number // Position delta (should be ~100 like stock)
   extrinsicPaid: number // Should be near zero
-  stockScore: number // Fundamental + growth score
-  optionVolume: number
-  trend: "bullish" | "bearish" | "neutral"
-  distanceToBreakeven: number // % from current to breakeven
-  leverageRatio: number
-  signal: "strong" | "moderate" | "speculative"
+  // stockScore, optionVolume and trend were Math.random() values presented as
+  // fundamental analysis, liquidity and price trend (AUDIT_BACKLOG P1-4).
+  // No feed supplies them, so they arrive null and the UI omits those columns.
+  stockScore: number | null
+  optionVolume: number | null
+  trend: "bullish" | "bearish" | "neutral" | null
+  atmIV: number
+  distanceToBreakeven: number | null
+  leverageRatio: number | null
+  signal: "strong" | "moderate" | "speculative" | null
   reason: string
   dataSource?: string
   isLive?: boolean
@@ -91,15 +96,16 @@ export function ZEBRAScanner() {
   // Risk-adjusted rank: ZEBRA upside is open-ended, so reward is proxied by
   // capital efficiency (leverage) weighted by the fundamental stock quality
   // score (higher score = lower thesis risk). Higher = better.
-  const rankScore = (s: ZEBRASetup) => s.leverageRatio * (s.stockScore / 10)
+  // Ranked purely on capital efficiency now. The old score multiplied leverage
+  // by a random 5-9 "stock score", so the ordering was noise.
+  const rankScore = (s: ZEBRASetup) => s.leverageRatio ?? 0
 
   const filteredSetups = setups
     .filter((s) => {
       if (maxDebit < 5000 && s.netDebit * 100 > maxDebit) return false
       if (optionType !== "all" && s.type !== optionType) return false
-      if (trendFilter !== "all" && s.trend !== trendFilter) return false
       if (s.dte < minDTE) return false
-      if (Math.abs(s.distanceToBreakeven) > maxBreakevenDistance) return false
+      if (s.distanceToBreakeven !== null && Math.abs(s.distanceToBreakeven) > maxBreakevenDistance) return false
       return true
     })
     .sort((a, b) => rankScore(b) - rankScore(a))
@@ -154,25 +160,31 @@ export function ZEBRAScanner() {
     )
   }
 
-  const getSignalBadge = (signal: string) => {
+  const getSignalBadge = (signal: string | null) => {
     switch (signal) {
       case "strong":
         return <Badge className="bg-green-100 text-green-800 border-green-200">Strong</Badge>
       case "moderate":
         return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Moderate</Badge>
-      default:
+      case "speculative":
         return <Badge className="bg-orange-100 text-orange-800 border-orange-200">Speculative</Badge>
+      default:
+        // Conviction withheld — the old signal was a function of two random values.
+        return null
     }
   }
 
-  const getTrendBadge = (trend: string) => {
+  const getTrendBadge = (trend: string | null) => {
     switch (trend) {
       case "bullish":
         return <Badge className="bg-green-600 text-white">Bullish</Badge>
       case "bearish":
         return <Badge className="bg-red-600 text-white">Bearish</Badge>
-      default:
+      case "neutral":
         return <Badge className="bg-gray-600 text-white">Neutral</Badge>
+      default:
+        // No trend feed is wired; "Neutral" would be an assertion, not a blank.
+        return null
     }
   }
 
@@ -206,15 +218,7 @@ export function ZEBRAScanner() {
           {/* Status Bar */}
           <div className="flex items-center justify-between mb-4 text-sm">
             <div className="flex items-center gap-4">
-              {isLiveData ? (
-                <span className="flex items-center gap-1 text-green-600">
-                  <Wifi className="h-4 w-4" /> Live Data
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-gray-500">
-                  <WifiOff className="h-4 w-4" /> Estimated Data
-                </span>
-              )}
+              <PricingProvenance />
               {lastUpdated && <span className="text-gray-500">Updated: {lastUpdated}</span>}
             </div>
             <span className="text-gray-500">{filteredSetups.length} setups found</span>
@@ -249,16 +253,9 @@ export function ZEBRAScanner() {
               </SelectContent>
             </Select>
 
-            <Select value={trendFilter} onValueChange={(v: any) => setTrendFilter(v)}>
-              <SelectTrigger className="w-[120px] h-8">
-                <SelectValue placeholder="Trend" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Trends</SelectItem>
-                <SelectItem value="bullish">Bullish</SelectItem>
-                <SelectItem value="bearish">Bearish</SelectItem>
-              </SelectContent>
-            </Select>
+{/* Trend filter removed: the underlying `trend` field was Math.random() > 0.3,
+    so the filter partitioned rows at random (AUDIT_BACKLOG P1-4). Restore once a
+    real trend signal (e.g. price vs 50/200 SMA) is wired in. */}
 
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600">Min DTE:</span>
@@ -417,10 +414,14 @@ export function ZEBRAScanner() {
                           <InfoTooltip content="Breakeven Distance shows how far the stock needs to move to reach profitability. +2.5% means the stock needs to rise 2.5% from current price. -1.5% means it needs to fall 1.5%. Closer to 0% = better entry point. Under 3% distance is generally favorable." />
                         </p>
                         <p
-                          className={`font-semibold ${Math.abs(setup.distanceToBreakeven) < 3 ? "text-green-600" : ""}`}
+                          className={`font-semibold ${
+                            setup.distanceToBreakeven !== null && Math.abs(setup.distanceToBreakeven) < 3
+                              ? "text-green-600"
+                              : ""
+                          }`}
                         >
-                          {setup.distanceToBreakeven > 0 ? "+" : ""}
-                          {setup.distanceToBreakeven.toFixed(1)}%
+                          {setup.distanceToBreakeven !== null && setup.distanceToBreakeven > 0 ? "+" : ""}
+                          <Metric value={setup.distanceToBreakeven} digits={1} suffix="%" />
                         </p>
                       </div>
                       <div>
@@ -446,11 +447,11 @@ export function ZEBRAScanner() {
                       </div>
                       <div>
                         <p className="text-gray-500 flex items-center">
-                          Stock Score
-                          <InfoTooltip content="Fundamental strength score from 1-10 based on revenue growth, earnings, margins, and analyst ratings. 7+ = strong company likely to trend. 5-6 = average. Under 5 = weak fundamentals. For directional bets like ZEBRA, you want fundamentally strong stocks (7+) moving in your direction." />
+                          ATM IV
+                          <InfoTooltip content="At-the-money implied volatility, averaged across the nearest option chain. It sets what you pay for the two long calls and receive for the short call, so it drives the net debit and therefore your leverage." />
                         </p>
-                        <p className={`font-semibold ${setup.stockScore >= 7 ? "text-green-600" : ""}`}>
-                          {setup.stockScore}/10
+                        <p className="font-semibold">
+                          <Metric value={setup.atmIV} digits={1} suffix="%" />
                         </p>
                       </div>
                       <div>
@@ -458,14 +459,18 @@ export function ZEBRAScanner() {
                           Leverage
                           <InfoTooltip content="Capital efficiency vs buying stock outright. 2.5x leverage means you control $25,000 worth of stock exposure with $10,000 in capital. ZEBRA gives you stock-like returns with less capital at risk. Higher leverage = more capital efficient but requires getting direction right." />
                         </p>
-                        <p className="font-semibold">{setup.leverageRatio.toFixed(1)}x</p>
+                        <p className="font-semibold">
+                          <Metric value={setup.leverageRatio} digits={1} suffix="x" />
+                        </p>
                       </div>
                       <div>
                         <p className="text-gray-500 flex items-center">
                           Opt Volume
-                          <InfoTooltip content="Options trading volume - higher is better for liquidity. 10K+ daily volume means tight bid-ask spreads and easy entry/exit. Low volume (<1K) can mean wide spreads and difficulty closing the position at a fair price. Stick to liquid options (5K+ volume)." />
+                          <InfoTooltip content="Options trading volume. Not currently sourced — the previous figure was generated, not measured. Check volume and open interest in your broker before trading; wide spreads on thin options can cost more than the strategy earns." />
                         </p>
-                        <p className="font-semibold">{(setup.optionVolume / 1000).toFixed(0)}K</p>
+                        <p className="font-semibold">
+                          <Metric value={setup.optionVolume} digits={0} unavailableLabel="not sourced — check your broker" />
+                        </p>
                       </div>
                     </div>
 

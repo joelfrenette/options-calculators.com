@@ -79,34 +79,53 @@ export function sortCanaries(canaries: CCPIData["canaries"]): CCPIData["canaries
 }
 
 /**
- * Calculates CCPI score from pillar values using weighted average
+ * Weighted-average CCPI from pillar values, renormalized over the non-null
+ * pillars — mirroring lib/ccpi/scoring.ts's composite semantics. A pillar is
+ * null when its scored weight fell below the minimum after baseline exclusion.
+ * Returns null when no pillar is scoreable; treating null as 0 here is exactly
+ * the un-renormalized bug the scoring rework removed (AUDIT P3-12).
  */
-export function calculateCCPI(pillars: CCPIData["pillars"]): number {
-  return (
-    pillars.momentum * PILLAR_WEIGHTS.momentum +
-    pillars.riskAppetite * PILLAR_WEIGHTS.riskAppetite +
-    pillars.valuation * PILLAR_WEIGHTS.valuation +
-    pillars.macro * PILLAR_WEIGHTS.macro
-  )
+export function calculateCCPI(pillars: CCPIData["pillars"]): number | null {
+  const entries: Array<[number | null, number]> = [
+    [pillars.momentum, PILLAR_WEIGHTS.momentum],
+    [pillars.riskAppetite, PILLAR_WEIGHTS.riskAppetite],
+    [pillars.valuation, PILLAR_WEIGHTS.valuation],
+    [pillars.macro, PILLAR_WEIGHTS.macro],
+  ]
+  let weighted = 0
+  let totalWeight = 0
+  for (const [score, weight] of entries) {
+    if (score === null) continue
+    weighted += score * weight
+    totalWeight += weight
+  }
+  return totalWeight > 0 ? weighted / totalWeight : null
 }
 
 /**
- * Validates that CCPI calculation matches expected value
+ * Validates that CCPI calculation matches expected value.
+ * Null pillars make an exact cross-check impossible when amplifiers are in
+ * play, so a null composite never reports a discrepancy.
  */
 export function validateCCPICalculation(pillars: CCPIData["pillars"], expectedCCPI: number, tolerance = 0.5): boolean {
   const calculated = calculateCCPI(pillars)
+  if (calculated === null) return true
   return Math.abs(calculated - expectedCCPI) <= tolerance
 }
 
 /**
- * Formats pillar contribution for logging
+ * Formats pillar contribution for logging. Null pillars print "n/a (excluded)".
  */
 export function formatPillarContribution(pillars: CCPIData["pillars"]): string {
+  const line = (label: string, score: number | null, weight: number) =>
+    score === null
+      ? `${label}: n/a (excluded — insufficient scored weight)`
+      : `${label}: ${score} × ${(weight * 100).toFixed(0)}% = ${(score * weight).toFixed(1)}`
   return [
-    `Momentum: ${pillars.momentum} × 35% = ${(pillars.momentum * 0.35).toFixed(1)}`,
-    `Risk Appetite: ${pillars.riskAppetite} × 30% = ${(pillars.riskAppetite * 0.3).toFixed(1)}`,
-    `Valuation: ${pillars.valuation} × 15% = ${(pillars.valuation * 0.15).toFixed(1)}`,
-    `Macro: ${pillars.macro} × 20% = ${(pillars.macro * 0.2).toFixed(1)}`,
+    line("Momentum", pillars.momentum, PILLAR_WEIGHTS.momentum),
+    line("Risk Appetite", pillars.riskAppetite, PILLAR_WEIGHTS.riskAppetite),
+    line("Valuation", pillars.valuation, PILLAR_WEIGHTS.valuation),
+    line("Macro", pillars.macro, PILLAR_WEIGHTS.macro),
   ].join("\n")
 }
 

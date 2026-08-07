@@ -333,10 +333,10 @@ async function auditVixIndex(): Promise<PageAudit> {
     },
     {
       name: "VIX Term Structure",
-      formula: "Term_Structure = VIX_1M / VIX_Spot",
+      formula: "Term_Structure = VIX3M / VIX_Spot",
       formulaExplanation:
-        "Ratio > 1.0 = contango (normal), < 1.0 = backwardation (fear). Inversion signals acute stress",
-      algorithm: "Compare spot VIX to 1-month VIX futures",
+        "Ratio > 1.0 = contango (normal, baseline ~1.08), < 1.0 = backwardation (fear). Inversion signals acute stress",
+      algorithm: "Compare spot VIX to 3-month VIX (VIX3M), both from FRED",
       primaryApi: "FRED + Calculated",
       fallbackChain: ["Polygon VIX futures", "CBOE direct"],
       currentSource: fredKey ? "FRED" : "Estimated",
@@ -625,10 +625,11 @@ async function auditCCPI(): Promise<PageAudit> {
   const indicators: IndicatorAudit[] = [
     {
       name: "CCPI Composite Score",
-      formula: "CCPI = (Momentum × 0.35) + (Risk × 0.30) + (Valuation × 0.15) + (Macro × 0.20)",
+      formula:
+        "CCPI = (Momentum × 0.35) + (Risk × 0.30) + (Valuation × 0.15) + (Macro × 0.20), renormalized over pillars with sufficient data",
       formulaExplanation:
-        "Comprehensive Crash Prediction Index. 0-30 Low Risk, 30-50 Moderate, 50-70 Elevated, 70-100 Extreme",
-      algorithm: "4-pillar weighted aggregation with 38 canary indicators",
+        "Comprehensive Crash Prediction Index. 0-30 Low Risk, 30-50 Moderate, 50-70 Elevated, 70-100 Extreme. A pillar with insufficient live/AI-sourced data reports null and its weight is renormalized away",
+      algorithm: "4-pillar weighted aggregation over 29 scored indicators with per-pillar provenance",
       primaryApi: "Multi-source aggregation",
       fallbackChain: ["AI estimates", "Historical baselines"],
       currentSource: "Live calculation",
@@ -638,7 +639,7 @@ async function auditCCPI(): Promise<PageAudit> {
     {
       name: "Pillar 1: Momentum & Technical",
       formula:
-        "16 indicators: NVDA(6%), SOX(6%), QQQ_Daily(8%), QQQ_Down(5%), SMA20(5%), SMA50(7%), SMA200(10%), Bollinger(6%), VIX(9%), VXN(7%), RVX(5%), VIX_Term(6%), ATR(5%), LTV(5%), Bullish%(5%), Yield(5%)",
+        "10 indicators: NVDA(9), SOX(9), QQQ_Daily(12), QQQ_Down(7), SMA20(7), SMA50(10), SMA200(15), Bollinger(9), VIX(13), VIX_Term(9) — maxima sum to 100",
       formulaExplanation: "Captures price action deterioration, technical breakdowns, and volatility spikes",
       primaryApi: "Polygon + FRED + TwelveData",
       fallbackChain: ["AI data extraction", "Historical averages"],
@@ -649,7 +650,7 @@ async function auditCCPI(): Promise<PageAudit> {
     {
       name: "Pillar 2: Risk Appetite",
       formula:
-        "8 indicators: Put/Call(18%), Fear&Greed(15%), AAII(16%), Short_Interest(13%), ATR(10%), LTV(10%), Bullish%(10%), Yield(8%)",
+        "4 indicators: Put/Call(29), Fear&Greed(24), AAII_Bullish(26), Short_Interest(21) — maxima sum to 100; a null Fear & Greed is excluded and renormalized",
       formulaExplanation: "Detects euphoria (complacency) and panic through sentiment and positioning",
       primaryApi: "CBOE + Surveys + FRED",
       fallbackChain: ["AI sentiment", "Baseline averages"],
@@ -659,7 +660,8 @@ async function auditCCPI(): Promise<PageAudit> {
     },
     {
       name: "Pillar 3: Valuation",
-      formula: "6 indicators: PE_Ratio(25%), CAPE(20%), PB_Ratio(15%), Div_Yield(15%), Buffett(15%), Margin_Debt(10%)",
+      formula:
+        "7 indicators: SPX_PE(18), SPX_PS(12), Buffett(16), QQQ_PE(16), Mag7_Concentration(15), Shiller_CAPE(13), Equity_Risk_Premium(10) — maxima sum to 100",
       formulaExplanation: "Measures market valuation vs historical norms. High scores = overvalued",
       primaryApi: "Quandl + Multpl + FRED",
       fallbackChain: ["Shiller CAPE data", "AI estimates"],
@@ -670,8 +672,9 @@ async function auditCCPI(): Promise<PageAudit> {
     {
       name: "Pillar 4: Macro",
       formula:
-        "8 indicators: Yield_Curve(20%), Credit_Spread(18%), GDP(12%), CPI(12%), PMI(12%), Unemployment(10%), Housing(8%), Consumer(8%)",
-      formulaExplanation: "Economic conditions and recession indicators",
+        "8 indicators: TED_Spread(13), DXY(12), ISM_PMI(15), Fed_Funds(15), Fed_Reverse_Repo(11), Junk_Spread(10), Debt_to_GDP(10), Yield_Curve(14) — maxima sum to 100",
+      formulaExplanation:
+        "Economic conditions and recession indicators. The 10Y-2Y yield curve is scored once, here (its former duplicates in Pillars 1/2 and the crash-amplifier bonus were removed)",
       primaryApi: "FRED Federal Reserve",
       fallbackChain: ["AI economic analysis", "Historical trends"],
       currentSource: fredKey ? "FRED" : "AI/Baseline",
@@ -680,8 +683,7 @@ async function auditCCPI(): Promise<PageAudit> {
     },
     {
       name: "Crash Amplifier System",
-      formula:
-        "Bonus = +25 (QQQ -6%), +40 (QQQ -9%), +20 (below SMA50), +20 (VIX>35), +15 (PCR>1.3), +15 (yield inverted)",
+      formula: "Bonus = +25 (QQQ -6%) or +40 (QQQ -9%), +20 (below SMA50), +20 (VIX>35), +15 (PCR>1.3)",
       formulaExplanation: "Adds bonus points for acute crash conditions. Capped at 100 total",
       algorithm: "Binary trigger system with additive bonuses",
       primaryApi: "Calculated from live data",
@@ -691,8 +693,8 @@ async function auditCCPI(): Promise<PageAudit> {
       statusReason: "Trigger logic always active",
     },
     {
-      name: "38 Canary Signals",
-      formula: "Canary_Count = Σ(Indicator_i > Threshold_i) for all 38 indicators",
+      name: "29 Canary Signals",
+      formula: "Canary_Count = Σ(Indicator_i > Threshold_i) for all 29 scored indicators",
       formulaExplanation: "Binary warnings when indicators breach medium/high thresholds",
       algorithm: "Threshold breach counting with severity levels",
       primaryApi: "Calculated from all indicators",
@@ -707,7 +709,7 @@ async function auditCCPI(): Promise<PageAudit> {
     id: "ccpi",
     name: "CCPI Dashboard",
     category: "analyze",
-    description: "Comprehensive Crash Prediction Index with 4 pillars and 38 canaries",
+    description: "Comprehensive Crash Prediction Index with 4 pillars and 29 scored indicators",
     indicators,
   }
 }

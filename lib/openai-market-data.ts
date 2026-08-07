@@ -32,7 +32,7 @@ CRITICAL RULES:
 - Examples: "34.5" or "150" or "0.89" or "null"
 
 Value:`,
-      maxTokens: 50,
+      maxOutputTokens: 50,
       temperature: 0.1,
     })
 

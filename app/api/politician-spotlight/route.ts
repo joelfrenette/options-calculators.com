@@ -72,12 +72,12 @@ export async function GET(request: Request) {
           message: res.status === 401 || res.status === 429 ? "Quiver Quant rate-limited briefly. Try again in a moment." : `Upstream HTTP ${res.status}`,
           members: ROSTER.map((r) => ({ ...r, totalTrades: 0, buys: 0, sells: 0, estimatedActivityUsd: 0, avgExcessReturnPct: null, topTickers: [], recentTrades: [] })),
         },
-        { status: 200 },
+        { status: 502 },
       )
     }
     const data = (await res.json()) as any[]
     if (!Array.isArray(data)) {
-      return NextResponse.json({ success: false, message: "Unexpected payload" }, { status: 200 })
+      return NextResponse.json({ success: false, message: "Unexpected payload" }, { status: 502 })
     }
 
     const members: MemberSpotlight[] = ROSTER.map((m) => {
@@ -144,7 +144,7 @@ export async function GET(request: Request) {
   } catch (err) {
     return NextResponse.json(
       { success: false, error: err instanceof Error ? err.message : "unknown", members: [] },
-      { status: 200 },
+      { status: 502 },
     )
   }
 }

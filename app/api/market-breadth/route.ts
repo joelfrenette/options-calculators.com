@@ -10,16 +10,24 @@ export async function GET() {
     console.log('[v0] Market breadth API called')
     
     const result = await fetchMarketBreadth()
-    
+
+    // NOTE: this route is pending a deletion decision — lib/market-breadth is
+    // deprecated (breadth was replaced by VIX term structure in CCPI) and only
+    // returns a zeroed baseline. Type-only fix: MarketBreadthData has no
+    // highLowIndex field, so compute it here from highs/lows (baseline 0.45 when
+    // there is no data). Do not extend this route.
+    const totalHighsLows = result.newHighs + result.newLows
+    const highLowIndex = totalHighsLows > 0 ? result.newHighs / totalHighsLows : 0.45
+
     return NextResponse.json({
-      value: result.highLowIndex,
+      value: highLowIndex,
       unit: "ratio",
       highs: result.newHighs,
       lows: result.newLows,
-      total: result.newHighs + result.newLows,
+      total: totalHighsLows,
       date: result.timestamp.split('T')[0],
       source: result.source,
-      threshold: result.highLowIndex < 0.30 ? "weak" : result.highLowIndex > 0.60 ? "strong" : "neutral",
+      threshold: highLowIndex < 0.30 ? "weak" : highLowIndex > 0.60 ? "strong" : "neutral",
       baseline: 0.45,
       lastFetched: result.timestamp,
       stale: result.source === "baseline"

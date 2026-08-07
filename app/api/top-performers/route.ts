@@ -43,6 +43,12 @@ function parseRangeMid(s: string): number {
     const hi = Number.parseInt(m[2].replace(/,/g, ""), 10) || 0
     return Math.round((lo + hi) / 2)
   }
+  // Sometimes a single value (e.g., "$50,000,000+") — without this fallback the
+  // largest trades parsed to $0 and were dropped from dollar-weighted excess return.
+  const m2 = s.match(/\$([\d,]+)\+?/)
+  if (m2) {
+    return Number.parseInt(m2[1].replace(/,/g, ""), 10) || 0
+  }
   return 0
 }
 
@@ -70,12 +76,12 @@ export async function GET(request: Request) {
           members: [],
           clusters: [],
         },
-        { status: 200 },
+        { status: 502 },
       )
     }
     const data = (await res.json()) as any[]
     if (!Array.isArray(data)) {
-      return NextResponse.json({ success: false, message: "Unexpected payload" }, { status: 200 })
+      return NextResponse.json({ success: false, message: "Unexpected payload" }, { status: 502 })
     }
 
     // Aggregate per-member statistics
@@ -218,7 +224,7 @@ export async function GET(request: Request) {
   } catch (err) {
     return NextResponse.json(
       { success: false, error: err instanceof Error ? err.message : "unknown" },
-      { status: 200 },
+      { status: 502 },
     )
   }
 }

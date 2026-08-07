@@ -64,7 +64,7 @@ Respond with ONLY the number, nothing else.`
       const { text: responseText } = await generateText({
         model: ai.provider(ai.model),
         prompt,
-        maxTokens: 50,
+        maxOutputTokens: 50,
         temperature: 0.1,
       })
       text = responseText

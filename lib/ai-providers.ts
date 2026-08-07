@@ -145,11 +145,12 @@ export async function generateWithFallback(options: AIGenerateOptions): Promise<
 
       const result = await generateText({
         model,
-        prompt,
-        messages,
+        // ai v5's Prompt type is a union: pass `messages` XOR `prompt`, never both keys.
+        // The cast covers the caller-supplied-neither case, which the SDK rejects at runtime as before.
+        ...(messages !== undefined ? { messages } : { prompt: prompt as string }),
         system,
         temperature,
-        maxTokens,
+        maxOutputTokens: maxTokens,
         abortSignal,
       })
 
@@ -196,11 +197,12 @@ export async function streamWithFallback(options: AIGenerateOptions) {
 
       const result = streamText({
         model,
-        prompt,
-        messages,
+        // ai v5's Prompt type is a union: pass `messages` XOR `prompt`, never both keys.
+        // The cast covers the caller-supplied-neither case, which the SDK rejects at runtime as before.
+        ...(messages !== undefined ? { messages } : { prompt: prompt as string }),
         system,
         temperature,
-        maxTokens,
+        maxOutputTokens: maxTokens,
         abortSignal,
       })
 

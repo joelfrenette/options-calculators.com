@@ -401,7 +401,12 @@ export async function GET(request: Request) {
         // signed share change. We need a concrete direction (no "Disclosure"
         // limbo) so the Type column is always populated for real US trades.
         const transactionCode = (t.transactionCode || "").toUpperCase()
-        const shareChange = Number(t.change ?? t.share ?? 0)
+        // Finnhub semantics: `change` = shares TRANSACTED (signed); `share` =
+        // shares HELD AFTER the transaction. Holdings must not be used as a
+        // direction fallback (always positive → biased "Buy") nor as a quantity
+        // fallback (prices the whole position as if it were the trade — the
+        // insider-clusters route had the same defect, fixed P0).
+        const shareChange = Number(t.change ?? 0)
         let transactionType: string
         if (transactionCode === "P") transactionType = "Buy"
         else if (transactionCode === "S") transactionType = "Sell"
@@ -409,8 +414,10 @@ export async function GET(request: Request) {
         else if (shareChange < 0) transactionType = "Sell"
         else transactionType = "Disclosure"
 
-        // Share quantity: prefer the signed change, fall back to the share field
-        const shareCount = Math.abs(Number(t.share ?? t.change ?? 0))
+        // Share quantity: the signed change only — the comment on the previous
+        // revision said "prefer the signed change" while the code preferred the
+        // post-trade holdings field.
+        const shareCount = Math.abs(shareChange)
         const unitPrice = Number(t.transactionPrice || 0)
         // Total trade value = shares × price-per-share
         const computedValue = shareCount > 0 && unitPrice > 0 ? shareCount * unitPrice : 0

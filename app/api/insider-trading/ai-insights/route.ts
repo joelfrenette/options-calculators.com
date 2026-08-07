@@ -1,3 +1,5 @@
+import { NextResponse } from "next/server"
+
 import { generateWithFallback } from "@/lib/ai-providers"
 
 export const dynamic = "force-dynamic"
@@ -116,7 +118,7 @@ export async function POST(request: Request) {
     const trades: Trade[] = Array.isArray(body.trades) ? body.trades : []
 
     if (trades.length === 0) {
-      return Response.json({ success: false, error: "No trades provided" }, { status: 400 })
+      return NextResponse.json({ success: false, error: "No trades provided" }, { status: 400 })
     }
 
     const aggregates = aggregateByTicker(trades)
@@ -172,7 +174,7 @@ Provide 3-5 signals max, ordered by importance. Keep it tight and specific to th
     }
 
     if (!parsed || !Array.isArray(parsed.signals)) {
-      return Response.json({
+      return NextResponse.json({
         success: true,
         summary:
           "AI returned an unstructured response. Showing computed aggregates instead — review tickers with the largest combined buy/sell value below.",
@@ -200,7 +202,7 @@ Provide 3-5 signals max, ordered by importance. Keep it tight and specific to th
       })
     }
 
-    return Response.json({
+    return NextResponse.json({
       success: true,
       summary: parsed.summary || "",
       signals: parsed.signals,
@@ -211,7 +213,7 @@ Provide 3-5 signals max, ordered by importance. Keep it tight and specific to th
     })
   } catch (error) {
     console.error("[v0] Insider AI insights error:", error instanceof Error ? error.message : error)
-    return Response.json(
+    return NextResponse.json(
       { success: false, error: "Failed to generate AI insights" },
       { status: 500 },
     )
