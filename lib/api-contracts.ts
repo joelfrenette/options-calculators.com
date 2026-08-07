@@ -136,7 +136,9 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
   {
     path: "/api/vix",
     method: "GET",
-    schema: z.object({ vix: anyObject, timestamp: iso }),
+    // Live run 2026-08-07: production returns `vix` as a NUMBER; the original
+    // object-only schema was over-specified and failed a working route.
+    schema: z.object({ vix: z.union([z.number(), anyObject]), timestamp: iso }),
     budgetMs: 8000,
     tabs: ["risk-management"],
   },

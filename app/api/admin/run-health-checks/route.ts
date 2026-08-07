@@ -43,9 +43,15 @@ interface Result {
 /** Resolve the origin to probe. Same deployment, so relative would also work,
  *  but an absolute URL keeps this usable from a script or a cron. */
 function originFrom(request: NextRequest): string {
+  // The REQUEST's own origin comes first: it is the deployment being tested.
+  // The first live run proved the old order wrong — NEXT_PUBLIC_BASE_URL points
+  // at production, so a preview deployment probed PRODUCTION's routes (old code)
+  // against the preview's contracts, and forwarded the admin cookie cross-host
+  // (five spurious 401s). Env fallbacks remain only for non-HTTP callers (cron).
+  const requestOrigin = new URL(request.url).origin
+  if (requestOrigin && requestOrigin !== "null") return requestOrigin
   const envBase = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL
-  if (envBase) return envBase.startsWith("http") ? envBase : `https://${envBase}`
-  return new URL(request.url).origin
+  return envBase ? (envBase.startsWith("http") ? envBase : `https://${envBase}`) : "http://localhost:3000"
 }
 
 function buildUrl(origin: string, c: RouteContract): string {
