@@ -98,6 +98,12 @@ async function probe(c: RouteContract, origin: string, sessionCookie: string | n
 
   const headers: Record<string, string> = {}
   if (c.method === "POST") headers["content-type"] = "application/json"
+  // Vercel Deployment Protection intercepts server-to-server fetches to preview
+  // URLs with an HTML auth wall (observed live: every probe returned the same
+  // interstitial). With "Protection Bypass for Automation" enabled, Vercel
+  // injects this secret as an env var and honors it as a bypass header.
+  const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+  if (bypass) headers["x-vercel-protection-bypass"] = bypass
   // Forward the caller's own admin session so auth-gated routes are exercised
   // rather than reporting their 401 as a route failure.
   if (c.needsAuth && sessionCookie) headers.cookie = `admin-session=${sessionCookie}`
