@@ -1,0 +1,4 @@
+{
+  "//": "Scoped to scripts/ only so `node scripts/*.ts` runs as ESM without touching the Next.js app's CommonJS default.",
+  "type": "module"
+}
