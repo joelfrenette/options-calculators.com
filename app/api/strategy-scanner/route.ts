@@ -82,8 +82,15 @@ export interface IVSnapshot {
 async function getIVData(ticker: string, price: number): Promise<IVSnapshot | null> {
   if (!POLYGON_API_KEY || !(price > 0)) return null
   try {
+    // The expiry window must be in the QUERY, not just filtered after the fact:
+    // the snapshot sorts nearest-expiry-first, and on option-dense tickers
+    // (AAPL ≈ 200+ front-week call strikes) a 250-row page never reached the
+    // 7-day-out expiries — the post-fetch filter then emptied the list and
+    // every scanner row was withheld (found live on staging, 2026-08-07).
+    const minExpiry = new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10)
+    const maxExpiry = new Date(Date.now() + 45 * 86400_000).toISOString().slice(0, 10)
     const res = await fetch(
-      `https://api.polygon.io/v3/snapshot/options/${ticker}?contract_type=call&limit=250&apiKey=${POLYGON_API_KEY}`,
+      `https://api.polygon.io/v3/snapshot/options/${ticker}?contract_type=call&expiration_date.gte=${minExpiry}&expiration_date.lte=${maxExpiry}&limit=250&apiKey=${POLYGON_API_KEY}`,
       { next: { revalidate: 300 }, signal: AbortSignal.timeout(10000) },
     )
     if (!res.ok) return null
@@ -92,9 +99,9 @@ async function getIVData(ticker: string, price: number): Promise<IVSnapshot | nu
     const contracts: any[] = data.results || []
     if (contracts.length === 0) return null
 
-    // Nearest expiry at least a week out. The front week's IV is noisy and is not
-    // representative of the ~30-day horizon these scanners quote.
-    const minExpiry = new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10)
+    // Nearest expiry at least a week out (belt-and-braces re-check of the query
+    // window above). The front week's IV is noisy and is not representative of
+    // the ~30-day horizon these scanners quote.
     const dated = contracts.filter((c) => (c.details?.expiration_date ?? "") >= minExpiry)
     if (dated.length === 0) return null
     const expiration: string = dated.reduce(
