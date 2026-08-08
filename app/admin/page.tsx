@@ -23,49 +23,118 @@ import {
   ImageIcon,
   Zap,
   Key,
-  Shield,
   DollarSign,
   HeartPulse,
+  MinusCircle,
+  PowerOff,
 } from "lucide-react"
 import { ApiKeysManager } from "@/components/api-keys-manager"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CcpiAuditAdmin } from "@/components/ccpi-audit-admin"
 import { ApiDataSourceStatus } from "@/components/api-data-source-status"
 import { AIStatusAdmin } from "@/components/ai-status-admin"
-import { RemainingSiteAudit } from "@/components/remaining-site-audit"
-import { FullSystemAudit } from "@/components/admin/full-system-audit"
 import { CostsUsageAdmin } from "@/components/costs-usage-admin"
 import { HealthCheckPanel } from "@/components/admin/health-check-panel"
 
+/**
+ * Shape emitted by GET /api/admin/api-status. Every field is the route's own
+ * diagnosis — this component derives nothing about health on its own, it only
+ * renders what the route measured (or states that it did not measure).
+ */
 interface ApiStatus {
+  id: string
   name: string
-  status: "online" | "error" | "unknown" | "warning"
+  /** Raw env var was present (says nothing about whether it is usable). */
+  rawPresent: boolean
+  /** Kill-switched via DISABLED_APIS — never probed, never "online". */
+  disabled: boolean
+  /** Which env var / alias actually resolved, or null if none did. */
+  resolvedVia: string | null
+  /** False means no network request was made: status is a claim, not a measurement. */
+  probed: boolean
+  httpStatus: number | null
+  status: "ok" | "error" | "disabled" | "unknown"
+  /** The route's plain-language reason. Always rendered. */
   message: string
-  hasKey: boolean
   endpoint?: string
   usedIn?: string[]
+}
+
+type Chip = { label: string; className: string; Icon: typeof CheckCircle2 }
+
+/**
+ * One derived chip per provider — the single source of truth for the row's
+ * colour. Order matters: a kill-switched provider can never read as healthy,
+ * and an unprobed provider can never read as "online".
+ */
+function deriveChip(api: ApiStatus): Chip {
+  if (api.disabled || api.status === "disabled") {
+    return {
+      label: "DISABLED (kill switch)",
+      className: "bg-slate-200 text-slate-700 border-slate-300",
+      Icon: PowerOff,
+    }
+  }
+  if (api.status === "ok") {
+    return {
+      label: api.httpStatus ? `OK (HTTP ${api.httpStatus})` : "OK",
+      className: "bg-green-100 text-green-800 border-green-300",
+      Icon: CheckCircle2,
+    }
+  }
+  if (api.status === "error") {
+    return {
+      label: api.httpStatus ? `ERROR (HTTP ${api.httpStatus})` : "ERROR",
+      className: "bg-red-100 text-red-800 border-red-300",
+      Icon: XCircle,
+    }
+  }
+  if (!api.probed) {
+    return {
+      label: "NOT PROBED",
+      className: "bg-slate-100 text-slate-700 border-slate-300",
+      Icon: MinusCircle,
+    }
+  }
+  return {
+    label: "UNKNOWN",
+    className: "bg-amber-100 text-amber-900 border-amber-300",
+    Icon: AlertCircle,
+  }
+}
+
+/** Key provenance is descriptive text, never a status badge. */
+function keyLine(api: ApiStatus): string {
+  if (api.disabled) {
+    return api.rawPresent
+      ? "Key present in the environment, but the provider is kill-switched — the key is not used."
+      : "No key configured; the provider is kill-switched regardless."
+  }
+  if (api.resolvedVia) return `Key resolved via ${api.resolvedVia}`
+  if (api.rawPresent) return "Key present in the environment but did not resolve (alias or kill-switch)"
+  return "No key configured"
 }
 
 export default function AdminDashboard() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [apiStatuses, setApiStatuses] = useState<ApiStatus[]>([])
-  const [auditResults, setAuditResults] = useState<any>(null)
+  const [apiStatusError, setApiStatusError] = useState<string | null>(null)
+  const [apiStatusLoaded, setApiStatusLoaded] = useState(false)
   const [adImages, setAdImages] = useState<string[]>([])
   const [adUrl, setAdUrl] = useState("")
   const [newAdImage, setNewAdImage] = useState("")
-  const [dataSourceStatus, setDataSourceStatus] = useState<any>(null)
-  const [activeTab, setActiveTab] = useState("full-audit")
+  const [activeTab, setActiveTab] = useState("health")
 
   useEffect(() => {
     // Don't auto-fetch on mount, let user click tabs
   }, [])
 
   useEffect(() => {
-    if (activeTab === "status" && apiStatuses.length === 0) {
+    if (activeTab === "status" && !apiStatusLoaded) {
       fetchApiStatus()
     }
-  }, [activeTab])
+  }, [activeTab, apiStatusLoaded])
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" })
@@ -74,57 +143,23 @@ export default function AdminDashboard() {
 
   const fetchApiStatus = async () => {
     setLoading(true)
+    setApiStatusError(null)
     try {
       const response = await fetch("/api/admin/api-status")
+      if (!response.ok) {
+        throw new Error(`/api/admin/api-status returned HTTP ${response.status}`)
+      }
       const data = await response.json()
-      setApiStatuses(data.apis || [])
+      setApiStatuses(Array.isArray(data?.apis) ? data.apis : [])
+      setApiStatusLoaded(true)
     } catch (error) {
       console.error("Failed to fetch API status:", error)
       setApiStatuses([])
+      setApiStatusLoaded(true)
+      setApiStatusError(error instanceof Error ? error.message : "Unknown error")
     } finally {
       setLoading(false)
     }
-  }
-
-  const fetchAuditResults = async () => {
-    setLoading(true)
-    try {
-      const response = await fetch("/api/admin/audit")
-      const data = await response.json()
-      setAuditResults(data)
-    } catch (error) {
-      console.error("Failed to fetch audit results:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const exportAuditReport = () => {
-    if (!auditResults) return
-
-    const report = `
-# AUDIT REPORT - OPTIONS-CALCULATORS.COM
-Generated: ${new Date(auditResults.timestamp).toLocaleString()}
-
-## VERDICT: ${auditResults.verdict}
-${auditResults.summary}
-
-## ISSUES FOUND: ${auditResults.issues.length === 0 ? "NONE" : auditResults.issues.length}
-${auditResults.issues.length === 0 ? "✓ No fake data detected\n✓ No random number generators\n✓ No hardcoded values pretending to be live data\n✓ All formulas match industry standards" : auditResults.issues.map((issue: string) => `- ${issue}`).join("\n")}
-
----
-**END OF AUDIT REPORT**
-`
-
-    const blob = new Blob([report], { type: "text/markdown" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `audit-report-${new Date().toISOString().split("T")[0]}.md`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
   }
 
   const fetchAdData = async () => {
@@ -206,15 +241,8 @@ ${auditResults.issues.length === 0 ? "✓ No fake data detected\n✓ No random n
         </div>
 
         {/* Main Tabs */}
-        <Tabs defaultValue="full-audit" className="w-full" onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-11 gap-1 bg-slate-800 p-1 h-auto mb-6">
-            <TabsTrigger
-              value="full-audit"
-              className="text-slate-200 data-[state=active]:bg-green-600 data-[state=active]:text-white text-xs md:text-sm"
-            >
-              <Shield className="h-4 w-4 mr-1 md:mr-2" />
-              <span className="hidden md:inline">Full</span> Audit
-            </TabsTrigger>
+        <Tabs defaultValue="health" className="w-full" onValueChange={setActiveTab}>
+          <TabsList className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-9 gap-1 bg-slate-800 p-1 h-auto mb-6">
             <TabsTrigger
               value="health"
               className="text-slate-200 data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-xs md:text-sm"
@@ -265,13 +293,6 @@ ${auditResults.issues.length === 0 ? "✓ No fake data detected\n✓ No random n
               CCPI
             </TabsTrigger>
             <TabsTrigger
-              value="audit"
-              className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900 text-xs md:text-sm"
-            >
-              <CheckCircle2 className="h-4 w-4 mr-1 md:mr-2" />
-              Site
-            </TabsTrigger>
-            <TabsTrigger
               value="backup"
               className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900 text-xs md:text-sm"
             >
@@ -286,10 +307,6 @@ ${auditResults.issues.length === 0 ? "✓ No fake data detected\n✓ No random n
               Ads
             </TabsTrigger>
           </TabsList>
-
-          <TabsContent value="full-audit">
-            <FullSystemAudit />
-          </TabsContent>
 
           <TabsContent value="health">
             <HealthCheckPanel />
@@ -316,7 +333,10 @@ ${auditResults.issues.length === 0 ? "✓ No fake data detected\n✓ No random n
                       <Activity className="h-5 w-5 text-blue-600" />
                       API Status & Key Management
                     </CardTitle>
-                    <CardDescription>Monitor all external APIs and manage configuration</CardDescription>
+                    <CardDescription>
+                      One derived status per provider, straight from the route&apos;s own diagnosis. A key being
+                      present is not a health signal and is never shown as one.
+                    </CardDescription>
                   </div>
                   <div className="flex gap-2">
                     <Button onClick={fetchApiStatus} disabled={loading}>
@@ -339,66 +359,73 @@ ${auditResults.issues.length === 0 ? "✓ No fake data detected\n✓ No random n
                 </div>
               </CardHeader>
               <CardContent>
-                {apiStatuses && apiStatuses.length > 0 && (
+                {apiStatusError ? (
+                  <div className="border border-red-300 bg-red-50 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <XCircle className="h-5 w-5 text-red-600" />
+                      <p className="font-semibold text-red-900">Could not load API status</p>
+                    </div>
+                    <p className="text-sm text-red-800 font-mono">{apiStatusError}</p>
+                    <p className="text-sm text-red-800 mt-2">
+                      Nothing below is measured — this panel is reporting its own failure, not a healthy stack.
+                    </p>
+                    <Button onClick={fetchApiStatus} disabled={loading} size="sm" className="mt-3">
+                      Retry
+                    </Button>
+                  </div>
+                ) : !apiStatusLoaded ? (
+                  <p className="text-sm text-slate-600 py-6 text-center">
+                    {loading ? "Probing providers…" : "Click “Refresh Status” to probe the providers."}
+                  </p>
+                ) : apiStatuses.length === 0 ? (
+                  <div className="border border-amber-300 bg-amber-50 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <AlertCircle className="h-5 w-5 text-amber-700" />
+                      <p className="font-semibold text-amber-900">No providers returned</p>
+                    </div>
+                    <p className="text-sm text-amber-900">
+                      The route responded successfully but listed zero providers. That is a fault in
+                      /api/admin/api-status, not an all-clear.
+                    </p>
+                  </div>
+                ) : (
                   <div className="space-y-3">
-                    {apiStatuses.map((api) => (
-                      <div
-                        key={api.name}
-                        className="flex items-start gap-4 p-4 border rounded-lg hover:bg-slate-50 transition-colors"
-                      >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className="font-bold text-slate-900">{api.name}</p>
-                            {api.hasKey ? (
-                              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded font-semibold">
-                                ✓ KEY SAVED
+                    {apiStatuses.map((api) => {
+                      const chip = deriveChip(api)
+                      return (
+                        <div
+                          key={api.id || api.name}
+                          className="flex items-start gap-4 p-4 border rounded-lg hover:bg-slate-50 transition-colors"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                              <p className="font-bold text-slate-900">{api.name}</p>
+                              <span
+                                className={`text-xs px-2 py-1 rounded font-semibold border inline-flex items-center gap-1 ${chip.className}`}
+                              >
+                                <chip.Icon className="h-3.5 w-3.5" />
+                                {chip.label}
                               </span>
-                            ) : api.status === "online" ? (
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-semibold">
-                                NO KEY REQUIRED
-                              </span>
-                            ) : (
-                              <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded font-semibold">
-                                ✗ KEY MISSING
-                              </span>
+                              {!api.probed && !api.disabled && (
+                                <span className="text-xs text-slate-500">no network request was made</span>
+                              )}
+                            </div>
+                            <p className="text-sm text-slate-800">{api.message || "No diagnosis reported."}</p>
+                            <p className="text-xs text-slate-600 mt-1">{keyLine(api)}</p>
+                            {api.endpoint && (
+                              <p className="text-xs text-slate-600 mt-2 font-mono bg-slate-100 px-2 py-1 rounded break-all">
+                                {api.endpoint}
+                              </p>
+                            )}
+                            {api.usedIn && api.usedIn.length > 0 && (
+                              <p className="text-sm text-slate-600 mt-1">
+                                <span className="font-semibold">Used in:</span> {api.usedIn.join(", ")}
+                              </p>
                             )}
                           </div>
-                          {api.endpoint && (
-                            <p className="text-xs text-slate-600 mb-2 font-mono bg-slate-100 px-2 py-1 rounded">
-                              {api.endpoint}
-                            </p>
-                          )}
-                          {api.usedIn && api.usedIn.length > 0 && (
-                            <p className="text-sm text-slate-600">
-                              <span className="font-semibold">Used in:</span> {api.usedIn.join(", ")}
-                            </p>
-                          )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          {api.status === "online" ? (
-                            <div className="relative">
-                              <div className="w-4 h-4 bg-green-500 rounded-full animate-pulse" />
-                              <div className="absolute inset-0 w-4 h-4 bg-green-400 rounded-full blur-sm" />
-                            </div>
-                          ) : api.status === "warning" ? (
-                            <div className="relative">
-                              <div className="w-4 h-4 bg-yellow-500 rounded-full animate-pulse" />
-                            </div>
-                          ) : (
-                            <div className="relative">
-                              <div className="w-4 h-4 bg-red-500 rounded-full animate-pulse" />
-                            </div>
-                          )}
-                          {api.status === "online" ? (
-                            <CheckCircle2 className="h-5 w-5 text-green-600" />
-                          ) : api.status === "error" ? (
-                            <XCircle className="h-5 w-5 text-red-600" />
-                          ) : (
-                            <AlertCircle className="h-5 w-5 text-yellow-600" />
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </CardContent>
@@ -413,10 +440,6 @@ ${auditResults.issues.length === 0 ? "✓ No fake data detected\n✓ No random n
             <CcpiAuditAdmin />
           </TabsContent>
 
-          <TabsContent value="audit">
-            <RemainingSiteAudit />
-          </TabsContent>
-
           <TabsContent value="backup">
             <div className="grid gap-6 md:grid-cols-2">
               <Card className="bg-white">
@@ -429,11 +452,12 @@ ${auditResults.issues.length === 0 ? "✓ No fake data detected\n✓ No random n
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-3 text-sm">
-                    <p className="font-semibold">Automatic Backups:</p>
+                    <p className="font-semibold">How backups actually work here:</p>
                     <ul className="space-y-2 ml-4 text-slate-600">
-                      <li>• Every code change is automatically committed to GitHub</li>
-                      <li>• Full version history is preserved</li>
-                      <li>• You can rollback to any previous version</li>
+                      <li>• Commits are manual — nothing is auto-committed on your behalf</li>
+                      <li>• Work lands on the staging branch first, then merges to main after UAT</li>
+                      <li>• Every commit that is pushed is preserved in GitHub history</li>
+                      <li>• Rollback is done from the Vercel deployments list, not from this page</li>
                     </ul>
                   </div>
                   <Button onClick={handleBackup} className="w-full">

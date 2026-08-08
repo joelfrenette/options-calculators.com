@@ -1,312 +1,425 @@
 import { NextResponse } from "next/server"
 import { isAuthenticated } from "@/lib/auth"
+import { API_KEY_ALIASES, hasRawKey, isServiceDisabled, resolveApiKey } from "@/lib/api-keys"
+import { meteredFetch } from "@/lib/metered-fetch"
+
+/**
+ * Per-provider status for the admin APIs tab (AUDIT_BACKLOG A-11).
+ *
+ * Rules this route obeys, each one a defect the rebuild removed:
+ *  1. Keys are resolved ONLY through lib/api-keys.ts (`resolveApiKey`,
+ *     `hasRawKey`, `isServiceDisabled`). No `process.env` reads, no hand-rolled
+ *     alias tables — a kill-switched provider (DISABLED_APIS) can never render
+ *     as configured/healthy, which is what made SerpAPI show a green
+ *     "✓ KEY SAVED" while switched off.
+ *  2. Key presence is NEVER a health verdict. A provider that was not probed is
+ *     `probed:false` / `status:"unknown"` and says so. There is no "online".
+ *  3. A probe hits the endpoint the app ACTUALLY calls. Where the only endpoint
+ *     the app uses costs money (billable actor run, scraper credit, LLM token,
+ *     an outbound email) the provider is deliberately NOT probed and the message
+ *     names that reason.
+ *  4. HTTP 200 with an error body is a FAILURE (mirrors `errorShape` in
+ *     lib/api-contracts.ts) — Alpha Vantage `{"Information": rate limit}` and
+ *     TwelveData `{"code":429}` used to score healthy.
+ *  5. `message` states the measured reason (status code, upstream text, timeout).
+ *     No guessed diagnosis — the old route reported every non-2xx as
+ *     "Invalid or expired API key".
+ *  6. Probes go through `meteredFetch` so admin probing shows up in the cost
+ *     ledger like every other outbound call.
+ *
+ * Admin-gated: the payload discloses which keys are configured.
+ */
+
+export const dynamic = "force-dynamic"
+export const maxDuration = 60
+
+const ROUTE_TAG = "/api/admin/api-status"
+const PROBE_TIMEOUT_MS = 8000
+
+type ProviderStatus = "ok" | "error" | "disabled" | "unknown"
+
+/** The contract the admin APIs tab renders. Every field is measured or stated. */
+interface ProviderRow {
+  id: string
+  name: string
+  /** A raw env var (any accepted alias) is present. Says nothing about health. */
+  rawPresent: boolean
+  /** Kill-switched via DISABLED_APIS. */
+  disabled: boolean
+  /** Which alias spelling actually resolved, or null. */
+  resolvedVia: string | null
+  /** False ⇒ no network request was made; `status` is a statement, not a measurement. */
+  probed: boolean
+  httpStatus: number | null
+  status: ProviderStatus
+  message: string
+  /** The endpoint the app itself calls (no key material). */
+  endpoint: string
+  usedIn: string[]
+}
+
+interface ProviderSpec {
+  /** Canonical lowercase provider tag — also the metering tag. */
+  id: string
+  name: string
+  /** Canonical key name in API_KEY_ALIASES, or null for a keyless provider. */
+  keyName: string | null
+  /** The endpoint the app actually calls, for display. */
+  endpoint: string
+  usedIn: string[]
+  /**
+   * Probe URL builder for the endpoint the app really uses. Return null (or omit)
+   * to declare the provider unprobeable; `noProbeReason` then explains why.
+   */
+  probeUrl?: (key: string) => string
+  probeInit?: RequestInit
+  noProbeReason?: string
+  /** No code path in the repo consumes this provider, so a missing key is not a fault. */
+  unused?: boolean
+}
+
+function isoDay(offsetDays: number): string {
+  const d = new Date(Date.now() + offsetDays * 86_400_000)
+  return d.toISOString().slice(0, 10)
+}
+
+/** Reason text reused by every provider whose only call site spends money. */
+const BILLABLE = (what: string) =>
+  `not probed — the only endpoint the app calls (${what}) costs money on every request, so probing it would bill the account. Key presence only.`
+
+const PROVIDERS: ProviderSpec[] = [
+  // ------------------------------------------------ market & economic data
+  {
+    id: "polygon",
+    name: "Polygon.io",
+    keyName: "POLYGON_API_KEY",
+    endpoint: "https://api.polygon.io/v2/aggs/ticker/{ticker}/prev",
+    usedIn: ["Options calculators", "Wheel / strategy scanners", "CCPI price inputs"],
+    probeUrl: (key) => `https://api.polygon.io/v2/aggs/ticker/SPY/prev?adjusted=true&apiKey=${key}`,
+  },
+  {
+    id: "fred",
+    name: "FRED (St. Louis Fed)",
+    keyName: "FRED_API_KEY",
+    endpoint: "https://api.stlouisfed.org/fred/series/observations",
+    usedIn: ["CCPI macro pillar", "FOMC predictions", "CPI / inflation", "Panic-Euphoria"],
+    probeUrl: (key) =>
+      `https://api.stlouisfed.org/fred/series/observations?series_id=DFF&api_key=${key}&file_type=json&limit=1&sort_order=desc`,
+  },
+  {
+    id: "twelvedata",
+    name: "Twelve Data",
+    keyName: "TWELVE_DATA_API_KEY",
+    endpoint: "https://api.twelvedata.com/time_series",
+    usedIn: ["Indicator backup source (RSI / MACD / SMA / Bollinger)"],
+    probeUrl: (key) => `https://api.twelvedata.com/time_series?symbol=AAPL&interval=1day&outputsize=1&apikey=${key}`,
+  },
+  {
+    id: "fmp",
+    name: "Financial Modeling Prep",
+    keyName: "FMP_API_KEY",
+    endpoint: "https://financialmodelingprep.com/stable/quote",
+    usedIn: ["CCPI valuation inputs (S&P 500 P/E, P/S)", "Scanner fundamentals"],
+    probeUrl: (key) => `https://financialmodelingprep.com/stable/quote?symbol=AAPL&apikey=${key}`,
+  },
+  {
+    id: "alphavantage",
+    name: "Alpha Vantage",
+    keyName: "ALPHA_VANTAGE_API_KEY",
+    endpoint: "https://www.alphavantage.co/query?function=GLOBAL_QUOTE",
+    usedIn: ["CCPI mega-cap / semiconductor momentum quotes"],
+    probeUrl: (key) => `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=SPY&apikey=${key}`,
+  },
+  {
+    id: "finnhub",
+    name: "Finnhub",
+    keyName: "FINNHUB_API_KEY",
+    endpoint: "https://finnhub.io/api/v1/calendar/earnings",
+    usedIn: ["Earnings calendar", "Landmine check", "Strategy scanner", "Insider transactions"],
+    // The app calls /calendar/earnings, /stock/insider-transactions and
+    // /company-news. It never calls /v1/quote — probing that endpoint is what
+    // made Finnhub render red while the health check reported it passing.
+    probeUrl: (key) => `https://finnhub.io/api/v1/calendar/earnings?from=${isoDay(0)}&to=${isoDay(7)}&token=${key}`,
+  },
+  {
+    id: "apify",
+    name: "Apify",
+    keyName: "APIFY_API_TOKEN",
+    endpoint: "https://api.apify.com/v2/acts/{actor-id}/runs",
+    usedIn: ["Yahoo Finance valuation scraping (CCPI)", "Sentiment sources"],
+    noProbeReason: BILLABLE("starting an actor run"),
+  },
+  // ------------------------------------------------------ scraping & search
+  {
+    id: "scrapingbee",
+    name: "ScrapingBee",
+    keyName: "SCRAPINGBEE_API_KEY",
+    endpoint: "https://app.scrapingbee.com/api/v1/",
+    usedIn: ["Market sentiment scrapes", "Panic-Euphoria inputs", "Social sentiment"],
+    noProbeReason: BILLABLE("a /api/v1/ scrape, which consumes credits"),
+  },
+  {
+    id: "serper",
+    name: "Serper.dev",
+    keyName: "SERPER_API_KEY",
+    endpoint: "https://google.serper.dev/search + /news",
+    usedIn: ["Google Trends proxy", "Serper finance news", "Social sentiment"],
+    noProbeReason: BILLABLE("a /search or /news query, which consumes a search credit"),
+  },
+  {
+    id: "serpapi",
+    name: "SerpAPI.com",
+    keyName: "SERPAPI_KEY",
+    endpoint: "— (no call site)",
+    usedIn: [],
+    unused: true,
+    noProbeReason:
+      "not probed — no code path in this repo calls SerpAPI. The key is registered in lib/api-keys.ts (and billed if the plan is active), but nothing consumes it, so there is no app endpoint to probe.",
+  },
+  // ------------------------------------------------------------------ email
+  {
+    id: "resend",
+    name: "Resend",
+    keyName: "RESEND_API_KEY",
+    endpoint: "https://api.resend.com/emails",
+    usedIn: ["Password-reset email", "Budget-guard notifications"],
+    noProbeReason: "not probed — the only Resend endpoint the app uses SENDS AN EMAIL. Key presence only.",
+  },
+  // ------------------------------------------------------- keyless upstreams
+  {
+    id: "cnn-dataviz",
+    name: "CNN Fear & Greed (keyless)",
+    keyName: null,
+    endpoint: "https://production.dataviz.cnn.io/index/fearandgreed/graphdata",
+    usedIn: ["CCPI Pillar 2 equity Fear & Greed"],
+    probeUrl: () => "https://production.dataviz.cnn.io/index/fearandgreed/graphdata",
+    probeInit: {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        Accept: "application/json",
+      },
+    },
+  },
+  // ------------------------------------------------------- AI / LLM providers
+  // Every one of these is reached only through lib/ai-providers.ts, i.e. a
+  // billable chat completion. None is probed. The AI tab renders the live
+  // fallback chain (order, model, key presence) generated from providerConfigs.
+  ...(
+    [
+      ["openrouter", "OpenRouter (free model)", "OPENROUTER_API_KEY", "https://openrouter.ai/api/v1/chat/completions"],
+      ["groq", "Groq", "GROQ_API_KEY", "https://api.groq.com/openai/v1/chat/completions"],
+      ["google", "Google Gemini", "GOOGLE_AI_API_KEY", "https://generativelanguage.googleapis.com/v1beta/models"],
+      ["openai", "OpenAI", "OPENAI_API_KEY", "https://api.openai.com/v1/chat/completions"],
+      ["xai", "xAI (Grok)", "XAI_API_KEY", "https://api.x.ai/v1/chat/completions"],
+      ["anthropic", "Anthropic Claude", "ANTHROPIC_API_KEY", "https://api.anthropic.com/v1/messages"],
+      ["perplexity", "Perplexity", "PERPLEXITY_API_KEY", "https://api.perplexity.ai/chat/completions"],
+    ] as const
+  ).map(([id, name, keyName, endpoint]) => ({
+    id,
+    name,
+    keyName,
+    endpoint,
+    usedIn: ["AI fallback chain (lib/ai-providers.ts)"],
+    noProbeReason:
+      "not probed — the only endpoint the app calls is a chat completion, which spends tokens. See the AI tab for the live fallback chain (order, model, key presence).",
+  })),
+]
+
+function snippet(text: string, max = 220): string {
+  const clean = text.replace(/\s+/g, " ").trim()
+  return clean.length > max ? `${clean.slice(0, max)}…` : clean
+}
+
+/** Never echo key material back into an admin payload or a log line. */
+function redact(text: string, key: string): string {
+  return key ? text.split(key).join("[redacted]") : text
+}
+
+/**
+ * Returns the upstream's own error text when a 2xx body is actually an error,
+ * else null. Same principle as `errorShape` in lib/api-contracts.ts: several
+ * providers answer HTTP 200 with a failure in the body.
+ */
+function describeErrorBody(body: unknown): string | null {
+  if (body === null || typeof body !== "object" || Array.isArray(body)) return null
+  const o = body as Record<string, unknown>
+
+  // Generic { error: "..." } (errorShape) and { error: { message } } (Apify).
+  if (typeof o.error === "string" && o.error.length > 0) return o.error
+  if (o.error && typeof o.error === "object") {
+    const nested = o.error as Record<string, unknown>
+    if (typeof nested.message === "string" && nested.message.length > 0) return nested.message
+  }
+
+  // Alpha Vantage answers 200 with Information / Note / Error Message.
+  for (const field of ["Information", "Note", "Error Message", "error_message"]) {
+    const value = o[field]
+    if (typeof value === "string" && value.length > 0) return `${field}: ${value}`
+  }
+
+  // Twelve Data answers 200 with { code: 429, message, status: "error" }.
+  const code = typeof o.code === "number" ? o.code : null
+  const statusField = typeof o.status === "string" ? o.status.toUpperCase() : null
+  const message = typeof o.message === "string" ? o.message : null
+  if (code !== null && code >= 400) return `code ${code}${message ? `: ${message}` : ""}`
+  if (statusField === "ERROR" || statusField === "NOT_AUTHORIZED") {
+    return message ? `status ${statusField}: ${message}` : `status ${statusField}`
+  }
+
+  return null
+}
+
+async function evaluate(spec: ProviderSpec): Promise<ProviderRow> {
+  const aliases = spec.keyName ? (API_KEY_ALIASES[spec.keyName] ?? [spec.keyName]) : []
+  const rawPresent = spec.keyName ? hasRawKey(spec.keyName) : false
+  const disabled = spec.keyName ? isServiceDisabled(spec.keyName) : false
+  const key = spec.keyName ? resolveApiKey(spec.keyName) : ""
+  // `resolveApiKey` returns "" for a kill-switched service, so the alias that
+  // resolved is derived from the same helper rather than a second env read.
+  const resolvedVia = key ? (aliases.find((alias) => resolveApiKey(alias) === key) ?? aliases[0] ?? null) : null
+
+  const base = {
+    id: spec.id,
+    name: spec.name,
+    rawPresent,
+    disabled,
+    resolvedVia,
+    endpoint: spec.endpoint,
+    usedIn: [...spec.usedIn],
+  }
+
+  // 1. Kill switch wins over everything, including a present key.
+  if (disabled) {
+    return {
+      ...base,
+      probed: false,
+      httpStatus: null,
+      status: "disabled",
+      message: rawPresent
+        ? `Kill-switched: ${spec.keyName} is listed in DISABLED_APIS, so resolveApiKey() returns "" and the app behaves as if unconfigured. The key is still set in the environment but is never used.`
+        : `Kill-switched: ${spec.keyName} is listed in DISABLED_APIS (and no key is configured either).`,
+    }
+  }
+
+  // 2. Key required but absent — a fact, not a health verdict. For a provider
+  //    nothing in the repo calls, an absent key is not a fault: it stays
+  //    "unknown" rather than reading as a broken integration.
+  if (spec.keyName && !key) {
+    return {
+      ...base,
+      probed: false,
+      httpStatus: null,
+      status: spec.unused ? "unknown" : "error",
+      message: spec.unused
+        ? `${spec.noProbeReason ?? "not probed — key presence only"} No key is configured either (accepted spellings: ${aliases.join(", ")}).`
+        : `No key configured. Accepted env-var spellings: ${aliases.join(", ")}.`,
+    }
+  }
+
+  // 3. Deliberately unprobed (billable or non-existent endpoint).
+  if (!spec.probeUrl) {
+    return {
+      ...base,
+      probed: false,
+      httpStatus: null,
+      status: "unknown",
+      message: spec.noProbeReason ?? "not probed — key presence only",
+    }
+  }
+
+  // 4. Real probe against the endpoint the app itself calls.
+  let response: Response
+  try {
+    response = await meteredFetch(spec.id, spec.probeUrl(key), {
+      ...spec.probeInit,
+      routeTag: ROUTE_TAG,
+      cache: "no-store",
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    })
+  } catch (error) {
+    const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")
+    return {
+      ...base,
+      probed: true,
+      httpStatus: null,
+      status: "error",
+      message: timedOut
+        ? `Probe timed out after ${PROBE_TIMEOUT_MS} ms against ${spec.endpoint}.`
+        : `Probe request threw: ${redact(String(error), key)}`,
+    }
+  }
+
+  const raw = await response.text().catch(() => "")
+
+  if (!response.ok) {
+    const detail = raw ? ` Upstream said: ${snippet(redact(raw, key))}` : ""
+    return {
+      ...base,
+      probed: true,
+      httpStatus: response.status,
+      status: "error",
+      message: `HTTP ${response.status} ${response.statusText || ""}`.trim() + "." + detail,
+    }
+  }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return {
+      ...base,
+      probed: true,
+      httpStatus: response.status,
+      status: "error",
+      message: `HTTP ${response.status} but the body was not JSON: ${snippet(redact(raw, key), 160)}`,
+    }
+  }
+
+  // 200-with-error-body is a failure, not a pass.
+  const bodyError = describeErrorBody(parsed)
+  if (bodyError) {
+    return {
+      ...base,
+      probed: true,
+      httpStatus: response.status,
+      status: "error",
+      message: `HTTP ${response.status} with an error body: ${snippet(redact(bodyError, key))}`,
+    }
+  }
+
+  return {
+    ...base,
+    probed: true,
+    httpStatus: response.status,
+    status: "ok",
+    message: `HTTP ${response.status} from ${spec.endpoint} with a well-formed body.`,
+  }
+}
 
 export async function GET() {
   if (!(await isAuthenticated())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
-  const apis = [
-    {
-      name: "Alpha Vantage API",
-      key: process.env.ALPHA_VANTAGE_API_KEY,
-      testUrl: "https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=IBM&apikey=",
-      endpoint: "https://www.alphavantage.co/query",
-      purpose: "Stock data & technical indicators (VIX, VXN, RVX, ATR, SMA)",
-      usedIn: ["CCPI Dashboard (VIX, VXN, ATR)", "Market Sentiment", "Panic/Euphoria"],
-    },
-    {
-      name: "Alternative.me API",
-      key: null,
-      testUrl: "https://api.alternative.me/fng/?limit=1",
-      endpoint: "https://api.alternative.me/fng",
-      purpose: "Crypto Fear & Greed Index",
-      usedIn: ["CCPI Dashboard (Fear & Greed component)"],
-    },
-    {
-      name: "Apify API",
-      key: process.env.APIFY_API_TOKEN,
-      testUrl: "https://api.apify.com/v2/acts?token=",
-      endpoint: "https://api.apify.com/v2/acts/{actor-id}/runs",
-      purpose: "Yahoo Finance data scraping (canadesk & Architjn actors for valuation metrics)",
-      usedIn: ["CCPI Dashboard (S&P 500 P/E, P/S ratios via Yahoo Finance)"],
-    },
-    {
-      name: "Financial Modeling Prep API",
-      key: process.env.FMP_API_KEY,
-      testUrl: "https://financialmodelingprep.com/stable/quote?symbol=AAPL&apikey=",
-      endpoint: "https://financialmodelingprep.com/stable/quote",
-      purpose: "Financial statements & valuation metrics (now using stable endpoint)",
-      usedIn: ["CCPI Dashboard (S&P 500 P/E, P/S ratios - primary source)"],
-    },
-    {
-      name: "FRED API",
-      key: process.env.FRED_API_KEY,
-      testUrl: "https://api.stlouisfed.org/fred/series?series_id=GDP&api_key=",
-      endpoint: "https://api.stlouisfed.org/fred/series/observations",
-      purpose: "Federal Reserve economic data (Fed Funds Rate, Yield Curve, Junk Bond Spread, CPI, M2 Money Supply)",
-      usedIn: [
-        "CCPI Dashboard (Fed Funds, Yield Curve, Junk Spread)",
-        "FOMC Predictions",
-        "CPI/Inflation",
-        "Panic/Euphoria",
-      ],
-    },
-    {
-      name: "Polygon.io API",
-      key: process.env.POLYGON_API_KEY,
-      testUrl: "https://api.polygon.io/v2/aggs/ticker/AAPL/range/1/day/2023-01-01/2023-01-02?apiKey=",
-      endpoint: "https://api.polygon.io/v2/aggs/ticker/{ticker}/range",
-      purpose: "Real-time options chains, stock quotes, Greeks, fundamentals, and market data",
-      usedIn: ["Options Calculators", "Wheel Scanner", "CCPI Dashboard", "Greeks Calculator"],
-    },
-    {
-      name: "Resend API",
-      key: process.env.RESEND_API_KEY,
-      testUrl: null,
-      endpoint: "https://api.resend.com/emails",
-      purpose: "Transactional email notifications (password reset emails)",
-      usedIn: ["Authentication System (password reset)"],
-    },
-    {
-      name: "Twelve Data API",
-      key: process.env.TWELVE_DATA_API_KEY || process.env.TWELVEDATA_API_KEY,
-      testUrl: "https://api.twelvedata.com/time_series?symbol=AAPL&interval=1day&apikey=",
-      endpoint: "https://api.twelvedata.com/time_series",
-      purpose: "Technical indicators, fundamentals, and market data (backup source)",
-      usedIn: ["CCPI Dashboard (backup)", "Wheel Scanner", "Market Data"],
-    },
-    {
-      name: "ScrapingBee API",
-      key: process.env.SCRAPINGBEE_API_KEY,
-      testUrl: "https://app.scrapingbee.com/api/v1/?api_key=",
-      endpoint: "https://app.scrapingbee.com/api/v1/",
-      purpose: "Web scraping for social/market sentiment and CNN data",
-      usedIn: ["Social Sentiment Score", "Fear & Greed Index", "Market Sentiment"],
-    },
-    {
-      name: "Serper",
-      key: process.env.SERPER_API_KEY,
-      testUrl: null,
-      endpoint: "https://google.serper.dev/search",
-      purpose: "Google Search data for sentiment analysis and stock news",
-      usedIn: ["Social Sentiment Score", "Stock News"],
-    },
-    {
-      name: "Grok (xAI)",
-      key: process.env.GROK_XAI_API_KEY || process.env.XAI_API_KEY,
-      testUrl: null,
-      endpoint: "https://api.x.ai/v1/chat/completions",
-      purpose: "LLM sentiment analysis (fastest option)",
-      usedIn: ["Social Sentiment Score"],
-    },
-    {
-      name: "Groq",
-      key: process.env.GROQ_API_KEY,
-      testUrl: null,
-      endpoint: "https://api.groq.com/openai/v1/chat/completions",
-      purpose: "LLM sentiment analysis (fast fallback)",
-      usedIn: ["Social Sentiment Score"],
-    },
-    {
-      name: "OpenAI",
-      key: process.env.OPENAI_API_KEY,
-      testUrl: null,
-      endpoint: "https://api.openai.com/v1/chat/completions",
-      purpose: "LLM sentiment analysis (reliable fallback)",
-      usedIn: ["Social Sentiment Score"],
-    },
-    {
-      name: "Google AI",
-      key: process.env.GOOGLE_AI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-      testUrl: null,
-      endpoint: "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent",
-      purpose: "LLM sentiment analysis (final fallback)",
-      usedIn: ["Social Sentiment Score"],
-    },
-    {
-      name: "Finnhub API",
-      key: process.env.FINNHUB_API_KEY,
-      testUrl: "https://finnhub.io/api/v1/quote?symbol=AAPL&token=",
-      endpoint: "https://finnhub.io/api/v1",
-      purpose: "Earnings calendar, insider transactions, news sentiment",
-      usedIn: ["Earnings Calendar", "Insider Trading", "Strategy Scanner", "Social Sentiment"],
-    },
-    {
-      name: "SerpAPI",
-      key: process.env.SERPAPI_KEY,
-      testUrl: "https://serpapi.com/account?api_key=",
-      endpoint: "https://serpapi.com/search",
-      purpose: "Google Trends fear/greed search volume (distinct from Serper.dev)",
-      usedIn: ["Social Sentiment Score (Google Trends)"],
-    },
-    {
-      name: "Anthropic Claude",
-      key: process.env.ANTHROPIC_API_KEY,
-      testUrl: null,
-      endpoint: "https://api.anthropic.com/v1/messages",
-      purpose: "LLM sentiment analysis & market data validation (AI fallback chain)",
-      usedIn: ["Social Sentiment Score", "CCPI Executive Summary", "CCPI Chat"],
-    },
-    {
-      name: "OpenRouter",
-      key: process.env.OPENROUTER_API_KEY,
-      testUrl: null,
-      endpoint: "https://openrouter.ai/api/v1/chat/completions",
-      purpose: "Aggregator LLM fallback",
-      usedIn: ["CCPI Executive Summary", "CCPI Chat", "AI Provider Fallback"],
-    },
-    {
-      name: "Perplexity",
-      key: process.env.PERPLEXITY_API_KEY,
-      testUrl: null,
-      endpoint: "https://api.perplexity.ai/chat/completions",
-      purpose: "Search-augmented LLM fallback",
-      usedIn: ["AI Provider Fallback"],
-    },
-  ]
 
-  // Test each API
-  const results = await Promise.all(
-    apis.map(async (api) => {
-      const hasKey = !!api.key
+  const startedAt = Date.now()
+  const apis = await Promise.all(PROVIDERS.map(evaluate))
 
-      // If no key required (like Alternative.me), test the endpoint directly
-      if (api.key === null && api.testUrl) {
-        try {
-          const controller = new AbortController()
-          const timeoutId = setTimeout(() => controller.abort(), 5000)
+  const summary = {
+    total: apis.length,
+    ok: apis.filter((a) => a.status === "ok").length,
+    error: apis.filter((a) => a.status === "error").length,
+    disabled: apis.filter((a) => a.status === "disabled").length,
+    unknown: apis.filter((a) => a.status === "unknown").length,
+    probed: apis.filter((a) => a.probed).length,
+    notProbed: apis.filter((a) => !a.probed).length,
+  }
 
-          const response = await fetch(api.testUrl, {
-            signal: controller.signal,
-            headers: { "User-Agent": "OPTIONS-CALCULATORS.COM/1.0" },
-          })
-          clearTimeout(timeoutId)
-
-          if (response.ok) {
-            return {
-              name: api.name,
-              status: "online" as const,
-              message: `Responding normally`,
-              purpose: api.purpose,
-              usedIn: api.usedIn,
-              endpoint: api.endpoint,
-              hasKey: false,
-            }
-          } else {
-            return {
-              name: api.name,
-              status: "error" as const,
-              message: `HTTP ${response.status}`,
-              purpose: api.purpose,
-              usedIn: api.usedIn,
-              endpoint: api.endpoint,
-              hasKey: false,
-            }
-          }
-        } catch (error: any) {
-          return {
-            name: api.name,
-            status: "error" as const,
-            message: error.name === "AbortError" ? "Request timeout (>5s)" : `Connection failed: ${error.message}`,
-            purpose: api.purpose,
-            usedIn: api.usedIn,
-            endpoint: api.endpoint,
-            hasKey: false,
-          }
-        }
-      }
-
-      // For APIs that require keys
-      if (!hasKey) {
-        return {
-          name: api.name,
-          status: "error" as const,
-          message: `API key not configured in environment variables`,
-          purpose: api.purpose,
-          usedIn: api.usedIn,
-          endpoint: api.endpoint,
-          hasKey: false,
-        }
-      }
-
-      if (!api.testUrl) {
-        return {
-          name: api.name,
-          status: "online" as const,
-          message: `Key configured (no test endpoint available)`,
-          purpose: api.purpose,
-          usedIn: api.usedIn,
-          endpoint: api.endpoint,
-          hasKey: true,
-        }
-      }
-
-      // Test API with key
-      try {
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 5000)
-
-        const testEndpoint = api.testUrl + api.key
-        const response = await fetch(testEndpoint, {
-          signal: controller.signal,
-          headers: { "User-Agent": "OPTIONS-CALCULATORS.COM/1.0" },
-        })
-        clearTimeout(timeoutId)
-
-        if (response.ok) {
-          return {
-            name: api.name,
-            status: "online" as const,
-            message: `Responding normally`,
-            purpose: api.purpose,
-            usedIn: api.usedIn,
-            endpoint: api.endpoint,
-            hasKey: true,
-          }
-        } else if (response.status === 401 || response.status === 403) {
-          return {
-            name: api.name,
-            status: "error" as const,
-            message: `Invalid or expired API key (HTTP ${response.status})`,
-            purpose: api.purpose,
-            usedIn: api.usedIn,
-            endpoint: api.endpoint,
-            hasKey: true,
-          }
-        } else if (response.status === 429) {
-          return {
-            name: api.name,
-            status: "warning" as const,
-            message: `Rate limit exceeded - API is working but throttled`,
-            purpose: api.purpose,
-            usedIn: api.usedIn,
-            endpoint: api.endpoint,
-            hasKey: true,
-          }
-        } else {
-          return {
-            name: api.name,
-            status: "error" as const,
-            message: `HTTP ${response.status}`,
-            purpose: api.purpose,
-            usedIn: api.usedIn,
-            endpoint: api.endpoint,
-            hasKey: true,
-          }
-        }
-      } catch (error: any) {
-        return {
-          name: api.name,
-          status: "unknown" as const,
-          message: error.name === "AbortError" ? "Request timeout (>5s)" : `Connection test failed: ${error.message}`,
-          purpose: api.purpose,
-          usedIn: api.usedIn,
-          endpoint: api.endpoint,
-          hasKey: true,
-        }
-      }
-    }),
-  )
-
-  return NextResponse.json({ apis: results })
+  return NextResponse.json({
+    timestamp: new Date().toISOString(),
+    durationMs: Date.now() - startedAt,
+    /** Stated so the panel can never be read as "everything is measured". */
+    note: `${summary.probed} of ${summary.total} providers were probed against the endpoint the app actually calls; the rest report key presence only and say why. Probes are recorded in the cost ledger.`,
+    summary,
+    apis,
+  })
 }

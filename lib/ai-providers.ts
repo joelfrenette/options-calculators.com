@@ -32,6 +32,9 @@ const providerConfigs = [
     // raises the daily cap to 1,000 requests.
     name: "openrouter" as const,
     displayName: "OpenRouter (free model)",
+    keyName: "OPENROUTER_API_KEY",
+    tier: "free" as const,
+    endpoint: "https://openrouter.ai/api/v1/chat/completions",
     key: () => resolveApiKey("OPENROUTER_API_KEY"),
     create: () =>
       createOpenAI({
@@ -44,6 +47,9 @@ const providerConfigs = [
     // Free backup.
     name: "groq" as const,
     displayName: "Groq (Llama 3.3 70B)",
+    keyName: "GROQ_API_KEY",
+    tier: "free" as const,
+    endpoint: "https://api.groq.com/openai/v1/chat/completions",
     key: () => resolveApiKey("GROQ_API_KEY"),
     create: () =>
       createOpenAI({
@@ -56,6 +62,9 @@ const providerConfigs = [
     // Free backup.
     name: "google" as const,
     displayName: "Google (Gemini 2.0 Flash)",
+    keyName: "GOOGLE_AI_API_KEY",
+    tier: "free" as const,
+    endpoint: "https://generativelanguage.googleapis.com/v1beta/models",
     key: () => resolveApiKey("GOOGLE_AI_API_KEY"),
     create: () => createGoogleGenerativeAI({ apiKey: resolveApiKey("GOOGLE_AI_API_KEY") }),
     model: "gemini-2.0-flash",
@@ -65,6 +74,9 @@ const providerConfigs = [
   {
     name: "openai" as const,
     displayName: "OpenAI (GPT-4o Mini)",
+    keyName: "OPENAI_API_KEY",
+    tier: "paid" as const,
+    endpoint: "https://api.openai.com/v1/chat/completions",
     key: () => resolveApiKey("OPENAI_API_KEY"),
     create: () => createOpenAI({ apiKey: resolveApiKey("OPENAI_API_KEY") }),
     model: "gpt-4o-mini",
@@ -72,6 +84,9 @@ const providerConfigs = [
   {
     name: "xai" as const,
     displayName: "xAI (Grok 2)",
+    keyName: "XAI_API_KEY",
+    tier: "paid" as const,
+    endpoint: "https://api.x.ai/v1/chat/completions",
     key: () => resolveApiKey("XAI_API_KEY"),
     create: () =>
       createOpenAI({
@@ -83,6 +98,9 @@ const providerConfigs = [
   {
     name: "anthropic" as const,
     displayName: "Anthropic (Claude 3.5 Sonnet)",
+    keyName: "ANTHROPIC_API_KEY",
+    tier: "paid" as const,
+    endpoint: "https://api.anthropic.com/v1/messages",
     key: () => resolveApiKey("ANTHROPIC_API_KEY"),
     create: () => createAnthropic({ apiKey: resolveApiKey("ANTHROPIC_API_KEY") }),
     model: "claude-3-5-sonnet-20241022",
@@ -90,6 +108,9 @@ const providerConfigs = [
   {
     name: "perplexity" as const,
     displayName: "Perplexity (Sonar Large)",
+    keyName: "PERPLEXITY_API_KEY",
+    tier: "paid" as const,
+    endpoint: "https://api.perplexity.ai/chat/completions",
     key: () => resolveApiKey("PERPLEXITY_API_KEY"),
     create: () =>
       createOpenAI({
@@ -101,6 +122,51 @@ const providerConfigs = [
 ]
 
 export type ProviderName = (typeof providerConfigs)[number]["name"]
+
+/**
+ * Read-only description of one link in the REAL fallback chain.
+ *
+ * AUDIT_BACKLOG A-7: the admin AI tab used to hand-maintain this list and got
+ * the order backwards (it claimed OpenAI was tried first; OpenAI is #4). Every
+ * field below is derived from `providerConfigs` above — the same array
+ * `generateWithFallback` / `streamWithFallback` iterate — so the panel cannot
+ * drift from the code again. Nothing here changes provider behavior.
+ */
+export interface AIProviderDescriptor {
+  /** 1-based position in the order the chain is actually tried. */
+  order: number
+  name: ProviderName
+  displayName: string
+  /** The model id actually requested (resolved at call time, env overrides included). */
+  model: string
+  /** Canonical key name in lib/api-keys.ts. */
+  keyName: string
+  /** Free-tier provider ($0 per token) vs pay-per-use. */
+  tier: "free" | "paid"
+  endpoint: string
+  /**
+   * Key resolved via `resolveApiKey` — false when unset OR kill-switched via
+   * DISABLED_APIS. A provider with `hasKey:false` is skipped by the chain.
+   */
+  hasKey: boolean
+}
+
+/**
+ * The live fallback chain, in the exact order the generate/stream loops try it.
+ * Read-only: callers get a fresh array of plain objects, never the configs.
+ */
+export function getProviderChain(): AIProviderDescriptor[] {
+  return providerConfigs.map((config, index) => ({
+    order: index + 1,
+    name: config.name,
+    displayName: config.displayName,
+    model: config.model,
+    keyName: config.keyName,
+    tier: config.tier,
+    endpoint: config.endpoint,
+    hasKey: !!config.key(),
+  }))
+}
 
 export interface AIGenerateOptions {
   prompt?: string

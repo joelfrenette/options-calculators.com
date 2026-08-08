@@ -365,15 +365,13 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     schema: anyObject,
     budgetMs: 5000,
     tabs: [],
+    // Also gained isAuthenticated() in the same pass (A-5/A-9) — it enumerates
+    // the provider stack, so it must not answer unauthenticated callers.
+    needsAuth: true,
   },
-  { path: "/api/ai-status", method: "GET", schema: anyObject, budgetMs: 10000, tabs: [] },
-  {
-    path: "/api/remaining-site-status",
-    method: "GET",
-    schema: anyObject,
-    budgetMs: 10000,
-    tabs: [],
-  },
+  // Gained isAuthenticated() in the admin hardening pass (A-9: it discloses
+  // which API keys are configured), so the probe must forward the cookie.
+  { path: "/api/ai-status", method: "GET", schema: anyObject, budgetMs: 10000, tabs: [], needsAuth: true },
   // Admin routes are session-gated; the probe forwards the caller's cookie, so
   // without needsAuth they would all report a 401 as a route failure.
   { path: "/api/admin/api-keys", method: "GET", schema: anyObject, budgetMs: 5000, tabs: [], needsAuth: true },
@@ -386,21 +384,6 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     tabs: [],
   },
   {
-    path: "/api/admin/audit",
-    method: "GET",
-    skip: "Same reason as /api/admin/api-status — it is itself a fan-out probe.",
-    budgetMs: 60000,
-    tabs: [],
-  },
-  {
-    path: "/api/admin/full-system-audit",
-    method: "GET",
-    skip: "Same reason as /api/admin/api-status — it is itself a fan-out probe.",
-    budgetMs: 60000,
-    tabs: [],
-  },
-  { path: "/api/admin/ccpi-audit", method: "GET", schema: anyObject, budgetMs: 15000, tabs: [], needsAuth: true },
-  {
     path: "/api/admin/run-health-checks",
     method: "GET",
     skip: "This endpoint. Probing itself would recurse.",
@@ -409,7 +392,6 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
   },
   { path: "/api/admin/ads", method: "GET", schema: anyObject, budgetMs: 5000, tabs: [], needsAuth: true },
   { path: "/api/admin/backup", method: "GET", schema: anyObject, budgetMs: 15000, tabs: [], needsAuth: true },
-  { path: "/api/admin/restore", method: "POST", skip: "Mutates stored state.", budgetMs: 15000, tabs: [] },
   { path: "/api/auth/login", method: "POST", skip: "Authentication side effects.", budgetMs: 5000, tabs: [] },
   { path: "/api/auth/logout", method: "POST", skip: "Authentication side effects.", budgetMs: 5000, tabs: [] },
   {
@@ -424,15 +406,8 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
   // Deployed surface with no in-repo consumer. Probed so the health check can
   // say whether each one still works — a dead route that also 500s is an easy
   // delete; a dead route that works needs an owner or a deletion decision.
-  {
-    path: "/api/qqq-technicals",
-    method: "GET",
-    schema: anyObject,
-    budgetMs: 15000,
-    requires: ["POLYGON_API_KEY"],
-    tabs: [],
-  },
-  { path: "/api/market-breadth", method: "GET", schema: anyObject, budgetMs: 8000, tabs: [] },
+  // /api/qqq-technicals and /api/market-breadth were retired in Phase 5b;
+  // lib/qqq-technicals.ts survives because /api/ccpi imports it directly.
   {
     path: "/api/macro-indicators",
     method: "GET",
@@ -486,27 +461,9 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     tabs: [],
   },
   {
-    path: "/api/twelve-data-proxy",
-    method: "GET",
-    canary: { query: { symbol: "AAPL" } },
-    schema: anyObject,
-    budgetMs: 12000,
-    requires: ["TWELVE_DATA_API_KEY"],
-    tabs: [],
-  },
-  {
-    path: "/api/twelvedata-proxy",
-    method: "GET",
-    canary: { query: { symbol: "AAPL" } },
-    schema: anyObject,
-    budgetMs: 12000,
-    requires: ["TWELVE_DATA_API_KEY"],
-    tabs: [],
-  },
-  {
     path: "/api/scraping-bee",
     method: "GET",
-    skip: "Billed per request against a small free quota; the three diagnostics routes below already cover it.",
+    skip: "Billed per request against a small free quota; /api/scraping-bee/diagnostics below already covers it.",
     budgetMs: 25000,
     tabs: [],
   },
@@ -516,20 +473,6 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     schema: anyObject,
     budgetMs: 20000,
     requires: ["SCRAPINGBEE_API_KEY"],
-    tabs: [],
-  },
-  {
-    path: "/api/scraping-bee/test",
-    method: "GET",
-    skip: "Duplicate of /api/scraping-bee/diagnostics; spends quota. Deletion candidate.",
-    budgetMs: 20000,
-    tabs: [],
-  },
-  {
-    path: "/api/scraping-bee/test-connection",
-    method: "GET",
-    skip: "Duplicate of /api/scraping-bee/diagnostics; spends quota. Deletion candidate.",
-    budgetMs: 20000,
     tabs: [],
   },
 ]

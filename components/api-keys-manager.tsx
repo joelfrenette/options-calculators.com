@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Key, CheckCircle2, XCircle, ExternalLink } from "lucide-react"
+import { Key, CheckCircle2, XCircle, ExternalLink, PowerOff } from "lucide-react"
 
 interface ApiKeyStatus {
   name: string
@@ -14,6 +14,13 @@ interface ApiKeyStatus {
   category: "Market & Economic Data" | "Scraping & Search" | "Email" | "AI / LLM Providers"
   required?: boolean
 }
+
+// `/api/admin/api-keys` returns `isKeyConfigured`, which RESPECTS the
+// DISABLED_APIS kill switch — so a provider whose key is set but kill-switched
+// came back false and rendered as a flat "Not Set", which is not what happened
+// to it. `/api/admin/usage` exposes `controls.disabledServices` and a per-service
+// `keyPresent` (raw presence, kill-switch-blind), so the two can be told apart.
+type KeyState = "configured" | "disabled" | "not-set"
 
 export function ApiKeysManager() {
   const [apiKeys, setApiKeys] = useState<ApiKeyStatus[]>([
@@ -55,7 +62,12 @@ export function ApiKeysManager() {
     {
       name: "ALPHA_VANTAGE_API_KEY",
       label: "Alpha Vantage API Key",
-      description: "Stock data & technical indicators (VIX, VXN, ATR, SMA)",
+      // Was "VIX, VXN, ATR, SMA". None of that is true: the app calls Alpha
+      // Vantage GLOBAL_QUOTE for NVDA / SOXX / the Mag7 tickers, plus a USD-EUR
+      // rate in /api/macro-indicators. VIX comes from FRED (VIXCLS/VXVCLS), the
+      // SMAs from Polygon via lib/indicators.ts, and VXN and ATR were deleted
+      // outright in the CCPI provenance rework (P3-19).
+      description: "Quote data for NVDA, SOXX and the Mag7 tickers; USD/EUR rate",
       configured: false,
       envVarName: "ALPHA_VANTAGE_API_KEY",
       category: "Market & Economic Data",
@@ -80,7 +92,10 @@ export function ApiKeysManager() {
     {
       name: "SCRAPINGBEE_API_KEY",
       label: "ScrapingBee API Key",
-      description: "Web scraping for social/market sentiment (CNN, etc.)",
+      // The CNN Fear & Greed index is fetched from CNN's own endpoint, not
+      // scraped. ScrapingBee serves the Buffett indicator, put/call ratio,
+      // AAII sentiment and short interest (lib/scraping-bee.tsx).
+      description: "Scrapes the Buffett indicator, put/call ratio, AAII sentiment, short interest",
       configured: false,
       envVarName: "SCRAPINGBEE_API_KEY",
       category: "Scraping & Search",
@@ -96,7 +111,10 @@ export function ApiKeysManager() {
     {
       name: "SERPAPI_KEY",
       label: "SerpAPI Key",
-      description: "Google Trends (fear/greed search volume) — distinct from Serper",
+      // Google Trends is served by SERPER_API_KEY (/api/google-trends).
+      // SERPAPI_KEY is read by nothing except the api-status probe — kept
+      // because it is re-enableable, but it currently serves no feature.
+      description: "No route reads this key — retained as a re-enableable provider, currently unused",
       configured: false,
       envVarName: "SERPAPI_KEY",
       category: "Scraping & Search",
@@ -170,15 +188,25 @@ export function ApiKeysManager() {
   ])
 
   const [loading, setLoading] = useState(true)
+  const [disabledKeys, setDisabledKeys] = useState<Set<string>>(new Set())
+  const [rawPresent, setRawPresent] = useState<Set<string>>(new Set())
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     checkConfiguredKeys()
   }, [])
 
   async function checkConfiguredKeys() {
+    setLoadError(null)
     try {
-      const response = await fetch("/api/admin/api-keys")
-      const data = await response.json()
+      const [keysRes, usageRes] = await Promise.all([
+        fetch("/api/admin/api-keys"),
+        // Kill-switch state lives here; failing to get it is not fatal.
+        fetch("/api/admin/usage").catch(() => null),
+      ])
+
+      if (!keysRes.ok) throw new Error(`/api/admin/api-keys returned HTTP ${keysRes.status}`)
+      const data = await keysRes.json()
 
       if (data.keys) {
         setApiKeys((prev) =>
@@ -188,14 +216,47 @@ export function ApiKeysManager() {
           })),
         )
       }
+
+      if (usageRes && usageRes.ok) {
+        const usage = await usageRes.json()
+        setDisabledKeys(
+          new Set(
+            (Array.isArray(usage?.controls?.disabledServices) ? usage.controls.disabledServices : []).map((s: string) =>
+              String(s).toUpperCase(),
+            ),
+          ),
+        )
+        setRawPresent(
+          new Set(
+            (Array.isArray(usage?.services) ? usage.services : [])
+              .filter((s: any) => s?.keyPresent)
+              .map((s: any) => String(s.key).toUpperCase()),
+          ),
+        )
+      }
     } catch (error) {
       console.error("Failed to check API keys:", error)
+      setLoadError(error instanceof Error ? error.message : "Failed to read API-key status.")
     } finally {
       setLoading(false)
     }
   }
 
+  /**
+   * "disabled" means the key exists but DISABLED_APIS kill-switched it, so the
+   * app deliberately behaves as if it were unset. That is a very different fact
+   * from "Not Set", and the old UI collapsed the two.
+   */
+  const stateOf = (k: ApiKeyStatus): KeyState => {
+    if (k.configured) return "configured"
+    if (disabledKeys.has(k.name.toUpperCase()) && (rawPresent.size === 0 || rawPresent.has(k.name.toUpperCase()))) {
+      return "disabled"
+    }
+    return "not-set"
+  }
+
   const configuredCount = apiKeys.filter((k) => k.configured).length
+  const disabledCount = apiKeys.filter((k) => stateOf(k) === "disabled").length
   const totalCount = apiKeys.length
 
   return (
@@ -206,10 +267,19 @@ export function ApiKeysManager() {
           <CardTitle>API Keys Configuration</CardTitle>
         </div>
         <CardDescription>
-          {configuredCount} of {totalCount} API keys configured. Manage via Vercel Environment Variables.
+          {configuredCount} of {totalCount} API keys active
+          {disabledCount > 0 ? `, ${disabledCount} kill-switched via DISABLED_APIS` : ""}. Manage via Vercel Environment
+          Variables.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {loadError && (
+          <Alert className="border-red-300 bg-red-50">
+            <AlertDescription className="text-sm text-red-800">
+              Could not read API-key status: {loadError}
+            </AlertDescription>
+          </Alert>
+        )}
         <Alert>
           <AlertDescription className="space-y-2">
             <p className="font-semibold">How to configure API keys:</p>
@@ -244,11 +314,17 @@ export function ApiKeysManager() {
             </h3>
             {apiKeys
               .filter((apiKey) => apiKey.category === category)
-              .map((apiKey) => (
+              .map((apiKey) => {
+                const state = stateOf(apiKey)
+                return (
                 <div
                   key={apiKey.name}
                   className={`p-4 border rounded-lg ${
-                    apiKey.configured ? "border-green-200 bg-green-50/50" : "border-slate-200 bg-slate-50/50"
+                    state === "configured"
+                      ? "border-green-200 bg-green-50/50"
+                      : state === "disabled"
+                        ? "border-amber-200 bg-amber-50/50"
+                        : "border-slate-200 bg-slate-50/50"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-4">
@@ -260,25 +336,37 @@ export function ApiKeysManager() {
                             Required
                           </span>
                         )}
-                        {apiKey.configured ? (
+                        {state === "configured" ? (
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        ) : state === "disabled" ? (
+                          <PowerOff className="h-4 w-4 text-amber-600" />
                         ) : (
                           <XCircle className="h-4 w-4 text-slate-400" />
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">{apiKey.description}</p>
+                      {state === "disabled" && (
+                        <p className="text-xs text-amber-700">
+                          Kill-switched: this name is listed in <code>DISABLED_APIS</code>, so{" "}
+                          <code>resolveApiKey</code> returns an empty string and the app falls back to its free path.
+                          The key itself is intact — remove it from <code>DISABLED_APIS</code> to re-enable.
+                        </p>
+                      )}
                       <code className="text-xs bg-slate-100 px-2 py-1 rounded font-mono">{apiKey.envVarName}</code>
                     </div>
                     <div className="text-xs font-medium">
-                      {apiKey.configured ? (
+                      {state === "configured" ? (
                         <span className="text-green-600">Configured</span>
+                      ) : state === "disabled" ? (
+                        <span className="text-amber-700">Disabled (kill switch)</span>
                       ) : (
                         <span className="text-slate-400">Not Set</span>
                       )}
                     </div>
                   </div>
                 </div>
-              ))}
+                )
+              })}
           </div>
         ))}
 

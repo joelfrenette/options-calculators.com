@@ -15,13 +15,61 @@ import {
   Activity,
   Shield,
   Database,
+  Gauge,
 } from "lucide-react"
+// Weights and the minimum scored weight come from the scoring core itself, so
+// this panel can never drift from the engine the way the old hardcoded
+// 35/30/15/20 arithmetic did.
+import { PILLAR_WEIGHTS, MIN_SCORED_MAX } from "@/lib/ccpi/scoring"
+
+// AUDIT A-8. This panel used to make 26 unguarded `.toFixed()` calls on
+// indicators the CCPI route may legitimately emit as null. The first null threw
+// a TypeError inside `buildAuditStructure`, the catch swallowed it, `auditData`
+// stayed null, and the tab showed "Loading CCPI Audit…" forever with no error.
+// Every value now goes through the null-safe formatters below and renders "—"
+// when the datum does not exist. Provenance is read from `ccpi.provenance`
+// (the real three-tier block) rather than merged in from /api/data-source-status.
+
+/** Provenance tier vocabulary emitted by lib/ccpi/scoring.ts. */
+type Tier = "live" | "ai-estimate" | "baseline" | "unknown"
+
+const EM_DASH = "—"
+
+/** Null-safe fixed-decimal formatter. Returns "—" for anything non-finite. */
+function fx(v: unknown, digits: number, opts: { prefix?: string; suffix?: string; signed?: boolean } = {}): string {
+  if (typeof v !== "number" || !Number.isFinite(v)) return EM_DASH
+  const sign = opts.signed && v > 0 ? "+" : ""
+  return `${opts.prefix ?? ""}${sign}${v.toFixed(digits)}${opts.suffix ?? ""}`
+}
+
+/** Null-safe passthrough for values rendered verbatim. */
+function raw(v: unknown, suffix = ""): string {
+  if (v === null || v === undefined || v === "") return EM_DASH
+  if (typeof v === "number" && !Number.isFinite(v)) return EM_DASH
+  return `${v}${suffix}`
+}
+
+/** Boolean-with-proximity rendering: "YES (n% proximity)" / "NO" / "—". */
+function breach(below: unknown, proximity: unknown, yesLabel = "YES"): string {
+  if (typeof below !== "boolean") return EM_DASH
+  if (!below) return "NO"
+  const p = fx(proximity, 0, { suffix: "% proximity" })
+  return p === EM_DASH ? `${yesLabel} (proximity ${EM_DASH})` : `${yesLabel} (${p})`
+}
+
+/** Pillar score band label; null-aware so a missing pillar never reads "🟢 NORMAL". */
+function band(score: unknown, high: string, mid: string, low: string): string {
+  if (typeof score !== "number" || !Number.isFinite(score)) {
+    return `Pillar score ${EM_DASH}. ⚪ INSUFFICIENT DATA — under 40 of this pillar's 100 weight was backed by live or AI data, so it reports no score and is dropped from the composite.`
+  }
+  return `Pillar score ${score}/100. ${score > 70 ? high : score > 50 ? mid : low}`
+}
 
 interface IndicatorDetail {
   name: string
   formula: string
   executiveSummary: string
-  currentValue: any
+  currentValue: string
   ranges: {
     safe: string
     warning: string
@@ -31,7 +79,7 @@ interface IndicatorDetail {
     primary: string
     fallbackChain: string[]
     currentSource: string
-    status: "live" | "aiFallback" | "baseline" | "failed"
+    status: Tier
     updateFrequency?: string
     methodology?: string
   }
@@ -44,7 +92,11 @@ interface IndicatorDetail {
 interface PillarAudit {
   name: string
   weight: number
-  score: number
+  score: number | null
+  scoredMax: number | null
+  liveMax: number | null
+  aiMax: number | null
+  excluded: string[]
   formula: string
   calculation: string
   executiveSummary: string
@@ -54,8 +106,8 @@ interface PillarAudit {
 
 export function CcpiAuditAdmin() {
   const [loading, setLoading] = useState(false)
-  const [ccpiData, setCcpiData] = useState<any>(null)
   const [auditData, setAuditData] = useState<any>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchAudit()
@@ -63,45 +115,64 @@ export function CcpiAuditAdmin() {
 
   const fetchAudit = async () => {
     setLoading(true)
+    setError(null)
     try {
-      const [ccpiRes, dataSourceRes] = await Promise.all([fetch("/api/ccpi"), fetch("/api/data-source-status")])
-
+      const ccpiRes = await fetch("/api/ccpi", { cache: "no-store" })
       const ccpi = await ccpiRes.json()
-      const dataSources = await dataSourceRes.json()
 
-      setCcpiData(ccpi)
-      setAuditData(buildAuditStructure(ccpi, dataSources))
-    } catch (error) {
-      console.error("Failed to fetch CCPI audit:", error)
+      if (!ccpiRes.ok) {
+        // /api/ccpi returns 503 with a provenance block when every pillar is
+        // unscorable, and 500 on an internal error. Surface it rather than
+        // spinning forever.
+        throw new Error(ccpi?.error ? `HTTP ${ccpiRes.status} — ${ccpi.error}` : `HTTP ${ccpiRes.status}`)
+      }
+      if (!ccpi?.pillars || !ccpi?.indicators) {
+        throw new Error("The CCPI payload has no `pillars`/`indicators` block — nothing to audit.")
+      }
+
+      setAuditData(buildAuditStructure(ccpi))
+    } catch (e) {
+      console.error("Failed to fetch CCPI audit:", e)
+      setAuditData(null)
+      setError(e instanceof Error ? e.message : "Failed to load the CCPI audit.")
     } finally {
       setLoading(false)
     }
   }
 
-  const buildAuditStructure = (ccpi: any, dataSources: any): any => {
-    // Build comprehensive audit structure
+  const buildAuditStructure = (ccpi: any): any => {
+    const prov = ccpi.provenance ?? {}
+    // Read the real count. The old `ccpi.totalIndicators || 29` invented 29 for
+    // any falsy value, including a payload that never carried the field.
+    const totalIndicators = typeof ccpi.totalIndicators === "number" ? ccpi.totalIndicators : null
+    const activeCanaries = typeof ccpi.activeCanaries === "number" ? ccpi.activeCanaries : null
+    const baseCCPI = typeof ccpi.baseCCPI === "number" ? ccpi.baseCCPI : null
+    const finalCCPI = typeof ccpi.ccpi === "number" ? ccpi.ccpi : null
+    const totalBonus = typeof ccpi.totalBonus === "number" ? ccpi.totalBonus : null
+
     return {
+      dataQuality: buildDataQuality(ccpi),
       ccpi: {
-        baseCCPI: ccpi.baseCCPI || ccpi.ccpi,
-        finalCCPI: ccpi.ccpi,
+        baseCCPI,
+        finalCCPI,
         formula:
-          "CCPI = (Momentum × 0.35) + (Risk Appetite × 0.30) + (Valuation × 0.15) + (Macro × 0.20), renormalized over pillars with sufficient data",
-        executiveSummary: `The Comprehensive Crash Prediction Index (CCPI) aggregates risk across four critical market dimensions. Each pillar contributes a weighted score (0-100), where higher scores indicate elevated crash risk. A pillar with insufficient live/AI-sourced data reports null and the composite renormalizes over the remaining pillars. The base CCPI score is then amplified by extreme crash conditions to produce the final score ranging from 0 (low risk) to 100 (extreme crash risk).`,
+          "CCPI = Σ(pillar score × pillar weight) / Σ(weight of pillars that scored) — weights 35/30/15/20, renormalized over the pillars with at least 40 of their 100 weight backed by live or AI data",
+        executiveSummary: `The Comprehensive Crash Prediction Index (CCPI) aggregates risk across four market dimensions. Each pillar scores 0-100, where higher means elevated crash risk. A pillar whose live/AI-backed weight falls below 40 of 100 reports no score at all and is dropped from the composite, which then renormalizes over the remaining pillars — so the divisor is not always 1.00. The base CCPI is then amplified by acute crash conditions to produce the final score.`,
         validation: validateCCPI(ccpi),
         weights: {
-          momentum: 35,
-          riskAppetite: 30,
-          valuation: 15,
-          macro: 20,
+          momentum: Math.round(PILLAR_WEIGHTS.momentum * 100),
+          riskAppetite: Math.round(PILLAR_WEIGHTS.riskAppetite * 100),
+          valuation: Math.round(PILLAR_WEIGHTS.valuation * 100),
+          macro: Math.round(PILLAR_WEIGHTS.macro * 100),
         },
       },
       crashAmplifier: {
-        baseScore: ccpi.baseCCPI || ccpi.ccpi,
-        bonuses: ccpi.crashAmplifiers || [],
-        totalBonus: ccpi.totalBonus || 0,
-        finalScore: ccpi.ccpi,
+        baseScore: baseCCPI,
+        bonuses: Array.isArray(ccpi.crashAmplifiers) ? ccpi.crashAmplifiers : [],
+        totalBonus,
+        finalScore: finalCCPI,
         formula: "Final CCPI = Base CCPI + Crash Amplifier Bonus (capped at 100)",
-        executiveSummary: `The Crash Amplifier system adds bonus points (+0 to +100) to the base CCPI when extreme conditions occur. These bonuses capture acute crash catalysts like single-day crashes (QQQ -6% = +25 points), major support breaks (QQQ below 50-day SMA = +20), or panic spikes (VIX >35 = +20). Currently: Base ${ccpi.baseCCPI || ccpi.ccpi} + Bonus ${ccpi.totalBonus || 0} = Final ${ccpi.ccpi}`,
+        executiveSummary: `The Crash Amplifier system adds bonus points to the base CCPI when acute conditions occur — single-day crashes (QQQ −6% = +25), a 50-day SMA break (+20), a VIX panic spike (+20). Currently: Base ${raw(baseCCPI)} + Bonus ${raw(totalBonus)} = Final ${raw(finalCCPI)}.`,
         triggers: [
           { condition: "QQQ drops ≥6% in 1 day", bonus: "+25 points (replaced by +40 if ≥9%)" },
           { condition: "QQQ drops ≥9% in 1 day", bonus: "+40 points" },
@@ -113,62 +184,212 @@ export function CcpiAuditAdmin() {
         ],
       },
       canaries: {
-        total: ccpi.totalIndicators || 29,
-        active: ccpi.activeCanaries,
+        total: totalIndicators,
+        active: activeCanaries,
         formula: "Count of indicators breaching medium or high risk thresholds",
-        executiveSummary: `Canary signals are binary warnings triggered when individual indicators cross predefined thresholds. ${ccpi.activeCanaries} of ${ccpi.totalIndicators || 29} scored indicators are currently flashing warning signals.`,
+        executiveSummary:
+          activeCanaries === null || totalIndicators === null
+            ? "The CCPI payload did not report a canary count, so no warning tally can be shown."
+            : `Canary signals are binary warnings triggered when individual indicators cross predefined thresholds. ${activeCanaries} of ${totalIndicators} scored indicators are currently flashing warning signals.`,
         severityLevels: {
           high: "Critical breach requiring immediate attention",
           medium: "Elevated risk requiring monitoring",
         },
       },
       pillars: [
-        buildMomentumPillar(ccpi, dataSources),
-        buildRiskAppetitePillar(ccpi, dataSources),
-        buildValuationPillar(ccpi, dataSources),
-        buildMacroPillar(ccpi, dataSources),
+        buildMomentumPillar(ccpi, prov),
+        buildRiskAppetitePillar(ccpi, prov),
+        buildValuationPillar(ccpi, prov),
+        buildMacroPillar(ccpi, prov),
       ],
     }
   }
 
-  const validateCCPI = (ccpi: any): string => {
-    const { momentum, riskAppetite, valuation, macro } = ccpi.pillars
-    const calculatedBase = Math.round(momentum * 0.35 + riskAppetite * 0.3 + valuation * 0.15 + macro * 0.2)
-    const reportedBase = ccpi.baseCCPI || ccpi.ccpi
-    const totalBonus = ccpi.totalBonus || 0
+  /**
+   * Renormalization-aware check of the composite.
+   *
+   * The old implementation computed `m*.35 + r*.30 + v*.15 + M*.20` — the
+   * PRE-REWORK, non-renormalized formula. A null pillar coerced to 0 in that
+   * arithmetic, so the badge printed a confident green "✅ VALID" when the
+   * numbers happened to line up and a meaningless "⚠️ DISCREPANCY" when they
+   * did not. This reproduces `computeBaseCCPI` exactly: skip null pillars,
+   * divide by the weight that actually participated.
+   */
+  const validateCCPI = (ccpi: any): { ok: boolean | null; text: string } => {
+    const p = ccpi.pillars ?? {}
+    const entries: Array<[unknown, number]> = [
+      [p.momentum, PILLAR_WEIGHTS.momentum],
+      [p.riskAppetite, PILLAR_WEIGHTS.riskAppetite],
+      [p.valuation, PILLAR_WEIGHTS.valuation],
+      [p.macro, PILLAR_WEIGHTS.macro],
+    ]
+
+    let num = 0
+    let den = 0
+    const dropped: string[] = []
+    const names = ["Momentum", "Risk Appetite", "Valuation", "Macro"]
+    entries.forEach(([score, weight], i) => {
+      if (typeof score !== "number" || !Number.isFinite(score)) {
+        dropped.push(names[i])
+        return
+      }
+      num += score * weight
+      den += weight
+    })
+
+    const reportedBase = ccpi.baseCCPI
+    const totalBonus = ccpi.totalBonus
     const finalCCPI = ccpi.ccpi
 
-    if (Math.abs(calculatedBase - reportedBase) <= 2) {
-      return `✅ VALID: Base CCPI (${calculatedBase}) + Crash Amplifier Bonus (${totalBonus}) = Final CCPI (${finalCCPI})`
-    } else {
-      return `⚠️ DISCREPANCY: Calculated Base (${calculatedBase}) vs Reported Base (${reportedBase}) - difference of ${Math.abs(calculatedBase - reportedBase)} points. Final: ${finalCCPI}`
+    if (den === 0) {
+      return {
+        ok: null,
+        text: `⚪ NOT VERIFIABLE: no pillar reported a score, so there is no composite to check. /api/ccpi answers 503 in this state.`,
+      }
+    }
+    if (typeof reportedBase !== "number") {
+      return { ok: null, text: `⚪ NOT VERIFIABLE: the payload carried no numeric baseCCPI to check against.` }
+    }
+
+    const recomputed = Math.round(num / den)
+    const droppedNote = dropped.length
+      ? ` Renormalized over ${Math.round(den * 100)}% of the pillar weight — ${dropped.join(", ")} reported no score and ${dropped.length === 1 ? "was" : "were"} dropped.`
+      : ` All four pillars scored, so the divisor is the full 100% of pillar weight.`
+
+    if (Math.abs(recomputed - reportedBase) <= 1) {
+      return {
+        ok: true,
+        text: `✅ VALID: recomputing the renormalized composite from the reported pillar scores gives ${recomputed}, matching the reported base CCPI of ${reportedBase}. Base ${reportedBase} + amplifier ${raw(totalBonus)} = final ${raw(finalCCPI)}.${droppedNote}`,
+      }
+    }
+    return {
+      ok: false,
+      text: `⚠️ DISCREPANCY: recomputed renormalized base ${recomputed} vs reported base ${reportedBase} — ${Math.abs(recomputed - reportedBase)} points apart. Final: ${raw(finalCCPI)}.${droppedNote}`,
     }
   }
 
-  const buildMomentumPillar = (ccpi: any, dataSources: any): PillarAudit => {
+  /**
+   * Data Quality card (A-8). `certainty` is emitted by /api/ccpi
+   * (computeCertainty in lib/ccpi/scoring.ts — pure live/AI weight, no longer
+   * inflated by canary counts) and was previously rendered nowhere.
+   */
+  const buildDataQuality = (ccpi: any) => {
+    const prov = ccpi.provenance ?? {}
+    const keys = ["momentum", "riskAppetite", "valuation", "macro"] as const
+    const labels: Record<(typeof keys)[number], string> = {
+      momentum: "Momentum & Technical",
+      riskAppetite: "Risk Appetite & Sentiment",
+      valuation: "Valuation & Market Structure",
+      macro: "Macro",
+    }
+
+    let liveCount = 0
+    let aiCount = 0
+    let baselineCount = 0
+    let unknownCount = 0
+
+    const pillars = keys.map((k) => {
+      const b = prov[k] ?? {}
+      const tiers: Record<string, unknown> = b.tiers ?? {}
+      for (const key of Object.keys(tiers)) {
+        const t = tiers[key]
+        if (t === "live") liveCount++
+        else if (t === "ai-estimate") aiCount++
+        else if (t === "baseline") baselineCount++
+        else unknownCount++
+      }
+      const scoredMax = typeof b.scoredMax === "number" ? b.scoredMax : null
+      const liveMax = typeof b.liveMax === "number" ? b.liveMax : null
+      const aiMax = typeof b.aiMax === "number" ? b.aiMax : null
+      return {
+        key: k,
+        name: labels[k],
+        score: typeof ccpi.pillars?.[k] === "number" ? ccpi.pillars[k] : null,
+        scoredMax,
+        liveMax,
+        aiMax,
+        excluded: Array.isArray(b.excluded) ? (b.excluded as string[]) : [],
+        // Below MIN_SCORED_MAX the pillar reports nothing at all.
+        belowMinimum: scoredMax !== null && scoredMax < MIN_SCORED_MAX,
+      }
+    })
+
+    const hasProvenance = pillars.some((p) => p.scoredMax !== null)
+
+    return {
+      certainty: typeof ccpi.certainty === "number" ? ccpi.certainty : null,
+      minScoredMax: MIN_SCORED_MAX,
+      hasProvenance,
+      tierCounts: { live: liveCount, aiEstimate: aiCount, baseline: baselineCount, unknown: unknownCount },
+      pillars,
+    }
+  }
+
+  /** Read an indicator's real provenance tier out of `ccpi.provenance`. */
+  const tierOf = (prov: any, pillarKey: string, indicatorKey: string): Tier => {
+    const t = prov?.[pillarKey]?.tiers?.[indicatorKey]
+    return t === "live" || t === "ai-estimate" || t === "baseline" ? t : "unknown"
+  }
+
+  /**
+   * Provenance for one indicator, read from `ccpi.provenance` at source.
+   * The old version merged this in from /api/data-source-status, a route that
+   * was a hardcoded object literal (A-5) — so the tab that was otherwise correct
+   * was being fed invented "live" statuses.
+   */
+  const src = (
+    prov: any,
+    pillarKey: string,
+    indicatorKey: string,
+    primary: string,
+    fallbackChain: string[],
+  ): IndicatorDetail["dataSources"] => {
+    const status = tierOf(prov, pillarKey, indicatorKey)
+    return {
+      primary,
+      fallbackChain,
+      // Never invent a provider name. Only a "live" tier means the primary
+      // actually served it; anything else renders the tier's own label and "—".
+      currentSource: status === "live" ? primary : EM_DASH,
+      status,
+    }
+  }
+
+  const buildMomentumPillar = (ccpi: any, prov: any): PillarAudit => {
+    const i = ccpi.indicators ?? {}
+    const p = prov?.momentum ?? {}
+    const POLYGON = "Polygon.io daily aggregates → lib/indicators.ts"
     return {
       name: "Pillar 1 - Momentum & Technical",
-      weight: 35,
-      score: ccpi.pillars.momentum,
+      weight: Math.round(PILLAR_WEIGHTS.momentum * 100),
+      score: typeof ccpi.pillars?.momentum === "number" ? ccpi.pillars.momentum : null,
+      scoredMax: typeof p.scoredMax === "number" ? p.scoredMax : null,
+      liveMax: typeof p.liveMax === "number" ? p.liveMax : null,
+      aiMax: typeof p.aiMax === "number" ? p.aiMax : null,
+      excluded: Array.isArray(p.excluded) ? p.excluded : [],
       formula: "Momentum = (Raw Points / Scored Weight) × 100, renormalized over live/AI-backed indicators",
       calculation:
         "10 indicators with maxima summing to 100: NVIDIA (9), SOX (9), QQQ Daily Return (12), QQQ Consecutive Down (7), QQQ Below SMA20 (7), QQQ Below SMA50 (10), QQQ Below SMA200 (15), QQQ Bollinger (9), VIX (13), VIX Term Structure (9). Baseline-tier or missing indicators are excluded and the pillar renormalizes; below 40 scored weight the pillar reports no score.",
       executiveSummary:
-        "Momentum pillar captures price action deterioration, technical breakdown, and volatility spikes. Heavy weighting on critical support levels (SMA50/200) and the VIX complex. Scores rise dramatically when QQQ breaks key moving averages or volatility explodes above panic thresholds. (VXN, RVX, ATR, LTV, and Bullish % were removed in the provenance rework — they were unsourced baseline constants.)",
-      validation: `Pillar score ${ccpi.pillars.momentum}/100. ${ccpi.pillars.momentum > 70 ? "🔴 EXTREME RISK" : ccpi.pillars.momentum > 50 ? "🟡 ELEVATED RISK" : "🟢 NORMAL"}`,
+        "Momentum pillar captures price action deterioration, technical breakdown, and volatility spikes. Heavy weighting on critical support levels (SMA50/200) and the VIX complex. Scores rise dramatically when QQQ breaks key moving averages or volatility explodes above panic thresholds.",
+      validation: band(ccpi.pillars?.momentum, "🔴 EXTREME RISK", "🟡 ELEVATED RISK", "🟢 NORMAL"),
       indicators: [
         {
           name: "NVIDIA Momentum Score",
           formula: "AI Bellwether = Price change % over rolling 30-day period",
           executiveSummary:
             "NVIDIA acts as leading indicator for AI/tech sentiment. Rapid drops signal sector rotation or bubble concerns.",
-          currentValue: ccpi.indicators.nvidiaMomentum || 50,
+          // Was `|| 50`, which invented a neutral reading whenever the value was
+          // missing (and also whenever it was legitimately 0).
+          currentValue: raw(i.nvidiaMomentum ?? null),
           ranges: {
             safe: "Above 60 (healthy momentum)",
             warning: "40-60 (slowing growth)",
             danger: "Below 40 (severe weakness/overheating >80)",
           },
-          dataSources: getDataSourceForIndicator("NVIDIA Momentum", dataSources),
+          dataSources: src(prov, "momentum", "nvidiaMomentum", "Alpha Vantage API", [
+            "AI fallback chain (lib/unified-ai-fallback.ts)",
+          ]),
           canaryThresholds: {
             medium: "Momentum < 40 or > 80",
             high: "Momentum < 20 (AI sector crash signal)",
@@ -179,13 +400,19 @@ export function CcpiAuditAdmin() {
           formula: "Chip Health = (Current Price - Baseline 5000) / 5000 × 100%",
           executiveSummary:
             "Semiconductor index tracks hardware backbone of AI economy. Chip crashes often precede broader tech selloffs.",
-          currentValue: ccpi.indicators.soxIndex,
+          currentValue: raw(i.soxIndex ?? null),
           ranges: {
             safe: "Above baseline (5000+)",
             warning: "-5% to -10% from baseline",
             danger: "Below -10% (chip sector crash)",
           },
-          dataSources: getDataSourceForIndicator("SOX Semiconductor", dataSources),
+          dataSources: src(
+            prov,
+            "momentum",
+            "soxIndex",
+            "AI fallback chain (lib/unified-ai-fallback.ts) — no live provider is wired for SOX",
+            [],
+          ),
           canaryThresholds: {
             medium: "Down 10-15%",
             high: "Down >15% (sector collapse)",
@@ -196,13 +423,13 @@ export function CcpiAuditAdmin() {
           formula: "Daily % Change = (Close - Previous Close) / Previous Close × 100",
           executiveSummary:
             "Single-day crashes are the strongest short-term crash predictor. Down days are weighted 5× more than up days to capture asymmetric risk.",
-          currentValue: `${ccpi.indicators.qqqDailyReturn.toFixed(2)}%`,
+          currentValue: fx(i.qqqDailyReturn, 2, { suffix: "%" }),
           ranges: {
             safe: "Above -1%",
             warning: "-1% to -3%",
             danger: "Below -3% (crash day if <-6%)",
           },
-          dataSources: getDataSourceForIndicator("QQQ Technicals", dataSources),
+          dataSources: src(prov, "momentum", "qqqDailyReturn", "Polygon.io daily aggregates", []),
           canaryThresholds: {
             medium: "Return < -1.5%",
             high: "Return < -6% (single-day crash)",
@@ -212,13 +439,13 @@ export function CcpiAuditAdmin() {
           name: "QQQ Consecutive Down Days",
           formula: "Streak Counter = Number of consecutive days with negative returns",
           executiveSummary: "Extended losing streaks indicate sustained selling pressure and potential trend reversal.",
-          currentValue: `${ccpi.indicators.qqqConsecDown} days`,
+          currentValue: raw(i.qqqConsecDown ?? null, " days"),
           ranges: {
             safe: "0-1 days",
             warning: "2-3 days",
             danger: "4+ days (trend breakdown)",
           },
-          dataSources: getDataSourceForIndicator("QQQ Technicals", dataSources),
+          dataSources: src(prov, "momentum", "qqqConsecDown", "Polygon.io daily aggregates", []),
           canaryThresholds: {
             medium: "3+ days down",
             high: "5+ days down (persistent weakness)",
@@ -229,15 +456,13 @@ export function CcpiAuditAdmin() {
           formula: "Short-term Support = Binary (Price < SMA20) + Proximity Score (0-100%)",
           executiveSummary:
             "20-day moving average is critical short-term support. Breaches signal momentum loss and potential correction.",
-          currentValue: ccpi.indicators.qqqBelowSMA20
-            ? `YES (${ccpi.indicators.qqqSMA20Proximity.toFixed(0)}% proximity)`
-            : "NO",
+          currentValue: breach(i.qqqBelowSMA20, i.qqqSMA20Proximity),
           ranges: {
             safe: "Above SMA20 (0% proximity)",
             warning: "25-50% proximity to breach",
             danger: "Below SMA20 (100% proximity = breached)",
           },
-          dataSources: getDataSourceForIndicator("QQQ Technicals", dataSources),
+          dataSources: src(prov, "momentum", "qqqSMA20", POLYGON, []),
           canaryThresholds: {
             medium: "50%+ proximity",
             high: "Breached (100% proximity)",
@@ -248,15 +473,13 @@ export function CcpiAuditAdmin() {
           formula: "Medium-term Support = Binary (Price < SMA50) + Proximity Score (0-100%)",
           executiveSummary:
             "50-day moving average marks intermediate trend health. Breaches often precede deeper corrections.",
-          currentValue: ccpi.indicators.qqqBelowSMA50
-            ? `YES (${ccpi.indicators.qqqSMA50Proximity.toFixed(0)}% proximity)`
-            : "NO",
+          currentValue: breach(i.qqqBelowSMA50, i.qqqSMA50Proximity),
           ranges: {
             safe: "Above SMA50",
             warning: "25-50% proximity",
             danger: "Below SMA50 (medium-term trend broken)",
           },
-          dataSources: getDataSourceForIndicator("QQQ Technicals", dataSources),
+          dataSources: src(prov, "momentum", "qqqSMA50", POLYGON, []),
           canaryThresholds: {
             medium: "50%+ proximity",
             high: "Breached (100% proximity)",
@@ -267,15 +490,13 @@ export function CcpiAuditAdmin() {
           formula: "Long-term Support = Binary (Price < SMA200) + Proximity Score (0-100%)",
           executiveSummary:
             "200-day moving average is the ultimate bull/bear line. Breaches signal potential bear market.",
-          currentValue: ccpi.indicators.qqqBelowSMA200
-            ? `YES (${ccpi.indicators.qqqSMA200Proximity.toFixed(0)}% proximity)`
-            : "NO",
+          currentValue: breach(i.qqqBelowSMA200, i.qqqSMA200Proximity),
           ranges: {
             safe: "Above SMA200 (bull market)",
             warning: "25-50% proximity (approaching danger)",
             danger: "Below SMA200 (bear market signal)",
           },
-          dataSources: getDataSourceForIndicator("QQQ Technicals", dataSources),
+          dataSources: src(prov, "momentum", "qqqSMA200", POLYGON, []),
           canaryThresholds: {
             medium: "50%+ proximity",
             high: "Breached (100% proximity - bear market)",
@@ -286,15 +507,13 @@ export function CcpiAuditAdmin() {
           formula: "Oversold Territory = Binary (Price < Lower Band) + Proximity Score (0-100%)",
           executiveSummary:
             "Bollinger bands mark statistical extremes. Breaches indicate oversold conditions or accelerating declines.",
-          currentValue: ccpi.indicators.qqqBelowBollinger
-            ? `YES - OVERSOLD (${ccpi.indicators.qqqBollingerProximity.toFixed(0)}% proximity)`
-            : "NO",
+          currentValue: breach(i.qqqBelowBollinger, i.qqqBollingerProximity, "YES - OVERSOLD"),
           ranges: {
             safe: "Within bands",
             warning: "25-50% proximity to lower band",
             danger: "Below lower band (extreme oversold)",
           },
-          dataSources: getDataSourceForIndicator("QQQ Technicals", dataSources),
+          dataSources: src(prov, "momentum", "qqqBollinger", POLYGON, []),
           canaryThresholds: {
             medium: "50%+ proximity",
             high: "Breached lower band (100% proximity - panic selling)",
@@ -305,13 +524,15 @@ export function CcpiAuditAdmin() {
           formula: "Implied Volatility = S&P 500 30-day expected volatility from options pricing",
           executiveSummary:
             "VIX measures market fear through options prices. Spikes above 25 indicate elevated stress; above 35 signals panic.",
-          currentValue: ccpi.indicators.vix.toFixed(1),
+          currentValue: fx(i.vix, 1),
           ranges: {
             safe: "Below 15 (calm market)",
             warning: "15-25 (elevated volatility)",
             danger: "Above 25 (fear), >35 (panic)",
           },
-          dataSources: getDataSourceForIndicator("VIX Term Structure", dataSources),
+          dataSources: src(prov, "momentum", "vix", "FRED VIXCLS", [
+            "AI fallback chain (lib/unified-ai-fallback.ts)",
+          ]),
           canaryThresholds: {
             medium: "VIX > 25",
             high: "VIX > 35 (extreme fear)",
@@ -322,13 +543,13 @@ export function CcpiAuditAdmin() {
           formula: "Term Structure = 3-Month VIX (VIX3M) / Spot VIX — ratio convention, normal contango ≈ 1.08",
           executiveSummary:
             "Term structure shows the market's fear timeline. Backwardation (ratio < 1.0) means immediate fear exceeds future expectations - classic crash signal. Both legs come from FRED.",
-          currentValue: `${ccpi.indicators.vixTermStructure.toFixed(2)} ${ccpi.indicators.vixTermInverted ? "(INVERTED - FEAR)" : ""}`,
+          currentValue: `${fx(i.vixTermStructure, 2)}${i.vixTermInverted === true ? " (INVERTED - FEAR)" : ""}`,
           ranges: {
             safe: "Above 1.05 (normal contango, baseline ~1.08)",
             warning: "1.00-1.05 (flattening)",
             danger: "Below 1.00 (backwardation - immediate fear; <0.95 severe)",
           },
-          dataSources: getDataSourceForIndicator("VIX Term Structure", dataSources),
+          dataSources: src(prov, "momentum", "vixTermStructure", "FRED VXVCLS ÷ FRED VIXCLS", []),
           canaryThresholds: {
             medium: "Ratio < 1.0 (mild backwardation)",
             high: "Ratio < 0.95 (severe backwardation)",
@@ -338,30 +559,38 @@ export function CcpiAuditAdmin() {
     }
   }
 
-  const buildRiskAppetitePillar = (ccpi: any, dataSources: any): PillarAudit => {
+  const buildRiskAppetitePillar = (ccpi: any, prov: any): PillarAudit => {
+    const i = ccpi.indicators ?? {}
+    const p = prov?.riskAppetite ?? {}
     return {
-      name: "Pillar 2 - Risk Appetite & Volatility",
-      weight: 30,
-      score: ccpi.pillars.riskAppetite,
+      name: "Pillar 2 - Risk Appetite & Sentiment",
+      weight: Math.round(PILLAR_WEIGHTS.riskAppetite * 100),
+      score: typeof ccpi.pillars?.riskAppetite === "number" ? ccpi.pillars.riskAppetite : null,
+      scoredMax: typeof p.scoredMax === "number" ? p.scoredMax : null,
+      liveMax: typeof p.liveMax === "number" ? p.liveMax : null,
+      aiMax: typeof p.aiMax === "number" ? p.aiMax : null,
+      excluded: Array.isArray(p.excluded) ? p.excluded : [],
       formula: "Risk Appetite = (Raw Points / Scored Weight) × 100, renormalized over live/AI-backed indicators",
       calculation:
-        "4 indicators with maxima summing to 100: Put/Call (29), Fear & Greed (24), AAII Bullish (26), Short Interest (21). A null Fear & Greed is excluded AND renormalized rather than silently deflating the pillar. (ATR, LTV, Bullish %, and the duplicate Yield Curve entry were removed in the provenance rework.)",
+        "4 indicators with maxima summing to 100: Put/Call (29), Fear & Greed (24), AAII Bullish (26), Short Interest (21). A null Fear & Greed is excluded AND renormalized rather than silently deflating the pillar.",
       executiveSummary:
         "Risk appetite pillar detects euphoria (complacency) and panic (capitulation) through sentiment and positioning indicators. Low put/call ratios and high bullish sentiment signal dangerous complacency, while extreme fear can be contrarian opportunity.",
-      validation: `Pillar score ${ccpi.pillars.riskAppetite}/100. ${ccpi.pillars.riskAppetite > 70 ? "🔴 EXTREME COMPLACENCY" : ccpi.pillars.riskAppetite > 50 ? "🟡 ELEVATED RISK" : "🟢 HEALTHY"}`,
+      validation: band(ccpi.pillars?.riskAppetite, "🔴 EXTREME COMPLACENCY", "🟡 ELEVATED RISK", "🟢 HEALTHY"),
       indicators: [
         {
           name: "Put/Call Ratio",
           formula: "Hedging Activity = Put Options Volume / Call Options Volume",
           executiveSummary:
             "Measures market hedging behavior. Ratios below 0.7 signal complacency (too few hedges), above 1.3 signals panic.",
-          currentValue: ccpi.indicators.putCallRatio.toFixed(2),
+          currentValue: fx(i.putCallRatio, 2),
           ranges: {
             safe: "0.85-1.10 (balanced hedging)",
             warning: "0.70-0.85 or 1.10-1.30",
             danger: "Below 0.70 (complacency) or Above 1.30 (panic)",
           },
-          dataSources: getDataSourceForIndicator("Put/Call Ratio", dataSources),
+          dataSources: src(prov, "riskAppetite", "putCallRatio", "ScrapingBee scrape", [
+            "AI fallback chain (lib/unified-ai-fallback.ts)",
+          ]),
           canaryThresholds: {
             medium: "<0.85 or >1.10",
             high: "<0.60 (extreme complacency) or >1.30 (panic)",
@@ -372,26 +601,24 @@ export function CcpiAuditAdmin() {
           formula:
             "CNN Composite: 7 indicators (Market Momentum [S&P vs 125-MA], Stock Strength [52-wk highs/lows], Breadth [McClellan Vol], Put/Call [5-day avg], VIX [vs 50-MA], Safe Haven [stock vs bond 20d], Junk Bond [HY spread])",
           executiveSummary:
-            "CNN's official 7-indicator sentiment composite. Scores 0-24 = Extreme Fear (buy opportunity), 75-100 = Extreme Greed (correction risk). Equal-weighted calculation updated continuously during market hours. Low scores (fear) appear on RIGHT of visual scale, high scores (greed) on LEFT per crash prediction logic.",
-          currentValue: ccpi.indicators.fearGreedIndex !== null ? ccpi.indicators.fearGreedIndex : "N/A",
+            "CNN's official 7-indicator equity sentiment composite. Scores 0-24 = Extreme Fear, 75-100 = Extreme Greed. Equal-weighted and updated continuously during market hours. (The crypto Fear & Greed index that previously stood in for it was replaced in the provenance rework.)",
+          currentValue: raw(i.fearGreedIndex ?? null),
           ranges: {
             safe: "45-55 (neutral - balanced market)",
             warning: "25-44 (fear - cautious) or 56-74 (greed - elevated)",
             danger: "0-24 (extreme fear - max opportunity) or 75-100 (extreme greed - correction risk)",
           },
           dataSources: {
-            primary: "CNN Fear & Greed API (https://production.dataviz.cnn.io/index/fearandgreed/graphdata)",
-            fallbackChain: [
-              "1. Yahoo Finance (^VIX, SPY, HYG, TLT) - Real-time prices",
-              "2. Calculated indicators (Put/Call from VIX term structure, Breadth from SPY volume patterns)",
-              "3. Approximated 52-week strength from SPY momentum analysis",
-            ],
-            currentSource:
-              dataSources?.sources?.find((s: any) => s.name === "Fear & Greed Index")?.currentSource || "CNN API",
-            status: dataSources?.sources?.find((s: any) => s.name === "Fear & Greed Index")?.status || "live",
-            updateFrequency: "Continuous during market hours (every component updates as data becomes available)",
+            ...src(
+              prov,
+              "riskAppetite",
+              "fearGreedIndex",
+              "CNN Fear & Greed API (production.dataviz.cnn.io/index/fearandgreed/graphdata)",
+              [],
+            ),
+            updateFrequency: "Continuous during market hours",
             methodology:
-              "Each of 7 indicators scores 0-100 independently, then averaged with equal weighting. Uses z-score normalization against historical ranges to determine how far current values deviate from typical levels.",
+              "Each of 7 indicators scores 0-100 independently, then averaged with equal weighting against historical ranges.",
           },
           canaryThresholds: {
             medium: "Score >70 (greed building) or <30 (fear building)",
@@ -403,13 +630,15 @@ export function CcpiAuditAdmin() {
           formula: "Retail Optimism = % of AAII members bullish on stocks (6-month outlook)",
           executiveSummary:
             "Retail investor sentiment survey. Values above 50% indicate excessive optimism; sustained highs precede corrections.",
-          currentValue: `${ccpi.indicators.aaiiBullish.toFixed(1)}%`,
+          currentValue: fx(i.aaiiBullish, 1, { suffix: "%" }),
           ranges: {
             safe: "30-45% (historical average ~38%)",
             warning: "45-55%",
             danger: "Above 55% (retail euphoria) or Below 25% (capitulation)",
           },
-          dataSources: getDataSourceForIndicator("AAII Sentiment", dataSources),
+          dataSources: src(prov, "riskAppetite", "aaiiBullish", "ScrapingBee scrape", [
+            "AI fallback chain (lib/unified-ai-fallback.ts)",
+          ]),
           canaryThresholds: {
             medium: ">45% or <30%",
             high: ">55% (euphoria warning)",
@@ -419,14 +648,20 @@ export function CcpiAuditAdmin() {
           name: "SPY Short Interest Ratio",
           formula: "Bearish Positioning = SPY ETF short interest as % of float",
           executiveSummary:
-            "Measures bearish bets on S&P 500. LOWER short interest (2-3%) signals bullish confidence and market stability, indicating low crash risk. HIGH short interest (>6%) signals bearish positioning, elevated market stress, and increased crash potential. Acts as both a sentiment gauge and potential fuel for short squeezes.",
-          currentValue: `${ccpi.indicators.shortInterest.toFixed(1)}%`,
+            "Measures bearish bets on the S&P 500. Lower short interest (2-3%) signals bullish confidence; high short interest (>6%) signals bearish positioning and elevated stress.",
+          currentValue: fx(i.shortInterest, 1, { suffix: "%" }),
           ranges: {
             safe: "2-3% (bullish confidence, low bearish stress)",
             warning: "3-5% (normal range)",
             danger: "Above 6% (elevated bearish stress), >8% (extreme bearish sentiment)",
           },
-          dataSources: getDataSourceForIndicator("Short Interest", dataSources),
+          dataSources: src(
+            prov,
+            "riskAppetite",
+            "shortInterest",
+            "AI fallback chain (lib/unified-ai-fallback.ts) — no live provider is wired for short interest",
+            [],
+          ),
           canaryThresholds: {
             medium: ">5% (increased bearish positioning)",
             high: ">8% (extreme bearish stress)",
@@ -436,30 +671,37 @@ export function CcpiAuditAdmin() {
     }
   }
 
-  const buildValuationPillar = (ccpi: any, dataSources: any): PillarAudit => {
+  const buildValuationPillar = (ccpi: any, prov: any): PillarAudit => {
+    const i = ccpi.indicators ?? {}
+    const p = prov?.valuation ?? {}
+    const APIFY = "Apify Yahoo Finance"
     return {
       name: "Pillar 3 - Valuation & Market Structure",
-      weight: 15,
-      score: ccpi.pillars.valuation,
-      formula: "Valuation = Σ(Indicator Score × Weight) / 100, capped at 100",
+      weight: Math.round(PILLAR_WEIGHTS.valuation * 100),
+      score: typeof ccpi.pillars?.valuation === "number" ? ccpi.pillars.valuation : null,
+      scoredMax: typeof p.scoredMax === "number" ? p.scoredMax : null,
+      liveMax: typeof p.liveMax === "number" ? p.liveMax : null,
+      aiMax: typeof p.aiMax === "number" ? p.aiMax : null,
+      excluded: Array.isArray(p.excluded) ? p.excluded : [],
+      formula: "Valuation = (Raw Points / Scored Weight) × 100, renormalized over live/AI-backed indicators",
       calculation:
-        "7 indicators: S&P P/E (18%), S&P P/S (12%), Buffett Indicator (16%), QQQ P/E (16%), Mag7 Concentration (15%), Shiller CAPE (13%), Equity Risk Premium (10%)",
+        "7 indicators with maxima summing to 100: S&P P/E (18), S&P P/S (12), Buffett Indicator (16), QQQ P/E (16), Mag7 Concentration (15), Shiller CAPE (13), Equity Risk Premium (10).",
       executiveSummary:
         "Valuation pillar identifies bubble conditions and structural fragility. High P/E ratios, extreme concentration in Mag7, and negative equity risk premiums signal overvalued markets vulnerable to sharp corrections.",
-      validation: `Pillar score ${ccpi.pillars.valuation}/100. ${ccpi.pillars.valuation > 70 ? "🔴 BUBBLE TERRITORY" : ccpi.pillars.valuation > 50 ? "🟡 OVERVALUED" : "🟢 REASONABLE"}`,
+      validation: band(ccpi.pillars?.valuation, "🔴 BUBBLE TERRITORY", "🟡 OVERVALUED", "🟢 REASONABLE"),
       indicators: [
         {
           name: "S&P 500 Forward P/E",
           formula: "Valuation Multiple = Current Price / Next 12 Months Estimated Earnings",
           executiveSummary:
             "Forward P/E above 22 indicates expensive market; above 25 signals bubble risk. Historical average is ~16-18.",
-          currentValue: ccpi.indicators.spxPE.toFixed(1),
+          currentValue: fx(i.spxPE, 1),
           ranges: {
             safe: "Below 18 (undervalued)",
             warning: "18-25 (fair to expensive)",
             danger: "Above 25 (overvalued), >30 (bubble)",
           },
-          dataSources: getDataSourceForIndicator("S&P 500 P/E", dataSources),
+          dataSources: src(prov, "valuation", "spxPE", APIFY, ["FMP key-metrics"]),
           canaryThresholds: {
             medium: "P/E > 22",
             high: "P/E > 30 (extreme overvaluation)",
@@ -470,13 +712,13 @@ export function CcpiAuditAdmin() {
           formula: "Revenue Multiple = Market Cap / Total Revenue",
           executiveSummary:
             "P/S above 2.5 indicates expensive market; above 3.0 signals bubble conditions. Less manipulable than P/E.",
-          currentValue: ccpi.indicators.spxPS.toFixed(1),
+          currentValue: fx(i.spxPS, 1),
           ranges: {
             safe: "Below 2.0",
             warning: "2.0-2.8",
             danger: "Above 2.8 (expensive if >3.5)",
           },
-          dataSources: getDataSourceForIndicator("S&P 500 P/E", dataSources),
+          dataSources: src(prov, "valuation", "spxPS", APIFY, ["FMP key-metrics"]),
           canaryThresholds: {
             medium: "P/S > 2.5",
             high: "P/S > 3.5 (extreme)",
@@ -487,13 +729,15 @@ export function CcpiAuditAdmin() {
           formula: "Total Market Valuation = Wilshire 5000 Market Cap / US GDP × 100",
           executiveSummary:
             "Warren Buffett's favorite metric. Above 120% is fairly valued; above 150% is overvalued; above 200% is bubble territory.",
-          currentValue: `${ccpi.indicators.buffettIndicator.toFixed(0)}%`,
+          currentValue: fx(i.buffettIndicator, 0, { suffix: "%" }),
           ranges: {
             safe: "Below 100% (undervalued)",
             warning: "100-150% (fairly valued)",
             danger: "Above 150% (overvalued), >180% (bubble)",
           },
-          dataSources: getDataSourceForIndicator("Buffett Indicator", dataSources),
+          dataSources: src(prov, "valuation", "buffettIndicator", "ScrapingBee scrape", [
+            "AI fallback chain (lib/unified-ai-fallback.ts)",
+          ]),
           canaryThresholds: {
             medium: ">150%",
             high: ">180% (significantly overvalued)",
@@ -504,13 +748,19 @@ export function CcpiAuditAdmin() {
           formula: "Tech Valuation = QQQ Price / Weighted Average Forward Earnings",
           executiveSummary:
             "QQQ P/E above 30 indicates AI/tech bubble; above 40 signals extreme speculation. More sensitive than S&P 500.",
-          currentValue: ccpi.indicators.qqqPE.toFixed(1),
+          currentValue: fx(i.qqqPE, 1),
           ranges: {
             safe: "Below 25",
             warning: "25-35",
             danger: "Above 35 (bubble if >40)",
           },
-          dataSources: getDataSourceForIndicator("QQQ Forward P/E", dataSources),
+          dataSources: src(
+            prov,
+            "valuation",
+            "qqqPE",
+            "AI fallback chain (lib/unified-ai-fallback.ts) — no live provider is wired for QQQ P/E",
+            [],
+          ),
           canaryThresholds: {
             medium: ">30",
             high: ">40 (AI bubble territory)",
@@ -522,13 +772,19 @@ export function CcpiAuditAdmin() {
             "Top-Heavy Risk = (AAPL + MSFT + GOOGL + AMZN + NVDA + META + TSLA Market Cap) / Total QQQ Market Cap × 100",
           executiveSummary:
             "Extreme concentration amplifies crash risk. If Mag7 falls, entire index collapses. Above 60% is dangerous top-heaviness.",
-          currentValue: `${ccpi.indicators.mag7Concentration.toFixed(1)}%`,
+          currentValue: fx(i.mag7Concentration, 1, { suffix: "%" }),
           ranges: {
             safe: "Below 45% (diversified)",
             warning: "45-55%",
             danger: "Above 55% (concentrated), >60% (extreme)",
           },
-          dataSources: getDataSourceForIndicator("Mag7 Concentration", dataSources),
+          dataSources: src(
+            prov,
+            "valuation",
+            "mag7Concentration",
+            "AI fallback chain (lib/unified-ai-fallback.ts) — no live provider is wired for Mag7 weight",
+            [],
+          ),
           canaryThresholds: {
             medium: ">50%",
             high: ">60% (severe concentration risk)",
@@ -539,13 +795,19 @@ export function CcpiAuditAdmin() {
           formula: "Cyclically-Adjusted P/E = Price / 10-Year Average Inflation-Adjusted Earnings",
           executiveSummary:
             "CAPE above 30 has historically preceded major market declines. Smooths earnings volatility for long-term valuation view.",
-          currentValue: ccpi.indicators.shillerCAPE.toFixed(1),
+          currentValue: fx(i.shillerCAPE, 1),
           ranges: {
             safe: "Below 20 (historical average ~16)",
             warning: "20-30",
             danger: "Above 30 (overvalued), >35 (extreme)",
           },
-          dataSources: getDataSourceForIndicator("Shiller CAPE", dataSources),
+          dataSources: src(
+            prov,
+            "valuation",
+            "shillerCAPE",
+            "AI fallback chain (lib/unified-ai-fallback.ts) — no live provider is wired for CAPE",
+            [],
+          ),
           canaryThresholds: {
             medium: ">28",
             high: ">35 (historic overvaluation)",
@@ -556,13 +818,19 @@ export function CcpiAuditAdmin() {
           formula: "Stock vs Bond Attractiveness = (1 / S&P P/E × 100) - 10Y Treasury Yield",
           executiveSummary:
             "Negative or near-zero premiums mean bonds are more attractive than stocks. Below 2% signals stocks are overpriced relative to risk-free rates.",
-          currentValue: `${ccpi.indicators.equityRiskPremium.toFixed(2)}%`,
+          currentValue: fx(i.equityRiskPremium, 2, { suffix: "%" }),
           ranges: {
             safe: "Above 4% (stocks attractive)",
             warning: "2-4% (fair)",
             danger: "Below 2% (stocks overpriced), <0% (bonds dominate)",
           },
-          dataSources: getDataSourceForIndicator("S&P 500 P/E", dataSources),
+          dataSources: src(
+            prov,
+            "valuation",
+            "equityRiskPremium",
+            "Derived: S&P earnings yield − FRED 10Y (tier = weaker of the two)",
+            [],
+          ),
           canaryThresholds: {
             medium: "<3%",
             high: "<1.5% (severely overpriced)",
@@ -572,30 +840,37 @@ export function CcpiAuditAdmin() {
     }
   }
 
-  const buildMacroPillar = (ccpi: any, dataSources: any): PillarAudit => {
+  const buildMacroPillar = (ccpi: any, prov: any): PillarAudit => {
+    const i = ccpi.indicators ?? {}
+    const p = prov?.macro ?? {}
+    const FRED = "FRED API"
     return {
-      name: "Pillar 4 - Macro (20% weight)",
-      weight: 20,
-      score: ccpi.pillars.macro,
+      name: "Pillar 4 - Macro",
+      weight: Math.round(PILLAR_WEIGHTS.macro * 100),
+      score: typeof ccpi.pillars?.macro === "number" ? ccpi.pillars.macro : null,
+      scoredMax: typeof p.scoredMax === "number" ? p.scoredMax : null,
+      liveMax: typeof p.liveMax === "number" ? p.liveMax : null,
+      aiMax: typeof p.aiMax === "number" ? p.aiMax : null,
+      excluded: Array.isArray(p.excluded) ? p.excluded : [],
       formula: "Macro = (Raw Points / Scored Weight) × 100, renormalized over live/AI-backed indicators",
       calculation:
         "8 indicators with maxima summing to 100: TED Spread (13), DXY Dollar Index (12), ISM PMI (15), Fed Funds Rate (15), Fed Reverse Repo (11), Junk Bond Spread (10), US Debt-to-GDP (10), Yield Curve (14). The 10Y-2Y yield curve is scored once, here — its former duplicates in Pillars 1 and 2 and the crash-amplifier bonus were removed.",
       executiveSummary:
         "Macro pillar captures systemic economic and financial conditions. Banking stress (TED spread), policy tightness (Fed funds), and credit stress (junk spreads) signal macro headwinds that can trigger crashes.",
-      validation: `Pillar score ${ccpi.pillars.macro}/100. ${ccpi.pillars.macro > 70 ? "🔴 MACRO CRISIS" : ccpi.pillars.macro > 50 ? "🟡 RESTRICTIVE" : "🟢 STABLE"}`,
+      validation: band(ccpi.pillars?.macro, "🔴 MACRO CRISIS", "🟡 RESTRICTIVE", "🟢 STABLE"),
       indicators: [
         {
           name: "TED Spread (Banking System Stress)",
           formula: "Credit Risk = 3-Month LIBOR - 3-Month Treasury Yield",
           executiveSummary:
             "TED spread above 0.5% signals banking sector stress; above 1.0% indicates credit crisis. 2008 crisis saw TED > 4%.",
-          currentValue: `${ccpi.indicators.tedSpread.toFixed(2)}%`,
+          currentValue: fx(i.tedSpread, 2, { suffix: "%" }),
           ranges: {
             safe: "Below 0.35% (healthy credit markets)",
             warning: "0.35-0.75%",
             danger: "Above 0.75% (stress), >1.0% (crisis)",
           },
-          dataSources: getDataSourceForIndicator("FRED Macro", dataSources),
+          dataSources: src(prov, "macro", "tedSpread", FRED, []),
           canaryThresholds: {
             medium: ">0.50%",
             high: ">1.0% (banking crisis signal)",
@@ -606,13 +881,13 @@ export function CcpiAuditAdmin() {
           formula: "Dollar Strength = Weighted basket vs EUR, JPY, GBP, CAD, SEK, CHF",
           executiveSummary:
             "Strong dollar (>110) hurts tech earnings from overseas and tightens global financial conditions. Dollar rallies often precede crashes.",
-          currentValue: ccpi.indicators.dxyIndex.toFixed(1),
+          currentValue: fx(i.dxyIndex, 1),
           ranges: {
             safe: "Below 100 (weak dollar helps tech)",
             warning: "100-110 (normal range)",
             danger: "Above 110 (strong dollar hurts tech), >115 (extreme)",
           },
-          dataSources: getDataSourceForIndicator("FRED Macro", dataSources),
+          dataSources: src(prov, "macro", "dxyIndex", FRED, []),
           canaryThresholds: {
             medium: ">105",
             high: ">110 (extreme dollar strength)",
@@ -623,13 +898,19 @@ export function CcpiAuditAdmin() {
           formula: "Factory Health = Survey of purchasing managers (>50 = expansion, <50 = contraction)",
           executiveSummary:
             "PMI below 50 indicates manufacturing contraction; below 45 signals recession risk. Leading indicator for GDP.",
-          currentValue: ccpi.indicators.ismPMI.toFixed(1),
+          currentValue: fx(i.ismPMI, 1),
           ranges: {
             safe: "Above 52 (expansion)",
             warning: "50-52 (neutral)",
             danger: "Below 50 (contraction), <45 (recession)",
           },
-          dataSources: getDataSourceForIndicator("ISM Manufacturing PMI", dataSources),
+          dataSources: src(
+            prov,
+            "macro",
+            "ismPMI",
+            "AI fallback chain (lib/unified-ai-fallback.ts) — no live provider is wired for ISM",
+            [],
+          ),
           canaryThresholds: {
             medium: "<50 (contraction)",
             high: "<46 (deep contraction)",
@@ -640,13 +921,13 @@ export function CcpiAuditAdmin() {
           formula: "Policy Rate = Federal Reserve target rate for overnight bank lending",
           executiveSummary:
             "Rates above 5% are restrictive and slow economy. Aggressive rate hikes have triggered past recessions and crashes.",
-          currentValue: `${ccpi.indicators.fedFundsRate.toFixed(2)}%`,
+          currentValue: fx(i.fedFundsRate, 2, { suffix: "%" }),
           ranges: {
             safe: "Below 4% (accommodative)",
             warning: "4-5% (neutral)",
             danger: "Above 5% (restrictive), >6% (extreme)",
           },
-          dataSources: getDataSourceForIndicator("FRED Macro", dataSources),
+          dataSources: src(prov, "macro", "fedFundsRate", FRED, []),
           canaryThresholds: {
             medium: ">4.5%",
             high: ">6.0% (severely restrictive)",
@@ -657,13 +938,13 @@ export function CcpiAuditAdmin() {
           formula: "Liquidity Drain = $ parked at Fed overnight (removes money from markets)",
           executiveSummary:
             "High RRP (>$1T) means tight liquidity. Money market funds choosing Fed over lending to markets reduces available capital.",
-          currentValue: `$${ccpi.indicators.fedReverseRepo.toFixed(0)}B`,
+          currentValue: fx(i.fedReverseRepo, 0, { prefix: "$", suffix: "B" }),
           ranges: {
             safe: "Below $500B (loose liquidity)",
             warning: "$500B-$1000B",
             danger: "Above $1000B (tight), >$1500B (severe drain)",
           },
-          dataSources: getDataSourceForIndicator("FRED Macro", dataSources),
+          dataSources: src(prov, "macro", "fedReverseRepo", FRED, []),
           canaryThresholds: {
             medium: ">$1000B",
             high: ">$2000B (extreme liquidity drain)",
@@ -674,13 +955,13 @@ export function CcpiAuditAdmin() {
           formula: "Credit Stress = High-Yield Corporate Bonds - 10Y Treasury Yield",
           executiveSummary:
             "Spread above 6% signals credit stress; above 8% indicates corporate distress. Widens dramatically before recessions.",
-          currentValue: `${ccpi.indicators.junkSpread.toFixed(2)}%`,
+          currentValue: fx(i.junkSpread, 2, { suffix: "%" }),
           ranges: {
             safe: "Below 3.5% (tight credit)",
             warning: "3.5-6%",
             danger: "Above 6% (stress), >8% (crisis)",
           },
-          dataSources: getDataSourceForIndicator("FRED Macro", dataSources),
+          dataSources: src(prov, "macro", "junkSpread", FRED, []),
           canaryThresholds: {
             medium: ">5%",
             high: ">8% (credit crisis)",
@@ -691,13 +972,13 @@ export function CcpiAuditAdmin() {
           formula: "Fiscal Burden = Total Federal Debt / Annual GDP × 100",
           executiveSummary:
             "Debt above 120% raises sovereign risk concerns; above 130% approaches fiscal crisis. Limits government crisis response capacity.",
-          currentValue: `${ccpi.indicators.debtToGDP.toFixed(0)}%`,
+          currentValue: fx(i.debtToGDP, 0, { suffix: "%" }),
           ranges: {
             safe: "Below 100% (healthy)",
             warning: "100-120% (elevated)",
             danger: "Above 120% (high risk), >130% (crisis risk)",
           },
-          dataSources: getDataSourceForIndicator("FRED Macro", dataSources),
+          dataSources: src(prov, "macro", "debtToGDP", FRED, []),
           canaryThresholds: {
             medium: ">110%",
             high: ">130% (fiscal crisis risk)",
@@ -708,13 +989,13 @@ export function CcpiAuditAdmin() {
           formula: "Recession Signal = 10-Year Treasury Yield - 2-Year Treasury Yield",
           executiveSummary:
             "Inverted yield curve (negative spread) has preceded every recession since 1950. Scored once, in this pillar (max 14 points).",
-          currentValue: `${ccpi.indicators.yieldCurve > 0 ? "+" : ""}${ccpi.indicators.yieldCurve.toFixed(2)}%`,
+          currentValue: fx(i.yieldCurve, 2, { suffix: "%", signed: true }),
           ranges: {
             safe: "Above 0% (normal curve)",
             warning: "0% to -0.5% (inverted)",
             danger: "Below -0.5% (deep inversion - recession signal)",
           },
-          dataSources: getDataSourceForIndicator("FRED Macro", dataSources),
+          dataSources: src(prov, "macro", "yieldCurve", FRED, []),
           canaryThresholds: {
             medium: "Curve inverted (-0.2% to -0.5%)",
             high: "Deep inversion (< -0.5%)",
@@ -724,36 +1005,19 @@ export function CcpiAuditAdmin() {
     }
   }
 
-  const getDataSourceForIndicator = (indicatorName: string, dataSources: any) => {
-    const source = dataSources?.sources?.find((s: any) => s.name === indicatorName)
-    if (source) {
-      return {
-        primary: source.primarySource,
-        fallbackChain: source.fallbackChain,
-        currentSource: source.currentSource,
-        status: source.status,
-      }
-    }
-    return {
-      primary: "Unknown",
-      fallbackChain: [],
-      currentSource: "Unknown",
-      status: "baseline" as const,
-    }
-  }
-
-  const getStatusBadge = (status: string) => {
+  // Badge vocabulary now matches the engine's tiers exactly. The old
+  // "aiFallback"/"failed" cases came from /api/data-source-status, which never
+  // measured anything; "ai-estimate" and "baseline" are what scoring.ts emits.
+  const getStatusBadge = (status: Tier) => {
     switch (status) {
       case "live":
-        return <Badge className="bg-green-500 text-white">🟢 Live API</Badge>
-      case "aiFallback":
-        return <Badge className="bg-yellow-500 text-white">🟡 AI-Fetched</Badge>
+        return <Badge className="bg-green-500 text-white">🟢 Live</Badge>
+      case "ai-estimate":
+        return <Badge className="bg-yellow-500 text-white">🟡 AI estimate</Badge>
       case "baseline":
-        return <Badge className="bg-orange-500 text-white">🟠 Baseline</Badge>
-      case "failed":
-        return <Badge className="bg-red-500 text-white">🔴 Failed</Badge>
+        return <Badge className="bg-orange-500 text-white">🟠 Baseline (not scored)</Badge>
       default:
-        return <Badge className="bg-gray-500 text-white">❓ Unknown</Badge>
+        return <Badge className="bg-slate-400 text-white">❓ Unknown</Badge>
     }
   }
 
@@ -764,12 +1028,22 @@ export function CcpiAuditAdmin() {
 Generated: ${new Date().toISOString()}
 
 ## CCPI Index Calculation
-Score: ${auditData.ccpi.finalCCPI}/100
+Score: ${raw(auditData.ccpi.finalCCPI)}/100
 Formula: ${auditData.ccpi.formula}
 
 ${auditData.ccpi.executiveSummary}
 
-Validation: ${auditData.ccpi.validation}
+Validation: ${auditData.ccpi.validation.text}
+
+## Data Quality
+Certainty (live/AI weight): ${auditData.dataQuality.certainty === null ? EM_DASH : `${auditData.dataQuality.certainty}%`}
+Indicator tiers: ${auditData.dataQuality.tierCounts.live} live · ${auditData.dataQuality.tierCounts.aiEstimate} AI estimate · ${auditData.dataQuality.tierCounts.baseline} baseline · ${auditData.dataQuality.tierCounts.unknown} unknown
+${auditData.dataQuality.pillars
+  .map(
+    (p: any) =>
+      `- ${p.name}: score ${raw(p.score)} · scored weight ${raw(p.scoredMax)}/100 (live ${raw(p.liveMax)}, AI ${raw(p.aiMax)})${p.excluded.length ? ` · excluded: ${p.excluded.join(", ")}` : ""}`,
+  )
+  .join("\n")}
 
 Pillar Weights:
 - Momentum & Technical: ${auditData.ccpi.weights.momentum}%
@@ -780,7 +1054,7 @@ Pillar Weights:
 ---
 
 ## Crash Amplifier Bonus System
-Base Score: ${auditData.crashAmplifier.baseScore} | Bonus: +${auditData.crashAmplifier.totalBonus} | Final Score: ${auditData.crashAmplifier.finalScore}
+Base Score: ${raw(auditData.crashAmplifier.baseScore)} | Bonus: ${raw(auditData.crashAmplifier.totalBonus)} | Final Score: ${raw(auditData.crashAmplifier.finalScore)}
 Formula: ${auditData.crashAmplifier.formula}
 
 ${auditData.crashAmplifier.executiveSummary}
@@ -794,7 +1068,7 @@ ${auditData.crashAmplifier.bonuses.length > 0 ? auditData.crashAmplifier.bonuses
 ---
 
 ## Canary Warning System
-Active Warnings: ${auditData.canaries.active} / ${auditData.canaries.total} indicators
+Active Warnings: ${raw(auditData.canaries.active)} / ${raw(auditData.canaries.total)} indicators
 Formula: ${auditData.canaries.formula}
 
 ${auditData.canaries.executiveSummary}
@@ -809,7 +1083,7 @@ ${auditData.pillars
   .map(
     (pillar: PillarAudit) => `
 ## ${pillar.name}
-Weight: ${pillar.weight}% | Score: ${pillar.score}/100
+Weight: ${pillar.weight}% | Score: ${raw(pillar.score)}/100 | Scored weight: ${raw(pillar.scoredMax)}/100 (live ${raw(pillar.liveMax)}, AI ${raw(pillar.aiMax)})
 Formula: ${pillar.formula}
 Calculation: ${pillar.calculation}
 
@@ -864,6 +1138,30 @@ ${idx + 1}. **${ind.name}**
     URL.revokeObjectURL(url)
   }
 
+  // A real error state. The old code had only the spinner, so any thrown
+  // TypeError left the tab loading forever with nothing to diagnose (A-8).
+  if (error) {
+    return (
+      <div className="bg-white rounded-lg p-6 border border-red-300">
+        <div className="flex items-start gap-3">
+          <XCircle className="h-6 w-6 text-red-600 mt-0.5 shrink-0" />
+          <div className="flex-1">
+            <h3 className="font-bold text-red-900">CCPI audit could not be loaded</h3>
+            <p className="text-sm text-red-800 mt-1">{error}</p>
+            <p className="text-xs text-red-700 mt-2">
+              Nothing is shown rather than a partially-invented audit. Check the CCPI route&apos;s logs and the provider
+              keys it depends on.
+            </p>
+            <Button onClick={fetchAudit} disabled={loading} size="sm" className="mt-3">
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+              Retry
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (!auditData) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -885,7 +1183,9 @@ ${idx + 1}. **${ind.name}**
             CCPI Audit - Complete Transparency
           </h2>
           <p className="text-sm text-gray-600 mt-1">
-            Full formulas, thresholds, data sources, and validation for all 29 scored indicators across 4 pillars
+            Formulas, thresholds, provenance and validation for the{" "}
+            {auditData.canaries.total === null ? EM_DASH : auditData.canaries.total} scored indicators across{" "}
+            {auditData.pillars.length} pillars. Values the engine could not source render {EM_DASH}.
           </p>
         </div>
         <div className="flex gap-2">
@@ -900,6 +1200,78 @@ ${idx + 1}. **${ind.name}**
         </div>
       </div>
 
+      {/* Data Quality — built from ccpi.certainty + ccpi.provenance. The
+          reworked certainty number was emitted by the route and rendered
+          nowhere until now (A-8). */}
+      <Card className="bg-white border-slate-300">
+        <CardHeader>
+          <CardTitle className="text-2xl flex items-center gap-2">
+            <Gauge className="h-6 w-6 text-slate-700" />
+            Data Quality
+          </CardTitle>
+          <CardDescription>
+            What this score is actually built on. Certainty is pure data provenance — the share of scored weight backed
+            by live data, plus half credit for AI estimates. Canary counts do not raise it.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!auditData.dataQuality.hasProvenance ? (
+            <p className="text-sm text-slate-600">
+              This CCPI payload carried no <code>provenance</code> block, so no per-indicator tiers can be shown.
+            </p>
+          ) : null}
+
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="p-4 rounded-lg border bg-slate-50">
+              <div className="text-3xl font-bold text-slate-800">
+                {auditData.dataQuality.certainty === null ? EM_DASH : `${auditData.dataQuality.certainty}%`}
+              </div>
+              <div className="text-xs text-slate-600">Certainty</div>
+            </div>
+            <div className="p-4 rounded-lg border bg-green-50">
+              <div className="text-3xl font-bold text-green-700">{auditData.dataQuality.tierCounts.live}</div>
+              <div className="text-xs text-green-700">Live</div>
+            </div>
+            <div className="p-4 rounded-lg border bg-yellow-50">
+              <div className="text-3xl font-bold text-yellow-700">{auditData.dataQuality.tierCounts.aiEstimate}</div>
+              <div className="text-xs text-yellow-700">AI estimate</div>
+            </div>
+            <div className="p-4 rounded-lg border bg-orange-50">
+              <div className="text-3xl font-bold text-orange-700">{auditData.dataQuality.tierCounts.baseline}</div>
+              <div className="text-xs text-orange-700">Baseline (excluded)</div>
+            </div>
+            <div className="p-4 rounded-lg border bg-slate-50">
+              <div className="text-3xl font-bold text-slate-600">{auditData.dataQuality.tierCounts.unknown}</div>
+              <div className="text-xs text-slate-600">Unknown</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {auditData.dataQuality.pillars.map((p: any) => (
+              <div key={p.key} className="p-4 border rounded-lg">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-semibold text-slate-900">{p.name}</span>
+                  <span className="text-lg font-bold text-slate-700">{p.score === null ? EM_DASH : `${p.score}/100`}</span>
+                </div>
+                <p className="text-xs text-slate-600">
+                  Scored weight <span className="font-mono">{raw(p.scoredMax)}</span>/100 — live{" "}
+                  <span className="font-mono">{raw(p.liveMax)}</span>, AI <span className="font-mono">{raw(p.aiMax)}</span>
+                </p>
+                {p.belowMinimum && (
+                  <p className="text-xs text-orange-700 mt-1">
+                    Below the {auditData.dataQuality.minScoredMax}-point minimum — this pillar reports no score and is
+                    dropped from the composite, which renormalizes over the rest.
+                  </p>
+                )}
+                {p.excluded.length > 0 && (
+                  <p className="text-xs text-slate-500 mt-1">Excluded from scoring: {p.excluded.join(", ")}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Section 1: CCPI Index Calculation */}
       <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
         <CardHeader>
@@ -913,7 +1285,7 @@ ${idx + 1}. **${ind.name}**
           <div className="bg-white p-6 rounded-lg border border-blue-200">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-lg">Current CCPI Score</h3>
-              <div className="text-4xl font-bold text-blue-600">{auditData.ccpi.finalCCPI}/100</div>
+              <div className="text-4xl font-bold text-blue-600">{raw(auditData.ccpi.finalCCPI)}/100</div>
             </div>
 
             <div className="space-y-4">
@@ -939,12 +1311,38 @@ ${idx + 1}. **${ind.name}**
                 </div>
               </div>
 
-              <div className="p-4 bg-green-50 border border-green-200 rounded">
+              {/* The badge colour now follows the actual result. Previously the
+                  card was hardcoded green regardless of what validateCCPI said. */}
+              <div
+                className={`p-4 border rounded ${
+                  auditData.ccpi.validation.ok === true
+                    ? "bg-green-50 border-green-200"
+                    : auditData.ccpi.validation.ok === false
+                      ? "bg-red-50 border-red-200"
+                      : "bg-slate-50 border-slate-200"
+                }`}
+              >
                 <h4 className="font-semibold mb-2 flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  {auditData.ccpi.validation.ok === true ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  ) : auditData.ccpi.validation.ok === false ? (
+                    <AlertTriangle className="h-5 w-5 text-red-600" />
+                  ) : (
+                    <AlertTriangle className="h-5 w-5 text-slate-500" />
+                  )}
                   Validation
                 </h4>
-                <p className="text-sm text-green-800">{auditData.ccpi.validation}</p>
+                <p
+                  className={`text-sm ${
+                    auditData.ccpi.validation.ok === true
+                      ? "text-green-800"
+                      : auditData.ccpi.validation.ok === false
+                        ? "text-red-800"
+                        : "text-slate-700"
+                  }`}
+                >
+                  {auditData.ccpi.validation.text}
+                </p>
               </div>
             </div>
           </div>
@@ -964,15 +1362,15 @@ ${idx + 1}. **${ind.name}**
             <div className="grid grid-cols-3 gap-4 mb-6">
               <div className="text-center p-4 bg-blue-50 rounded-lg">
                 <div className="text-sm text-gray-600 mb-1">Base CCPI</div>
-                <div className="text-3xl font-bold text-blue-600">{auditData.crashAmplifier.baseScore}</div>
+                <div className="text-3xl font-bold text-blue-600">{raw(auditData.crashAmplifier.baseScore)}</div>
               </div>
               <div className="text-center p-4 bg-orange-50 rounded-lg">
                 <div className="text-sm text-gray-600 mb-1">Amplifier Bonus</div>
-                <div className="text-3xl font-bold text-orange-600">+{auditData.crashAmplifier.totalBonus}</div>
+                <div className="text-3xl font-bold text-orange-600">{auditData.crashAmplifier.totalBonus === null ? EM_DASH : `+${auditData.crashAmplifier.totalBonus}`}</div>
               </div>
               <div className="text-center p-4 bg-red-50 rounded-lg">
                 <div className="text-sm text-gray-600 mb-1">Final CCPI</div>
-                <div className="text-3xl font-bold text-red-600">{auditData.crashAmplifier.finalScore}</div>
+                <div className="text-3xl font-bold text-red-600">{raw(auditData.crashAmplifier.finalScore)}</div>
               </div>
             </div>
 
@@ -1040,7 +1438,7 @@ ${idx + 1}. **${ind.name}**
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-lg">Active Warnings</h3>
               <div className="text-4xl font-bold text-yellow-600">
-                {auditData.canaries.active}/{auditData.canaries.total}
+                {raw(auditData.canaries.active)}/{raw(auditData.canaries.total)}
               </div>
             </div>
 
@@ -1094,10 +1492,11 @@ ${idx + 1}. **${ind.name}**
                     <div className="text-left">
                       <h3 className="font-bold text-lg">{pillar.name}</h3>
                       <p className="text-sm text-gray-600">
-                        Weight: {pillar.weight}% | {pillar.indicators.length} indicators
+                        Weight: {pillar.weight}% | {pillar.indicators.length} indicators | scored weight{" "}
+                        {raw(pillar.scoredMax)}/100 (live {raw(pillar.liveMax)}, AI {raw(pillar.aiMax)})
                       </p>
                     </div>
-                    <div className="text-2xl font-bold text-purple-600">{pillar.score}/100</div>
+                    <div className="text-2xl font-bold text-purple-600">{raw(pillar.score)}/100</div>
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="px-6 pb-6 pt-2">

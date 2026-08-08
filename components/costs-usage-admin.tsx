@@ -29,7 +29,9 @@ interface ServiceCost {
   disabled: boolean
   active: boolean
   effectiveCost: number
-  usageCount: number
+  // `usageCount` is still emitted by /api/admin/usage but is deliberately not
+  // rendered — nothing in the repo calls `recordApiUsage`, so it is a
+  // never-measured 0, not a measurement of zero (AUDIT A-13).
 }
 
 /**
@@ -372,9 +374,15 @@ export function CostsUsageAdmin() {
                         <p className="text-xs text-amber-700 mt-1">↳ {s.replacement}</p>
                       )}
                     </div>
+                    {/* AUDIT A-13: `usageCount` came from lib/api-usage.ts, whose
+                        `recordApiUsage` is called from nowhere in the repo — so it
+                        was permanently 0 and rendered as "0 calls (this instance)",
+                        which reads as "never used" rather than "never measured".
+                        Real per-call counts come from lib/metered-fetch.ts and are
+                        shown in the "Measured usage" card at the top. */}
                     <div className="text-right">
                       <p className="font-mono text-sm text-slate-900">${s.monthlyCost}/mo est.</p>
-                      <p className="text-[11px] text-slate-400 mt-1">{s.usageCount} calls (this instance)</p>
+                      <p className="text-[11px] text-slate-400 mt-1">call count: see Measured usage</p>
                     </div>
                   </div>
                 )

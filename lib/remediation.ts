@@ -177,8 +177,8 @@ const PATH_HINTS: [string, string][] = [
   ["/api/polygon", "POLYGON_API_KEY"],
   ["/api/apify", "APIFY_API_TOKEN"],
   ["/api/scraping-bee", "SCRAPINGBEE_API_KEY"],
-  ["/api/twelve-data-proxy", "TWELVE_DATA_API_KEY"],
-  ["/api/twelvedata-proxy", "TWELVE_DATA_API_KEY"],
+  // (both twelvedata proxy routes were retired in the admin cleanup — S-20/P2-3:
+  // duplicates of each other, zero consumers, provider kill-switched)
   ["/api/serper-finance", "SERPER_API_KEY"],
   ["/api/google-trends", "SERPER_API_KEY"],
   ["/api/macro-indicators", "FRED_API_KEY"],

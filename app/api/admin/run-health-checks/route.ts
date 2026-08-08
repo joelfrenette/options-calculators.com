@@ -305,9 +305,8 @@ export async function GET(request: NextRequest) {
  */
 function contractCoverage() {
   const KNOWN_ROUTES = [
-    "/api/admin/ads", "/api/admin/api-keys", "/api/admin/api-status", "/api/admin/audit",
-    "/api/admin/backup", "/api/admin/ccpi-audit", "/api/admin/full-system-audit",
-    "/api/admin/restore", "/api/admin/run-health-checks", "/api/admin/usage",
+    "/api/admin/ads", "/api/admin/api-keys", "/api/admin/api-status",
+    "/api/admin/backup", "/api/admin/run-health-checks", "/api/admin/usage",
     "/api/ai-status", "/api/apify-proxy",
     "/api/auth/login", "/api/auth/logout", "/api/auth/reset-password", "/api/ccpi",
     "/api/ccpi/cache", "/api/ccpi/chat", "/api/ccpi/executive-summary", "/api/ccpi/history",
@@ -315,14 +314,13 @@ function contractCoverage() {
     "/api/earnings-calendar", "/api/earnings-calendar/insights", "/api/fmp-proxy",
     "/api/fomc-predictions", "/api/form-144", "/api/google-trends", "/api/hedge-fund-13f",
     "/api/insider-clusters", "/api/insider-trading", "/api/insider-trading/ai-insights",
-    "/api/jobs-report", "/api/landmine-check", "/api/macro-indicators", "/api/market-breadth",
+    "/api/jobs-report", "/api/landmine-check", "/api/macro-indicators",
     "/api/market-sentiment", "/api/panic-euphoria", "/api/politician-spotlight",
-    "/api/polygon-proxy", "/api/polygon-tickers", "/api/qqq-technicals",
-    "/api/remaining-site-status", "/api/scenario-analysis", "/api/scraping-bee",
-    "/api/scraping-bee/diagnostics", "/api/scraping-bee/test", "/api/scraping-bee/test-connection",
+    "/api/polygon-proxy", "/api/polygon-tickers",
+    "/api/scenario-analysis", "/api/scraping-bee", "/api/scraping-bee/diagnostics",
     "/api/sentiment-heatmap", "/api/serper-finance", "/api/smart-money-etfs",
     "/api/social-sentiment", "/api/strategy-scanner", "/api/time-server", "/api/top-performers",
-    "/api/trend-analysis", "/api/twelve-data-proxy", "/api/twelvedata-proxy", "/api/vix",
+    "/api/trend-analysis", "/api/vix",
     "/api/vix-history", "/api/yahoo-proxy",
   ]
   const contracted = new Set(ROUTE_CONTRACTS.map((c) => c.path))

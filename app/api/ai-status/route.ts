@@ -1,88 +1,66 @@
 import { NextResponse } from "next/server"
+import { isAuthenticated } from "@/lib/auth"
+import { getProviderChain } from "@/lib/ai-providers"
+import { hasRawKey, isServiceDisabled } from "@/lib/api-keys"
+
+/**
+ * The live AI fallback chain (AUDIT_BACKLOG A-7, A-9).
+ *
+ * Generated entirely from `providerConfigs` in lib/ai-providers.ts via
+ * `getProviderChain()` — the same array the generate/stream loops iterate — so
+ * order, display name and model id cannot drift from the code. The old handwritten
+ * list had the order backwards (it claimed OpenAI #1; OpenAI is #4, behind three
+ * free-tier providers) and shipped hardcoded "average latency" strings rendered
+ * as if measured.
+ *
+ * There is no latency field here on purpose: this route makes ZERO upstream
+ * calls (a probe would spend tokens). Real per-call latency belongs to the
+ * metering ledger (lib/metered-fetch.ts → Costs tab), not to a constant.
+ *
+ * Admin-gated (A-9): the payload discloses which AI keys are configured.
+ */
+
+export const dynamic = "force-dynamic"
 
 export async function GET() {
-  const aiProviders = [
-    {
-      name: "OpenAI GPT-4o",
-      priority: 1,
-      speed: "Fastest",
-      hasKey: !!process.env.OPENAI_API_KEY,
-      status: process.env.OPENAI_API_KEY ? "online" : "offline",
-      endpoint: "api.openai.com",
-      usedFor: ["All CCPI indicators", "Primary AI fallback"],
-      averageLatency: "1.2s"
-    },
-    {
-      name: "Anthropic Claude",
-      priority: 2,
-      speed: "Fast",
-      hasKey: !!process.env.ANTHROPIC_API_KEY,
-      status: process.env.ANTHROPIC_API_KEY ? "online" : "offline",
-      endpoint: "api.anthropic.com",
-      usedFor: ["Secondary AI fallback", "Market data validation"],
-      averageLatency: "1.8s"
-    },
-    {
-      name: "Groq Llama",
-      priority: 3,
-      speed: "Medium",
-      hasKey: !!process.env.GROQ_API_KEY,
-      status: process.env.GROQ_API_KEY ? "online" : "offline",
-      endpoint: "api.groq.com",
-      usedFor: ["Tertiary AI fallback", "High-speed inference"],
-      averageLatency: "2.5s"
-    },
-    {
-      name: "Grok xAI",
-      priority: 4,
-      speed: "Standard",
-      hasKey: !!process.env.XAI_API_KEY || !!process.env.GROK_XAI_API_KEY,
-      status: (process.env.XAI_API_KEY || process.env.GROK_XAI_API_KEY) ? "online" : "offline",
-      endpoint: "api.x.ai",
-      usedFor: ["Real-time data extraction", "Market data fetch"],
-      averageLatency: "3.2s"
-    },
-    {
-      name: "Google Gemini",
-      priority: 5,
-      speed: "Fast",
-      hasKey: !!process.env.GOOGLE_AI_API_KEY || !!process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-      status: (process.env.GOOGLE_AI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY) ? "online" : "offline",
-      endpoint: "generativelanguage.googleapis.com",
-      usedFor: ["AI fallback chain", "CCPI summaries & chat"],
-      averageLatency: "1.5s"
-    },
-    {
-      name: "OpenRouter",
-      priority: 6,
-      speed: "Standard",
-      hasKey: !!process.env.OPENROUTER_API_KEY,
-      status: process.env.OPENROUTER_API_KEY ? "online" : "offline",
-      endpoint: "openrouter.ai",
-      usedFor: ["Aggregator fallback", "CCPI summaries & chat"],
-      averageLatency: "2.8s"
-    },
-    {
-      name: "Perplexity",
-      priority: 7,
-      speed: "Standard",
-      hasKey: !!process.env.PERPLEXITY_API_KEY,
-      status: process.env.PERPLEXITY_API_KEY ? "online" : "offline",
-      endpoint: "api.perplexity.ai",
-      usedFor: ["Search-augmented fallback"],
-      averageLatency: "3.0s"
-    }
-  ]
-
-  const summary = {
-    total: aiProviders.length,
-    online: aiProviders.filter(p => p.status === "online").length,
-    offline: aiProviders.filter(p => p.status === "offline").length
+  if (!(await isAuthenticated())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
+
+  const chain = getProviderChain().map((p) => {
+    const disabled = isServiceDisabled(p.keyName)
+    return {
+      ...p,
+      /** Raw env var present, ignoring the kill switch. */
+      rawPresent: hasRawKey(p.keyName),
+      /** Kill-switched via DISABLED_APIS — the chain skips it even with a key set. */
+      disabled,
+      /** The loop `continue`s past any provider whose key does not resolve. */
+      willBeTried: p.hasKey,
+      /** No measurement is taken here; see lib/metered-fetch.ts for real latency. */
+      latencyMs: null as number | null,
+    }
+  })
+
+  const tried = chain.filter((p) => p.willBeTried)
 
   return NextResponse.json({
     timestamp: new Date().toISOString(),
-    summary,
-    providers: aiProviders
+    source: "lib/ai-providers.ts → providerConfigs (generated; the panel cannot drift from the chain)",
+    summary: {
+      total: chain.length,
+      configured: tried.length,
+      unconfigured: chain.filter((p) => !p.hasKey && !p.disabled).length,
+      disabled: chain.filter((p) => p.disabled).length,
+      free: chain.filter((p) => p.tier === "free").length,
+      paid: chain.filter((p) => p.tier === "paid").length,
+      /** The provider that will actually serve the next request, or null. */
+      firstAttempted: tried[0]?.displayName ?? null,
+      /** True when the next request lands on a pay-per-use provider. */
+      firstAttemptedIsPaid: tried[0] ? tried[0].tier === "paid" : false,
+    },
+    /** Stated, not inferred: no upstream call was made to produce this. */
+    measurement: "key presence only — no AI provider was called, so no latency or liveness was measured",
+    providers: chain,
   })
 }
