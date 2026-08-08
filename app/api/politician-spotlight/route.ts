@@ -142,7 +142,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
-      source: "Quiver Quant (free public feed)",
+      source: "Quiver Quant (licensed API)",
       windowDays: days,
       members,
       generatedAt: new Date().toISOString(),

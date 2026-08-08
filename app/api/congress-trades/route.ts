@@ -183,7 +183,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
-      source: "Quiver Quant (free public feed)",
+      source: "Quiver Quant (licensed API)",
       fetched: all.length,
       returned: filtered.length,
       filters: { days, party: party || null, chamber: chamber || null, owner: owner || null, ticker: ticker || null, type: type || null, minSize },
