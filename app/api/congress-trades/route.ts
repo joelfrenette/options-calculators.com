@@ -1,13 +1,16 @@
 // Congress Trade Feed — dedicated endpoint for the COPY > Congress Trades tab.
-// Uses Quiver Quant's public live congressional trading feed (no key needed)
-// and normalizes records with Party, chamber, value-range, and a disclosure-lag
-// metric (days between trade date and report date — key context for traders).
+// Reads Quiver Quant's live congressional trading feed and normalizes records
+// with Party, chamber, value-range, and a disclosure-lag metric (days between
+// trade date and report date — key context for traders).
+//
+// The feed REQUIRES an API key (QUIVER_API_KEY). This comment used to say "no
+// key needed", which is what the code assumed, and Quiver answered 401 to every
+// request. See lib/quiver.ts and AUDIT_BACKLOG P6-1.
 
 import { NextResponse } from "next/server"
+import { fetchCongressTrading } from "@/lib/quiver"
 
 export const dynamic = "force-dynamic"
-
-const QUIVER_URL = "https://api.quiverquant.com/beta/live/congresstrading"
 
 // STOCK Act disclosure ranges (the exact discrete buckets used in PTR filings).
 // We map the string back to a midpoint dollar value so we can sort/filter by size.
@@ -73,38 +76,27 @@ export async function GET(request: Request) {
   const cutoffMs = cutoff.getTime()
 
   try {
-    const res = await fetch(QUIVER_URL, {
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "options-calculators.com contact@options-calculators.com",
-      },
-      next: { revalidate: 3600 }, // hourly cache (fresh enough; data updates infrequently)
-    })
+    // Auth, status mapping and metering all live in lib/quiver.ts. This route
+    // used to call Quiver unauthenticated and report the resulting permanent
+    // 401 as "rate-limited briefly, try again in a moment" — see P6-1.
+    const result = await fetchCongressTrading("/api/congress-trades")
 
-    if (!res.ok) {
-      // Quiver's free public feed sometimes rate-limits or 401s briefly.
-      // Return 502 (Bad Gateway) so the transport matches the error body —
-      // upstream status is surfaced in the body alongside an empty trades array.
+    if (!result.ok) {
       return NextResponse.json(
         {
           success: false,
           source: "Quiver Quant",
-          upstreamStatus: res.status,
-          message:
-            res.status === 401 || res.status === 429
-              ? "Quiver Quant rate-limited briefly. Try again in a moment."
-              : `Quiver Quant returned HTTP ${res.status}.`,
+          upstreamStatus: "upstreamStatus" in result ? result.upstreamStatus : null,
+          message: result.message,
+          transient: result.transient,
           trades: [],
           generatedAt: new Date().toISOString(),
         },
-        { status: 502 },
+        { status: result.httpStatus },
       )
     }
 
-    const data = (await res.json()) as any[]
-    if (!Array.isArray(data)) {
-      return NextResponse.json({ success: false, error: "Unexpected payload shape", trades: [] }, { status: 502 })
-    }
+    const data = result.data as any[]
 
     const all: Trade[] = []
     for (const t of data) {

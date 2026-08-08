@@ -3,7 +3,10 @@
 // surface an Insider Cluster Buys section: tickers where many *different*
 // members bought in the trailing window (a high-signal pattern).
 
+// Requires QUIVER_API_KEY — see lib/quiver.ts and AUDIT_BACKLOG P6-1.
+
 import { NextResponse } from "next/server"
+import { fetchCongressTrading } from "@/lib/quiver"
 
 export const dynamic = "force-dynamic"
 
@@ -60,29 +63,25 @@ export async function GET(request: Request) {
   const minTradesForRanking = Math.max(3, Math.floor(days / 60)) // require some sample size
 
   try {
-    const res = await fetch("https://api.quiverquant.com/beta/live/congresstrading", {
-      headers: { Accept: "application/json", "User-Agent": "options-calculators.com contact@options-calculators.com" },
-      next: { revalidate: 3600 },
-    })
-    if (!res.ok) {
+    // Auth, status mapping and metering live in lib/quiver.ts. This route used
+    // to call Quiver unauthenticated and report the permanent 401 it got back
+    // as "rate-limited briefly, try again in a moment" — see P6-1.
+    const result = await fetchCongressTrading("/api/top-performers")
+    if (!result.ok) {
       return NextResponse.json(
         {
           success: false,
-          message:
-            res.status === 401 || res.status === 429
-              ? "Quiver Quant rate-limited briefly. Try again in a moment."
-              : `Upstream HTTP ${res.status}`,
+          message: result.message,
+          transient: result.transient,
+          upstreamStatus: "upstreamStatus" in result ? result.upstreamStatus : null,
           windowDays: days,
           members: [],
           clusters: [],
         },
-        { status: 502 },
+        { status: result.httpStatus },
       )
     }
-    const data = (await res.json()) as any[]
-    if (!Array.isArray(data)) {
-      return NextResponse.json({ success: false, message: "Unexpected payload" }, { status: 502 })
-    }
+    const data = result.data as any[]
 
     // Aggregate per-member statistics
     const memberAgg = new Map<

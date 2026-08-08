@@ -112,8 +112,17 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
   {
     path: "/api/earnings-calendar",
     method: "GET",
+    // Probe the way the UI actually calls it. components/earnings-economic-calendar.tsx
+    // requests `?skipAI=true` and fills the explainers in afterwards via
+    // /insights. Without the flag the probe took the slow path — up to 25 LLM
+    // calls — and reported 20.7s against a 20s budget as "degraded", measuring
+    // a path no user ever hits while spending real money on every run. The
+    // sibling /insights entry is skipped for exactly that reason. Precedent:
+    // the yahoo-proxy canary below, where the canary was wrong, not the route.
+    canary: { query: { skipAI: "true" } },
     schema: anyObject,
-    budgetMs: 20000,
+    // The fast path targets ~2s; this leaves headroom without hiding a regression.
+    budgetMs: 10000,
     requires: ["FINNHUB_API_KEY", "POLYGON_API_KEY"],
     tabs: ["earnings-calendar"],
   },
@@ -312,11 +321,15 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     tabs: ["insider-clusters"],
   },
   { path: "/api/form-144", method: "GET", schema: anyObject, budgetMs: 20000, tabs: ["form-144"] },
+  // All three read the same Quiver Quantitative congressional feed. Declaring
+  // the key means one missing credential reports as one blocked cause across
+  // three routes, instead of three unexplained 502s (AUDIT_BACKLOG P6-1).
   {
     path: "/api/congress-trades",
     method: "GET",
     schema: anyObject,
     budgetMs: 20000,
+    requires: ["QUIVER_API_KEY"],
     tabs: ["congress-feed"],
   },
   {
@@ -324,6 +337,7 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     method: "GET",
     schema: anyObject,
     budgetMs: 20000,
+    requires: ["QUIVER_API_KEY"],
     tabs: ["politician-spotlight"],
   },
   {
@@ -331,6 +345,7 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     method: "GET",
     schema: anyObject,
     budgetMs: 20000,
+    requires: ["QUIVER_API_KEY"],
     tabs: ["top-performers"],
   },
   {
@@ -455,14 +470,6 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     canary: { query: { endpoint: "quote", ticker: "AAPL" } },
     schema: anyObject,
     budgetMs: 12000,
-    tabs: [],
-  },
-  {
-    path: "/api/fmp-proxy",
-    method: "GET",
-    schema: anyObject,
-    budgetMs: 12000,
-    requires: ["FMP_API_KEY"],
     tabs: [],
   },
   {

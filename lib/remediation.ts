@@ -111,6 +111,7 @@ export const KEY_ALIASES: Record<string, string[]> = {
   ALPHA_VANTAGE_API_KEY: ["ALPHA_VANTAGE_API_KEY"],
   FINNHUB_API_KEY: ["FINNHUB_API_KEY"],
   APIFY_API_TOKEN: ["APIFY_API_TOKEN", "APIFY_API_KEY"],
+  QUIVER_API_KEY: ["QUIVER_API_KEY", "QUIVER_QUANT_API_KEY"],
   SCRAPINGBEE_API_KEY: ["SCRAPINGBEE_API_KEY"],
   SERPER_API_KEY: ["SERPER_API_KEY"],
   SERPAPI_KEY: ["SERPAPI_KEY"],
@@ -141,6 +142,7 @@ export const PROVIDERS: Record<string, Provider> = {
   ALPHA_VANTAGE_API_KEY: { label: "Alpha Vantage", dashboard: "https://www.alphavantage.co/support/#api-key" },
   FINNHUB_API_KEY: { label: "Finnhub", dashboard: "https://finnhub.io/dashboard", status: "https://status.finnhub.io" },
   APIFY_API_TOKEN: { label: "Apify", dashboard: "https://console.apify.com/account/integrations", status: "https://status.apify.com" },
+  QUIVER_API_KEY: { label: "Quiver Quantitative", dashboard: "https://www.quiverquant.com/pricing/" },
   SCRAPINGBEE_API_KEY: { label: "ScrapingBee", dashboard: "https://app.scrapingbee.com/account/dashboard" },
   SERPER_API_KEY: { label: "Serper", dashboard: "https://serper.dev/dashboard" },
   SERPAPI_KEY: { label: "SerpApi", dashboard: "https://serpapi.com/dashboard" },
@@ -173,7 +175,6 @@ const VERCEL_BYPASS: RemediationLink = {
  * fallback after ctx.keys.
  */
 const PATH_HINTS: [string, string][] = [
-  ["/api/fmp-proxy", "FMP_API_KEY"],
   ["/api/polygon", "POLYGON_API_KEY"],
   ["/api/apify", "APIFY_API_TOKEN"],
   ["/api/scraping-bee", "SCRAPINGBEE_API_KEY"],
@@ -181,6 +182,9 @@ const PATH_HINTS: [string, string][] = [
   // duplicates of each other, zero consumers, provider kill-switched)
   ["/api/serper-finance", "SERPER_API_KEY"],
   ["/api/google-trends", "SERPER_API_KEY"],
+  ["/api/congress-trades", "QUIVER_API_KEY"],
+  ["/api/politician-spotlight", "QUIVER_API_KEY"],
+  ["/api/top-performers", "QUIVER_API_KEY"],
   ["/api/macro-indicators", "FRED_API_KEY"],
   ["/api/cpi-inflation", "FRED_API_KEY"],
   ["/api/fomc-predictions", "FRED_API_KEY"],

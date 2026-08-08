@@ -313,7 +313,10 @@ function contractCoverage() {
     "/api/ccpi/cache", "/api/ccpi/chat", "/api/ccpi/executive-summary", "/api/ccpi/history",
     "/api/congress-trades", "/api/cpi-inflation", "/api/cron/budget-guard",
     "/api/data-source-status",
-    "/api/earnings-calendar", "/api/earnings-calendar/insights", "/api/fmp-proxy",
+    "/api/earnings-calendar", "/api/earnings-calendar/insights",
+    // /api/fmp-proxy retired 2026-08-07: its entire body was a hardcoded 410
+    // ("requires premium subscription") with no consumer anywhere. FMP_API_KEY
+    // itself is still live via lib/fmp-valuation.ts and /api/polygon-tickers.
     "/api/fomc-predictions", "/api/form-144", "/api/google-trends", "/api/hedge-fund-13f",
     "/api/insider-clusters", "/api/insider-trading", "/api/insider-trading/ai-insights",
     "/api/jobs-report", "/api/landmine-check", "/api/macro-indicators",

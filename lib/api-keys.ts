@@ -17,6 +17,9 @@ export const API_KEY_ALIASES: Record<string, string[]> = {
   ALPHA_VANTAGE_API_KEY: ["ALPHA_VANTAGE_API_KEY"],
   FINNHUB_API_KEY: ["FINNHUB_API_KEY"],
   APIFY_API_TOKEN: ["APIFY_API_TOKEN", "APIFY_API_KEY"],
+  // Congressional trading data. The three routes that use it were calling
+  // Quiver unauthenticated and getting a permanent 401 — see AUDIT_BACKLOG P6-1.
+  QUIVER_API_KEY: ["QUIVER_API_KEY", "QUIVER_QUANT_API_KEY"],
   // Scraping & search
   SCRAPINGBEE_API_KEY: ["SCRAPINGBEE_API_KEY"],
   SERPER_API_KEY: ["SERPER_API_KEY"],

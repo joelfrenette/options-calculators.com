@@ -1,8 +1,13 @@
-// Politician Spotlight — for each tracked member, return their last N
-// trades from Quiver Quant's free public feed, with pattern statistics
-// computed on the server (avoids client-side data shuffling).
+// Politician Spotlight — for each tracked member, return their last N trades
+// from Quiver Quant's congressional feed, with pattern statistics computed on
+// the server (avoids client-side data shuffling).
+//
+// The feed is NOT free and requires QUIVER_API_KEY. This header used to call it
+// a "free public feed", which is what the code assumed, and Quiver answered 401
+// to every request. See lib/quiver.ts and AUDIT_BACKLOG P6-1.
 
 import { NextResponse } from "next/server"
+import { fetchCongressTrading } from "@/lib/quiver"
 
 export const dynamic = "force-dynamic"
 
@@ -61,24 +66,25 @@ export async function GET(request: Request) {
   const cutoffMs = cutoff.getTime()
 
   try {
-    const res = await fetch("https://api.quiverquant.com/beta/live/congresstrading", {
-      headers: { Accept: "application/json", "User-Agent": "options-calculators.com contact@options-calculators.com" },
-      next: { revalidate: 3600 },
-    })
-    if (!res.ok) {
+    // Auth, status mapping and metering live in lib/quiver.ts. This route used
+    // to call Quiver unauthenticated and report the permanent 401 it got back
+    // as "rate-limited briefly, try again in a moment" — see P6-1.
+    const result = await fetchCongressTrading("/api/politician-spotlight")
+    if (!result.ok) {
       return NextResponse.json(
         {
           success: false,
-          message: res.status === 401 || res.status === 429 ? "Quiver Quant rate-limited briefly. Try again in a moment." : `Upstream HTTP ${res.status}`,
+          message: result.message,
+          transient: result.transient,
+          upstreamStatus: "upstreamStatus" in result ? result.upstreamStatus : null,
+          // Zeroed counters with a null return, so the UI can tell "no data"
+          // from "zero activity" — house rule: missing data is never 0.
           members: ROSTER.map((r) => ({ ...r, totalTrades: 0, buys: 0, sells: 0, estimatedActivityUsd: 0, avgExcessReturnPct: null, topTickers: [], recentTrades: [] })),
         },
-        { status: 502 },
+        { status: result.httpStatus },
       )
     }
-    const data = (await res.json()) as any[]
-    if (!Array.isArray(data)) {
-      return NextResponse.json({ success: false, message: "Unexpected payload" }, { status: 502 })
-    }
+    const data = result.data as any[]
 
     const members: MemberSpotlight[] = ROSTER.map((m) => {
       const matched = data
