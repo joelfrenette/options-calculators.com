@@ -24,6 +24,19 @@ say so rather than presenting it as an exact count. When there is no tracking
 data, report `0` and why. Inventing a savings number for a tool bought to save
 money is the same failure as inventing market data.
 
+## Interaction rule (mandatory)
+**After the status block, end every reply with a clickable multiple-choice
+question** (AskUserQuestion) offering Joel his next actions. Pick the 3-4 most
+contextually relevant from his standard set, in priority order:
+- "Please continue" (default next build step, named)
+- "UAT passed — merge" (when staging is ahead)
+- "I have UAT findings to resolve"
+- "I have audit items for you to review"
+- "I have backlog items to add"
+- "Handoff" (end session cleanly)
+The user can always type free-form instead ("Other" is built in). Never ask
+permission-style questions this way — it is a navigation menu, not a gate.
+
 ## Deployment rule (mandatory)
 **Never push directly to `main`.** `main` = production (www.options-calculators.com).
 1. All work deploys first to the staging branch (currently `audit-preview`) →

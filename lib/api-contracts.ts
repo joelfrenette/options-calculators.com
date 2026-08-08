@@ -436,6 +436,13 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     tabs: [],
   },
   {
+    path: "/api/cron/quiver-probe",
+    method: "GET",
+    skip: "CRON_SECRET-gated operator probe; each run spends ~8 metered Quiver calls.",
+    budgetMs: 120000,
+    tabs: [],
+  },
+  {
     path: "/api/cron/budget-guard",
     method: "GET",
     skip: "Vercel Cron endpoint, authenticated with CRON_SECRET rather than the admin cookie — the health check has no way to present it, and a probe could trip the shutoff for real.",
