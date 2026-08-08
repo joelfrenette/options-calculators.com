@@ -25,6 +25,8 @@ const STALENESS_DAYS: Record<string, number> = {
   // live path serves it too. No staleness gate, else the store could never win.
   TEDRATE: Number.POSITIVE_INFINITY,
   GASREGW: 21,
+  WRMFSL: 21,
+  BOGZ1FL663067003Q: 150,
   UNRATE: 60,
   CPIAUCSL: 60,
   CPILFESL: 60,
@@ -49,6 +51,23 @@ export async function fredLatestFromStore(seriesId: string): Promise<{ value: nu
   if (!rows || rows.length === 0) return null
   const latest = rows[0]
   return fresh(latest.day, seriesId) ? { value: latest.value, day: latest.day } : null
+}
+
+/** Latest stored value + percentile within stored history — the house
+ * percentile-of-self normalization (P6-14), fed from the store instead of a
+ * live FRED history pull. Null below minHistory points or when the head point
+ * is stale for the series' cadence. */
+export async function fredPercentileFromStore(
+  seriesId: string,
+  minHistory = 8,
+): Promise<{ value: number; day: string; pct: number; n: number } | null> {
+  const rows = await getSeriesHistory(`fred:${seriesId}`, 800)
+  if (!rows || rows.length < minHistory) return null
+  if (!fresh(rows[0].day, seriesId)) return null
+  const values = rows.map((r) => r.value)
+  const latest = values[0]
+  const below = values.filter((v) => v < latest).length
+  return { value: latest, day: rows[0].day, pct: below / values.length, n: values.length }
 }
 
 /** Recent stored observations, newest first — same freshness gate on the head

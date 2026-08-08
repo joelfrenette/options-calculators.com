@@ -3,6 +3,7 @@ import { sma } from "@/lib/indicators"
 import { getApiKey } from "@/lib/api-keys"
 import { meteredFetch } from "@/lib/metered-fetch"
 import { upsertSeriesPoint, latestWithPercentile } from "@/lib/market-series"
+import { fredLatestFromStore, fredPercentileFromStore } from "@/lib/fred-store"
 
 // Helper function to fetch Yahoo Finance data
 async function fetchYahooData(symbol: string, range = "5y") {
@@ -251,7 +252,9 @@ async function calculatePanicEuphoria() {
     // Retail money market funds — Citi's model uses RETAIL MMF (Levkovich
     // component list), so WRMFSL is the right series. High cash on the
     // sidelines = fear, so the score is the inverted percentile.
-    const mmf = await fredLatestWithPercentile("WRMFSL", 260) // ~5y weekly
+    // E-7b store-first: percentile computed over the fred-snapshot store when
+    // it has depth; live FRED history pull as fallback (store empty/stale).
+    const mmf = (await fredPercentileFromStore("WRMFSL")) ?? (await fredLatestWithPercentile("WRMFSL", 260)) // ~5y weekly
     const moneyMarketFunds = mmf ? Math.round((mmf.value / 1000) * 100) / 100 : null
     const mmfIsLive = mmf !== null
     const mmfScore = mmf ? -(mmf.pct - 0.5) * 2 : null
@@ -259,7 +262,8 @@ async function calculatePanicEuphoria() {
     // Margin debt — real quarterly broker-dealer margin loans from FRED
     // (Z.1 flow of funds, $ millions) instead of the old `700 + momentum*5`
     // synthesis. High leverage percentile = euphoria.
-    const marginReal = await fredLatestWithPercentile("BOGZ1FL663067003Q", 20) // ~5y quarterly
+    const marginReal =
+      (await fredPercentileFromStore("BOGZ1FL663067003Q")) ?? (await fredLatestWithPercentile("BOGZ1FL663067003Q", 20)) // ~5y quarterly
     if (marginReal) {
       marginDebt = Math.round(marginReal.value / 1000) // $M → $B
       marginScore = (marginReal.pct - 0.5) * 2
@@ -295,7 +299,12 @@ async function calculatePanicEuphoria() {
         return null
       }
     }
-    const [commodityPrices, gasPrices] = await Promise.all([fredSeries("PPIACO"), fredSeries("GASREGW")])
+    const [commodityStore, gasStore] = await Promise.all([
+      fredLatestFromStore("PPIACO"),
+      fredLatestFromStore("GASREGW"),
+    ])
+    const commodityPrices = commodityStore?.value ?? (await fredSeries("PPIACO"))
+    const gasPrices = gasStore?.value ?? (await fredSeries("GASREGW"))
     const commodityScore =
       commodityPrices !== null ? Math.max(-1, Math.min(1, normalize(commodityPrices, 250, 320, 280))) : null
     const gasScore = gasPrices !== null ? Math.max(-1, Math.min(1, normalize(gasPrices, 2.5, 4.5, 3.25))) * -1 : null

@@ -36,6 +36,8 @@ const SERIES: { id: string; cadence: "daily" | "weekly" | "monthly" | "quarterly
   { id: "RRPONTSYD", cadence: "daily", dailyLimit: 8 },
   { id: "TEDRATE", cadence: "daily", dailyLimit: 8 }, // discontinued 2022; kept for the stored tail
   { id: "GASREGW", cadence: "weekly", dailyLimit: 4 },
+  { id: "WRMFSL", cadence: "weekly", dailyLimit: 4 }, // retail MMF (panic-euphoria)
+  { id: "BOGZ1FL663067003Q", cadence: "quarterly", dailyLimit: 2 }, // Z.1 margin debt (panic-euphoria)
   { id: "UNRATE", cadence: "monthly", dailyLimit: 3 },
   { id: "CPIAUCSL", cadence: "monthly", dailyLimit: 3 },
   { id: "CPILFESL", cadence: "monthly", dailyLimit: 3 },
