@@ -22,10 +22,15 @@ const CANDIDATES: { key: string; label: string; url: string }[] = [
   { key: "offexchange", label: "Off-exchange short volume (E-8a)", url: "https://api.quiverquant.com/beta/live/offexchange" },
   { key: "wallstreetbets", label: "WSB mentions (E-8b)", url: "https://api.quiverquant.com/beta/live/wallstreetbets" },
   { key: "insiders", label: "Insider transactions aggregate (E-8e)", url: "https://api.quiverquant.com/beta/live/insiders" },
-  { key: "thirteenf", label: "13F holdings/deltas (E-8f)", url: "https://api.quiverquant.com/beta/live/thirteenf" },
+  // "thirteenf" 404'd (name unknown); Django URL resolution 401s on real routes
+  // and 404s on unknown ones, and sec13f/sec13fchanges answer 401 unauthenticated.
+  { key: "sec13f", label: "13F holdings (E-8f)", url: "https://api.quiverquant.com/beta/live/sec13f" },
+  { key: "sec13fchanges", label: "13F position changes (E-8f)", url: "https://api.quiverquant.com/beta/live/sec13fchanges" },
   { key: "govcontracts", label: "Government contracts (E-8g)", url: "https://api.quiverquant.com/beta/live/govcontractsall" },
   { key: "lobbying", label: "Lobbying (E-8g)", url: "https://api.quiverquant.com/beta/live/lobbying" },
   { key: "wikipedia", label: "Wikipedia page views (E-8h)", url: "https://api.quiverquant.com/beta/live/wikipedia" },
+  // Wikipedia may only exist per-ticker under /historical — probe one ticker.
+  { key: "wikipedia-historical", label: "Wikipedia page views, historical per-ticker (E-8h)", url: "https://api.quiverquant.com/beta/historical/wikipedia/AAPL" },
 ]
 
 function authorized(request: Request): boolean {
