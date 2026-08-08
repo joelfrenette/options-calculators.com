@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { diagnose } from "@/lib/remediation"
+import { RemediationCard } from "@/components/admin/remediation-card"
 import {
   Activity,
   AlertTriangle,
@@ -340,6 +342,34 @@ export function HealthCheckPanel() {
                   </tbody>
                 </table>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Remediation — every problem gets an owner and concrete next steps.
+              Passing rows are hidden unless they carry a warning (e.g. a key
+              resolved via a non-canonical alias), so this list stays actionable. */}
+          <Card className="bg-white">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">What to do about it</CardTitle>
+              <CardDescription>
+                One card per problem, with who acts and the exact next steps. YOU = a dashboard, billing or env
+                change; CLAUDE = a code fix (copy the prompt); WAIT = upstream, re-check shortly.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {(() => {
+                const cards = report.results
+                  .filter((r) => r.status !== "skipped")
+                  .map((r) => ({ r, rem: diagnose(r, { keys: report.keys }) }))
+                  .filter(({ r, rem }) => r.status !== "pass" || rem.headline.startsWith("Works, but"))
+                return cards.length === 0 ? (
+                  <p className="text-sm text-gray-500">Nothing needs attention — every probed route passed.</p>
+                ) : (
+                  cards.map(({ r, rem }) => (
+                    <RemediationCard key={`${r.method} ${r.path}`} result={r} remediation={rem} />
+                  ))
+                )
+              })()}
             </CardContent>
           </Card>
 
