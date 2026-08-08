@@ -41,7 +41,8 @@ interface PanicEuphoriaData {
   latestCitiDate?: string
   ytdAverage?: number
   // 9 Citibank Model Inputs
-  nyseShortInterest: number
+  // Null until the Quiver off-exchange feed answers (E-8a).
+  nyseShortInterest: number | null
   marginDebt: number
   volumeRatio: number
   investorIntelligence: number
@@ -54,7 +55,7 @@ interface PanicEuphoriaData {
   gasPrices: number | null
   // Server-computed scores for percentile-normalized components (P6-14) —
   // the client bars must not recompute these with the old hardcoded ranges.
-  componentScores?: { moneyMarketFunds: number | null; marginDebt: number }
+  componentScores?: { moneyMarketFunds: number | null; marginDebt: number; shortInterest: number | null }
 }
 
 function PanicGradientBar({ value, min = -1, max = 1 }: { value: number; min?: number; max?: number }) {
@@ -535,12 +536,12 @@ export function PanicEuphoria() {
             {data && (
               <>
                 <PanicIndicator
-                  label="NYSE Short Interest"
-                  value={Math.max(-1, Math.min(1, ((data.nyseShortInterest - 20) / 10) * -1))}
-                  rawValue={`${data.nyseShortInterest}%`}
+                  label="Off-Exchange Short Volume %"
+                  value={data.componentScores?.shortInterest ?? 0}
+                  rawValue={data.nyseShortInterest !== null ? `${data.nyseShortInterest}%` : "—"}
                   tooltip={
                     tooltipsEnabled
-                      ? "NYSE Short Interest measures the percentage of shares shorted relative to total float. SOURCE: Derived from VIX volatility and market conditions. INTERPRETATION: High short interest (>25%) indicates extreme bearish positioning, which historically signals panic and is a contrarian BUY signal. Low short interest (<15%) suggests complacency/euphoria. Current range: 10-30%."
+                      ? "Off-Exchange Short Volume % — share of FINRA off-exchange (dark pool/OTC) volume marked short, aggregated across ~5,000 tickers. SOURCE: Quiver Quantitative (FINRA data), stored daily and scored as the percentile of its own history; the score bar reads 0.00 until 8 days accumulate. INTERPRETATION: high short share = bearish positioning building (contrarian panic side); low = complacency."
                       : ""
                   }
                 />
@@ -781,7 +782,7 @@ export function PanicEuphoria() {
                         </div>
                       </div>
                     </div>
-                    <span className="text-sm font-bold text-gray-900">{data.nyseShortInterest.toFixed(1)}%</span>
+                    <span className="text-sm font-bold text-gray-900">{data.nyseShortInterest !== null ? `${data.nyseShortInterest.toFixed(1)}%` : "—"}</span>
                   </div>
 
                   <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { sma } from "@/lib/indicators"
 import { getApiKey } from "@/lib/api-keys"
+import { meteredFetch } from "@/lib/metered-fetch"
+import { upsertSeriesPoint, latestWithPercentile } from "@/lib/market-series"
 
 // Helper function to fetch Yahoo Finance data
 async function fetchYahooData(symbol: string, range = "5y") {
@@ -143,26 +145,52 @@ async function calculatePanicEuphoria() {
     const vixPrices = vixData.indicators.quote[0].close.filter((p: number) => p !== null)
     const currentVix = vixPrices[vixPrices.length - 1]
 
-    // NYSE Short Interest estimate based on VIX (inverse correlation)
-    // Low VIX = complacent market = low short interest (10-15%)
-    // High VIX = fearful market = high short interest (20-30%)
-    let nyseShortInterest = 15 + ((currentVix - 15) / 30) * 10
-    nyseShortInterest = Math.max(10, Math.min(30, nyseShortInterest))
-    console.log("[v0] Calculated NYSE short interest from VIX:", nyseShortInterest)
-
-    // Try AI estimate as backup
-    if (currentVix > 30 || currentVix < 12) {
-      const aiEstimate = await getAIEstimate(
-        "NYSE Short Interest Ratio",
-        `Current VIX is ${currentVix.toFixed(2)}, SPX is ${currentSpx.toFixed(2)}. Typical range is 10-30%. High VIX suggests high short interest.`,
-      )
-      if (aiEstimate > 0 && aiEstimate <= 30) {
-        nyseShortInterest = aiEstimate
-        console.log("[v0] AI estimated NYSE short interest:", nyseShortInterest)
+    // REAL short positioning (E-8a): aggregate FINRA off-exchange short-volume
+    // ratio from Quiver (probed live 2026-08-08: included in Joel's plan,
+    // 5,469 tickers/day). Replaces the old VIX-derived synthesis and its AI
+    // backup entirely. Each reading lands in market_series and is scored as
+    // the percentile of its own stored history (the P6-14 rule) — until 8
+    // days accumulate, the component's SCORE is null and drops out of the
+    // composite; the raw value still displays.
+    let nyseShortInterest: number | null = null
+    let shortInterestScore: number | null = null
+    let shortInterestIsLive = false
+    try {
+      const quiverKey = getApiKey("QUIVER_API_KEY")
+      if (quiverKey) {
+        const oe = await meteredFetch("quiver", "https://api.quiverquant.com/beta/live/offexchange", {
+          headers: { Accept: "application/json", Authorization: `Bearer ${quiverKey}` },
+          signal: AbortSignal.timeout(15000),
+          next: { revalidate: 3600 }, // FINRA data is daily; hourly cache is generous
+          routeTag: "/api/panic-euphoria",
+        })
+        if (oe.ok) {
+          const rows = (await oe.json()) as { Date?: string; OTC_Short?: number; OTC_Total?: number }[]
+          if (Array.isArray(rows) && rows.length > 0) {
+            const latestDate = rows.reduce((m, r) => (r.Date && r.Date > m ? r.Date : m), "")
+            let shortSum = 0
+            let totalSum = 0
+            for (const r of rows) {
+              if (r.Date === latestDate && Number.isFinite(r.OTC_Short) && Number.isFinite(r.OTC_Total)) {
+                shortSum += r.OTC_Short as number
+                totalSum += r.OTC_Total as number
+              }
+            }
+            if (totalSum > 0 && latestDate) {
+              nyseShortInterest = Math.round((shortSum / totalSum) * 10000) / 100
+              shortInterestIsLive = true
+              await upsertSeriesPoint("offexchange_short_pct", latestDate.slice(0, 10), nyseShortInterest)
+              const hist = await latestWithPercentile("offexchange_short_pct", 8)
+              // High short positioning = fear = panic side (negative score),
+              // matching the Citi component's contrarian direction.
+              if (hist && hist.pct !== null) shortInterestScore = -(hist.pct - 0.5) * 2
+            }
+          }
+        }
       }
+    } catch (e) {
+      console.error("[v0] off-exchange short volume fetch failed:", e)
     }
-
-    const shortInterestScore = Math.max(-1, Math.min(1, normalize(nyseShortInterest, 10, 30, 15))) * -1
 
     const spx125DayMA = smaOrThrow(spxPrices, 125, "SPX 125-day MA")
     const spxMomentum = ((currentSpx - spx125DayMA) / spx125DayMA) * 100
@@ -342,7 +370,7 @@ async function calculatePanicEuphoria() {
       latestCitiReading: 0.72,
       latestCitiDate: "Nov 7, 2025",
       ytdAverage: 0.44,
-      nyseShortInterest: Math.round(nyseShortInterest * 10) / 10,
+      nyseShortInterest: nyseShortInterest !== null ? Math.round(nyseShortInterest * 10) / 10 : null,
       marginDebt: Math.round(marginDebt),
       volumeRatio: Math.round(volumeRatio * 100) / 100,
       investorIntelligence: Math.round(investorIntelligence),
@@ -355,7 +383,7 @@ async function calculatePanicEuphoria() {
       // estimates) rather than measured series. Margin debt and MMF leave the
       // list when their FRED series fetched (P6-8/P6-14).
       syntheticComponents: [
-        "nyseShortInterest",
+        ...(shortInterestIsLive ? [] : ["nyseShortInterest"]),
         "investorIntelligence",
         "aaiiBullish",
         "putCallRatio",
@@ -368,6 +396,7 @@ async function calculatePanicEuphoria() {
       componentScores: {
         moneyMarketFunds: mmfScore !== null ? Math.round(mmfScore * 100) / 100 : null,
         marginDebt: Math.round(marginScore * 100) / 100,
+        shortInterest: shortInterestScore !== null ? Math.round(shortInterestScore * 100) / 100 : null,
       },
     }
   } catch (error) {

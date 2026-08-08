@@ -127,12 +127,13 @@ export const API_COSTS: ApiCost[] = [
     key: "SERPER_API_KEY",
     vendor: "Serper.dev",
     category: "Scraping & Search",
-    monthlyCost: 0,
-    targetCost: 0,
-    status: "keep-free",
-    billing: "free",
-    provides: "Google search / news",
-    replacement: "Free tier (2,500/mo) is sufficient",
+    // Joel upgraded to a paid plan 2026-08-08.
+    monthlyCost: 20,
+    targetCost: 20,
+    status: "keep-paid",
+    billing: "flat",
+    provides: "Google search / news (ticker headlines, landmine checks)",
+    replacement: "",
   },
   {
     key: "SERPAPI_KEY",
@@ -144,6 +145,20 @@ export const API_COSTS: ApiCost[] = [
     billing: "flat",
     provides: "Google Trends fear/greed search volume",
     replacement: "Not must-keep; Serper.dev free can cover if needed",
+  },
+  {
+    key: "QUIVER_API_KEY",
+    vendor: "Quiver Quantitative",
+    category: "Market & Economic Data",
+    // Added 2026-08-08. Tier includes: congress trading, off-exchange short
+    // volume (+DPI), gov contracts, lobbying. NOT included (probed): WSB
+    // mentions, insider aggregate. Joel: no tier upgrades — at budget max.
+    monthlyCost: 30,
+    targetCost: 30,
+    status: "keep-paid",
+    billing: "flat",
+    provides: "Congress trades, off-exchange short volume, gov contracts, lobbying",
+    replacement: "No free source for these datasets",
   },
   // Email
   {
