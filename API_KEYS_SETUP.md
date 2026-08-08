@@ -1,204 +1,106 @@
-# API Key Management System
+# API Key Management
 
-This application uses an encrypted API key management system that allows you to securely store and manage all API keys through the admin dashboard.
+> **Corrected 2026-08-07.** The previous version of this file described, in
+> detail and with confidence, a system that does not exist: AES-256-GCM encryption, a
+> `.api-keys.encrypted` store, an "API Keys Management" screen with input fields
+> and a **Save All API Keys** button, key backup/restore, and a `getApiKey()`
+> that falls back to encrypted storage. None of it is in the repo — there is no
+> `createCipheriv` call anywhere, no `.api-keys.encrypted` handling, and
+> `/api/admin/api-keys` has no POST handler. `ENCRYPTION_KEY` is declared in
+> `lib/api-keys.ts` and never read.
+>
+> The document also carried a "Migration from Environment Variables" procedure
+> ending in *"Remove from .env"* — following it would have deleted every key with
+> nothing to fall back to.
+>
+> Documentation that describes features the code does not have is the same
+> failure mode as data the code invents, and it is corrected here on the same
+> principle. Admin-managed keys are tracked as a real feature request in
+> AUDIT_BACKLOG **P4-4**.
 
-## Overview
+## How keys actually work
 
-All API keys are:
-- Encrypted using AES-256-GCM encryption before storage
-- Stored in a secure encrypted file (`.api-keys.encrypted`)
-- Never logged or transmitted unencrypted
-- Only accessible by authenticated administrators
+**API keys come from environment variables. There is no other store.**
 
-## Quick Start
+- Set them in Vercel → project → Settings → Environment Variables.
+- Environment variable changes take effect **only on a new build** — redeploy after adding one.
+- `lib/api-keys.ts` `resolveApiKey(name)` is the single resolution point. It
+  checks each accepted spelling for that key in order, and returns `""` when the
+  service is unconfigured, kill-switched via `DISABLED_APIS`, or cut off by the
+  budget guard.
+- Never read `process.env.SOMETHING_API_KEY` directly. Doing so bypasses
+  `DISABLED_APIS`, the budget guard, and the alias list. Five libraries used to
+  do exactly that; see AUDIT_BACKLOG E-5b.
 
-### 1. Access Admin Dashboard
+```typescript
+import { resolveApiKey } from "@/lib/api-keys"
 
-1. Navigate to `https://options-calculators.com/login`
-2. Login with your credentials:
-   - Email: `<your-admin-email>`
-   - Password: `<set-in-env>`
+const apiKey = resolveApiKey("POLYGON_API_KEY") // "" when unavailable
+```
 
-### 2. Configure API Keys
+### The admin "API Keys" panel is read-only
 
-Once logged in, go to the **API Keys Management** section in the admin dashboard.
+`components/api-keys-manager.tsx` shows, per service, whether a key is
+**Configured**, **Kill-switched** (present but disabled via `DISABLED_APIS`), or
+**Not set**. It has no input fields and saves nothing — it reads
+`/api/admin/api-keys` and `/api/admin/usage` and renders status. That is by
+design and the panel says so.
 
-### Required API Keys
+### Key aliases
 
-| API Key Name | Purpose | How to Get |
-|--------------|---------|------------|
-| **POLYGON_API_KEY** | Real-time options and stock data | [polygon.io](https://polygon.io/) - Free tier available |
-| **TWELVE_DATA_API_KEY** | Technical indicators and fundamentals | [twelvedata.com](https://twelvedata.com/) - Free tier available |
-| **FRED_API_KEY** | Economic data (CPI, Fed Funds Rate) | [research.stlouisfed.org/useraccount/apikeys](https://research.stlouisfed.org/useraccount/apikeys) - Free |
-| **APIFY_API_TOKEN** | Web scraping for financial data | [apify.com](https://apify.com/) - Free tier available |
-| **RESEND_API_KEY** | Email notifications (password reset) | [resend.com](https://resend.com/) - Free tier available |
-| **FMP_API_KEY** | Financial Modeling Prep data (optional) | [financialmodelingprep.com](https://financialmodelingprep.com/) |
+Several services accept more than one spelling, because the codebase historically
+referenced them inconsistently. `API_KEY_ALIASES` in `lib/api-keys.ts` is the
+source of truth; prefer the canonical (first) name.
 
-### 3. Enter API Keys
+| Canonical | Also accepted |
+|---|---|
+| `TWELVE_DATA_API_KEY` | `TWELVEDATA_API_KEY` |
+| `APIFY_API_TOKEN` | `APIFY_API_KEY` |
+| `XAI_API_KEY` | `GROK_XAI_API_KEY` |
+| `GOOGLE_AI_API_KEY` | `GOOGLE_GENERATIVE_AI_API_KEY` |
 
-1. In the **API Keys Management** section, you'll see input fields for each API key
-2. Click the eye icon to toggle visibility while entering keys
-3. Enter your API keys (keys are masked after saving for security)
-4. Click **Save All API Keys** button
+## The keys
 
-### 4. Verify Keys Are Working
+Status reflects the cost-optimization decisions in `lib/api-costs.ts`.
 
-After saving, the system will show "Configured: ****1234" next to each key (showing last 4 characters).
+| Key | Provider | Status | Purpose |
+|---|---|---|---|
+| `POLYGON_API_KEY` | [polygon.io](https://polygon.io/) | keep-paid, $29/mo | Live options chains, Greeks, quotes, OHLCV — powers the scanners |
+| `FRED_API_KEY` | [FRED](https://research.stlouisfed.org/useraccount/apikeys) | keep-free | Fed Funds, CPI, VIX, yield curve, jobs, credit spreads |
+| `FINNHUB_API_KEY` | [finnhub.io](https://finnhub.io/) | keep-free | Earnings, insider transactions, news |
+| `FMP_API_KEY` | [FMP](https://financialmodelingprep.com/) | downgrade to free | Fundamentals, valuation ratios |
+| `ALPHA_VANTAGE_API_KEY` | [Alpha Vantage](https://www.alphavantage.co/) | eliminate | Redundant with FRED + local calc |
+| `TWELVE_DATA_API_KEY` | [twelvedata.com](https://twelvedata.com/) | eliminate | Replaced by local calc from Polygon OHLCV |
+| `APIFY_API_TOKEN` | [apify.com](https://apify.com/) | eliminate | Replaced by FMP/Finnhub free |
+| `SCRAPINGBEE_API_KEY` | [scrapingbee.com](https://www.scrapingbee.com/) | eliminate | Replaced by CNN direct + Alternative.me |
+| `SERPER_API_KEY` | [serper.dev](https://serper.dev/) | **keep-free** | Google search/news — `/api/google-trends`, `/api/serper-finance` |
+| `SERPAPI_KEY` | [serpapi.com](https://serpapi.com/) | eliminate | No call site in the repo at all |
+| `RESEND_API_KEY` | [resend.com](https://resend.com/) | keep-free | Budget-guard shutoff notifications |
+| `GROQ_API_KEY` | [groq.com](https://groq.com/) | keep-free | AI fallback chain |
+| `GOOGLE_AI_API_KEY` | [Google AI Studio](https://aistudio.google.com/) | keep-free | AI fallback chain |
+| `OPENROUTER_API_KEY` | [openrouter.ai](https://openrouter.ai/) | pay-per-use | Primary AI (free model), guarded |
+| `OPENAI_API_KEY` | [openai.com](https://platform.openai.com/) | pay-per-use | AI fallback, guarded |
+| `ANTHROPIC_API_KEY` | [anthropic.com](https://console.anthropic.com/) | pay-per-use | AI fallback, guarded |
+| `XAI_API_KEY` | [x.ai](https://x.ai/) | pay-per-use | AI fallback, guarded |
+| `PERPLEXITY_API_KEY` | [perplexity.ai](https://www.perplexity.ai/) | pay-per-use | Search-augmented AI fallback, guarded |
 
-## How It Works
-
-### Encryption
-
-- Uses AES-256-GCM (Galois/Counter Mode) encryption
-- Each key has a unique initialization vector (IV)
-- Authentication tags prevent tampering
-- Encryption key is stored securely in environment variable `ENCRYPTION_KEY`
-
-### Storage
-
-Keys are stored in `.api-keys.encrypted` file with this structure:
-
-\`\`\`json
-{
-  "POLYGON_API_KEY": "iv:authtag:encrypteddata",
-  "TWELVE_DATA_API_KEY": "iv:authtag:encrypteddata"
-}
-\`\`\`
-
-### Usage in Code
-
-The application uses a secure `getApiKey()` function that:
-1. First checks environment variables (for backward compatibility)
-2. Then checks encrypted storage
-3. Automatically decrypts keys when needed
-4. Never exposes keys in logs or responses
-
-\`\`\`typescript
-import { getApiKey } from '@/lib/api-keys'
-
-// In your API route
-const apiKey = getApiKey('POLYGON_API_KEY')
-\`\`\`
-
-## Security Best Practices
-
-### For Development
-
-1. **Never commit** `.api-keys.encrypted` to git (already in `.gitignore`)
-2. **Use environment variables** during local development via `.env.local`
-3. **Keep your encryption key secure** - without it, encrypted keys cannot be decrypted
-
-### For Production
-
-1. **Set encryption key** as environment variable `ENCRYPTION_KEY` (32 characters)
-2. **Backup encrypted keys** regularly using the admin backup feature
-3. **Rotate keys periodically** by updating them in the admin dashboard
-4. **Monitor access logs** for unauthorized admin access attempts
-
-## Backup & Restore
-
-The admin dashboard includes backup/restore functionality:
-
-### Creating a Backup
-
-1. Go to Admin Dashboard → **Backup & Restore** section
-2. Click **Download Backup**
-3. Save the ZIP file securely (includes encrypted keys)
-
-### Restoring from Backup
-
-1. Go to Admin Dashboard → **Backup & Restore** section
-2. Click **Restore from Backup**
-3. Select your backup ZIP file
-4. System will restore all files including encrypted keys
+A key marked `eliminate` being absent is **expected**, not a fault. The health
+check reports those routes as `blocked` — "no credential to call its provider
+with" — rather than as failures.
 
 ## Troubleshooting
 
-### Keys Not Working
+**A route reports "Key(s) not configured".** The key is missing for that
+environment. A Production-only variable leaves staging blocked, and vice versa —
+set both, then redeploy.
 
-1. **Check if keys are configured**: Look for "Configured: ****" status in admin
-2. **Verify key format**: Some APIs require specific formats (e.g., `Bearer xxx`)
-3. **Check API limits**: Free tier APIs have rate limits
-4. **Test individually**: Check debug logs for specific API errors
+**A key is set but the service still does not work.** Check whether it is
+kill-switched: `DISABLED_APIS` (manual) or the budget guard (automatic). The
+admin API Keys panel distinguishes "Kill-switched" from "Not set" precisely so
+these do not look the same.
 
-### "API key not configured" Error
-
-This means the key is not found in either:
-- Environment variables
-- Encrypted storage file
-
-**Solution**: Add the key via the admin dashboard.
-
-### Encryption Errors
-
-If you see "Cannot decrypt" errors:
-- Verify `ENCRYPTION_KEY` environment variable is set correctly
-- Check that `.api-keys.encrypted` file exists and is not corrupted
-- Restore from backup if necessary
-
-## Migration from Environment Variables
-
-If you're currently using `.env.local` with hardcoded keys:
-
-1. **Save existing keys**: Copy your current API keys
-2. **Add to admin dashboard**: Enter them via the API Keys Management UI
-3. **Remove from .env**: Delete old API key entries from `.env.local`
-4. **Test**: Verify application still works with encrypted keys
-
-## API Providers
-
-### Getting Your Keys
-
-#### Polygon.io (Stock & Options Data)
-- Website: https://polygon.io/
-- Free tier: 5 API calls/minute
-- Paid plans start at $29/month
-- Required for: Real-time options chains, stock quotes, greeks
-
-#### TwelveData (Technical Indicators)
-- Website: https://twelvedata.com/
-- Free tier: 800 requests/day
-- Paid plans start at $79/month
-- Required for: RSI, MACD, Stochastic indicators
-
-#### FRED (Economic Data)
-- Website: https://research.stlouisfed.org/useraccount/apikeys
-- Completely free, no limits
-- Required for: Fed Funds Rate, CPI inflation data, unemployment
-
-#### Apify (Web Scraping)
-- Website: https://apify.com/
-- Free tier: $5 monthly credit
-- Required for: Supplemental financial data scraping
-
-#### Resend (Email Service)
-- Website: https://resend.com/
-- Free tier: 100 emails/day
-- Required for: Password reset emails
-
-## Support
-
-For issues or questions:
-1. Check the browser console for detailed error messages
-2. Review API provider documentation
-3. Verify API key quotas haven't been exceeded
-4. Contact support at vercel.com/help
-
-## Environment Variables Reference
-
-\`\`\`bash
-# Required for encryption (32 characters recommended)
-ENCRYPTION_KEY="your-32-character-encryption-key"
-
-# Optional: Set these if you want to bypass admin dashboard
-POLYGON_API_KEY="your-polygon-key"
-TWELVE_DATA_API_KEY="your-twelvedata-key"
-FRED_API_KEY="your-fred-key"
-APIFY_API_TOKEN="your-apify-token"
-RESEND_API_KEY="your-resend-key"
-\`\`\`
-
-**Note**: Environment variables take precedence over encrypted storage. This allows you to override specific keys without changing the encrypted file.
+**A key was just added and nothing changed.** Redeploy. Environment variables
+are baked in at build time.
 
 ---
 
@@ -271,3 +173,67 @@ automatic one.
 \`\`\`bash
 DISABLED_APIS="TWELVE_DATA_API_KEY,APIFY_API_TOKEN"
 \`\`\`
+
+---
+
+## Admin authentication
+
+### Password
+
+Prefer a hash over the plaintext env var:
+
+\`\`\`bash
+node scripts/hash-admin-password.ts
+\`\`\`
+
+It prompts with echo disabled (nothing lands in shell history), then prints an
+`ADMIN_PASSWORD_HASH` value — scrypt, salted, via `node:crypto`, no extra
+dependency.
+
+\`\`\`bash
+ADMIN_EMAIL="you@example.com"
+
+# Preferred. Mark it Sensitive in Vercel.
+ADMIN_PASSWORD_HASH="scrypt:<saltHex>:<hashHex>"
+
+# Legacy fallback. Still honoured so setting the hash is a migration, not a
+# lockout. Delete it only after confirming you can log in with the hash.
+ADMIN_PASSWORD="..."
+\`\`\`
+
+Migration order matters — get this wrong and you lock yourself out:
+
+1. Add `ADMIN_PASSWORD_HASH` for **both** Preview and Production.
+2. Redeploy. Env vars only take effect on a new build.
+3. Log in at `/login` and confirm it works.
+4. **Only then** delete `ADMIN_PASSWORD`.
+
+`lib/auth.ts` prefers the hash and falls back to the plaintext, so having both
+set simultaneously is safe and is the whole point of the overlap.
+
+### Brute-force rate limiting
+
+Failed sign-ins are counted per client IP in the Supabase `login_attempts`
+table (migration `0003_login_attempts.sql`). Past the threshold the endpoint
+answers `429` with `Retry-After` until the oldest failure ages out. The window
+slides, so it never locks permanently.
+
+\`\`\`bash
+# Optional. Defaults shown.
+LOGIN_MAX_FAILURES="10"
+LOGIN_WINDOW_MINUTES="15"
+\`\`\`
+
+**It fails open.** If Supabase is unreachable or unconfigured, sign-ins are
+allowed through unlimited and the fail-open is logged. That is deliberate for
+this admin specifically: the credential is an environment variable, there is no
+self-service reset, and the owner has already been locked out once — so a
+database outage must not become an unrecoverable lockout. The trade is that
+brute-force protection is only as available as Supabase.
+
+### There is no password reset
+
+`/api/auth/reset-password` returns `501` with the recovery procedure. The
+credential is an environment variable and no web request can change one, so a
+reset flow is impossible by construction rather than merely unbuilt. Recovery is
+the four steps above. See AUDIT_BACKLOG P4-2 and P4-4.

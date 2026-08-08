@@ -410,13 +410,26 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     budgetMs: 30000,
     tabs: [],
   },
-  { path: "/api/auth/login", method: "POST", skip: "Authentication side effects.", budgetMs: 5000, tabs: [] },
+  {
+    path: "/api/auth/login",
+    method: "POST",
+    // Now also counts against the per-IP brute-force limit (P4-3), so probing
+    // it would spend the admin's own allowance and could lock the health check
+    // out of the very session it depends on.
+    skip: "Authentication side effects, and each probe consumes a rate-limit attempt.",
+    budgetMs: 5000,
+    tabs: [],
+  },
   { path: "/api/auth/logout", method: "POST", skip: "Authentication side effects.", budgetMs: 5000, tabs: [] },
   {
     path: "/api/auth/reset-password",
     method: "POST",
-    skip: "Sends email. Never probe.",
-    budgetMs: 15000,
+    // No longer sends anything: P4-2 replaced the fake reset with an honest 501
+    // carrying the real recovery procedure. Safe to probe, and worth probing —
+    // a 200 here would mean the theatre came back.
+    schema: z.object({ error: z.string(), recovery: z.array(z.string()) }).passthrough(),
+    okStatuses: [501],
+    budgetMs: 5000,
     tabs: [],
   },
 

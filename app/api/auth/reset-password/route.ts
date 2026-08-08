@@ -1,63 +1,48 @@
 import { NextResponse } from "next/server"
-import { Resend } from "resend"
-import { getApiKey } from "@/lib/api-keys"
 
-export async function POST(request: Request) {
-  try {
-    const { email } = await request.json()
+/**
+ * Admin password recovery — AUDIT_BACKLOG P4-2.
+ *
+ * WHAT THIS USED TO DO, AND WHY IT WAS REMOVED. It generated a token with
+ * `Math.random()`, stored it nowhere, emailed a link to `/reset-password` — a
+ * page that does not exist in `app/` and 404s — and answered
+ * `{ success: true, message: "Reset email sent" }`. The login UI then told the
+ * owner "Password reset email sent! Check your inbox."
+ *
+ * None of it could ever have worked. The admin credential is the ADMIN_PASSWORD
+ * / ADMIN_PASSWORD_HASH environment variable, and no web request can change an
+ * environment variable. A reset flow is not merely unimplemented here; it is
+ * impossible by construction. The owner discovered this the hard way, locked
+ * out, following a button that lied.
+ *
+ * So this endpoint no longer pretends. It returns 501 with the recovery
+ * procedure that actually works. That is the honest answer for an env-var
+ * credential, and it matches the house rule that the UI must never present
+ * something as done when it has not happened.
+ *
+ * IF SELF-SERVICE RESET IS WANTED LATER it requires moving admin auth off the
+ * env var into a real store (Supabase is connected) with a hashed credential,
+ * a stored single-use token with an expiry, and a real /reset-password page.
+ * That is a feature, not a bug fix — tracked in the backlog.
+ */
 
-    if (email !== process.env.ADMIN_EMAIL) {
-      return NextResponse.json({ error: "Email not found" }, { status: 404 })
-    }
-
-    const RESEND_API_KEY = getApiKey("RESEND_API_KEY")
-
-    if (!RESEND_API_KEY) {
-      return NextResponse.json({ error: "Email service not configured" }, { status: 500 })
-    }
-
-    const resend = new Resend(RESEND_API_KEY)
-
-    const resetToken = Math.random().toString(36).substring(2, 15)
-    const resetUrl = `https://options-calculators.com/reset-password?token=${resetToken}`
-
-    try {
-      await resend.emails.send({
-        from: "Options Calculator <noreply@options-calculators.com>",
-        to: email,
-        subject: "Password Reset Request",
-        html: `
-          <h2>Password Reset Request</h2>
-          <p>Click the link below to reset your password:</p>
-          <a href="${resetUrl}">${resetUrl}</a>
-          <p>This link will expire in 1 hour.</p>
-          <p>If you didn't request this, please ignore this email.</p>
-        `,
-      })
-
-      return NextResponse.json({ success: true, message: "Reset email sent" })
-    } catch (resendError: any) {
-      if (resendError?.message?.includes("domain is not verified")) {
-        console.error("[v0] Resend domain verification error:", resendError.message)
-        return NextResponse.json(
-          {
-            error: "Email service configuration issue",
-            details: "The email domain needs to be verified. Please verify options-calculators.com at https://resend.com/domains",
-            token: resetToken, // Return token so admin can manually reset
-          },
-          { status: 503 }
-        )
-      }
-      throw resendError
-    }
-  } catch (error: any) {
-    console.error("[v0] Password reset error:", error)
-    return NextResponse.json(
-      {
-        error: "Failed to send reset email",
-        details: error?.message || "Unknown error",
-      },
-      { status: 500 }
-    )
-  }
+export async function POST() {
+  // 501 Not Implemented, not a 200 with an error body: the house rule is that
+  // error responses use real HTTP error statuses. Deliberately says nothing
+  // about whether any particular address is the admin — the old version
+  // answered 404 "Email not found" for a non-match, which made it an oracle
+  // for the admin's email address.
+  return NextResponse.json(
+    {
+      error: "Self-service password reset is not available for the admin account.",
+      recovery: [
+        "Open Vercel → your project → Settings → Environment Variables.",
+        "Update ADMIN_PASSWORD_HASH (preferred) or ADMIN_PASSWORD.",
+        "Generate a hash with `node scripts/hash-admin-password.ts`.",
+        "Redeploy — environment variables only take effect on a new build.",
+        "Sign in at /login with the new password.",
+      ],
+    },
+    { status: 501 },
+  )
 }
