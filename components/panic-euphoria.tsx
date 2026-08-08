@@ -46,11 +46,15 @@ interface PanicEuphoriaData {
   volumeRatio: number
   investorIntelligence: number
   aaiiBullish: number
-  moneyMarketFunds: number
+  // Null when FRED WRMFSL is unavailable — rendered as "—".
+  moneyMarketFunds: number | null
   putCallRatio: number
   // Null when FRED (PPIACO / GASREGW) is unavailable — rendered as "—".
   commodityPrices: number | null
   gasPrices: number | null
+  // Server-computed scores for percentile-normalized components (P6-14) —
+  // the client bars must not recompute these with the old hardcoded ranges.
+  componentScores?: { moneyMarketFunds: number | null; marginDebt: number }
 }
 
 function PanicGradientBar({ value, min = -1, max = 1 }: { value: number; min?: number; max?: number }) {
@@ -542,7 +546,7 @@ export function PanicEuphoria() {
                 />
                 <PanicIndicator
                   label="Margin Debt"
-                  value={(data.marginDebt - 700) / 150}
+                  value={data.componentScores?.marginDebt ?? (data.marginDebt - 700) / 150}
                   rawValue={`$${data.marginDebt}B`}
                   tooltip={
                     tooltipsEnabled
@@ -582,8 +586,8 @@ export function PanicEuphoria() {
                 />
                 <PanicIndicator
                   label="Money Market Funds"
-                  value={(6.0 - data.moneyMarketFunds) / 1.0}
-                  rawValue={`$${data.moneyMarketFunds}T`}
+                  value={data.componentScores?.moneyMarketFunds ?? 0}
+                  rawValue={data.moneyMarketFunds !== null ? `${data.moneyMarketFunds}T` : "—"}
                   tooltip={
                     tooltipsEnabled
                       ? "Money Market Fund Assets tracks cash sitting on the sidelines in low-risk money market accounts. SOURCE: Investment Company Institute (ICI) via FRED. INTERPRETATION: High cash levels (>$6T) indicate fear/caution—this is 'dry powder' that could fuel a rally (bullish). Low cash (<$5T) means investors are fully invested—euphoria/risk. Current range: $5-7T."
@@ -844,7 +848,9 @@ export function PanicEuphoria() {
                         </div>
                       </div>
                     </div>
-                    <span className="text-sm font-bold text-gray-900">${data.moneyMarketFunds.toFixed(0)}T</span>
+                    <span className="text-sm font-bold text-gray-900">
+                      {data.moneyMarketFunds !== null ? `$${data.moneyMarketFunds.toFixed(2)}T` : "—"}
+                    </span>
                   </div>
 
                   <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">

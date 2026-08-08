@@ -170,11 +170,12 @@ async function calculatePanicEuphoria() {
     // Margin Debt estimate based on SPX momentum and VIX
     // Strong positive momentum + low VIX = high margin (750-850B)
     // Weak/negative momentum + high VIX = low margin (600-700B)
+    // Synthetic PROXY, used only when the real FRED series below is
+    // unavailable — overridden by BOGZ1FL663067003Q when it fetches.
     let marginDebt = 700 + spxMomentum * 5 - (currentVix - 15) * 3
     marginDebt = Math.max(600, Math.min(850, marginDebt))
-    console.log("[v0] Calculated margin debt from SPX momentum and VIX:", marginDebt)
-
-    const marginScore = Math.max(-1, Math.min(1, normalize(marginDebt, 600, 850, 700)))
+    let marginScore = Math.max(-1, Math.min(1, normalize(marginDebt, 600, 850, 700)))
+    let marginIsLive = false
 
     const qqqVolumes = qqqData.indicators.quote[0].volume.filter((v: number) => v !== null && v > 0)
     const diaVolumes = diaData.indicators.quote[0].volume.filter((v: number) => v !== null && v > 0)
@@ -189,28 +190,53 @@ async function calculatePanicEuphoria() {
     const aaiiBullish = Math.max(25, Math.min(65, investorIntelligence * 0.9))
     const aaiiScore = Math.max(-1, Math.min(1, normalize(aaiiBullish, 25, 65, 40)))
 
-    let moneyMarketFunds = 6.0 - spxMomentum * 0.02
-    let mmfIsLive = false
-    let mmfScore = Math.max(-1, Math.min(1, normalize(moneyMarketFunds, 5.0, 7.0, 6.0))) * -1
-
+    // FRED helper: latest value + its percentile within ~5y of history. The
+    // percentile IS the normalization — the series scores against its own
+    // range, so no hand-picked constants can drift out of scale (P6-14: the
+    // old code normalized retail-MMF ~$1.4T against a 5.0–7.0 total-market
+    // range, clamping the component to max-euphoria whenever FRED was live).
     const fredApiKey = getApiKey("FRED_API_KEY")
-    if (fredApiKey) {
+    const fredLatestWithPercentile = async (
+      id: string,
+      limit: number,
+    ): Promise<{ value: number; pct: number } | null> => {
+      if (!fredApiKey) return null
       try {
-        const fredResponse = await fetch(
-          `https://api.stlouisfed.org/fred/series/observations?series_id=WRMFSL&api_key=${fredApiKey}&file_type=json&limit=1&sort_order=desc`,
+        const r = await fetch(
+          `https://api.stlouisfed.org/fred/series/observations?series_id=${id}&api_key=${fredApiKey}&file_type=json&limit=${limit}&sort_order=desc`,
+          { signal: AbortSignal.timeout(8000) },
         )
-        if (fredResponse.ok) {
-          const fredData = await fredResponse.json()
-          if (fredData.observations && fredData.observations.length > 0) {
-            moneyMarketFunds = Number.parseFloat(fredData.observations[0].value) / 1000
-            mmfScore = Math.max(-1, Math.min(1, normalize(moneyMarketFunds, 5.0, 7.0, 6.0))) * -1
-            mmfIsLive = true
-            console.log("[v0] Real MMF from FRED:", moneyMarketFunds)
-          }
-        }
-      } catch (error) {
-        console.log("[v0] FRED API error, using calculated estimate:", error)
+        if (!r.ok) return null
+        const j = await r.json()
+        const vals = (j?.observations ?? [])
+          .map((o: any) => Number.parseFloat(o.value))
+          .filter((v: number) => Number.isFinite(v))
+        if (vals.length < 8) return null
+        const latest = vals[0]
+        const below = vals.filter((v: number) => v < latest).length
+        return { value: latest, pct: below / vals.length }
+      } catch {
+        return null
       }
+    }
+
+    // Retail money market funds — Citi's model uses RETAIL MMF (Levkovich
+    // component list), so WRMFSL is the right series. High cash on the
+    // sidelines = fear, so the score is the inverted percentile.
+    const mmf = await fredLatestWithPercentile("WRMFSL", 260) // ~5y weekly
+    const moneyMarketFunds = mmf ? Math.round((mmf.value / 1000) * 100) / 100 : null
+    const mmfIsLive = mmf !== null
+    const mmfScore = mmf ? -(mmf.pct - 0.5) * 2 : null
+
+    // Margin debt — real quarterly broker-dealer margin loans from FRED
+    // (Z.1 flow of funds, $ millions) instead of the old `700 + momentum*5`
+    // synthesis. High leverage percentile = euphoria.
+    const marginReal = await fredLatestWithPercentile("BOGZ1FL663067003Q", 20) // ~5y quarterly
+    if (marginReal) {
+      marginDebt = Math.round(marginReal.value / 1000) // $M → $B
+      marginScore = (marginReal.pct - 0.5) * 2
+      marginIsLive = true
+      console.log("[v0] Real margin debt from FRED Z.1:", marginDebt, "B, pct", marginReal.pct)
     }
 
     const vix50DayMA = smaOrThrow(vixPrices, 50, "VIX 50-day MA")
@@ -321,20 +347,28 @@ async function calculatePanicEuphoria() {
       volumeRatio: Math.round(volumeRatio * 100) / 100,
       investorIntelligence: Math.round(investorIntelligence),
       aaiiBullish: Math.round(aaiiBullish),
-      moneyMarketFunds: Math.round(moneyMarketFunds * 10) / 10,
+      moneyMarketFunds,
       putCallRatio: Math.round(putCallRatio * 100) / 100,
       commodityPrices: commodityPrices !== null ? Math.round(commodityPrices * 10) / 10 : null,
       gasPrices: gasPrices !== null ? Math.round(gasPrices * 100) / 100 : null,
       // Which components are synthetic proxies (derived from SPX/VIX or AI
-      // estimates) rather than measured series. The UI badges these (P6-8).
+      // estimates) rather than measured series. Margin debt and MMF leave the
+      // list when their FRED series fetched (P6-8/P6-14).
       syntheticComponents: [
         "nyseShortInterest",
-        "marginDebt",
         "investorIntelligence",
         "aaiiBullish",
         "putCallRatio",
-        ...(moneyMarketFunds !== null && mmfIsLive ? [] : ["moneyMarketFunds"]),
+        ...(marginIsLive ? [] : ["marginDebt"]),
+        ...(mmfIsLive ? [] : ["moneyMarketFunds"]),
       ],
+      // Server-computed scores for components whose scale changed to
+      // percentile-of-history — the client bar must not recompute these with
+      // the old hardcoded ranges (P6-14).
+      componentScores: {
+        moneyMarketFunds: mmfScore !== null ? Math.round(mmfScore * 100) / 100 : null,
+        marginDebt: Math.round(marginScore * 100) / 100,
+      },
     }
   } catch (error) {
     console.error("[v0] Error calculating Panic/Euphoria:", error)
