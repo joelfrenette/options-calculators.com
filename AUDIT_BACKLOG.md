@@ -210,6 +210,15 @@ gate flips on 12.6% of windows (S-2 evidence).
 
 ## Phase 5b findings — ADMIN SECTION AUDIT (2026-08-07, two read-only agents)
 
+> **STATUS 2026-08-07 (end of session): A-1 … A-15 are all addressed** on the
+> `audit-preview` staging branch (commit `9f4259c`), awaiting the owner's UAT and
+> merge to production. Retired 11 route dirs + 3 support files (4,248 lines);
+> rebuilt `api-status`, the AI tab, `data-source-status` and the CCPI admin tab;
+> deleted the zip-slip write primitive and gated the three unauthenticated routes.
+> Routes 62 → 51, admin tabs 11 → 9, TS errors 20 → 18, all four check suites green.
+> §4's "no fake numbers anywhere on the admin page itself" now holds.
+> The findings below are kept as the record of *why* — do not re-open without evidence.
+
 **Verdict: AUDIT_PLAN §4 "No fake numbers anywhere on the admin page itself" FAILS on 6 of 11 tabs.**
 ~2,700 lines across 5 routes produce zero measurements while emitting the site's strongest false assurances.
 
