@@ -26,8 +26,11 @@ money is the same failure as inventing market data.
 
 ## Interaction rule (mandatory)
 **After the status block, end every reply with a clickable multiple-choice
-question** (AskUserQuestion) offering Joel his next actions. Pick the 3-4 most
-contextually relevant from his standard set, in priority order:
+question** (AskUserQuestion) offering Joel his next actions. **The FIRST 1-3
+options MUST be dynamic — generated from what just happened in this specific
+response** (e.g. "Build E-8a against the dataset that just probed YES",
+"Retry the failed deploy", "Review the 3 findings above"). The remaining
+options come from his standard set:
 - "Please continue" (default next build step, named)
 - "UAT passed — merge" (when staging is ahead)
 - "I have UAT findings to resolve"
