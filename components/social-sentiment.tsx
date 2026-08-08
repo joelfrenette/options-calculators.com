@@ -192,6 +192,7 @@ export function SocialSentiment() {
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [loadingSource, setLoadingSource] = useState("")
   const [isFromCache, setIsFromCache] = useState(false)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [needsInitialFetch, setNeedsInitialFetch] = useState(false)
   const [loaded, setLoaded] = useState(false)
 
@@ -230,6 +231,7 @@ export function SocialSentiment() {
       setLoadingProgress(95)
       setLoadingSource("Processing results...")
 
+      setFetchError(null)
       if (response.ok) {
         const result = await response.json()
         setData(result)
@@ -240,10 +242,12 @@ export function SocialSentiment() {
         setLoadingSource("Complete!")
       } else {
         console.error("[v0] Social sentiment API error:", response.status)
+        setFetchError(`Sentiment API returned HTTP ${response.status}. Showing cached data if available.`)
       }
     } catch (error) {
       clearInterval(progressInterval)
       console.error("[v0] Error fetching social sentiment data:", error)
+      setFetchError("Could not reach the sentiment API. Data shown may be stale.")
     } finally {
       setTimeout(() => {
         setLoading(false)
@@ -337,6 +341,13 @@ export function SocialSentiment() {
                     <span className="text-amber-600">Click Refresh to load data</span>
                   )}
                 </p>
+                {/* Failed fetches used to be console-only — the tab silently
+                    showed stale cache as if fresh (P6-15). */}
+                {fetchError && (
+                  <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1 mt-1">
+                    {fetchError}
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-3">
                 <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
@@ -391,10 +402,10 @@ export function SocialSentiment() {
                         <div className="bg-black text-white px-4 py-2 rounded-lg shadow-xl">
                           <div className="text-xs font-semibold">TODAY</div>
                           <div className="text-2xl font-bold">
-                            {Math.round(safeNumber(data.global_social_sentiment, 50))}
+                            {data.global_social_sentiment != null ? Math.round(data.global_social_sentiment) : "—"}
                           </div>
                           <div className="text-xs text-center">
-                            {getSentimentLabel(safeNumber(data.global_social_sentiment, 50))}
+                            {data.global_social_sentiment != null ? getSentimentLabel(data.global_social_sentiment) : "no data"}
                           </div>
                         </div>
                         <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-black mx-auto" />
@@ -410,7 +421,7 @@ export function SocialSentiment() {
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-semibold text-gray-700">Macro Sentiment</span>
                       <span className="text-2xl font-bold text-gray-900">
-                        {Math.round(safeNumber(data?.macro_sentiment, 47))}
+                        {data?.macro_sentiment != null ? Math.round(data.macro_sentiment) : "—"}
                       </span>
                     </div>
                     <div className="relative h-3 rounded-full overflow-hidden mb-1">
@@ -419,13 +430,13 @@ export function SocialSentiment() {
                       <div
                         className="absolute top-0 bottom-0 w-1 bg-gray-900 rounded"
                         style={{
-                          left: `${100 - safeNumber(data?.macro_sentiment, 47)}%`,
+                          left: `${100 - safeNumber(data?.macro_sentiment, 50)}%`,
                           transform: "translateX(-50%)",
                         }}
                       />
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
-                      {getSentimentLabel(safeNumber(data?.macro_sentiment, 47))}
+                      {data?.macro_sentiment != null ? getSentimentLabel(data.macro_sentiment) : "no data"}
                     </div>
                   </div>
                 </ConditionalTooltip>
@@ -434,7 +445,7 @@ export function SocialSentiment() {
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-semibold text-gray-700">Social Sentiment</span>
                       <span className="text-2xl font-bold text-gray-900">
-                        {Math.round(safeNumber(data?.social_sentiment, 54))}
+                        {data?.social_sentiment != null ? Math.round(data.social_sentiment) : "—"}
                       </span>
                     </div>
                     <div className="relative h-3 rounded-full overflow-hidden mb-1">
@@ -443,13 +454,13 @@ export function SocialSentiment() {
                       <div
                         className="absolute top-0 bottom-0 w-1 bg-gray-900 rounded"
                         style={{
-                          left: `${100 - safeNumber(data?.social_sentiment, 54)}%`,
+                          left: `${100 - safeNumber(data?.social_sentiment, 50)}%`,
                           transform: "translateX(-50%)",
                         }}
                       />
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
-                      {getSentimentLabel(safeNumber(data?.social_sentiment, 54))}
+                      {data?.social_sentiment != null ? getSentimentLabel(data.social_sentiment) : "no data"}
                     </div>
                   </div>
                 </ConditionalTooltip>
