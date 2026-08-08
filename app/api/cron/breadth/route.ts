@@ -57,59 +57,35 @@ async function sbUpsertCloses(rows: { ticker: string; day: string; close: number
   return true
 }
 
-/** Recompute breadth for the most recent stored day. */
+/**
+ * Recompute breadth for the most recent stored day — server-side via the
+ * compute_breadth() RPC (migration 0006). The first version read closes back
+ * through PostgREST and computed in JS; PostgREST caps responses at 1000 rows
+ * (~10 days of a 100-ticker universe), so no ticker ever reached 200 days and
+ * the compute always reported "keep backfilling" against a fully-loaded store.
+ * SQL has no row cap and does one window pass.
+ */
 async function computeBreadth(): Promise<{ ok: boolean; detail: string; row?: object }> {
   const cfg = sb()
   if (!cfg) return { ok: false, detail: "Supabase not configured" }
 
-  // Last 200 trading days of closes for the universe, newest first.
-  const res = await fetch(
-    `${cfg.url}/rest/v1/market_closes?select=ticker,day,close&order=day.desc&limit=${BREADTH_UNIVERSE.length * 210}`,
-    { headers: { apikey: cfg.key, Authorization: `Bearer ${cfg.key}` }, signal: AbortSignal.timeout(20000), cache: "no-store" },
-  )
-  if (!res.ok) return { ok: false, detail: `closes read failed: HTTP ${res.status}` }
-  const rows = (await res.json()) as { ticker: string; day: string; close: string | number }[]
-  if (rows.length === 0) return { ok: false, detail: "no closes stored yet — run backfill" }
-
-  const latestDay = rows[0].day
-  const byTicker = new Map<string, number[]>()
-  for (const r of rows) {
-    const arr = byTicker.get(r.ticker) ?? []
-    if (arr.length < 200) arr.push(Number(r.close)) // newest-first, cap at 200
-    byTicker.set(r.ticker, arr)
-  }
-
-  let above = 0
-  let qualified = 0
-  for (const t of BREADTH_UNIVERSE) {
-    const closes = byTicker.get(t)
-    // Full 200-day history required — partial histories do not vote.
-    if (!closes || closes.length < 200 || closes[0] === undefined) continue
-    const sma200 = closes.reduce((a, b) => a + b, 0) / closes.length
-    qualified++
-    if (closes[0] > sma200) above++
-  }
-  if (qualified === 0) return { ok: false, detail: "no ticker has 200 days of history yet — keep backfilling" }
-
-  const row = {
-    day: latestDay,
-    pct_above_200dma: Math.round((above / qualified) * 10000) / 100,
-    sample_size: qualified,
-    universe_size: BREADTH_UNIVERSE.length,
-  }
-  const ins = await fetch(`${cfg.url}/rest/v1/breadth_daily?on_conflict=day`, {
+  const res = await fetch(`${cfg.url}/rest/v1/rpc/compute_breadth`, {
     method: "POST",
     headers: {
       apikey: cfg.key,
       Authorization: `Bearer ${cfg.key}`,
       "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates,return=minimal",
     },
-    body: JSON.stringify(row),
-    signal: AbortSignal.timeout(10000),
+    body: JSON.stringify({ universe_n: BREADTH_UNIVERSE.length }),
+    signal: AbortSignal.timeout(30000),
   })
-  if (!ins.ok) return { ok: false, detail: `breadth write failed: HTTP ${ins.status}` }
-  return { ok: true, detail: `breadth ${row.pct_above_200dma}% (${above}/${qualified})`, row }
+  if (!res.ok) return { ok: false, detail: `compute_breadth RPC failed: HTTP ${res.status}` }
+  const rows = (await res.json()) as { day: string; pct: string | number; sample_size: number; universe_size: number }[]
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return { ok: false, detail: "no ticker has 200 days of history yet — keep backfilling" }
+  }
+  const r = rows[0]
+  return { ok: true, detail: `breadth ${r.pct}% (${r.sample_size}/${r.universe_size} qualified) for ${r.day}`, row: r }
 }
 
 export async function GET(request: Request) {
