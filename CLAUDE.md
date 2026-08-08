@@ -1,5 +1,22 @@
 # CLAUDE.md — Options-Calculators.com
 
+## Reporting rule (mandatory)
+**End every reply with an ASCII status block.** Joel is the owner, not a
+full-time reader of the transcript — he needs plan position and his own action
+items without reconstructing them from prose.
+
+```
+PROJECT   Options-Calculators.com — audit
+PHASE     <n of 8> · <phase name>
+DONE      <what just landed>
+NEXT      <immediate next action, and whose it is>
+YOURS     <numbered items blocked on Joel — or "nothing blocking">
+STATE     prod <sha> · staging <sha> · checks <pass/fail>
+```
+
+Keep it a dashboard, not a recap. Always include the `YOURS` line, saying
+"nothing blocking" when true, so its absence never reads as an oversight.
+
 ## Deployment rule (mandatory)
 **Never push directly to `main`.** `main` = production (www.options-calculators.com).
 1. All work deploys first to the staging branch (currently `audit-preview`) →

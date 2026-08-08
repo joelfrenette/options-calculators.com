@@ -119,6 +119,45 @@ export function isBudgetKilled(name: string): boolean {
   return budgetSnapshot.guardedKeys.includes(name.toUpperCase())
 }
 
+// --- Admin-managed key overrides (P4-4) -----------------------------------
+//
+// Same arrangement as the budget-guard snapshot above, and for the same reason:
+// `resolveApiKey` is synchronous and this file must stay import-free, so the
+// storage lives here and lib/key-store.ts (which owns the AES-256-GCM crypto
+// and all Supabase I/O, and is Node-runtime only) pushes decrypted values in.
+//
+// The snapshot is empty on a cold serverless instance. instrumentation.ts warms
+// it at boot and a stale read triggers a background refresh, so a key pasted in
+// the admin is live within roughly the cache TTL — not instantly. The admin UI
+// states that rather than implying otherwise.
+
+interface KeyOverrideSnapshot {
+  /** Canonical key name -> decrypted value. Never logged, never serialized out. */
+  values: Record<string, string>
+  fetchedAt: number
+}
+
+let overrideSnapshot: KeyOverrideSnapshot | null = null
+
+export function setKeyOverrideSnapshot(next: KeyOverrideSnapshot): void {
+  overrideSnapshot = next
+}
+
+export function getKeyOverrideSnapshot(): KeyOverrideSnapshot | null {
+  return overrideSnapshot
+}
+
+/** The admin-set value for a key, or "" when there isn't one. */
+export function getKeyOverride(name: string): string {
+  if (overrideSnapshot === null) return ""
+  return overrideSnapshot.values[name.toUpperCase()] ?? ""
+}
+
+/** Is this key currently supplied by an admin override rather than the env? */
+export function isOverridden(name: string): boolean {
+  return getKeyOverride(name).length > 0
+}
+
 // Backwards-compatible interface (kept for existing imports).
 export interface ApiKeyConfig {
   POLYGON_API_KEY?: string
@@ -131,13 +170,28 @@ export interface ApiKeyConfig {
   SERPER_API_KEY?: string
 }
 
-// Resolve a key by canonical name, falling back through every known alias.
-// Returns "" if the service has been disabled via DISABLED_APIS (manual kill
-// switch) or cut off by the budget guard (automatic kill switch, E-5). Callers
-// see an unconfigured service and take their existing free/local fallback path.
+// Resolve a key by canonical name.
+//
+// Precedence, and the order matters:
+//   1. DISABLED_APIS      — manual kill switch, always wins
+//   2. budget guard       — automatic kill switch (E-5), always wins
+//   3. admin override     — pasted in the admin (P4-4)
+//   4. environment vars   — checked through the full alias list
+//
+// The two kill switches come FIRST on purpose: pasting a key in the admin must
+// never be able to defeat a cost or safety cutoff. An override beats the env
+// var because the person who just pasted a key expects it to be the one used —
+// the reverse would silently ignore their change, which is worse than useless.
+//
+// Returns "" when nothing resolves, so callers see an unconfigured service and
+// take their existing free/local fallback path.
 export function resolveApiKey(name: string): string {
   if (isServiceDisabled(name)) return ""
   if (isBudgetKilled(name)) return ""
+
+  const override = getKeyOverride(name)
+  if (override) return override
+
   const aliases = API_KEY_ALIASES[name] ?? [name]
   for (const alias of aliases) {
     const value = process.env[alias]
@@ -160,11 +214,23 @@ export function isKeyConfigured(name: string): boolean {
   return resolveApiKey(name).length > 0
 }
 
-// Is a raw key present, ignoring the kill switch? Lets the dashboard tell
-// "disabled but key still set" apart from "no key at all".
+// Is a raw key present, ignoring the kill switches? Lets the dashboard tell
+// "disabled but key still set" apart from "no key at all". Counts an admin
+// override as present — from the operator's point of view the credential
+// exists, it just came from the admin instead of the environment.
 export function hasRawKey(name: string): boolean {
+  if (isOverridden(name)) return true
   const aliases = API_KEY_ALIASES[name] ?? [name]
   return aliases.some((alias) => !!process.env[alias])
+}
+
+/** Where a key's value comes from, for the admin panel. */
+export type KeySource = "admin" | "env" | "none"
+
+export function getKeySource(name: string): KeySource {
+  if (isOverridden(name)) return "admin"
+  const aliases = API_KEY_ALIASES[name] ?? [name]
+  return aliases.some((alias) => !!process.env[alias]) ? "env" : "none"
 }
 
 // For the admin UI - presence map across every service the app uses.

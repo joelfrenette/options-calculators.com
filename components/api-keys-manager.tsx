@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Key, CheckCircle2, XCircle, ExternalLink, PowerOff } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Key, CheckCircle2, XCircle, ExternalLink, PowerOff, Save, Trash2, AlertTriangle } from "lucide-react"
 
 interface ApiKeyStatus {
   name: string
@@ -21,6 +23,25 @@ interface ApiKeyStatus {
 // to it. `/api/admin/usage` exposes `controls.disabledServices` and a per-service
 // `keyPresent` (raw presence, kill-switch-blind), so the two can be told apart.
 type KeyState = "configured" | "disabled" | "not-set"
+
+/** Per-key status from /api/admin/api-keys. Deliberately carries no key value. */
+interface KeyDetail {
+  name: string
+  source: "admin" | "env" | "none"
+  present: boolean
+  disabled: boolean
+  last4: string | null
+  updatedAt: string | null
+  updatedBy: string | null
+  /** Stored row could not be decrypted — usually ENCRYPTION_KEY changed. */
+  unreadable: boolean
+}
+
+interface StoreState {
+  available: boolean
+  reason: string | null
+  note: string
+}
 
 export function ApiKeysManager() {
   const [apiKeys, setApiKeys] = useState<ApiKeyStatus[]>([
@@ -192,6 +213,15 @@ export function ApiKeysManager() {
   const [rawPresent, setRawPresent] = useState<Set<string>>(new Set())
   const [loadError, setLoadError] = useState<string | null>(null)
 
+  // --- Admin-managed keys (P4-4) ---
+  const [detail, setDetail] = useState<Record<string, KeyDetail>>({})
+  const [store, setStore] = useState<StoreState | null>(null)
+  // Typed-but-unsaved values, per key. Never populated from the server —
+  // the API does not return key values and this must not imply otherwise.
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState<string | null>(null)
+  const [rowError, setRowError] = useState<Record<string, string>>({})
+
   useEffect(() => {
     checkConfiguredKeys()
   }, [])
@@ -216,6 +246,13 @@ export function ApiKeysManager() {
           })),
         )
       }
+
+      if (Array.isArray(data.detail)) {
+        const byName: Record<string, KeyDetail> = {}
+        for (const d of data.detail as KeyDetail[]) byName[d.name] = d
+        setDetail(byName)
+      }
+      if (data.store) setStore(data.store as StoreState)
 
       if (usageRes && usageRes.ok) {
         const usage = await usageRes.json()
@@ -255,6 +292,30 @@ export function ApiKeysManager() {
     return "not-set"
   }
 
+  async function submitKey(name: string, action: "set" | "clear") {
+    setSaving(name)
+    setRowError((prev) => ({ ...prev, [name]: "" }))
+    try {
+      const res = await fetch("/api/admin/api-keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          action === "set" ? { action, name, value: drafts[name] ?? "" } : { action, name },
+        ),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body?.error || `HTTP ${res.status}`)
+      // Clear the draft immediately on success — the typed secret should not
+      // linger in component state once it has been stored.
+      setDrafts((prev) => ({ ...prev, [name]: "" }))
+      await checkConfiguredKeys()
+    } catch (err) {
+      setRowError((prev) => ({ ...prev, [name]: err instanceof Error ? err.message : String(err) }))
+    } finally {
+      setSaving(null)
+    }
+  }
+
   const configuredCount = apiKeys.filter((k) => k.configured).length
   const disabledCount = apiKeys.filter((k) => stateOf(k) === "disabled").length
   const totalCount = apiKeys.length
@@ -268,8 +329,8 @@ export function ApiKeysManager() {
         </div>
         <CardDescription>
           {configuredCount} of {totalCount} API keys active
-          {disabledCount > 0 ? `, ${disabledCount} kill-switched via DISABLED_APIS` : ""}. Manage via Vercel Environment
-          Variables.
+          {disabledCount > 0 ? `, ${disabledCount} kill-switched via DISABLED_APIS` : ""}. Paste a key below to override
+          its Vercel environment variable without redeploying.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -281,27 +342,42 @@ export function ApiKeysManager() {
           </Alert>
         )}
         <Alert>
-          <AlertDescription className="space-y-2">
-            <p className="font-semibold">How to configure API keys:</p>
-            <ol className="list-decimal list-inside space-y-1 ml-2 text-sm">
-              <li>
-                Go to your{" "}
-                <a
-                  href="https://vercel.com/dashboard"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline inline-flex items-center gap-1"
-                >
-                  Vercel Dashboard
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              </li>
-              <li>Select your project → Settings → Environment Variables</li>
-              <li>Add each API key with the exact variable names shown below</li>
-              <li>Redeploy your application for changes to take effect</li>
-            </ol>
+          <AlertDescription className="space-y-2 text-sm">
+            <p className="font-semibold">Two ways to set a key</p>
+            <p>
+              <strong>Paste it here.</strong> Stored encrypted, overrides the environment variable, and takes effect
+              within about 60 seconds — no redeploy. Keys are write-only: this page can show you the last 4 characters
+              to confirm which key is set, and can never show you the key itself.
+            </p>
+            <p>
+              <strong>Or set it in Vercel.</strong>{" "}
+              <a
+                href="https://vercel.com/dashboard"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline inline-flex items-center gap-1"
+              >
+                Dashboard
+                <ExternalLink className="h-3 w-3" />
+              </a>{" "}
+              → project → Settings → Environment Variables, using the exact variable names below. Environment changes
+              only take effect on a <strong>new build</strong>, so redeploy afterwards.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              A pasted key beats the environment variable. Both are still overridden by{" "}
+              <code>DISABLED_APIS</code> and by the budget guard — pasting a key cannot defeat a kill switch.
+            </p>
           </AlertDescription>
         </Alert>
+
+        {store && !store.available && (
+          <Alert className="border-amber-300 bg-amber-50">
+            <AlertDescription className="text-sm text-amber-900">
+              <strong>Pasting keys is unavailable here.</strong> {store.reason} Keys can still be set as Vercel
+              environment variables.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {Array.from(new Set(apiKeys.map((k) => k.category))).map((category) => (
           <div key={category} className="space-y-3">
@@ -316,6 +392,7 @@ export function ApiKeysManager() {
               .filter((apiKey) => apiKey.category === category)
               .map((apiKey) => {
                 const state = stateOf(apiKey)
+                const d = detail[apiKey.name.toUpperCase()]
                 return (
                 <div
                   key={apiKey.name}
@@ -354,7 +431,7 @@ export function ApiKeysManager() {
                       )}
                       <code className="text-xs bg-slate-100 px-2 py-1 rounded font-mono">{apiKey.envVarName}</code>
                     </div>
-                    <div className="text-xs font-medium">
+                    <div className="text-xs font-medium text-right space-y-0.5">
                       {state === "configured" ? (
                         <span className="text-green-600">Configured</span>
                       ) : state === "disabled" ? (
@@ -362,8 +439,74 @@ export function ApiKeysManager() {
                       ) : (
                         <span className="text-slate-400">Not Set</span>
                       )}
+                      {d?.source === "admin" && (
+                        <p className="text-[11px] font-normal text-blue-700">
+                          Set here{d.last4 ? ` ····${d.last4}` : ""}
+                        </p>
+                      )}
+                      {d?.source === "env" && (
+                        <p className="text-[11px] font-normal text-slate-500">From Vercel env</p>
+                      )}
                     </div>
                   </div>
+
+                  {/* Paste / rotate (P4-4). No value is ever rendered here —
+                      the API returns presence and last-4 only, never a key. */}
+                  {store?.available && (
+                    <div className="mt-3 pt-3 border-t border-slate-200 space-y-2">
+                      {d?.unreadable && (
+                        <p className="text-xs text-red-700 flex items-start gap-1">
+                          <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                          A key is stored but cannot be decrypted — <code>ENCRYPTION_KEY</code> has changed since it
+                          was saved. Paste the key again to replace it.
+                        </p>
+                      )}
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Input
+                          type="password"
+                          autoComplete="off"
+                          spellCheck={false}
+                          placeholder={d?.source === "admin" ? "Paste a new key to rotate" : "Paste key to override the env var"}
+                          value={drafts[apiKey.name] ?? ""}
+                          onChange={(e) => setDrafts((p) => ({ ...p, [apiKey.name]: e.target.value }))}
+                          className="text-xs font-mono bg-white"
+                          disabled={saving === apiKey.name}
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => submitKey(apiKey.name, "set")}
+                            disabled={saving === apiKey.name || !(drafts[apiKey.name] ?? "").trim()}
+                            className="bg-slate-900 hover:bg-slate-800 text-white"
+                          >
+                            <Save className="h-3 w-3 mr-1" />
+                            Save
+                          </Button>
+                          {d?.source === "admin" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => submitKey(apiKey.name, "clear")}
+                              disabled={saving === apiKey.name}
+                              className="text-red-700 border-red-300 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Remove
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      {rowError[apiKey.name] && (
+                        <p className="text-xs text-red-600">{rowError[apiKey.name]}</p>
+                      )}
+                      {d?.source === "admin" && d.updatedAt && (
+                        <p className="text-[11px] text-slate-500">
+                          Overriding <code>{apiKey.envVarName}</code> · set {new Date(d.updatedAt).toLocaleString()}
+                          {d.updatedBy ? ` by ${d.updatedBy}` : ""}. Remove it to fall back to the environment variable.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
                 )
               })}
@@ -371,12 +514,15 @@ export function ApiKeysManager() {
         ))}
 
         <div className="text-xs text-muted-foreground space-y-1 p-3 bg-muted/50 rounded">
-          <p className="font-semibold">Security Notes:</p>
+          <p className="font-semibold">How keys are handled</p>
           <ul className="list-disc list-inside space-y-1 ml-2">
-            <li>API keys are stored securely in Vercel's encrypted environment variable system</li>
-            <li>Keys are never exposed in client-side code or logs</li>
-            <li>Only server-side API routes can access these values</li>
-            <li>Changes require redeployment to take effect</li>
+            <li>Environment keys live in Vercel's encrypted variable store; changes need a redeploy</li>
+            <li>Keys pasted here are encrypted with AES-256-GCM before storage and take ~60s to apply</li>
+            <li>
+              No key value is ever returned by this page, logged, or sent to the browser — only presence and the last 4
+              characters
+            </li>
+            <li>Only server-side code holding the service role can read the stored ciphertext</li>
           </ul>
         </div>
       </CardContent>
