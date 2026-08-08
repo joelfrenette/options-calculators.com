@@ -12,10 +12,17 @@ DONE      <what just landed>
 NEXT      <immediate next action, and whose it is>
 YOURS     <numbered items blocked on Joel — or "nothing blocking">
 STATE     prod <sha> · staging <sha> · checks <pass/fail>
+RTK       <tokens saved, read from `rtk gain` — never estimated>
 ```
 
 Keep it a dashboard, not a recap. Always include the `YOURS` line, saying
 "nothing blocking" when true, so its absence never reads as an oversight.
+
+**The RTK line is measured, never guessed.** Read it from `rtk gain`. RTK
+computes savings as bytes/4, so the figure is approximate by its own admission —
+say so rather than presenting it as an exact count. When there is no tracking
+data, report `0` and why. Inventing a savings number for a tool bought to save
+money is the same failure as inventing market data.
 
 ## Deployment rule (mandatory)
 **Never push directly to `main`.** `main` = production (www.options-calculators.com).
