@@ -436,6 +436,13 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     tabs: [],
   },
   {
+    path: "/api/cron/fred-snapshot",
+    method: "GET",
+    skip: "CRON_SECRET-authenticated pipeline; a probe would spend ~17 FRED calls and write to the market_series store.",
+    budgetMs: 300000,
+    tabs: [],
+  },
+  {
     path: "/api/cron/quiver-probe",
     method: "GET",
     skip: "CRON_SECRET-gated operator probe; each run spends ~8 metered Quiver calls.",

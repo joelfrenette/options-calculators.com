@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { resolveApiKey } from "@/lib/api-keys"
+import { fredLatestFromStore } from "@/lib/fred-store"
 import { fetchVIXTermStructure } from "@/lib/vix-term-structure"
 import { fetchQQQTechnicals as fetchQQQTechnicalsData } from "@/lib/qqq-technicals"
 import { scrapeBuffettIndicator, scrapePutCallRatio, scrapeAAIISentiment } from "@/lib/scraping-bee"
@@ -585,6 +586,43 @@ async function fetchFREDIndicators() {
     shillerCAPE: null as number | null,
     yieldCurve10Y: null as number | null,
     source: "baseline" as const,
+  }
+
+  // E-7b store-first: the daily fred-snapshot cron already holds these series
+  // in market_series; eight sub-second Supabase reads replace eight FRED round
+  // trips per CCPI load. All-or-nothing — any stale/missing series falls
+  // through to the live path unchanged, so the store is never a new failure
+  // mode (and works even when FRED itself is down or the key is absent).
+  try {
+    const [sDff, sJunk, sCurve, sDebt, sTed, sDxy, sRrp, s10y] = await Promise.all([
+      fredLatestFromStore("DFF"),
+      fredLatestFromStore("BAMLH0A0HYM2"),
+      fredLatestFromStore("T10Y2Y"),
+      fredLatestFromStore("GFDEGDQ188S"),
+      fredLatestFromStore("TEDRATE"),
+      fredLatestFromStore("DTWEXBGS"),
+      fredLatestFromStore("RRPONTSYD"),
+      fredLatestFromStore("DGS10"),
+    ])
+    if (sDff && sJunk && sCurve && sDebt && sTed && sDxy && sRrp && s10y) {
+      return {
+        fedFundsRate: sDff.value,
+        junkSpread: sJunk.value,
+        yieldCurve: sCurve.value,
+        debtToGDP: sDebt.value,
+        tedSpread: sTed.value,
+        dxyIndex: sDxy.value,
+        ismPMI: null, // never carried by FRED; comes from the AI fallback
+        fedReverseRepo: sRrp.value,
+        shillerCAPE: null, // dead field, see live path note (P6-7)
+        yieldCurve10Y: s10y.value,
+        // Measured FRED observations, served from the snapshot store — same
+        // provenance tier as a direct FRED read, not an estimate.
+        source: "live" as const,
+      }
+    }
+  } catch {
+    // fall through to live FRED
   }
 
   if (!FRED_API_KEY) {

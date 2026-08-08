@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/breadth",
       "schedule": "30 21 * * 1-5"
+    },
+    {
+      "path": "/api/cron/fred-snapshot",
+      "schedule": "45 21 * * 1-5"
     }
   ]
 }
