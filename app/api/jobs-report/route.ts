@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server"
 import { getApiKey } from "@/lib/api-keys"
 
+// E-7d: BLS/FRED series update monthly-to-daily, never intraday. ISR caches
+// the whole response at the edge for 15 min instead of re-pulling full
+// history from FRED on every page view.
+export const revalidate = 900
+
+
 // BLS Jobs Rate Forecaster - LIVE data from FRED Economic Data
 // Series used:
 //   UNRATE          - Civilian Unemployment Rate (U-3), percent

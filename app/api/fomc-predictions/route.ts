@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server"
 import { getApiKey } from "@/lib/api-keys"
 
+// E-7d: BLS/FRED series update monthly-to-daily, never intraday. ISR caches
+// the whole response at the edge for 15 min instead of re-pulling full
+// history from FRED on every page view.
+export const revalidate = 900
+
+
 export async function GET() {
   try {
     const fredApiKey = getApiKey("FRED_API_KEY")

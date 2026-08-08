@@ -1,4 +1,6 @@
-export const dynamic = "force-dynamic"
+// E-7d: daily VIX closes do not move intraday-fast enough to justify a
+// fresh Yahoo history pull per page view; 15-min edge cache.
+export const revalidate = 900
 
 export async function GET() {
   try {
