@@ -309,9 +309,10 @@ function contractCoverage() {
     "/api/admin/backup", "/api/admin/budget-guard", "/api/admin/run-health-checks",
     "/api/admin/usage",
     "/api/ai-status", "/api/apify-proxy",
-    "/api/auth/login", "/api/auth/logout", "/api/auth/reset-password", "/api/ccpi",
+    "/api/auth/login", "/api/auth/logout", "/api/auth/reset-password",
+    "/api/breadth", "/api/ccpi",
     "/api/ccpi/cache", "/api/ccpi/chat", "/api/ccpi/executive-summary", "/api/ccpi/history",
-    "/api/congress-trades", "/api/cpi-inflation", "/api/cron/budget-guard",
+    "/api/congress-trades", "/api/cpi-inflation", "/api/cron/breadth", "/api/cron/budget-guard",
     "/api/data-source-status",
     "/api/earnings-calendar", "/api/earnings-calendar/insights",
     // /api/fmp-proxy retired 2026-08-07: its entire body was a hardcoded 410

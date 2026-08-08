@@ -418,6 +418,23 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     tabs: [],
     needsAuth: true,
   },
+  // Breadth (E-6a). GET is a read-only Supabase view; 503 is the honest
+  // "warming up / not configured" answer, not a failure.
+  {
+    path: "/api/breadth",
+    method: "GET",
+    schema: anyObject,
+    okStatuses: [503],
+    budgetMs: 10000,
+    tabs: [],
+  },
+  {
+    path: "/api/cron/breadth",
+    method: "GET",
+    skip: "CRON_SECRET-authenticated pipeline; a probe would spend Polygon calls and write to the closes store.",
+    budgetMs: 300000,
+    tabs: [],
+  },
   {
     path: "/api/cron/budget-guard",
     method: "GET",
