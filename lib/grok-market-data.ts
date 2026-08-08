@@ -1,10 +1,18 @@
 import { generateText } from "ai"
 import { createOpenAI } from "@ai-sdk/openai"
+import { resolveApiKey } from "@/lib/api-keys"
+import { recordAiCall } from "@/lib/metered-fetch"
 
-// Use environment variables directly - priority: Groq > OpenAI > xAI
+// Keys resolve through lib/api-keys.ts, not process.env directly. Reading the
+// env vars here bypassed DISABLED_APIS (and the XAI_API_KEY/GROK_XAI_API_KEY
+// alias list was hand-duplicated) — and would have bypassed the E-5 budget
+// guard too, leaving paid providers reachable after the kill switch tripped.
+//
+// `tag` is the canonical provider name used in the spend ledger; `name` stays
+// the human label the existing logs print.
 function getAIProvider() {
   // For market data, prefer xAI/Grok as it's trained on real-time data
-  const xaiKey = process.env.XAI_API_KEY || process.env.GROK_XAI_API_KEY
+  const xaiKey = resolveApiKey("XAI_API_KEY")
   if (xaiKey) {
     return {
       provider: createOpenAI({
@@ -13,25 +21,28 @@ function getAIProvider() {
       }),
       model: "grok-2-latest",
       name: "xAI",
+      tag: "xai",
     }
   }
-  if (process.env.GROQ_API_KEY) {
+  const groqKey = resolveApiKey("GROQ_API_KEY")
+  if (groqKey) {
     return {
       provider: createOpenAI({
-        apiKey: process.env.GROQ_API_KEY,
+        apiKey: groqKey,
         baseURL: "https://api.groq.com/openai/v1",
       }),
       model: "llama-3.3-70b-versatile",
       name: "Groq",
+      tag: "groq",
     }
   }
-  if (process.env.OPENAI_API_KEY) {
+  const openaiKey = resolveApiKey("OPENAI_API_KEY")
+  if (openaiKey) {
     return {
-      provider: createOpenAI({
-        apiKey: process.env.OPENAI_API_KEY,
-      }),
+      provider: createOpenAI({ apiKey: openaiKey }),
       model: "gpt-4o-mini",
       name: "OpenAI",
+      tag: "openai",
     }
   }
   return null
@@ -60,17 +71,34 @@ Examples:
 Respond with ONLY the number, nothing else.`
 
     let text = ""
+    const started = Date.now()
     try {
-      const { text: responseText } = await generateText({
+      const result = await generateText({
         model: ai.provider(ai.model),
         prompt,
         maxOutputTokens: 50,
         temperature: 0.1,
       })
-      text = responseText
+      text = result.text
+      recordAiCall({
+        provider: ai.tag,
+        model: ai.model,
+        route: "lib/grok-market-data",
+        ms: Date.now() - started,
+        ok: true,
+        usage: result.usage,
+      })
     } catch (sdkError) {
       const errorMsg = sdkError instanceof Error ? sdkError.message : String(sdkError)
       console.log(`[AI] ${ai.name}: SDK error occurred: ${errorMsg.substring(0, 100)}`)
+      recordAiCall({
+        provider: ai.tag,
+        model: ai.model,
+        route: "lib/grok-market-data",
+        ms: Date.now() - started,
+        ok: false,
+        usage: null,
+      })
       return null
     }
 

@@ -306,11 +306,13 @@ export async function GET(request: NextRequest) {
 function contractCoverage() {
   const KNOWN_ROUTES = [
     "/api/admin/ads", "/api/admin/api-keys", "/api/admin/api-status",
-    "/api/admin/backup", "/api/admin/run-health-checks", "/api/admin/usage",
+    "/api/admin/backup", "/api/admin/budget-guard", "/api/admin/run-health-checks",
+    "/api/admin/usage",
     "/api/ai-status", "/api/apify-proxy",
     "/api/auth/login", "/api/auth/logout", "/api/auth/reset-password", "/api/ccpi",
     "/api/ccpi/cache", "/api/ccpi/chat", "/api/ccpi/executive-summary", "/api/ccpi/history",
-    "/api/congress-trades", "/api/cpi-inflation", "/api/data-source-status",
+    "/api/congress-trades", "/api/cpi-inflation", "/api/cron/budget-guard",
+    "/api/data-source-status",
     "/api/earnings-calendar", "/api/earnings-calendar/insights", "/api/fmp-proxy",
     "/api/fomc-predictions", "/api/form-144", "/api/google-trends", "/api/hedge-fund-13f",
     "/api/insider-clusters", "/api/insider-trading", "/api/insider-trading/ai-insights",

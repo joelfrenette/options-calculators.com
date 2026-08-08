@@ -1,12 +1,20 @@
 import { generateText } from "ai"
 import { createOpenAI } from "@ai-sdk/openai"
+import { resolveApiKey } from "@/lib/api-keys"
+import { recordAiCall } from "@/lib/metered-fetch"
 
+const MODEL = "llama-3.3-70b-versatile"
+
+// Keys resolve through lib/api-keys.ts, not process.env directly, so
+// DISABLED_APIS applies here like everywhere else. Groq is free-tier, so this
+// costs nothing at the margin — it is metered for call-volume visibility.
 function getGroqProvider() {
-  if (!process.env.GROQ_API_KEY) {
+  const apiKey = resolveApiKey("GROQ_API_KEY")
+  if (!apiKey) {
     return null
   }
   return createOpenAI({
-    apiKey: process.env.GROQ_API_KEY,
+    apiKey,
     baseURL: "https://api.groq.com/openai/v1",
   })
 }
@@ -20,8 +28,9 @@ async function fetchMarketDataWithGroqLLM(indicator: string, specificData = "Cur
     }
 
     // Use groq("model") instead of just "model" string
-    const { text } = await generateText({
-      model: groq("llama-3.3-70b-versatile"),
+    const started = Date.now()
+    const result = await generateText({
+      model: groq(MODEL),
       prompt: `You are a financial data expert. Provide ONLY the current numeric value for: ${indicator}.
       
 Specific requirement: ${specificData}
@@ -35,6 +44,16 @@ CRITICAL RULES:
 Value:`,
       maxOutputTokens: 50,
       temperature: 0.1,
+    })
+    const text = result.text
+
+    recordAiCall({
+      provider: "groq",
+      model: MODEL,
+      route: "lib/groq-llm-market-data",
+      ms: Date.now() - started,
+      ok: true,
+      usage: result.usage,
     })
 
     const value = Number.parseFloat(text.trim())

@@ -4,6 +4,8 @@ import { createOpenAI } from "@ai-sdk/openai"
 import { createAnthropic } from "@ai-sdk/anthropic"
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { resolveApiKey } from "@/lib/api-keys"
+import { recordAiCall } from "@/lib/metered-fetch"
+import { ensureBudgetGuardFresh } from "@/lib/budget-guard"
 
 const OPENROUTER_FREE_MODEL = process.env.OPENROUTER_FREE_MODEL || "openrouter/free"
 
@@ -114,23 +116,46 @@ Write a comprehensive 2-3 sentence executive summary that:
 
 Make it professional, data-driven, and immediately actionable for sophisticated traders. Focus on what the numbers mean and what traders should DO.`
 
+    // Budget guard (E-5): refresh before spending, so `config.key()` below
+    // resolves to "" for guarded providers once the kill switch has tripped.
+    await ensureBudgetGuardFresh()
+
     let lastError: Error | null = null
 
     for (const config of providerConfigs) {
       if (!config.key()) continue
 
+      const started = Date.now()
+      // The call is metered exactly once. Without this the "empty response"
+      // throw below would fall into the catch and log a second row for the
+      // same call, inflating both the count and the cost.
+      let metered = false
       try {
         console.log(`[AI] Trying ${config.name} for executive summary...`)
         const provider = config.create()
         const model = provider(config.model)
 
-        const { text } = await generateText({
+        const result = await generateText({
           model,
           prompt,
           temperature: 0.7,
-          maxTokens: 300,
+          // ai v5 renamed this from `maxTokens`. Under the old name the option
+          // was silently dropped, so output length was unbounded on the paid
+          // fallbacks — a real spend leak, not just a type error.
+          maxOutputTokens: 300,
           abortSignal: AbortSignal.timeout(30000),
         })
+        const text = result.text
+
+        recordAiCall({
+          provider: config.name,
+          model: config.model,
+          route: "/api/ccpi/executive-summary",
+          ms: Date.now() - started,
+          ok: true,
+          usage: result.usage,
+        })
+        metered = true
 
         if (!text || text.trim().length === 0) {
           throw new Error("AI returned empty response")
@@ -140,6 +165,16 @@ Make it professional, data-driven, and immediately actionable for sophisticated 
         return NextResponse.json({ summary: text.trim(), provider: config.name })
       } catch (error) {
         console.error(`[AI] ${config.name} failed:`, error instanceof Error ? error.message : error)
+        if (!metered) {
+          recordAiCall({
+            provider: config.name,
+            model: config.model,
+            route: "/api/ccpi/executive-summary",
+            ms: Date.now() - started,
+            ok: false,
+            usage: null,
+          })
+        }
         lastError = error instanceof Error ? error : new Error(String(error))
         // Continue to next provider
       }

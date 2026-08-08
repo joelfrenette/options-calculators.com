@@ -1,8 +1,13 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
+import { resolveApiKey } from "@/lib/api-keys"
 
-// Function to get Google provider
+// Function to get Google provider. Resolves through lib/api-keys.ts so
+// DISABLED_APIS and the GOOGLE_AI_API_KEY/GOOGLE_GENERATIVE_AI_API_KEY alias
+// list apply — the alias pair used to be hand-duplicated here.
+// No metering call: every entry point in this file is disabled below and
+// returns null before reaching the SDK.
 function getGoogleProvider() {
-  const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY
+  const apiKey = resolveApiKey("GOOGLE_AI_API_KEY")
   if (!apiKey) return null
   return createGoogleGenerativeAI({ apiKey })
 }

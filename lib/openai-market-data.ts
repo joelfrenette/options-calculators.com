@@ -1,14 +1,19 @@
 import { generateText } from "ai"
 import { createOpenAI } from "@ai-sdk/openai"
+import { resolveApiKey } from "@/lib/api-keys"
+import { recordAiCall } from "@/lib/metered-fetch"
 
-// Function to create OpenAI provider with direct API key
+const MODEL = "gpt-4o-mini"
+
+// Keys resolve through lib/api-keys.ts, not process.env directly. Reading the
+// env var here bypassed DISABLED_APIS — and would have bypassed the E-5 budget
+// guard too, leaving a paid provider reachable after the kill switch tripped.
 function getOpenAIProvider() {
-  if (!process.env.OPENAI_API_KEY) {
+  const apiKey = resolveApiKey("OPENAI_API_KEY")
+  if (!apiKey) {
     return null
   }
-  return createOpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  })
+  return createOpenAI({ apiKey })
 }
 
 async function fetchMarketDataWithOpenAI(indicator: string, specificData = "Current value"): Promise<number | null> {
@@ -19,8 +24,9 @@ async function fetchMarketDataWithOpenAI(indicator: string, specificData = "Curr
       return null
     }
 
-    const { text } = await generateText({
-      model: openai("gpt-4o-mini"),
+    const started = Date.now()
+    const result = await generateText({
+      model: openai(MODEL),
       prompt: `You are a financial data expert. Provide ONLY the current numeric value for: ${indicator}.
       
 Specific requirement: ${specificData}
@@ -34,6 +40,16 @@ CRITICAL RULES:
 Value:`,
       maxOutputTokens: 50,
       temperature: 0.1,
+    })
+    const text = result.text
+
+    recordAiCall({
+      provider: "openai",
+      model: MODEL,
+      route: "lib/openai-market-data",
+      ms: Date.now() - started,
+      ok: true,
+      usage: result.usage,
     })
 
     const value = Number.parseFloat(text.trim())

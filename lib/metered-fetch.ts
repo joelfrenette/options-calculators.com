@@ -23,6 +23,8 @@
 //
 // This module is edge-runtime safe (no Node-only imports).
 
+import { estimateAiCallCost } from "@/lib/api-costs"
+
 export interface MeteredCall {
   provider: string
   /** Calling route (from init.routeTag), or null when the caller didn't tag. */
@@ -34,6 +36,15 @@ export interface MeteredCall {
   /** ISO timestamp of when the call completed (or threw). */
   ts: string
   ok: boolean
+  // --- LLM calls only (recordAiCall); null/undefined for plain fetches. ---
+  /** Exact model id requested. */
+  model?: string | null
+  inputTokens?: number | null
+  outputTokens?: number | null
+  /** Estimated marginal USD. NULL means unpriced — never treat it as free. */
+  costUsd?: number | null
+  /** False when the model had no price on file. */
+  costKnown?: boolean | null
 }
 
 export interface ProviderCallStats {
@@ -73,6 +84,15 @@ export function isSupabaseMeteringConfigured(): boolean {
   return getSupabaseConfig() !== null
 }
 
+/**
+ * Shared Supabase REST config, exported so lib/budget-guard.ts reads the ledger
+ * through the same resolution as the writer. Duplicating the env lookup would
+ * let the guard and the meter disagree about whether metering is even on.
+ */
+export function getMeteringSupabaseConfig(): { url: string; key: string } | null {
+  return getSupabaseConfig()
+}
+
 /** Fire-and-forget durable write. Never throws, never blocks the caller. */
 function persistToSupabase(call: MeteredCall): void {
   const cfg = getSupabaseConfig()
@@ -93,6 +113,11 @@ function persistToSupabase(call: MeteredCall): void {
         status: call.status,
         ms: call.ms,
         ok: call.ok,
+        model: call.model ?? null,
+        input_tokens: call.inputTokens ?? null,
+        output_tokens: call.outputTokens ?? null,
+        cost_usd: call.costUsd ?? null,
+        cost_known: call.costKnown ?? null,
       }),
       signal: AbortSignal.timeout(3000),
     })
@@ -155,6 +180,68 @@ export async function meteredFetch(
       ok: false,
     })
     throw error
+  }
+}
+
+// ------------------------------------------------------- LLM metering (E-5)
+//
+// LLM calls go through the Vercel AI SDK, not fetch(), so `meteredFetch` never
+// sees them — which left the ledger blind to the only providers that bill per
+// use. `recordAiCall` is the equivalent entry point for them: same table, same
+// fire-and-forget contract, plus token counts and an estimated cost.
+
+/** Token usage as reported by the AI SDK. Fields are optional — some providers omit them. */
+export interface AiUsage {
+  inputTokens?: number
+  outputTokens?: number
+}
+
+/**
+ * Record one LLM call. Never throws: metering must not be able to break a
+ * generation. Cost is estimated from lib/api-costs.ts list prices; an unknown
+ * model yields costUsd=null / costKnown=false rather than a $0 that would
+ * quietly understate spend.
+ */
+export function recordAiCall(args: {
+  /** Provider name from lib/ai-providers.ts ("openai", "anthropic", "xai", ...). */
+  provider: string
+  model: string
+  route: string | null
+  ms: number
+  ok: boolean
+  usage?: AiUsage | null
+}): void {
+  try {
+    const inputTokens = Number.isFinite(args.usage?.inputTokens) ? (args.usage!.inputTokens as number) : null
+    const outputTokens = Number.isFinite(args.usage?.outputTokens) ? (args.usage!.outputTokens as number) : null
+
+    // No token counts means no defensible cost. Say so rather than guessing —
+    // and mark it unpriced so the guard counts it as unaccounted, not free.
+    let costUsd: number | null = null
+    let costKnown = false
+    if (inputTokens !== null || outputTokens !== null) {
+      const estimate = estimateAiCallCost(args.model, inputTokens ?? 0, outputTokens ?? 0)
+      costUsd = estimate.usd
+      costKnown = !estimate.unpriced
+    }
+
+    record({
+      provider: args.provider,
+      route: args.route,
+      // Not an HTTP call from our side; the SDK owns the transport. 200/0
+      // mirrors the ok/failed convention the rest of the ledger uses.
+      status: args.ok ? 200 : 0,
+      ms: args.ms,
+      ts: new Date().toISOString(),
+      ok: args.ok,
+      model: args.model,
+      inputTokens,
+      outputTokens,
+      costUsd,
+      costKnown,
+    })
+  } catch (err) {
+    warnSupabaseOnce("recordAiCall", err)
   }
 }
 

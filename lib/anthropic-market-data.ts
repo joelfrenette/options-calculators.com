@@ -1,14 +1,19 @@
 import { generateText } from "ai"
 import { createAnthropic } from "@ai-sdk/anthropic"
+import { resolveApiKey } from "@/lib/api-keys"
+import { recordAiCall } from "@/lib/metered-fetch"
 
-// Function to create Anthropic provider with direct API key
+const MODEL = "claude-3-5-sonnet-20241022"
+
+// Keys resolve through lib/api-keys.ts, not process.env directly. Reading the
+// env var here bypassed DISABLED_APIS — and would have bypassed the E-5 budget
+// guard too, leaving a paid provider reachable after the kill switch tripped.
 function getAnthropicProvider() {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  const apiKey = resolveApiKey("ANTHROPIC_API_KEY")
+  if (!apiKey) {
     return null
   }
-  return createAnthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  })
+  return createAnthropic({ apiKey })
 }
 
 async function fetchMarketDataWithAnthropic(indicator: string, specificData = "Current value"): Promise<number | null> {
@@ -19,8 +24,9 @@ async function fetchMarketDataWithAnthropic(indicator: string, specificData = "C
       return null
     }
 
-    const { text } = await generateText({
-      model: anthropic("claude-3-5-sonnet-20241022"),
+    const started = Date.now()
+    const result = await generateText({
+      model: anthropic(MODEL),
       prompt: `You are a financial data expert. Provide ONLY the current numeric value for: ${indicator}.
       
 Specific requirement: ${specificData}
@@ -34,6 +40,16 @@ CRITICAL RULES:
 Value:`,
       maxOutputTokens: 50,
       temperature: 0.1,
+    })
+    const text = result.text
+
+    recordAiCall({
+      provider: "anthropic",
+      model: MODEL,
+      route: "lib/anthropic-market-data",
+      ms: Date.now() - started,
+      ok: true,
+      usage: result.usage,
     })
 
     const value = Number.parseFloat(text.trim())

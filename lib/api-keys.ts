@@ -58,6 +58,64 @@ export function getMonthlyBudgetTarget(): number {
   return Number.isFinite(raw) && raw >= 0 ? raw : 40
 }
 
+// --- Budget guard (E-5) ---------------------------------------------------
+//
+// A second, automatic kill switch on top of DISABLED_APIS. DISABLED_APIS is a
+// deliberate env-var decision that needs a redeploy; this one flips by itself
+// when metered spend breaches a threshold, and flips back from the admin Health
+// tab. It only ever cuts off keys that can actually overspend (the per-token /
+// per-call entries in lib/api-costs.ts) — killing flat-rate Polygon on a budget
+// breach would break the scanners and save nothing.
+//
+// THE SNAPSHOT LIVES HERE, not in lib/budget-guard.ts, and that is deliberate.
+// `resolveApiKey` is synchronous and cannot await a Supabase read, so it needs
+// a cached answer. This file must also stay IMPORT-FREE: scripts/check-
+// remediation.ts loads it under bare node, which resolves neither the "@/"
+// alias nor a transitive import chain (and tsconfig forbids the ".ts"-suffixed
+// relative form that would). So api-keys.ts owns the storage — it already owns
+// key availability — and lib/budget-guard.ts, which does all the I/O, pushes
+// state in via setBudgetKillSnapshot().
+
+interface BudgetKillSnapshot {
+  tripped: boolean
+  /** Canonical key names the guard cuts off. Travels with the snapshot so this
+   *  file needs no knowledge of lib/api-costs.ts pricing. */
+  guardedKeys: string[]
+  /** Epoch ms of the read that produced this snapshot. */
+  fetchedAt: number
+}
+
+let budgetSnapshot: BudgetKillSnapshot | null = null
+
+export function setBudgetKillSnapshot(next: BudgetKillSnapshot): void {
+  budgetSnapshot = next
+}
+
+export function getBudgetKillSnapshot(): BudgetKillSnapshot | null {
+  return budgetSnapshot
+}
+
+export function clearBudgetKillSnapshot(): void {
+  budgetSnapshot = null
+}
+
+/**
+ * Is a key currently cut off by the budget guard?
+ *
+ * False when nothing has been cached yet — a cold serverless instance fails
+ * OPEN by design (a metering outage must not take the site down). The accurate
+ * check is `ensureBudgetGuardFresh()`, which the AI paths await before spending;
+ * this is the belt-and-braces layer for every other caller.
+ *
+ * A stale "tripped" deliberately does NOT expire on TTL: it stays tripped until
+ * a successful refresh says otherwise, because staying off is the safe
+ * direction for a spend control.
+ */
+export function isBudgetKilled(name: string): boolean {
+  if (budgetSnapshot === null || !budgetSnapshot.tripped) return false
+  return budgetSnapshot.guardedKeys.includes(name.toUpperCase())
+}
+
 // Backwards-compatible interface (kept for existing imports).
 export interface ApiKeyConfig {
   POLYGON_API_KEY?: string
@@ -71,9 +129,12 @@ export interface ApiKeyConfig {
 }
 
 // Resolve a key by canonical name, falling back through every known alias.
-// Returns "" if the service has been disabled via DISABLED_APIS (kill switch).
+// Returns "" if the service has been disabled via DISABLED_APIS (manual kill
+// switch) or cut off by the budget guard (automatic kill switch, E-5). Callers
+// see an unconfigured service and take their existing free/local fallback path.
 export function resolveApiKey(name: string): string {
   if (isServiceDisabled(name)) return ""
+  if (isBudgetKilled(name)) return ""
   const aliases = API_KEY_ALIASES[name] ?? [name]
   for (const alias of aliases) {
     const value = process.env[alias]

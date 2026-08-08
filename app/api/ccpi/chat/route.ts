@@ -3,6 +3,8 @@ import { createOpenAI } from "@ai-sdk/openai"
 import { createAnthropic } from "@ai-sdk/anthropic"
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { resolveApiKey } from "@/lib/api-keys"
+import { recordAiCall } from "@/lib/metered-fetch"
+import { ensureBudgetGuardFresh } from "@/lib/budget-guard"
 
 const OPENROUTER_FREE_MODEL = process.env.OPENROUTER_FREE_MODEL || "openrouter/free"
 
@@ -118,11 +120,16 @@ ${
 
     const prompt = convertToModelMessages(messages)
 
+    // Budget guard (E-5): refresh before spending, so `config.key()` below
+    // resolves to "" for guarded providers once the kill switch has tripped.
+    await ensureBudgetGuardFresh()
+
     let lastError: Error | null = null
 
     for (const config of providerConfigs) {
       if (!config.key()) continue
 
+      const started = Date.now()
       try {
         console.log(`[AI] Trying ${config.name} for CCPI chat...`)
         const provider = config.create()
@@ -133,14 +140,50 @@ ${
           system: systemPrompt,
           messages: prompt,
           temperature: 0.7,
-          maxTokens: 1000,
+          // ai v5 renamed this from `maxTokens`. Under the old name the option
+          // was silently dropped, so a chat turn on a paid fallback had no
+          // output ceiling at all — a real spend leak, not just a type error.
+          maxOutputTokens: 1000,
           abortSignal: req.signal,
         })
 
         console.log(`[AI] Success with ${config.name}`)
+
+        // Spend accounting (E-5). `usage` resolves only when the stream ends,
+        // so this is deliberately not awaited — the response must go out now.
+        void Promise.resolve(result.usage)
+          .then((usage) =>
+            recordAiCall({
+              provider: config.name,
+              model: config.model,
+              route: "/api/ccpi/chat",
+              ms: Date.now() - started,
+              ok: true,
+              usage,
+            }),
+          )
+          .catch(() =>
+            recordAiCall({
+              provider: config.name,
+              model: config.model,
+              route: "/api/ccpi/chat",
+              ms: Date.now() - started,
+              ok: false,
+              usage: null,
+            }),
+          )
+
         return result.toUIMessageStreamResponse()
       } catch (error) {
         console.error(`[AI] ${config.name} failed:`, error instanceof Error ? error.message : error)
+        recordAiCall({
+          provider: config.name,
+          model: config.model,
+          route: "/api/ccpi/chat",
+          ms: Date.now() - started,
+          ok: false,
+          usage: null,
+        })
         lastError = error instanceof Error ? error : new Error(String(error))
         // Continue to next provider
       }

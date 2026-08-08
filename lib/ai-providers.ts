@@ -18,6 +18,8 @@ import { createOpenAI } from "@ai-sdk/openai"
 import { createAnthropic } from "@ai-sdk/anthropic"
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { resolveApiKey } from "@/lib/api-keys"
+import { recordAiCall } from "@/lib/metered-fetch"
+import { ensureBudgetGuardFresh } from "@/lib/budget-guard"
 
 // OpenRouter free auto-router (zero per-token cost). "openrouter/free" lets
 // OpenRouter pick among whatever models are currently free, so it survives the
@@ -176,6 +178,8 @@ export interface AIGenerateOptions {
   maxTokens?: number
   preferredProvider?: ProviderName
   abortSignal?: AbortSignal
+  /** Calling route, recorded with the spend row so cost can be attributed. */
+  routeTag?: string
 }
 
 export interface AIGenerateResult {
@@ -189,7 +193,16 @@ export interface AIGenerateResult {
  * Tries each provider in order until one succeeds
  */
 export async function generateWithFallback(options: AIGenerateOptions): Promise<AIGenerateResult> {
-  const { prompt, messages, system, temperature = 0.7, maxTokens = 1000, preferredProvider, abortSignal } = options
+  const {
+    prompt,
+    messages,
+    system,
+    temperature = 0.7,
+    maxTokens = 1000,
+    preferredProvider,
+    abortSignal,
+    routeTag,
+  } = options
 
   // Build the list of providers to try (preferred first if specified)
   const configsToTry = preferredProvider
@@ -199,11 +212,19 @@ export async function generateWithFallback(options: AIGenerateOptions): Promise<
       ].filter(Boolean)
     : providerConfigs
 
+  // Budget guard (E-5). This is the one path that can actually spend money, and
+  // it is async, so it does the accurate check rather than relying on the
+  // best-effort sync snapshot: refresh first, then `config.key()` below returns
+  // "" for every guarded provider and the chain skips straight past them to the
+  // free tiers. Fails open if Supabase is unreachable — see lib/budget-guard.ts.
+  await ensureBudgetGuardFresh()
+
   let lastError: Error | null = null
 
   for (const config of configsToTry) {
     if (!config || !config.key()) continue
 
+    const started = Date.now()
     try {
       console.log(`[AI] Trying ${config.displayName}...`)
       const provider = config.create()
@@ -222,6 +243,19 @@ export async function generateWithFallback(options: AIGenerateOptions): Promise<
 
       console.log(`[AI] Success with ${config.displayName}`)
 
+      // Spend accounting (E-5). A failed attempt is recorded too: a provider
+      // that errors after consuming tokens still bills, and a fallback chain
+      // that burns three paid providers per request is exactly the runaway
+      // pattern the guard needs to see.
+      recordAiCall({
+        provider: config.name,
+        model: config.model,
+        route: routeTag ?? null,
+        ms: Date.now() - started,
+        ok: true,
+        usage: result.usage,
+      })
+
       return {
         text: result.text,
         provider: config.name,
@@ -229,6 +263,15 @@ export async function generateWithFallback(options: AIGenerateOptions): Promise<
       }
     } catch (error) {
       console.error(`[AI] ${config.displayName} failed:`, error instanceof Error ? error.message : error)
+      recordAiCall({
+        provider: config.name,
+        model: config.model,
+        route: routeTag ?? null,
+        ms: Date.now() - started,
+        ok: false,
+        // No usage on a thrown call — the row lands unpriced rather than $0.
+        usage: null,
+      })
       lastError = error instanceof Error ? error : new Error(String(error))
       // Continue to next provider
     }
@@ -241,7 +284,16 @@ export async function generateWithFallback(options: AIGenerateOptions): Promise<
  * Stream text with automatic fallback between providers
  */
 export async function streamWithFallback(options: AIGenerateOptions) {
-  const { prompt, messages, system, temperature = 0.7, maxTokens = 1000, preferredProvider, abortSignal } = options
+  const {
+    prompt,
+    messages,
+    system,
+    temperature = 0.7,
+    maxTokens = 1000,
+    preferredProvider,
+    abortSignal,
+    routeTag,
+  } = options
 
   // Build the list of providers to try
   const configsToTry = preferredProvider
@@ -251,11 +303,19 @@ export async function streamWithFallback(options: AIGenerateOptions) {
       ].filter(Boolean)
     : providerConfigs
 
+  // Budget guard (E-5). This is the one path that can actually spend money, and
+  // it is async, so it does the accurate check rather than relying on the
+  // best-effort sync snapshot: refresh first, then `config.key()` below returns
+  // "" for every guarded provider and the chain skips straight past them to the
+  // free tiers. Fails open if Supabase is unreachable — see lib/budget-guard.ts.
+  await ensureBudgetGuardFresh()
+
   let lastError: Error | null = null
 
   for (const config of configsToTry) {
     if (!config || !config.key()) continue
 
+    const started = Date.now()
     try {
       console.log(`[AI] Streaming with ${config.displayName}...`)
       const provider = config.create()
@@ -274,6 +334,32 @@ export async function streamWithFallback(options: AIGenerateOptions) {
 
       console.log(`[AI] Stream started with ${config.displayName}`)
 
+      // Spend accounting (E-5). streamText resolves `usage` only once the
+      // stream finishes, so this is deliberately not awaited — awaiting it
+      // here would block the caller until generation completed and defeat the
+      // point of streaming. Metering must never change call behavior.
+      void Promise.resolve(result.usage)
+        .then((usage) =>
+          recordAiCall({
+            provider: config.name,
+            model: config.model,
+            route: routeTag ?? null,
+            ms: Date.now() - started,
+            ok: true,
+            usage,
+          }),
+        )
+        .catch(() =>
+          recordAiCall({
+            provider: config.name,
+            model: config.model,
+            route: routeTag ?? null,
+            ms: Date.now() - started,
+            ok: false,
+            usage: null,
+          }),
+        )
+
       return {
         stream: result,
         provider: config.name,
@@ -281,6 +367,14 @@ export async function streamWithFallback(options: AIGenerateOptions) {
       }
     } catch (error) {
       console.error(`[AI] ${config.displayName} stream failed:`, error instanceof Error ? error.message : error)
+      recordAiCall({
+        provider: config.name,
+        model: config.model,
+        route: routeTag ?? null,
+        ms: Date.now() - started,
+        ok: false,
+        usage: null,
+      })
       lastError = error instanceof Error ? error : new Error(String(error))
       // Continue to next provider
     }

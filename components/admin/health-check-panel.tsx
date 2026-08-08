@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { diagnose } from "@/lib/remediation"
 import { RemediationCard } from "@/components/admin/remediation-card"
+import { BudgetGuardPanel } from "@/components/admin/budget-guard-panel"
 import {
   Activity,
   AlertTriangle,
@@ -181,6 +182,10 @@ export function HealthCheckPanel() {
 
   return (
     <div className="space-y-6">
+      {/* Budget guard (E-5) — first, because a tripped shutoff explains any
+          AI-route failures the health check below is about to report. */}
+      <BudgetGuardPanel />
+
       {/* Run controls */}
       <Card className="bg-white">
         <CardHeader>

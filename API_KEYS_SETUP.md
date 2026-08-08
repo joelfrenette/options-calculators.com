@@ -199,3 +199,75 @@ RESEND_API_KEY="your-resend-key"
 \`\`\`
 
 **Note**: Environment variables take precedence over encrypted storage. This allows you to override specific keys without changing the encrypted file.
+
+---
+
+## Cost controls
+
+Three layers, weakest last. Only layer 1 still works when this app does not.
+
+### Layer 1 — provider-side hard caps (owner action, not code)
+
+Set a monthly spend limit in each pay-per-use console. Nothing in this repo can
+substitute for these; they are the only control that survives a bad deploy, an
+unreachable ledger, or a key leaking.
+
+- OpenAI, Anthropic, xAI, Perplexity — monthly usage limit in the billing console
+- OpenRouter — keep it on prepaid credits, never a linked card
+- Vercel — Billing → Spend Management
+
+Flat-rate providers (Polygon, FMP, TwelveData, Apify, ScrapingBee, SerpAPI) and
+free tiers cannot overspend: exceeding the plan throttles or 429s, it does not
+bill more. The dollar risk is entirely the metered AI keys.
+
+### Layer 2 — the budget guard (AUDIT_BACKLOG E-5)
+
+A Vercel cron computes spend from the Supabase `api_calls` ledger × the list
+prices in `lib/api-costs.ts`, and cuts off pay-per-use keys when a hard stop is
+breached. Cut-off keys resolve to `""` through `resolveApiKey`, so the app falls
+back to its free AI path rather than erroring.
+
+\`\`\`bash
+# Hard stops, USD. Omit for the defaults ($50 / $100).
+DAILY_BUDGET_HARD_STOP="50"
+MONTHLY_BUDGET_HARD_STOP="100"
+
+# Required — the cron refuses to run unauthenticated rather than defaulting open.
+CRON_SECRET="a-long-random-string"
+
+# Required for durable metering; without them the guard reports UNKNOWN and
+# fails OPEN (it will not cut anything off).
+SUPABASE_URL="https://<ref>.supabase.co"
+SUPABASE_SERVICE_ROLE_KEY="..."
+
+# Where the shutoff notification goes (reuses the admin address).
+ADMIN_EMAIL="..."
+RESEND_API_KEY="..."
+\`\`\`
+
+Deploy prerequisites:
+
+1. Apply `supabase/migrations/0002_ai_spend.sql` — adds the token/cost columns,
+   the `api_spend_daily` view, and the `budget_state` kill-flag table.
+2. Set `CRON_SECRET` in the Vercel project.
+3. Confirm the Vercel plan allows the `*/10 * * * *` schedule in `vercel.json`.
+   Sub-daily cron frequency is a paid-plan feature; on Hobby the deploy will be
+   rejected and the schedule has to be a once-daily expression (e.g. `0 6 * * *`).
+   A once-daily guard still works — it just checks spend once a day instead of
+   every ten minutes, which makes layer 1 that much more important.
+
+Spend figures are **estimates** from vendor list prices (dated in
+`TOKEN_PRICES_AS_OF`), not invoices. Calls using a model with no price on file
+are counted separately as "unpriced" and are excluded from the total — the admin
+panel says so rather than reporting them as free. Day boundaries are **UTC**,
+because the rollup buckets on `date_trunc('day', ts)` in the database.
+
+### Layer 3 — `DISABLED_APIS` (manual)
+
+Comma-separated canonical key names that resolve to `""` regardless of spend.
+Requires a redeploy to change, so it is the deliberate off-switch, not the
+automatic one.
+
+\`\`\`bash
+DISABLED_APIS="TWELVE_DATA_API_KEY,APIFY_API_TOKEN"
+\`\`\`

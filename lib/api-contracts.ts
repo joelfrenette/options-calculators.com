@@ -392,6 +392,24 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
   },
   { path: "/api/admin/ads", method: "GET", schema: anyObject, budgetMs: 5000, tabs: [], needsAuth: true },
   { path: "/api/admin/backup", method: "GET", schema: anyObject, budgetMs: 15000, tabs: [], needsAuth: true },
+  // Budget guard (E-5). GET is read-only — spend vs hard stops plus the kill-flag
+  // state — so it is safe to probe. The POST side (clear / trip) is not probed:
+  // it mutates the switch that cuts off every paid API.
+  {
+    path: "/api/admin/budget-guard",
+    method: "GET",
+    schema: anyObject,
+    budgetMs: 10000,
+    tabs: [],
+    needsAuth: true,
+  },
+  {
+    path: "/api/cron/budget-guard",
+    method: "GET",
+    skip: "Vercel Cron endpoint, authenticated with CRON_SECRET rather than the admin cookie — the health check has no way to present it, and a probe could trip the shutoff for real.",
+    budgetMs: 30000,
+    tabs: [],
+  },
   { path: "/api/auth/login", method: "POST", skip: "Authentication side effects.", budgetMs: 5000, tabs: [] },
   { path: "/api/auth/logout", method: "POST", skip: "Authentication side effects.", budgetMs: 5000, tabs: [] },
   {
