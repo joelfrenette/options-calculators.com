@@ -200,7 +200,7 @@ export async function scrapePutCallRatio(): Promise<{
   }
 
   try {
-    const alphaVantageKey = process.env.ALPHA_VANTAGE_API_KEY
+    const alphaVantageKey = resolveApiKey("ALPHA_VANTAGE_API_KEY")
 
     if (alphaVantageKey) {
       const vixResponse = await fetch(
@@ -349,7 +349,7 @@ export async function scrapeShortInterest(): Promise<{
   spyShortRatio: number
   status: "live" | "baseline"
 }> {
-  const polygonKey = process.env.POLYGON_API_KEY
+  const polygonKey = resolveApiKey("POLYGON_API_KEY")
 
   if (polygonKey) {
     try {
@@ -379,7 +379,7 @@ export async function scrapeShortInterest(): Promise<{
   }
 
   // Try Source 1: Alpha Vantage (we have this key)
-  const alphaKey = process.env.ALPHA_VANTAGE_API_KEY
+  const alphaKey = resolveApiKey("ALPHA_VANTAGE_API_KEY")
 
   if (alphaKey) {
     try {

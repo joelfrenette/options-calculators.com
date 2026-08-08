@@ -77,12 +77,12 @@ async function getStockTwitsSentiment(
 
 // ========== FINNHUB NEWS ==========
 async function getFinnhubSentiment(): Promise<{ score: number; source: string; articles: number }> {
-  if (!process.env.FINNHUB_API_KEY) return { score: -1, source: "unavailable", articles: 0 }
+  if (!resolveApiKey("FINNHUB_API_KEY")) return { score: -1, source: "unavailable", articles: 0 }
   try {
     const today = new Date().toISOString().split("T")[0]
     const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString().split("T")[0]
     const res = await fetch(
-      `https://finnhub.io/api/v1/news?category=general&from=${weekAgo}&to=${today}&token=${process.env.FINNHUB_API_KEY}`,
+      `https://finnhub.io/api/v1/news?category=general&from=${weekAgo}&to=${today}&token=${resolveApiKey("FINNHUB_API_KEY")}`,
       { signal: AbortSignal.timeout(10000) },
     )
     if (res.ok) {
@@ -104,9 +104,9 @@ async function getFinnhubSentiment(): Promise<{ score: number; source: string; a
 
 // ========== POLYGON NEWS ==========
 async function getPolygonNewsSentiment(): Promise<{ score: number; source: string; articles: number }> {
-  if (!process.env.POLYGON_API_KEY) return { score: -1, source: "unavailable", articles: 0 }
+  if (!resolveApiKey("POLYGON_API_KEY")) return { score: -1, source: "unavailable", articles: 0 }
   try {
-    const res = await fetch(`https://api.polygon.io/v2/reference/news?limit=50&apiKey=${process.env.POLYGON_API_KEY}`, {
+    const res = await fetch(`https://api.polygon.io/v2/reference/news?limit=50&apiKey=${resolveApiKey("POLYGON_API_KEY")}`, {
       signal: AbortSignal.timeout(10000),
     })
     if (res.ok) {
@@ -129,12 +129,12 @@ async function getPolygonNewsSentiment(): Promise<{ score: number; source: strin
 
 // ========== NEWS FEAR / GREED (Finnhub general news, fear vs greed lexicon) ==========
 async function getNewsFearGreed(): Promise<{ score: number; source: string }> {
-  if (!process.env.FINNHUB_API_KEY) return { score: -1, source: "unavailable" }
+  if (!resolveApiKey("FINNHUB_API_KEY")) return { score: -1, source: "unavailable" }
   try {
     const today = new Date().toISOString().split("T")[0]
     const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString().split("T")[0]
     const res = await fetch(
-      `https://finnhub.io/api/v1/news?category=general&from=${weekAgo}&to=${today}&token=${process.env.FINNHUB_API_KEY}`,
+      `https://finnhub.io/api/v1/news?category=general&from=${weekAgo}&to=${today}&token=${resolveApiKey("FINNHUB_API_KEY")}`,
       { signal: AbortSignal.timeout(8000) },
     )
     if (res.ok) {

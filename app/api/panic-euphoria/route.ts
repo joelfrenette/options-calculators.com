@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { sma } from "@/lib/indicators"
 import { getApiKey } from "@/lib/api-keys"
 
 // Helper function to fetch Yahoo Finance data
@@ -10,11 +11,14 @@ async function fetchYahooData(symbol: string, range = "5y") {
   return data.chart.result[0]
 }
 
-// Helper function to calculate simple moving average
-function calculateSMA(prices: number[], period: number): number {
-  if (prices.length < period) return prices[prices.length - 1] || 0
-  const slice = prices.slice(-period)
-  return slice.reduce((sum, price) => sum + price, 0) / slice.length
+// SMA from the shared lib (house rule: indicators only from lib/indicators.ts).
+// The old local copy returned the LAST PRICE — or 0 — when history was too
+// short, silently presenting a non-average as an average (P6-9). Insufficient
+// history now throws, which the route's catch turns into an honest 500.
+function smaOrThrow(prices: number[], period: number, label: string): number {
+  const v = sma(prices, period)
+  if (v === null) throw new Error(`Insufficient history for ${label}: have ${prices.length}, need ${period}`)
+  return v
 }
 
 // Helper function to normalize indicator to -1 to +1 scale
@@ -131,7 +135,7 @@ async function calculatePanicEuphoria() {
 
     const spxPrices = spxData.indicators.quote[0].close.filter((p: number) => p !== null)
     const currentSpx = spxPrices[spxPrices.length - 1]
-    const spx200WeekMA = calculateSMA(spxPrices, 200)
+    const spx200WeekMA = smaOrThrow(spxPrices, 200, "SPX 200-week MA")
     const aboveMA = currentSpx > spx200WeekMA
 
     console.log("[v0] SPX:", currentSpx, "200-WMA:", spx200WeekMA, "Above MA:", aboveMA)
@@ -160,7 +164,7 @@ async function calculatePanicEuphoria() {
 
     const shortInterestScore = Math.max(-1, Math.min(1, normalize(nyseShortInterest, 10, 30, 15))) * -1
 
-    const spx125DayMA = calculateSMA(spxPrices, 125)
+    const spx125DayMA = smaOrThrow(spxPrices, 125, "SPX 125-day MA")
     const spxMomentum = ((currentSpx - spx125DayMA) / spx125DayMA) * 100
 
     // Margin Debt estimate based on SPX momentum and VIX
@@ -186,6 +190,7 @@ async function calculatePanicEuphoria() {
     const aaiiScore = Math.max(-1, Math.min(1, normalize(aaiiBullish, 25, 65, 40)))
 
     let moneyMarketFunds = 6.0 - spxMomentum * 0.02
+    let mmfIsLive = false
     let mmfScore = Math.max(-1, Math.min(1, normalize(moneyMarketFunds, 5.0, 7.0, 6.0))) * -1
 
     const fredApiKey = getApiKey("FRED_API_KEY")
@@ -199,6 +204,7 @@ async function calculatePanicEuphoria() {
           if (fredData.observations && fredData.observations.length > 0) {
             moneyMarketFunds = Number.parseFloat(fredData.observations[0].value) / 1000
             mmfScore = Math.max(-1, Math.min(1, normalize(moneyMarketFunds, 5.0, 7.0, 6.0))) * -1
+            mmfIsLive = true
             console.log("[v0] Real MMF from FRED:", moneyMarketFunds)
           }
         }
@@ -207,29 +213,54 @@ async function calculatePanicEuphoria() {
       }
     }
 
-    const vix50DayMA = calculateSMA(vixPrices, 50)
-    const vixShortTerm = calculateSMA(vixPrices.slice(-5), 5)
+    const vix50DayMA = smaOrThrow(vixPrices, 50, "VIX 50-day MA")
+    const vixShortTerm = smaOrThrow(vixPrices.slice(-5), 5, "VIX 5-day MA")
     const vixLongTerm = vix50DayMA
     const putCallRatio = Math.max(0.8, Math.min(1.3, vixShortTerm / vixLongTerm))
     const pcScore = Math.max(-1, Math.min(1, normalize(putCallRatio, 0.8, 1.3, 1.0))) * -1
 
-    const commodityPrices = Math.max(250, Math.min(320, 280 + spxMomentum * 2))
-    const commodityScore = Math.max(-1, Math.min(1, normalize(commodityPrices, 250, 320, 280)))
+    // Real series, not SPX echoes (P6-8). These were `280 + spxMomentum * 2`
+    // and `3.2 + spxMomentum * 0.01` — zero independent information, presented
+    // as commodity and gas prices while literally re-plotting SPX momentum.
+    // Now: FRED PPIACO (producer price index, all commodities) and GASREGW
+    // (US regular gas, $/gal), same pattern as the MMF fetch above. When FRED
+    // is unavailable they are null and their scores drop out of the composite
+    // instead of faking a reading.
+    const fredSeries = async (id: string): Promise<number | null> => {
+      if (!fredApiKey) return null
+      try {
+        const r = await fetch(
+          `https://api.stlouisfed.org/fred/series/observations?series_id=${id}&api_key=${fredApiKey}&file_type=json&limit=1&sort_order=desc`,
+          { signal: AbortSignal.timeout(8000) },
+        )
+        if (!r.ok) return null
+        const j = await r.json()
+        const v = Number.parseFloat(j?.observations?.[0]?.value)
+        return Number.isFinite(v) ? v : null
+      } catch {
+        return null
+      }
+    }
+    const [commodityPrices, gasPrices] = await Promise.all([fredSeries("PPIACO"), fredSeries("GASREGW")])
+    const commodityScore =
+      commodityPrices !== null ? Math.max(-1, Math.min(1, normalize(commodityPrices, 250, 320, 280))) : null
+    const gasScore = gasPrices !== null ? Math.max(-1, Math.min(1, normalize(gasPrices, 2.5, 4.5, 3.25))) * -1 : null
 
-    const gasPrices = Math.max(2.5, Math.min(4.5, 3.2 + spxMomentum * 0.01))
-    const gasScore = Math.max(-1, Math.min(1, normalize(gasPrices, 2.5, 4.5, 3.25))) * -1
-
-    const overallScore =
-      (shortInterestScore +
-        marginScore +
-        volumeScore +
-        iiScore +
-        aaiiScore +
-        mmfScore +
-        pcScore +
-        commodityScore +
-        gasScore) /
-      9
+    // Composite over the components that actually have a value — a null
+    // (unavailable FRED series) drops out instead of entering as a fake
+    // neutral. Divisor = count actually scored.
+    const componentScores = [
+      shortInterestScore,
+      marginScore,
+      volumeScore,
+      iiScore,
+      aaiiScore,
+      mmfScore,
+      pcScore,
+      commodityScore,
+      gasScore,
+    ].filter((s): s is number => s !== null)
+    const overallScore = componentScores.reduce((a, b) => a + b, 0) / componentScores.length
 
     const clampedScore = Math.max(-1, Math.min(1, overallScore))
 
@@ -269,17 +300,19 @@ async function calculatePanicEuphoria() {
     return {
       overallScore: Math.round(clampedScore * 1000) / 1000,
       level,
-      trend: (clampedScore > clampedScore - yesterdayChange
-        ? "up"
-        : clampedScore < clampedScore - yesterdayChange
-          ? "down"
-          : "neutral") as const,
+      // `x > x - d` is just `d > 0`: the trend is the sign of yesterday's move.
+      // (Also clears a baseline TS1355 — `as const` on a ternary is invalid.)
+      trend: (yesterdayChange > 0 ? "up" : yesterdayChange < 0 ? "down" : "neutral") as "up" | "down" | "neutral",
       yesterdayChange: Math.round(yesterdayChange * 1000) / 1000,
       lastWeekChange: Math.round(weekChange * 1000) / 1000,
       lastMonthChange: Math.round(monthChange * 1000) / 1000,
       spx: Math.round(currentSpx * 100) / 100,
       spx200WeekMA: Math.round(spx200WeekMA * 100) / 100,
       aboveMA,
+      // Citi's Panic/Euphoria is proprietary and has no API. This is the last
+      // PUBLISHED reading, entered manually — the date travels with it so the
+      // UI can show its age instead of implying freshness. Update both together
+      // when Citi publishes a new one (P6-8).
       latestCitiReading: 0.72,
       latestCitiDate: "Nov 7, 2025",
       ytdAverage: 0.44,
@@ -290,8 +323,18 @@ async function calculatePanicEuphoria() {
       aaiiBullish: Math.round(aaiiBullish),
       moneyMarketFunds: Math.round(moneyMarketFunds * 10) / 10,
       putCallRatio: Math.round(putCallRatio * 100) / 100,
-      commodityPrices: Math.round(commodityPrices * 10) / 10,
-      gasPrices: Math.round(gasPrices * 100) / 100,
+      commodityPrices: commodityPrices !== null ? Math.round(commodityPrices * 10) / 10 : null,
+      gasPrices: gasPrices !== null ? Math.round(gasPrices * 100) / 100 : null,
+      // Which components are synthetic proxies (derived from SPX/VIX or AI
+      // estimates) rather than measured series. The UI badges these (P6-8).
+      syntheticComponents: [
+        "nyseShortInterest",
+        "marginDebt",
+        "investorIntelligence",
+        "aaiiBullish",
+        "putCallRatio",
+        ...(moneyMarketFunds !== null && mmfIsLive ? [] : ["moneyMarketFunds"]),
+      ],
     }
   } catch (error) {
     console.error("[v0] Error calculating Panic/Euphoria:", error)

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { resolveApiKey } from "@/lib/api-keys"
 import {
   generateEarningsExplainer as aiEarningsExplainer,
   generateEconomicExplainer as aiEconomicExplainer,
@@ -45,7 +46,7 @@ function getCurrentWeekRange(): { start: Date; end: Date; label: string } {
 
 // Fetch earnings from Finnhub (primary source)
 async function fetchFinnhubEarnings(startDate: string, endDate: string) {
-  const apiKey = process.env.FINNHUB_API_KEY
+  const apiKey = resolveApiKey("FINNHUB_API_KEY")
   if (!apiKey) return null
 
   try {
@@ -66,7 +67,7 @@ async function fetchFinnhubEarnings(startDate: string, endDate: string) {
 }
 
 async function fetchPolygonEarnings(startDate: string, endDate: string) {
-  const apiKey = process.env.POLYGON_API_KEY
+  const apiKey = resolveApiKey("POLYGON_API_KEY")
   if (!apiKey) return null
 
   try {

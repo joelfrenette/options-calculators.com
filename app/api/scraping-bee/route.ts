@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { resolveApiKey } from "@/lib/api-keys"
 
 export async function POST(request: Request) {
   try {
@@ -8,7 +9,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "URL is required" }, { status: 400 })
     }
 
-    const apiKey = process.env.SCRAPINGBEE_API_KEY
+    const apiKey = resolveApiKey("SCRAPINGBEE_API_KEY")
 
     if (!apiKey) {
       return NextResponse.json({ error: "ScrapingBee API key not configured" }, { status: 500 })

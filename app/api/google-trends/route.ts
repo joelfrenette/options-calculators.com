@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server"
+import { resolveApiKey } from "@/lib/api-keys"
 
 // Uses Serper API (requires SERPER_API_KEY)
 
 export async function GET() {
-  const SERPER_API_KEY = process.env.SERPER_API_KEY
+  const SERPER_API_KEY = resolveApiKey("SERPER_API_KEY")
 
   if (!SERPER_API_KEY) {
     console.log("[v0] Google Trends: No SERPER_API_KEY found, returning fallback data")

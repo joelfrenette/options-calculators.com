@@ -1,7 +1,8 @@
 import { sma, bollinger } from "@/lib/indicators"
+import { resolveApiKey } from "@/lib/api-keys"
 
 export async function fetchQQQTechnicals() {
-  const POLYGON_API_KEY = process.env.POLYGON_API_KEY
+  const POLYGON_API_KEY = resolveApiKey("POLYGON_API_KEY")
   
   if (!POLYGON_API_KEY) {
     console.warn("[v0] POLYGON_API_KEY not set, using baseline values")

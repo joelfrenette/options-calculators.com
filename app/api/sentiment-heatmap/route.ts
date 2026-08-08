@@ -1,24 +1,22 @@
 import { NextResponse } from "next/server"
-import { generateText } from "ai"
+import { generateWithFallback as sharedGenerate } from "@/lib/ai-providers"
 
+// Through the shared chain (P6-11), not a local generateText with hardcoded
+// model strings. The local version tried PAID gpt-4o-mini FIRST — skipping the
+// free-tier chain, the per-call metering, and the budget guard, all three.
 async function generateWithFallback(prompt: string, systemPrompt: string): Promise<string | null> {
-  const models = ["openai/gpt-4o-mini", "anthropic/claude-3-haiku-20240307"]
-
-  for (const model of models) {
-    try {
-      const { text } = await generateText({
-        model,
-        system: systemPrompt,
-        prompt,
-        temperature: 0.3,
-      })
-      return text
-    } catch (error) {
-      console.log(`[v0] Model ${model} failed, trying next...`)
-      continue
-    }
+  try {
+    const result = await sharedGenerate({
+      prompt,
+      system: systemPrompt,
+      temperature: 0.3,
+      maxTokens: 400,
+      routeTag: "/api/sentiment-heatmap",
+    })
+    return result.text
+  } catch {
+    return null
   }
-  return null
 }
 
 async function analyzeSentimentWithAI(
@@ -34,7 +32,10 @@ async function analyzeSentimentWithAI(
     const systemPrompt =
       "You are a financial sentiment analyst specializing in social media analysis. Provide accurate, data-driven sentiment scores based on recent market discussions. Always respond with valid JSON only."
 
-    const prompt = `Analyze the current social media and market sentiment for ${tickerName} (${ticker}) based on recent StockTwits discussions, financial news, and general market commentary from the past 24 hours.
+    // The model has NO live source access — asking it for "the past 24 hours
+    // of StockTwits" invited it to hallucinate specifics (P6-11). Ask for what
+    // it can actually give: a general impression, stated as such.
+    const prompt = `Give your best general impression of market sentiment toward ${tickerName} (${ticker}). You have no live data access — do not invent specific recent discussions; base the estimate on the security's general profile and typical sentiment drivers.
 
 Provide a JSON response with:
 - bullishScore: percentage of bullish sentiment (0-100)
@@ -105,7 +106,12 @@ export async function GET() {
     return NextResponse.json({
       data: sentimentData,
       lastUpdated: new Date().toISOString(),
-      dataSource: "AI-powered sentiment analysis from StockTwits, financial news, and market forums",
+      // Honest provenance (P6-11). The old string named StockTwits, news and
+      // forums as sources — none are queried. These scores are a language
+      // model's impression with no live source access, i.e. an estimate, and
+      // are labeled as exactly that.
+      dataSource: "AI-estimated sentiment (model impression — no live social/news feed is queried)",
+      estimated: true,
     })
   } catch (error) {
     console.error("[v0] Error fetching sentiment heatmap:", error)

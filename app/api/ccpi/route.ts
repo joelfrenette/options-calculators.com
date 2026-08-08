@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { resolveApiKey } from "@/lib/api-keys"
 import { fetchVIXTermStructure } from "@/lib/vix-term-structure"
 import { fetchQQQTechnicals as fetchQQQTechnicalsData } from "@/lib/qqq-technicals"
 import { scrapeBuffettIndicator, scrapePutCallRatio, scrapeAAIISentiment } from "@/lib/scraping-bee"
@@ -39,7 +40,6 @@ import {
   getISMPMI,
 } from "@/lib/unified-ai-fallback"
 
-import { fetchShillerCAPEWithGrok } from "@/lib/grok-market-data" // Kept Grok for now as a fallback
 
 interface DataSourceStatus {
   live: boolean
@@ -206,12 +206,6 @@ export async function GET() {
         aaiiBullish: data.aaiiBullish,
         aaiiBearish: data.aaiiBearish,
         aaiiSpread: data.aaiiSpread,
-
-        // AI Structural (display-only, unscored)
-        aiCapexGrowth: data.aiCapexGrowth,
-        aiRevenueGrowth: data.aiRevenueGrowth,
-        gpuPricingPremium: data.gpuPricingPremium,
-        aiJobPostingsGrowth: data.aiJobPostingsGrowth,
 
         // Phase 1 indicators
         nvidiaPrice: data.nvidiaPrice,
@@ -434,7 +428,8 @@ async function fetchMarketData() {
   const spxPETier: Tier = apifyLive || fmpVal?.spxPE !== undefined ? "live" : "baseline"
   const spxPSTier: Tier = (apifyLive && apifyRaw?.data?.priceToSales) || fmpVal?.spxPS !== undefined ? "live" : "baseline"
   const yieldCurve10Y = fredData?.yieldCurve10Y ?? 4.5
-  const fredTier: Tier = fredLive ? "live" : "baseline"
+  // Per-series, not blanket (P6-6): the 10Y is the only series ERP depends on.
+  const fredTier: Tier = fredData?.yieldCurve10Y != null ? "live" : "baseline"
 
   // -------------------------------------------------------------------------
   // Three-tier provenance map (P3-12): live | ai-estimate | baseline.
@@ -474,14 +469,18 @@ async function fetchMarketData() {
       equityRiskPremium: weakerTier(spxPETier, fredTier),
     },
     macro: {
-      tedSpread: fredTier,
-      dxyIndex: fredTier,
+      // Per-series (P6-6): "live" only when THAT series actually parsed. The
+      // blanket fredTier stamped every macro input live if the batch call as a
+      // whole succeeded, so one dead series scored its baseline constant as
+      // real data.
+      tedSpread: fredData?.tedSpread != null ? "live" : "baseline",
+      dxyIndex: fredData?.dxyIndex != null ? "live" : "baseline",
       ismPMI: aiTier(ismPMIResult.source),
-      fedFundsRate: fredTier,
-      fedReverseRepo: fredTier,
-      junkSpread: fredTier,
-      debtToGDP: fredTier,
-      yieldCurve: fredTier,
+      fedFundsRate: fredData?.fedFundsRate != null ? "live" : "baseline",
+      fedReverseRepo: fredData?.fedReverseRepo != null ? "live" : "baseline",
+      junkSpread: fredData?.junkSpread != null ? "live" : "baseline",
+      debtToGDP: fredData?.debtToGDP != null ? "live" : "baseline",
+      yieldCurve: fredData?.yieldCurve != null ? "live" : "baseline",
     },
   }
 
@@ -531,16 +530,19 @@ async function fetchMarketData() {
     etfFlows: apifyRaw?.data?.netInflows as number | undefined,
     shortInterest: shortInterestResult.value,
 
-    // AI Structural (display-only; never scored)
-    aiCapexGrowth: 40,
-    aiRevenueGrowth: 15,
-    gpuPricingPremium: 20,
-    aiJobPostingsGrowth: -5,
+    // AI Structural block deleted (P6-5): aiCapexGrowth/aiRevenueGrowth/
+    // gpuPricingPremium/aiJobPostingsGrowth were hardcoded constants shipped in
+    // the payload with zero consumers — dead fields carrying invented numbers.
 
     buffettIndicator: buffettData.status === "live" ? buffettData.ratio : buffettResult.value,
     aaiiBullish: aaiData.status === "live" ? aaiData.bullish : aaiiBullishResult.value,
-    aaiiBearish: aaiData.bearish || 30,
-    aaiiSpread: aaiData.spread || 5,
+    // Bearish/spread have NO AI-fallback path — only the (kill-switched)
+    // ScrapingBee scrape carries them. When not live they are undefined, and
+    // the dashboard's `!== undefined` guards hide the cards. They used to be
+    // `|| 30` / `|| 5`, rendering an invented "30.0%" / "+5.0" with two-decimal
+    // precision on every load since the scraper was disabled (P6-4).
+    aaiiBearish: aaiData.status === "live" ? aaiData.bearish : undefined,
+    aaiiSpread: aaiData.status === "live" ? aaiData.spread : undefined,
 
     // Phase 1 indicators
     nvidiaPrice: nvidiaPriceResult.value,
@@ -565,19 +567,23 @@ function calculateEquityRiskPremium(spxPE: number, treasury10Y: number): number 
 }
 
 async function fetchFREDIndicators() {
-  const FRED_API_KEY = process.env.FRED_API_KEY
+  const FRED_API_KEY = resolveApiKey("FRED_API_KEY")
 
+  // Nulls, not constants (P6-6). The assembly layer applies its labeled
+  // `?? baseline` there, and the per-field tier map reads null = "baseline" so
+  // the constant is excluded from scoring. Returning numbers here would make
+  // the per-field null-checks stamp invented values as live.
   const baselineValues = {
-    fedFundsRate: 5.33,
-    junkSpread: 3.5,
-    yieldCurve: 0.25,
-    debtToGDP: 123,
-    tedSpread: 0.25,
-    dxyIndex: 103,
-    ismPMI: 48,
-    fedReverseRepo: 450,
-    shillerCAPE: 30,
-    yieldCurve10Y: 4.5,
+    fedFundsRate: null as number | null,
+    junkSpread: null as number | null,
+    yieldCurve: null as number | null,
+    debtToGDP: null as number | null,
+    tedSpread: null as number | null,
+    dxyIndex: null as number | null,
+    ismPMI: null as number | null,
+    fedReverseRepo: null as number | null,
+    shillerCAPE: null as number | null,
+    yieldCurve10Y: null as number | null,
     source: "baseline" as const,
   }
 
@@ -627,31 +633,43 @@ async function fetchFREDIndicators() {
       treasury10YRes.json(),
     ])
 
-    console.log("[v0] FRED: Attempting to fetch Shiller CAPE with Grok...")
-    const shillerCAPE = await fetchShillerCAPEWithGrok()
+    // Per-series honesty (P6-6): a missing FRED observation parses to null,
+    // never to a constant. The old `|| "5.33"`-style fallbacks meant one dead
+    // series silently entered the CCPI as an invented number stamped "live" —
+    // the assembly layer's `?? baseline` + per-field tier is where a fallback
+    // is allowed to happen, because there it is labeled and excluded from
+    // scoring.
+    const obs = (r: any): number | null => {
+      const v = Number.parseFloat(r?.observations?.[0]?.value)
+      return Number.isFinite(v) ? v : null
+    }
 
     return {
-      fedFundsRate: Number.parseFloat(fedFunds.observations?.[0]?.value || "5.33"),
-      junkSpread: Number.parseFloat(junkSpread.observations?.[0]?.value || "3.5"),
-      yieldCurve: Number.parseFloat(yieldCurve.observations?.[0]?.value || "0.25"),
-      debtToGDP: Number.parseFloat(debtToGDP.observations?.[0]?.value || "123"),
-      tedSpread: Number.parseFloat(tedSpread.observations?.[0]?.value || "0.25"),
-      dxyIndex: Number.parseFloat(dxy.observations?.[0]?.value || "103"),
-      ismPMI: 48, // Will be overridden by AI fallback
-      fedReverseRepo: Number.parseFloat(rrp.observations?.[0]?.value || "450"),
-      shillerCAPE,
-      yieldCurve10Y: Number.parseFloat(treasury10Y.observations?.[0]?.value || "4.5"),
+      fedFundsRate: obs(fedFunds),
+      junkSpread: obs(junkSpread),
+      yieldCurve: obs(yieldCurve),
+      debtToGDP: obs(debtToGDP),
+      tedSpread: obs(tedSpread),
+      dxyIndex: obs(dxy),
+      ismPMI: null, // never carried by FRED; comes from the AI fallback
+      fedReverseRepo: obs(rrp),
+      // Dead field kept for shape only. The scored CAPE is shillerCAPEResult
+      // from the tiered AI-fallback path; the old fetchShillerCAPEWithGrok()
+      // call here burned an LLM request per CCPI load for a value nothing
+      // consumed (P6-7).
+      shillerCAPE: null,
+      yieldCurve10Y: obs(treasury10Y),
       source: "live" as const,
     }
   } catch (error) {
     console.error("[v0] FRED API error:", error instanceof Error ? error.message : String(error))
-    const shillerCAPE = await fetchShillerCAPEWithGrok()
-    return { ...baselineValues, shillerCAPE }
+    // No CAPE call here either — same dead field as the happy path (P6-7).
+    return baselineValues
   }
 }
 
 async function fetchAlphaVantageIndicators() {
-  const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY
+  const ALPHA_VANTAGE_API_KEY = resolveApiKey("ALPHA_VANTAGE_API_KEY")
 
   const baselineValues = {
     nvidiaPrice: 800,

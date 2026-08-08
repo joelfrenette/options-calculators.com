@@ -48,8 +48,9 @@ interface PanicEuphoriaData {
   aaiiBullish: number
   moneyMarketFunds: number
   putCallRatio: number
-  commodityPrices: number
-  gasPrices: number
+  // Null when FRED (PPIACO / GASREGW) is unavailable — rendered as "—".
+  commodityPrices: number | null
+  gasPrices: number | null
 }
 
 function PanicGradientBar({ value, min = -1, max = 1 }: { value: number; min?: number; max?: number }) {
@@ -545,7 +546,7 @@ export function PanicEuphoria() {
                   rawValue={`$${data.marginDebt}B`}
                   tooltip={
                     tooltipsEnabled
-                      ? "Margin Debt tracks total borrowed money used for stock purchases. SOURCE: FINRA monthly margin statistics via FRED. INTERPRETATION: High margin debt (>$800B) indicates leveraged speculation and euphoria—investors are borrowing heavily to buy stocks, a warning sign. Low margin debt (<$600B) suggests fear/panic. Current range: $600-$850B."
+                      ? "Margin Debt tracks total borrowed money used for stock purchases. SOURCE: SYNTHETIC PROXY — derived from SPX momentum and VIX, NOT real FINRA statistics (FINRA publishes monthly with no free API). Treat as a directional gauge only. INTERPRETATION: High readings suggest leveraged speculation/euphoria; low readings suggest fear. Modeled range: $600-$850B."
                       : ""
                   }
                 />
@@ -601,8 +602,8 @@ export function PanicEuphoria() {
                 />
                 <PanicIndicator
                   label="Commodity Prices (CRB)"
-                  value={(data.commodityPrices - 280) / 40}
-                  rawValue={`${data.commodityPrices.toFixed(1)}`}
+                  value={data.commodityPrices !== null ? (data.commodityPrices - 280) / 40 : 0}
+                  rawValue={data.commodityPrices !== null ? `${data.commodityPrices.toFixed(1)}` : "—"}
                   tooltip={
                     tooltipsEnabled
                       ? "CRB Commodity Index tracks a basket of raw materials including energy, metals, and agriculture. SOURCE: Live commodity futures data. INTERPRETATION: High prices (>300) indicate inflation/speculation—economic overheating and euphoria. Low prices (<260) suggest deflation fears/recession—panic territory. Current range: 250-320."
@@ -611,8 +612,8 @@ export function PanicEuphoria() {
                 />
                 <PanicIndicator
                   label="Retail Gas Prices"
-                  value={(3.25 - data.gasPrices) / 1.0}
-                  rawValue={`$${data.gasPrices.toFixed(2)}/gal`}
+                  value={data.gasPrices !== null ? (3.25 - data.gasPrices) / 1.0 : 0}
+                  rawValue={data.gasPrices !== null ? `$${data.gasPrices.toFixed(2)}/gal` : "—"}
                   tooltip={
                     tooltipsEnabled
                       ? "Retail Gas Prices track national average gasoline costs that directly impact consumer spending. SOURCE: EIA (Energy Information Administration) weekly data. INTERPRETATION: High prices (>$4.00) create consumer stress and economic drag—bearish for markets. Low prices (<$3.00) act as a 'tax cut' for consumers—bullish. Current range: $2.50-$4.50/gal."
@@ -634,10 +635,15 @@ export function PanicEuphoria() {
                   <div className="p-3 bg-white rounded-lg border border-blue-200">
                     <div className="text-xs font-semibold text-gray-600 mb-1">Latest Official Citi Reading</div>
                     <div className="text-2xl font-bold text-blue-900">
-                      {data.latestCitiReading >= 0 ? "+" : ""}
-                      {data.latestCitiReading.toFixed(2)}
+                      {data.latestCitiReading !== undefined
+                        ? `${data.latestCitiReading >= 0 ? "+" : ""}${data.latestCitiReading.toFixed(2)}`
+                        : "—"}
                     </div>
-                    <div className="text-xs text-gray-600 mt-1">{data.latestCitiDate || "Nov 7, 2025"}</div>
+                    {/* Date always from the API — the old `|| "Nov 7, 2025"` default
+                        could stamp a wrong date on a reading (P6-8). */}
+                    <div className="text-xs text-gray-600 mt-1">
+                      {data.latestCitiDate ? `${data.latestCitiDate} (last published reading)` : "—"}
+                    </div>
                   </div>
                   <div className="p-3 bg-white rounded-lg border border-purple-200">
                     <div className="text-xs font-semibold text-gray-600 mb-1">Your Real-Time Proxy</div>
@@ -864,7 +870,7 @@ export function PanicEuphoria() {
                         </div>
                       </div>
                     </div>
-                    <span className="text-sm font-bold text-gray-900">{data.commodityPrices.toFixed(1)}</span>
+                    <span className="text-sm font-bold text-gray-900">{data.commodityPrices !== null ? data.commodityPrices.toFixed(1) : "—"}</span>
                   </div>
 
                   <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">
@@ -877,7 +883,9 @@ export function PanicEuphoria() {
                         </div>
                       </div>
                     </div>
-                    <span className="text-sm font-bold text-gray-900">${data.gasPrices.toFixed(2)}/gal</span>
+                    <span className="text-sm font-bold text-gray-900">
+                      {data.gasPrices !== null ? `$${data.gasPrices.toFixed(2)}/gal` : "—"}
+                    </span>
                   </div>
                 </div>
               </div>

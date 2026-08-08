@@ -911,8 +911,11 @@ export async function GET(request: Request) {
 
       volatilitySkew: 0,
       openInterestPutCall: 0,
-      vixTermStructure: finalIndicators.find((i: any) => i.name.toLowerCase().includes("volatility"))?.score || 50,
-      cboeSkewIndex: 100 - finalIndicators.find((i: any) => i.name.toLowerCase().includes("volatility"))?.score || 50,
+      vixTermStructure: finalIndicators.find((i: any) => i.name.toLowerCase().includes("volatility"))?.score ?? 50,
+      // Parenthesized (P6-10): `100 - x || 50` binds as `(100 - x) || 50`, so a
+      // volatility score of exactly 100 produced 0 → falsy → silently became 50.
+      cboeSkewIndex:
+        100 - (finalIndicators.find((i: any) => i.name.toLowerCase().includes("volatility"))?.score ?? 50),
 
       dataSource: "CNN API + Live Market Data",
       methodology: "Using CNN's actual Fear & Greed scores with live market calculations",

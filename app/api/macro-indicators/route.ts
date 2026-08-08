@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server"
+import { resolveApiKey } from "@/lib/api-keys"
 
 // Macro Indicators API - USD Index, M2, Unemployment, Debt-to-GDP
 // Uses FRED and Alpha Vantage APIs
 
 export async function GET() {
-  const FRED_API_KEY = process.env.FRED_API_KEY
-  const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY
+  const FRED_API_KEY = resolveApiKey("FRED_API_KEY")
+  const ALPHA_VANTAGE_API_KEY = resolveApiKey("ALPHA_VANTAGE_API_KEY")
 
   if (!FRED_API_KEY || !ALPHA_VANTAGE_API_KEY) {
     console.log("[v0] Macro Indicators: Missing API keys")

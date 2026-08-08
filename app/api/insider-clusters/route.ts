@@ -4,6 +4,7 @@
 // Finnhub source) and aggregate by ticker.
 
 import { NextResponse } from "next/server"
+import { resolveApiKey } from "@/lib/api-keys"
 
 export const dynamic = "force-dynamic"
 
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
   cutoff.setDate(cutoff.getDate() - days)
   const cutoffMs = cutoff.getTime()
 
-  const apiKey = process.env.FINNHUB_API_KEY
+  const apiKey = resolveApiKey("FINNHUB_API_KEY")
   if (!apiKey) {
     return NextResponse.json(
       {

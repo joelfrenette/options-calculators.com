@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { resolveApiKey } from "@/lib/api-keys"
 
 export const dynamic = "force-dynamic"
 
@@ -131,7 +132,7 @@ function buildCorporateNote(type: string, role: string, value: number): string {
 // to get deeper history beyond the 2000-row market-wide cap.
 // ---------------------------------------------------------------------------
 async function fetchFinnhubInsiderTransactions(days = 30, ticker = "") {
-  const apiKey = process.env.FINNHUB_API_KEY
+  const apiKey = resolveApiKey("FINNHUB_API_KEY")
   if (!apiKey) {
     console.log("[v0] No Finnhub API key")
     return []

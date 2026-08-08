@@ -128,7 +128,7 @@ export async function getFinnhubNewsSentiment(): Promise<{
   source: string
   detail: string
 }> {
-  const key = process.env.FINNHUB_API_KEY
+  const key = resolveApiKey("FINNHUB_API_KEY")
   if (!key) {
     console.log("[v0] Source (Finnhub): FINNHUB_API_KEY not set")
     return { score: -1, source: "unavailable", detail: "no_key" }
@@ -168,7 +168,7 @@ export async function getPolygonNewsSentiment(): Promise<{
   source: string
   detail: string
 }> {
-  const key = process.env.POLYGON_API_KEY
+  const key = resolveApiKey("POLYGON_API_KEY")
   if (!key) {
     console.log("[v0] Source (Polygon): POLYGON_API_KEY not set")
     return { score: -1, source: "unavailable", detail: "no_key" }

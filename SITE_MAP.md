@@ -16,7 +16,7 @@
 | `trend-analysis` | Index Trend Analysis | `TrendAnalysis` | `components/trend-analysis.tsx` | 1159 | `/api/trend-analysis` |
 | `risk-management` | CBOE VIX Volatility Index | `RiskCalculator` | `components/risk-calculator.tsx` | 845 | `/api/vix`<br>`/api/vix-history` |
 | `market-sentiment` | CNN's Fear & Greed | `MarketSentiment` | `components/market-sentiment.tsx` | 1601 | `/api/market-sentiment`<br>`/api/sentiment-heatmap` |
-| `panic-euphoria` | Citibank's Panic & Euphoria Index | `PanicEuphoria` | `components/panic-euphoria.tsx` | 1142 | `/api/panic-euphoria` |
+| `panic-euphoria` | Citibank's Panic & Euphoria Index | `PanicEuphoria` | `components/panic-euphoria.tsx` | 1150 | `/api/panic-euphoria` |
 | `social-sentiment` | Social Sentiment Index | `SocialSentiment` | `components/social-sentiment.tsx` | 682 | `/api/social-sentiment` |
 | `fomc-predictions` | FOMC Fed Rate Forecaster | `FomcPredictions` | `components/fomc-predictions.tsx` | 1258 | `/api/fomc-predictions` |
 | `cpi-inflation` | BLS CPI Inflation Forecaster | `CpiInflationAnalysis` | `components/cpi-inflation-analysis.tsx` | 669 | `/api/cpi-inflation` |
@@ -108,7 +108,7 @@ Every route: HTTP verbs, segment config, upstream hosts, env keys, timeout wirin
 | `/api/landmine-check` | GET | runtime="edge"<br>dynamic="force-dynamic" | finnhub.io | FINNHUB_API_KEY | yes | `components/scanner/use-landmines.ts`<br>`lib/api-contracts.ts`<br>`lib/remediation.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/macro-indicators` | GET | — | api.stlouisfed.org<br>www.alphavantage.co | ALPHA_VANTAGE_API_KEY<br>FRED_API_KEY | yes | `lib/api-contracts.ts`<br>`lib/remediation.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/market-sentiment` | GET | — | app.scrapingbee.com<br>production.dataviz.cnn.io<br>query1.finance.yahoo.com<br>www.barchart.com<br>www.cnn.com | SCRAPINGBEE_API_KEY | yes | `components/market-sentiment.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
-| `/api/panic-euphoria` | GET | — | api.groq.com<br>api.stlouisfed.org<br>api.x.ai<br>app.scrapingbee.com<br>query1.finance.yahoo.com | FRED_API_KEY<br>GROK_XAI_API_KEY<br>GROQ_API_KEY<br>SCRAPINGBEE_API_KEY<br>XAI_API_KEY | **no** | `components/panic-euphoria.tsx`<br>`lib/api-contracts.ts`<br>`lib/remediation.ts`<br>`app/api/admin/run-health-checks/route.ts` |
+| `/api/panic-euphoria` | GET | — | api.groq.com<br>api.stlouisfed.org<br>api.x.ai<br>app.scrapingbee.com<br>query1.finance.yahoo.com | FRED_API_KEY<br>GROK_XAI_API_KEY<br>GROQ_API_KEY<br>SCRAPINGBEE_API_KEY<br>XAI_API_KEY | yes | `components/panic-euphoria.tsx`<br>`lib/api-contracts.ts`<br>`lib/remediation.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/politician-spotlight` | GET | dynamic="force-dynamic" | — | — | **no** | `components/politician-spotlight.tsx`<br>`lib/api-contracts.ts`<br>`lib/remediation.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/polygon-proxy` | GET | runtime="edge" | api.polygon.io | POLYGON_API_KEY | yes | `components/scanner/enrichment.ts`<br>`components/scanner/fundamental-scan.ts`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/polygon-tickers` | GET | runtime="edge"<br>dynamic="force-dynamic" | api.polygon.io<br>financialmodelingprep.com | FMP_API_KEY<br>POLYGON_API_KEY | yes | `components/scanner/use-wheel-scanner.ts`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
@@ -215,7 +215,7 @@ _None._
 | `components/market-sentiment.tsx` | 1601 | 1001 |
 | `components/fomc-predictions.tsx` | 1258 | 658 |
 | `components/trend-analysis.tsx` | 1159 | 559 |
-| `components/panic-euphoria.tsx` | 1142 | 542 |
+| `components/panic-euphoria.tsx` | 1150 | 550 |
 | `components/options-strategy-toolbox.tsx` | 1040 | 440 |
 | `components/insider-trading-dashboard.tsx` | 961 | 361 |
 | `components/trade-walkthrough-modal.tsx` | 866 | 266 |
@@ -233,14 +233,21 @@ _None._
 Hand-maintained. Legend: `data` live/labeled · `api` verified · `math` verified ·
 `fb` fallbacks fire · `copy` accurate · `err` handled · `mob` mobile · `size` ≤600 lines/module.
 
+**2026-08-08 cross-cutting sweeps (P6-4…P6-13):** repo-wide passes covering all
+tabs — fake-data patterns, null-vs-0 rendering, duplicated math, raw env-key
+reads, admin auth, client secrets, module sizes — plus live-staging probes of
+every public route (fresh dates, plausible values, honest provenance). Findings
+fixed or logged as P6-4…P6-13. Ticks below record only what was verified for
+that tab; `fb` and `mob` remain unverified this pass.
+
 | Tab | data | api | math | fb | copy | err | mob | size |
 |---|---|---|---|---|---|---|---|---|
-| `ccpi` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `earnings-calendar` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| `ccpi` | ☑ | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☐ |
+| `earnings-calendar` | ☐ | ☑ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
 | `trend-analysis` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 | `risk-management` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `market-sentiment` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `panic-euphoria` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| `market-sentiment` | ☐ | ☐ | ☑ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| `panic-euphoria` | ☑ | ☑ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
 | `social-sentiment` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 | `fomc-predictions` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 | `cpi-inflation` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
@@ -254,11 +261,11 @@ Hand-maintained. Legend: `data` live/labeled · `api` verified · `math` verifie
 | `zebra-scanner` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 | `insiders` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 | `insider-clusters` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `form-144` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `congress-feed` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `politician-spotlight` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `top-performers` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `hedge-fund-13f` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| `form-144` | ☑ | ☑ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| `congress-feed` | ☑ | ☑ | ☐ | ☐ | ☑ | ☑ | ☐ | ☐ |
+| `politician-spotlight` | ☑ | ☑ | ☐ | ☐ | ☑ | ☑ | ☐ | ☐ |
+| `top-performers` | ☑ | ☑ | ☐ | ☐ | ☑ | ☑ | ☐ | ☐ |
+| `hedge-fund-13f` | ☑ | ☑ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 | `smart-money-etfs` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 | `wheel-strategy` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 | `learn-csp` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
@@ -274,7 +281,7 @@ Hand-maintained. Legend: `data` live/labeled · `api` verified · `math` verifie
 | `collars` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 | `exit-rules` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 | `earnings-iv-crusher` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `greeks` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| `greeks` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
 | `risk-rewards` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 
 ## 7. CLIENT-SIDE CACHE KEYS

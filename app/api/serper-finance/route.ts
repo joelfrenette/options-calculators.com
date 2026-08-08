@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { resolveApiKey } from "@/lib/api-keys"
 
 /**
  * Serper Google Finance/Search API Proxy
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Missing ticker parameter" }, { status: 400 })
   }
 
-  const SERPER_API_KEY = process.env.SERPER_API_KEY
+  const SERPER_API_KEY = resolveApiKey("SERPER_API_KEY")
 
   if (!SERPER_API_KEY) {
     console.log("[v0] Serper Finance: No SERPER_API_KEY found")

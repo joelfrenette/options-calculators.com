@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
+import { resolveApiKey } from "@/lib/api-keys"
 
 /**
  * Diagnostic endpoint for ScrapingBee integration
  * GET /api/scraping-bee/diagnostics
  */
 export async function GET() {
-  const apiKey = process.env.SCRAPINGBEE_API_KEY
+  const apiKey = resolveApiKey("SCRAPINGBEE_API_KEY")
   
   const diagnostics = {
     timestamp: new Date().toISOString(),
