@@ -50,6 +50,7 @@ import {
 } from "./groq-llm-market-data"
 
 import { fetchMarketDataWithGrok } from "./grok-market-data"
+import { getMeteringSupabaseConfig } from "./metered-fetch"
 
 /**
  * Unified AI Fallback System - OPTIMIZED FOR SPEED
@@ -73,6 +74,72 @@ function isPlausible(value: number | null, range: PlausibleRange): value is numb
   return value !== null && Number.isFinite(value) && value >= range.min && value <= range.max
 }
 
+// --- E-7a: Supabase TTL cache -----------------------------------------------
+//
+// These indicators move daily at most, but the LLM chain below used to run on
+// EVERY request that needed one — the site's largest recurring AI spend. A
+// fresh estimate is now written to `ai_estimates` and served for TTL hours.
+//
+// Honesty rules: only LIVE model answers are cached (a baseline is never
+// written, so cache hits are always real estimates); the original source tag
+// is preserved so tier attribution is identical fresh or cached; a failed
+// cache read/write silently falls through to the live chain — the cache can
+// only ever save calls, never change results.
+
+const AI_ESTIMATE_TTL_HOURS = (() => {
+  const raw = Number(process.env.AI_ESTIMATE_TTL_HOURS)
+  return Number.isFinite(raw) && raw > 0 ? raw : 18
+})()
+
+type AiSource = "grok" | "groq" | "anthropic" | "openai"
+
+async function readCachedEstimate(
+  key: string,
+  range: PlausibleRange,
+): Promise<{ value: number; source: AiSource } | null> {
+  const cfg = getMeteringSupabaseConfig()
+  if (!cfg) return null
+  try {
+    const since = new Date(Date.now() - AI_ESTIMATE_TTL_HOURS * 3600_000).toISOString()
+    const res = await fetch(
+      `${cfg.url}/rest/v1/ai_estimates?key=eq.${encodeURIComponent(key)}&updated_at=gte.${since}&select=value,source`,
+      { headers: { apikey: cfg.key, Authorization: `Bearer ${cfg.key}` }, signal: AbortSignal.timeout(4000), cache: "no-store" },
+    )
+    if (!res.ok) return null
+    const rows = await res.json()
+    if (!Array.isArray(rows) || rows.length === 0) return null
+    const value = Number(rows[0].value)
+    // Re-validate against the plausibility window — a range tightened since
+    // the row was written must invalidate stale cache, not resurrect it.
+    if (!isPlausible(value, range)) return null
+    const source = rows[0].source as AiSource
+    if (!["grok", "groq", "anthropic", "openai"].includes(source)) return null
+    return { value, source }
+  } catch {
+    return null
+  }
+}
+
+function writeCachedEstimate(key: string, value: number, source: AiSource): void {
+  const cfg = getMeteringSupabaseConfig()
+  if (!cfg) return
+  try {
+    void fetch(`${cfg.url}/rest/v1/ai_estimates?on_conflict=key`, {
+      method: "POST",
+      headers: {
+        apikey: cfg.key,
+        Authorization: `Bearer ${cfg.key}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      },
+      body: JSON.stringify({ key, value, source, updated_at: new Date().toISOString() }),
+      signal: AbortSignal.timeout(4000),
+    }).catch(() => {})
+  } catch {
+    /* cache write is best-effort */
+  }
+}
+
 export async function fetchWithAIFallback(
   indicatorName: string,
   grokFunc: () => Promise<number | null>,
@@ -82,12 +149,21 @@ export async function fetchWithAIFallback(
   range: PlausibleRange,
   baselineValue: number,
 ): Promise<{ value: number; source: "grok" | "groq" | "anthropic" | "openai" | "baseline" }> {
+  // Cache first (E-7a): a fresh-enough live estimate serves every request in
+  // the TTL window instead of re-running the LLM chain per view.
+  const cached = await readCachedEstimate(indicatorName, range)
+  if (cached) {
+    console.log(`[v0] ✓ ${indicatorName}: cached ${cached.source} estimate (${cached.value})`)
+    return cached
+  }
+
   console.log(`[v0] AI Fallback: Fetching ${indicatorName}...`)
 
   try {
     const grokValue = await grokFunc()
     if (isPlausible(grokValue, range)) {
       console.log(`[v0] ✓ ${indicatorName}: Using Grok xAI (${grokValue})`)
+      writeCachedEstimate(indicatorName, grokValue, "grok")
       return { value: grokValue, source: "grok" }
     }
   } catch (error) {
@@ -98,6 +174,7 @@ export async function fetchWithAIFallback(
     const groqLLMValue = await groqLLMFunc()
     if (isPlausible(groqLLMValue, range)) {
       console.log(`[v0] ⚠ ${indicatorName}: Falling back to Groq Llama (${groqLLMValue})`)
+      writeCachedEstimate(indicatorName, groqLLMValue, "groq")
       return { value: groqLLMValue, source: "groq" }
     }
   } catch (error) {
@@ -109,6 +186,7 @@ export async function fetchWithAIFallback(
     const anthropicValue = await anthropicFunc()
     if (isPlausible(anthropicValue, range)) {
       console.log(`[v0] ⚠ ${indicatorName}: Falling back to Anthropic Claude (${anthropicValue})`)
+      writeCachedEstimate(indicatorName, anthropicValue, "anthropic")
       return { value: anthropicValue, source: "anthropic" }
     }
   } catch (error) {
@@ -120,6 +198,7 @@ export async function fetchWithAIFallback(
     const openaiValue = await openaiFunc()
     if (isPlausible(openaiValue, range)) {
       console.log(`[v0] ⚠ ${indicatorName}: Falling back to OpenAI GPT-4o (${openaiValue})`)
+      writeCachedEstimate(indicatorName, openaiValue, "openai")
       return { value: openaiValue, source: "openai" }
     }
   } catch (error) {
