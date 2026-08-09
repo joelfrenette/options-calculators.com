@@ -38,15 +38,25 @@ export async function GET() {
     const fetchCPIData = async () => {
       const levels = await fetchCpiLevels()
       if (levels.length < 13) return null
-      // YoY per month: each point needs its own value 12 months earlier, so the
-      // first 12 levels are the base and produce no output point.
-      return levels.slice(12).map((row, i) => {
-        const yearAgo = levels[i].value
-        return {
+      // Pair each month with the SAME MONTH one year earlier by date, not by
+      // counting back twelve rows: CPIAUCSL has no 2025-10 observation, so a
+      // row offset would compare Nov-2025 against Oct-2024 and label the
+      // 13-month result "year-over-year". A month whose base is missing yields
+      // no point at all rather than a mismeasured one.
+      const byDate = new Map(levels.map((r) => [r.date, r.value]))
+      const out: { date: string; yoyChange: number }[] = []
+      for (const row of levels) {
+        const [y, m] = row.date.split("-").map(Number)
+        const base = new Date(Date.UTC(y - 1, m - 1, 1))
+        const baseKey = `${base.getUTCFullYear()}-${String(base.getUTCMonth() + 1).padStart(2, "0")}-01`
+        const yearAgo = byDate.get(baseKey)
+        if (yearAgo === undefined || yearAgo === 0) continue
+        out.push({
           date: row.date,
           yoyChange: Number((((row.value - yearAgo) / yearAgo) * 100).toFixed(2)),
-        }
-      })
+        })
+      }
+      return out.length > 0 ? out : null
     }
 
     const historicalCPI = await fetchCPIData()

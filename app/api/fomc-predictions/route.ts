@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { getApiKey } from "@/lib/api-keys"
-import { fredHistoryFromStore, fredTrendFromStore } from "@/lib/fred-store"
+import { fredHistoryFromStore, fredTrendFromStore, yoyTrend } from "@/lib/fred-store"
 
 // E-7d: BLS/FRED series update monthly-to-daily, never intraday. ISR caches
 // the whole response at the edge for 15 min instead of re-pulling full
@@ -21,31 +21,25 @@ export async function GET() {
       if (stored) return stored
       if (!fredApiKey) return null
       try {
-        // 14 observations for YoY: 13 for the current comparison plus one more
-        // so the previous month's YoY also spans a full 12 months.
-        const limit = calculateYoY ? 14 : 2
+        // 16 for YoY so a gap month (FRED sends "." and we drop it) cannot push
+        // the 12-months-back base outside the window; yoyTrend aligns by date,
+        // not by row offset.
+        const limit = calculateYoY ? 16 : 2
         const response = await fetch(
           `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${fredApiKey}&file_type=json&sort_order=desc&limit=${limit}`,
+          { signal: AbortSignal.timeout(10000) },
         )
         if (!response.ok) return null
         const data = await response.json()
         const obs = Array.isArray(data?.observations) ? data.observations : []
-        const v = obs.map((o: any) => Number.parseFloat(o.value)).filter((n: number) => Number.isFinite(n))
-        if (v.length === 0) return null
+        const rows = obs
+          .map((o: any) => ({ day: String(o.date), value: Number.parseFloat(o.value) }))
+          .filter((r: { value: number }) => Number.isFinite(r.value))
+        if (rows.length < 2) return null
 
-        if (calculateYoY) {
-          if (v.length < 14) return null
-          const current = ((v[0] - v[12]) / v[12]) * 100
-          const previous = ((v[1] - v[13]) / v[13]) * 100
-          if (!Number.isFinite(current) || !Number.isFinite(previous)) return null
-          return {
-            current: Number(current.toFixed(2)),
-            previous: Number(previous.toFixed(2)),
-            trend: current > previous ? "up" : current < previous ? "down" : "stable",
-          }
-        }
-        const current = v[0]
-        const previous = v.length > 1 ? v[1] : current
+        if (calculateYoY) return yoyTrend(rows)
+
+        const [current, previous] = [rows[0].value, rows[1].value]
         return {
           current,
           previous,

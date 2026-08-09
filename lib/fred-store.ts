@@ -13,6 +13,11 @@
  */
 
 import { getSeriesHistory } from "@/lib/market-series"
+import { yoyTrend, type SeriesTrend } from "@/lib/yoy"
+
+// Re-exported so routes have one import for store reads and the YoY maths that
+// goes with them; lib/yoy.ts stays dependency-free for scripts/check-yoy.ts.
+export { yoyTrend, type SeriesTrend }
 
 const STALENESS_DAYS: Record<string, number> = {
   DFF: 7,
@@ -26,18 +31,23 @@ const STALENESS_DAYS: Record<string, number> = {
   TEDRATE: Number.POSITIVE_INFINITY,
   GASREGW: 21,
   WRMFSL: 21,
-  BOGZ1FL663067003Q: 150,
-  UNRATE: 60,
-  CPIAUCSL: 60,
-  CPILFESL: 60,
-  PCEPI: 60,
-  PAYEMS: 60,
-  U6RATE: 60,
-  CES0500000003: 60,
-  M2SL: 60,
-  PPIACO: 60,
-  A191RL1Q225SBEA: 150,
-  GFDEGDQ188S: 150,
+  BOGZ1FL663067003Q: 200,
+  // Monthly series publish 4-6 weeks in arrears and occasionally skip a month
+  // (no October 2025 CPI was ever published). A 60-day gate marked genuinely
+  // current data stale and pushed every read back onto live FRED — the exact
+  // per-view traffic the store exists to remove. 100 days still catches a cron
+  // that has been dead for three publication cycles.
+  UNRATE: 100,
+  CPIAUCSL: 100,
+  CPILFESL: 100,
+  PCEPI: 100,
+  PAYEMS: 100,
+  U6RATE: 100,
+  CES0500000003: 100,
+  M2SL: 100,
+  PPIACO: 100,
+  A191RL1Q225SBEA: 200,
+  GFDEGDQ188S: 200,
 }
 
 function fresh(day: string, seriesId: string): boolean {
@@ -56,30 +66,18 @@ export async function fredLatestFromStore(seriesId: string): Promise<{ value: nu
 }
 
 /**
- * Latest / previous / trend for one series, computed over stored observations.
+ * Latest / previous / trend for one series from the store.
  *
- * `yoy: true` returns year-over-year percent change for a monthly index (CPI,
- * core CPI, PCE) and needs 14 observations: 13 for the current comparison and
- * one more so the PREVIOUS month's YoY spans a full 12 months too. The old
- * per-route version asked FRED for 13 and then read index 13, which is
- * undefined — it silently fell back to index 12 and compared an 11-month span
- * against a 12-month one, so "last month's inflation rate" was consistently
- * wrong by one month of base effect.
+ * `yoy: true` uses date-aligned year-over-year (see yoyTrend) and pulls 16
+ * observations so a gap month cannot push the base out of the window.
  */
-export async function fredTrendFromStore(
-  seriesId: string,
-  yoy: boolean,
-): Promise<{ current: number; previous: number; trend: "up" | "down" | "stable" } | null> {
-  const need = yoy ? 14 : 2
-  const rows = await fredHistoryFromStore(seriesId, need)
-  if (!rows || rows.length < need) return null
+export async function fredTrendFromStore(seriesId: string, yoy: boolean): Promise<SeriesTrend | null> {
+  const rows = await fredHistoryFromStore(seriesId, yoy ? 16 : 2)
+  if (!rows || rows.length < 2) return null
+  if (yoy) return yoyTrend(rows)
 
-  const v = rows.map((r) => r.value)
-  const [current, previous] = yoy
-    ? [((v[0] - v[12]) / v[12]) * 100, ((v[1] - v[13]) / v[13]) * 100]
-    : [v[0], v[1]]
+  const [current, previous] = [rows[0].value, rows[1].value]
   if (!Number.isFinite(current) || !Number.isFinite(previous)) return null
-
   return {
     current: Number(current.toFixed(2)),
     previous: Number(previous.toFixed(2)),
