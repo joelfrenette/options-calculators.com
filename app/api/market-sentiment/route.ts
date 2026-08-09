@@ -1,6 +1,65 @@
 import { NextResponse } from "next/server"
 import { resolveApiKey } from "@/lib/api-keys"
 import { sma } from "@/lib/indicators"
+import { getStoredCloses } from "@/lib/market-closes"
+import { getSeriesHistory } from "@/lib/market-series"
+
+/**
+ * Raw indicators computed from OUR OWN stored data — P6-22.
+ *
+ * These are the three fields that correctly read "NO DATA" after P6-18 removed
+ * their invented constants: spot VIX (was a literal 0), its 50-day average
+ * (was `vixVs50DayMA * 50 + vix`, a linear combination of a ratio and a spot
+ * level printed to two decimals) and SPY momentum (was divided by a hardcoded
+ * 125 regardless of how many closes came back).
+ *
+ * The E-7c snapshot now stores both inputs, so they can be measured instead of
+ * guessed: VIXCLS from FRED and SPY closes from Polygon.
+ *
+ * THESE ARE NOT CNN COMPONENT SCORES and are deliberately not wired into the
+ * seven-component list. They are raw measured quantities on their own scales —
+ * a VIX level, a percentage versus a moving average. Turning them into 0-100
+ * component scores would mean inventing a transform CNN has never published
+ * and rendering the result alongside CNN's own figures as if it were one.
+ *
+ * putCallRatio is absent on purpose: nothing in the codebase sources one, and
+ * there is no free feed. It stays null and is named in `notTracked`.
+ */
+async function fetchStoredRawIndicators(): Promise<{
+  vix: number | null
+  vix50DayMA: number | null
+  stockPriceMomentum: number | null
+}> {
+  const [vixRows, spyRows] = await Promise.all([
+    getSeriesHistory("fred:VIXCLS", 80),
+    getStoredCloses("SPY", 200, 125),
+  ])
+
+  let vix: number | null = null
+  let vix50DayMA: number | null = null
+  if (vixRows && vixRows.length > 0) {
+    vix = vixRows[0].value
+    // Both stores return newest-first; sma() takes oldest-first.
+    const ma = sma([...vixRows].reverse().map((r) => r.value), 50)
+    vix50DayMA = ma !== null && ma > 0 ? Number(ma.toFixed(2)) : null
+  }
+
+  let stockPriceMomentum: number | null = null
+  if (spyRows && spyRows.length >= 125) {
+    const closes = [...spyRows].reverse().map((r) => r.close)
+    // sma() returns null on short history rather than a stand-in, so a thin
+    // store yields null momentum instead of a percentage against a fake mean.
+    const ma125 = sma(closes, 125)
+    if (ma125 !== null && ma125 > 0) {
+      stockPriceMomentum = Number((((closes[closes.length - 1] - ma125) / ma125) * 100).toFixed(2))
+    }
+  }
+
+  return { vix, vix50DayMA, stockPriceMomentum }
+}
+
+/** Indicators with no source at all — named so a null is not read as a bug. */
+const NOT_TRACKED = ["putCallRatio"]
 
 /**
  * COMPREHENSIVE DATA SOURCE ANALYSIS & FALLBACK STRATEGY
@@ -710,8 +769,11 @@ export async function GET(request: Request) {
       // Also fetch live Yahoo data for the raw indicator values
       const [vixData, spyData] = await Promise.all([fetchYahooData("^VIX"), fetchYahooData("SPY", "6mo")])
 
+      // P6-22: stored VIX first (E-7c snapshot), the live Yahoo meta price
+      // only as the fallback.
+      const stored = await fetchStoredRawIndicators()
       const rawVix = vixData?.meta?.regularMarketPrice
-      const vixPrice = Number.isFinite(rawVix) ? Number(rawVix) : null
+      const vixPrice = stored.vix ?? (Number.isFinite(rawVix) ? Number(rawVix) : null)
 
       // Was `const putCallRatio = 1.0 // Default neutral put/call ratio`, then
       // reported as a measured figure under a "Live Raw Data" log line. Nothing
@@ -722,8 +784,8 @@ export async function GET(request: Request) {
       // regardless of how many closes came back, so a short series produced a
       // deflated MA and a wildly overstated momentum percentage.
       const spyPrices: number[] = spyData?.indicators?.quote?.[0]?.close?.filter((p: number) => p !== null) || []
-      let spyMomentumPct: number | null = null
-      if (spyPrices.length >= 125) {
+      let spyMomentumPct: number | null = stored.stockPriceMomentum
+      if (spyMomentumPct === null && spyPrices.length >= 125) {
         const window = spyPrices.slice(-125)
         const ma125 = window.reduce((a: number, b: number) => a + b, 0) / window.length
         const currentSPY = spyPrices[spyPrices.length - 1]
@@ -758,8 +820,11 @@ export async function GET(request: Request) {
         // bottom of a 0-100 fear scale — "EXTREME FEAR" — whenever CNN's page
         // simply did not carry that indicator.
         marketVolatility: vixPrice,
+        vix: vixPrice,
+        vix50DayMA: stored.vix50DayMA,
         putCallRatio,
         stockPriceMomentum: spyMomentumPct,
+        notTracked: NOT_TRACKED,
         stockPriceStrength: scrapedComponent("strength"),
         stockPriceBreadth: scrapedComponent("breadth"),
         junkBondSpread: scrapedComponent("junk"),
@@ -909,6 +974,8 @@ export async function GET(request: Request) {
 
     console.log(`[v0] Final indicators count: ${finalIndicators.length}`)
 
+    const storedRaw = await fetchStoredRawIndicators()
+
     const componentScore = (needle: string): number | null =>
       finalIndicators.find((i) => i.name.toLowerCase().includes(needle))?.score ?? null
     const volatilityScore = componentScore("volatility")
@@ -952,9 +1019,12 @@ export async function GET(request: Request) {
       // These five shipped as literal 0 on every response — not a fallback, a
       // constant. Nothing in this branch measures them, so they are null and
       // the UI renders "—".
-      vix: null,
-      putCallRatio: null,
-      stockPriceMomentum: null,
+      // P6-22: measured from the stored VIXCLS and SPY closes the E-7c
+      // snapshot writes. Null only when the store genuinely cannot serve them.
+      vix: storedRaw.vix,
+      vix50DayMA: storedRaw.vix50DayMA,
+      putCallRatio: null, // no free source — see NOT_TRACKED
+      stockPriceMomentum: storedRaw.stockPriceMomentum,
       stockPriceStrength: componentScore("strength"),
       stockPriceBreadth: componentScore("breadth"),
       junkBondSpread: componentScore("junk"),
@@ -970,6 +1040,7 @@ export async function GET(request: Request) {
       // Components CNN did not supply, so a consumer cannot mistake a "—" for
       // a rendering bug.
       unavailableComponents: finalIndicators.filter((i) => i.score === null).map((i) => i.name),
+      notTracked: NOT_TRACKED,
       dataSource: "CNN API + Live Market Data",
       methodology:
         "CNN's published Fear & Greed component scores. Components CNN did not return are reported as null and excluded — never substituted with a neutral 50.",

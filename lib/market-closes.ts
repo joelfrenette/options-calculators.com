@@ -33,6 +33,45 @@ export interface StoredBar {
 const MAX_STALE_DAYS = 6
 
 /**
+ * Closes only, for callers that genuinely need no other leg (a moving average
+ * of closes, say). Separate from getStoredBars on purpose: requiring OHLC
+ * where it is not used would leave those callers empty until the 0009
+ * backfill lands, for data that is already in the table today.
+ *
+ * Newest-first, or null when the store cannot serve `minBars` fresh closes.
+ */
+export async function getStoredCloses(ticker: string, limit: number, minBars: number): Promise<{ day: string; close: number }[] | null> {
+  const cfg = getMeteringSupabaseConfig()
+  if (!cfg) return null
+
+  try {
+    const url =
+      `${cfg.url}/rest/v1/market_closes` +
+      `?ticker=eq.${encodeURIComponent(ticker)}` +
+      `&select=day,close&order=day.desc&limit=${limit}`
+    const res = await fetch(url, {
+      headers: { apikey: cfg.key, Authorization: `Bearer ${cfg.key}` },
+      signal: AbortSignal.timeout(10000),
+    })
+    if (!res.ok) return null
+    const rows = (await res.json()) as { day: string; close: string | number }[] | null
+    if (!Array.isArray(rows)) return null
+
+    const closes = rows
+      .map((r) => ({ day: r.day, close: Number(r.close) }))
+      .filter((r) => Number.isFinite(r.close))
+    if (closes.length < minBars) return null
+
+    const ageDays = (Date.now() - new Date(closes[0].day + "T00:00:00Z").getTime()) / 86400000
+    if (ageDays > MAX_STALE_DAYS) return null
+
+    return closes
+  } catch {
+    return null
+  }
+}
+
+/**
  * Newest-first bars for one ticker, or null when the store cannot serve a
  * complete, fresh history of at least `minBars`.
  *

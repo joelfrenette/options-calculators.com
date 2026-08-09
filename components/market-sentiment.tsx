@@ -30,6 +30,8 @@ import { Info } from "lucide-react"
 // neutral 50 — those read as measurements on a 0-100 fear scale.
 interface MarketData {
   vix: number | null
+  /** Real 50-day average of FRED VIXCLS (P6-22). */
+  vix50DayMA?: number | null
   vixVs50DayMA: number | null
   putCallRatio: number | null
   marketMomentum: number | null
@@ -72,6 +74,7 @@ interface MarketData {
   }
   cnnComponents?: { score: number | null }[] // Array for CNN's 7 indicators
   unavailableComponents?: string[] // Components CNN did not supply this fetch
+  notTracked?: string[] // Indicators with no source at all — a null here is not a fault
   dataSource?: string // Added to fetch and display data source
   score: number // Ensure score is part of the interface for validation
   chartData?: {
@@ -1339,6 +1342,20 @@ export function MarketSentiment() {
             </div>
           )}
 
+          {/* A permanently unsourced indicator is a different fact from one CNN
+              happened not to send today, and saying so stops anyone chasing a
+              feed that does not exist. */}
+          {marketData?.notTracked && marketData.notTracked.length > 0 && (
+            <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+              <p className="text-sm text-gray-700">
+                <span className="font-semibold">Not tracked:</span> {marketData.notTracked.join(", ")}. No free data
+                source exists for {marketData.notTracked.length === 1 ? "it" : "them"}, so{" "}
+                {marketData.notTracked.length === 1 ? "it is" : "they are"} reported as null rather than estimated from
+                something else.
+              </p>
+            </div>
+          )}
+
           {cnnIndicatorCards.map((indicator, index) => {
             const chartInfo = getChartDataForIndicator(indicator.name) // Use indicator.name to match tooltip keys
             console.log(`[v0] Chart for ${indicator.name}:`, {
@@ -1575,10 +1592,22 @@ export function MarketSentiment() {
                             <div className="text-xs font-semibold text-gray-700 uppercase mb-1">50-Day MA</div>
                             {/* Was `vixVs50DayMA * 50 + vix` — a linear combination
                                 of a ratio and the spot level, printed to two
-                                decimals as if it were a moving average. Nothing
-                                in the payload carries a VIX 50-day MA. */}
-                            <div className="text-lg font-bold text-gray-400">—</div>
-                            <div className="text-xs text-gray-500 mt-1">Not sourced</div>
+                                decimals as if it were a moving average. Now the
+                                real 50-day mean of FRED VIXCLS (P6-22), or "—"
+                                when the store cannot supply 50 observations. */}
+                            {marketData.vix50DayMA === null || marketData.vix50DayMA === undefined ? (
+                              <>
+                                <div className="text-lg font-bold text-gray-400">—</div>
+                                <div className="text-xs text-gray-500 mt-1">Insufficient stored history</div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="text-lg font-bold text-gray-900">
+                                  {marketData.vix50DayMA.toFixed(2)}
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">FRED VIXCLS, 50-day mean</div>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
