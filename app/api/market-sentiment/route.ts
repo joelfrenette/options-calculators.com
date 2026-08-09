@@ -710,18 +710,33 @@ export async function GET(request: Request) {
       // Also fetch live Yahoo data for the raw indicator values
       const [vixData, spyData] = await Promise.all([fetchYahooData("^VIX"), fetchYahooData("SPY", "6mo")])
 
-      const vixPrice = vixData?.meta?.regularMarketPrice || 0
-      const putCallRatio = 1.0 // Default neutral put/call ratio
+      const rawVix = vixData?.meta?.regularMarketPrice
+      const vixPrice = Number.isFinite(rawVix) ? Number(rawVix) : null
 
-      // Get SPY momentum calculation
-      const spyPrices = spyData?.indicators?.quote?.[0]?.close?.filter((p: number) => p !== null) || []
-      const currentSPY = spyPrices[spyPrices.length - 1] || 0
-      const ma125 = spyPrices.slice(-125).reduce((a: number, b: number) => a + b, 0) / 125
-      const spyMomentumPct = ((currentSPY - ma125) / ma125) * 100
+      // Was `const putCallRatio = 1.0 // Default neutral put/call ratio`, then
+      // reported as a measured figure under a "Live Raw Data" log line. Nothing
+      // here fetches a put/call ratio, so the honest value is null.
+      const putCallRatio: number | null = null
 
+      // SPY momentum vs its 125-day MA. The old code divided by a hardcoded 125
+      // regardless of how many closes came back, so a short series produced a
+      // deflated MA and a wildly overstated momentum percentage.
+      const spyPrices: number[] = spyData?.indicators?.quote?.[0]?.close?.filter((p: number) => p !== null) || []
+      let spyMomentumPct: number | null = null
+      if (spyPrices.length >= 125) {
+        const window = spyPrices.slice(-125)
+        const ma125 = window.reduce((a: number, b: number) => a + b, 0) / window.length
+        const currentSPY = spyPrices[spyPrices.length - 1]
+        if (ma125 > 0) spyMomentumPct = ((currentSPY - ma125) / ma125) * 100
+      }
+
+      const num = (v: number | null) => (v === null ? "unavailable" : v.toFixed(2))
       console.log(
-        `[v0] Live Raw Data: VIX=${vixPrice.toFixed(2)}, Put/Call=${putCallRatio.toFixed(2)}, SPY Momentum=${spyMomentumPct.toFixed(2)}%`,
+        `[v0] Live Raw Data: VIX=${num(vixPrice)}, Put/Call=${num(putCallRatio)}, SPY Momentum=${num(spyMomentumPct)}%`,
       )
+
+      const scrapedComponent = (needle: string) =>
+        scrapedData.indicators.find((i) => i.name.toLowerCase().includes(needle))?.score ?? null
 
       return NextResponse.json({
         score: scrapedData.score, // Added missing 'score' field for client compatibility
@@ -739,13 +754,16 @@ export async function GET(request: Request) {
           sentiment: ind.sentiment,
         })),
         chartData: chartData || { dates: [], spy: [], vix: [] },
+        // Missing components are null, not 0. `|| 0` put a real reading at the
+        // bottom of a 0-100 fear scale — "EXTREME FEAR" — whenever CNN's page
+        // simply did not carry that indicator.
         marketVolatility: vixPrice,
-        putCallRatio: putCallRatio,
+        putCallRatio,
         stockPriceMomentum: spyMomentumPct,
-        stockPriceStrength: scrapedData.indicators.find((i) => i.name.toLowerCase().includes("strength"))?.score || 0,
-        stockPriceBreadth: scrapedData.indicators.find((i) => i.name.toLowerCase().includes("breadth"))?.score || 0,
-        junkBondSpread: scrapedData.indicators.find((i) => i.name.toLowerCase().includes("junk"))?.score || 0,
-        safeHavenDemand: scrapedData.indicators.find((i) => i.name.toLowerCase().includes("safe"))?.score || 0,
+        stockPriceStrength: scrapedComponent("strength"),
+        stockPriceBreadth: scrapedComponent("breadth"),
+        junkBondSpread: scrapedComponent("junk"),
+        safeHavenDemand: scrapedComponent("safe"),
         lastUpdate: new Date().toISOString(),
         dataSource: "CNN (Scraped)",
       })
@@ -767,7 +785,14 @@ export async function GET(request: Request) {
     const cnnData = await cnnResponse.json()
     console.log(`[v0] ✓ CNN API Success: Score ${cnnData.fear_and_greed?.score}/100`)
 
-    const cnnScore = cnnData.fear_and_greed?.score || 50
+    // The headline score is the whole tab. `|| 50` painted a measured-looking
+    // "Neutral 50" gauge whenever CNN's payload lacked a score — fail instead,
+    // the catch below returns a real error the UI already renders.
+    const rawCnnScore = cnnData.fear_and_greed?.score
+    if (!Number.isFinite(rawCnnScore)) {
+      throw new Error("CNN API returned no fear_and_greed score")
+    }
+    const cnnScore = Number(rawCnnScore)
     const cnnSentiment = cnnData.fear_and_greed?.rating?.toLowerCase() || "neutral"
 
     // CNN API returns indicators in fear_and_greed_historical.data array
@@ -788,49 +813,62 @@ export async function GET(request: Request) {
         const dataKeys = Object.keys(latestData)
         console.log(`[v0] Available data keys:`, dataKeys.join(", "))
 
+        // First key CNN actually supplies wins; absent from all of them means
+        // absent, not 50. `|| 50` sat a fabricated neutral reading in the
+        // middle of a 0-100 fear scale and it rendered like a measurement.
+        const firstScore = (...keys: string[]): number | null => {
+          for (const k of keys) {
+            const v = latestData[k]
+            if (Number.isFinite(v)) return Number(v)
+          }
+          return null
+        }
+
         // Map CNN API keys to our indicator names
         indicatorValues = [
           {
             name: "Market Momentum",
-            score: latestData.momentum_score || latestData.market_momentum_score || latestData.sp500_momentum || 50,
+            score: firstScore("momentum_score", "market_momentum_score", "sp500_momentum"),
             description: "S&P 500 vs 125-day MA",
           },
           {
             name: "Stock Price Strength",
-            score: latestData.strength_score || latestData.price_strength || latestData.stock_strength || 50,
+            score: firstScore("strength_score", "price_strength", "stock_strength"),
             description: "52-week highs vs lows",
           },
           {
             name: "Stock Price Breadth",
-            score: latestData.breadth_score || latestData.price_breadth || latestData.mcclellan || 50,
+            score: firstScore("breadth_score", "price_breadth", "mcclellan"),
             description: "McClellan Volume Summation",
           },
           {
             name: "Put and Call Options",
-            score: latestData.options_score || latestData.put_call || latestData.put_call_ratio || 50,
+            score: firstScore("options_score", "put_call", "put_call_ratio"),
             description: "5-day average ratio",
           },
           {
             name: "Market Volatility",
-            score: latestData.volatility_score || latestData.vix_score || latestData.market_volatility || 50,
+            score: firstScore("volatility_score", "vix_score", "market_volatility"),
             description: "VIX vs 50-day MA",
           },
           {
             name: "Safe Haven Demand",
-            score: latestData.safe_haven_score || latestData.bonds_score || latestData.safe_haven || 50,
+            score: firstScore("safe_haven_score", "bonds_score", "safe_haven"),
             description: "20-day stock vs bond returns",
           },
           {
             name: "Junk Bond Demand",
-            score: latestData.junk_bond_score || latestData.junk_demand || latestData.credit_spread || 50,
+            score: firstScore("junk_bond_score", "junk_demand", "credit_spread"),
             description: "Yield spread analysis",
           },
         ]
       }
     }
 
-    // If no indicator values extracted, calculate from live market data
-    if (indicatorValues.every((i) => i.score === 50)) {
+    // If no indicator values extracted, calculate from live market data.
+    // Sentinel was `every(score === 50)`, which only worked because the missing
+    // case WAS 50; it now tests for the absence it means to test for.
+    if (indicatorValues.length === 0 || indicatorValues.every((i) => i.score === null)) {
       console.log("[v0] No indicator data from CNN API, calculating from live market data...")
       const fallbackData = await calculateFallbackIndex()
 
@@ -844,26 +882,36 @@ export async function GET(request: Request) {
     }
 
     const finalIndicators = indicatorValues.map((ind, index) => {
-      const indicatorScore = ind.score
+      const indicatorScore: number | null = ind.score ?? null
 
-      // Calculate sentiment label based on score
-      let sentiment = "NEUTRAL"
-      if (indicatorScore < 25) sentiment = "EXTREME FEAR"
-      else if (indicatorScore < 45) sentiment = "FEAR"
-      else if (indicatorScore >= 55 && indicatorScore < 75) sentiment = "GREED"
-      else if (indicatorScore >= 75) sentiment = "EXTREME GREED"
+      // A null score has no sentiment. Every comparison below is false against
+      // null, so the old code labelled unknown indicators "NEUTRAL".
+      let sentiment: string | null = null
+      if (indicatorScore !== null) {
+        sentiment = "NEUTRAL"
+        if (indicatorScore < 25) sentiment = "EXTREME FEAR"
+        else if (indicatorScore < 45) sentiment = "FEAR"
+        else if (indicatorScore >= 55 && indicatorScore < 75) sentiment = "GREED"
+        else if (indicatorScore >= 75) sentiment = "EXTREME GREED"
+      }
 
-      console.log(`[v0] Indicator ${index + 1} - ${ind.name}: ${indicatorScore}/100 (${sentiment})`)
+      console.log(
+        `[v0] Indicator ${index + 1} - ${ind.name}: ${indicatorScore === null ? "unavailable" : `${indicatorScore}/100 (${sentiment})`}`,
+      )
 
       return {
         name: ind.name,
         score: indicatorScore,
         description: ind.description,
-        sentiment: sentiment,
+        sentiment,
       }
     })
 
     console.log(`[v0] Final indicators count: ${finalIndicators.length}`)
+
+    const componentScore = (needle: string): number | null =>
+      finalIndicators.find((i) => i.name.toLowerCase().includes(needle))?.score ?? null
+    const volatilityScore = componentScore("volatility")
 
     const yesterdayData = await fetchYahooData("^VIX", "5d")
     const weekAgoData = await fetchYahooData("^VIX", "2mo")
@@ -901,24 +949,30 @@ export async function GET(request: Request) {
 
       chartData: chartData || { dates: [], spy: [], vix: [] },
 
-      vix: 0,
-      putCallRatio: 0,
-      stockPriceMomentum: 0,
-      stockPriceStrength: finalIndicators.find((i: any) => i.name.toLowerCase().includes("strength"))?.score || 50,
-      stockPriceBreadth: finalIndicators.find((i: any) => i.name.toLowerCase().includes("breadth"))?.score || 50,
-      junkBondSpread: finalIndicators.find((i: any) => i.name.toLowerCase().includes("junk"))?.score || 50,
-      safeHavenDemand: finalIndicators.find((i: any) => i.name.toLowerCase().includes("safe"))?.score || 50,
+      // These five shipped as literal 0 on every response — not a fallback, a
+      // constant. Nothing in this branch measures them, so they are null and
+      // the UI renders "—".
+      vix: null,
+      putCallRatio: null,
+      stockPriceMomentum: null,
+      stockPriceStrength: componentScore("strength"),
+      stockPriceBreadth: componentScore("breadth"),
+      junkBondSpread: componentScore("junk"),
+      safeHavenDemand: componentScore("safe"),
 
-      volatilitySkew: 0,
-      openInterestPutCall: 0,
-      vixTermStructure: finalIndicators.find((i: any) => i.name.toLowerCase().includes("volatility"))?.score ?? 50,
-      // Parenthesized (P6-10): `100 - x || 50` binds as `(100 - x) || 50`, so a
-      // volatility score of exactly 100 produced 0 → falsy → silently became 50.
-      cboeSkewIndex:
-        100 - (finalIndicators.find((i: any) => i.name.toLowerCase().includes("volatility"))?.score ?? 50),
+      volatilitySkew: null,
+      openInterestPutCall: null,
+      vixTermStructure: componentScore("volatility"),
+      // Was `100 - (… ?? 50)`, which returned a confident 50 when the
+      // volatility component was missing. Null in, null out.
+      cboeSkewIndex: volatilityScore === null ? null : 100 - volatilityScore,
 
+      // Components CNN did not supply, so a consumer cannot mistake a "—" for
+      // a rendering bug.
+      unavailableComponents: finalIndicators.filter((i) => i.score === null).map((i) => i.name),
       dataSource: "CNN API + Live Market Data",
-      methodology: "Using CNN's actual Fear & Greed scores with live market calculations",
+      methodology:
+        "CNN's published Fear & Greed component scores. Components CNN did not return are reported as null and excluded — never substituted with a neutral 50.",
     })
   } catch (error) {
     console.error("[v0] ✗ All CNN data sources failed:", error)

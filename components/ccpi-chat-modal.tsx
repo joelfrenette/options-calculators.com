@@ -13,14 +13,17 @@ interface CCPIChatModalProps {
   isOpen: boolean
   onClose: () => void
   ccpiContext: {
-    ccpi: number
-    certainty: number
+    ccpi: number | null
+    certainty: number | null
     regime: { name: string; description: string }
+    // A pillar is null when too little of its weight was live/AI-sourced. The
+    // chat route states that as "insufficient data"; it used to arrive as 0,
+    // which on this scale reads as maximum crash signal.
     pillars: {
-      momentum: number
-      riskAppetite: number
-      valuation: number
-      macro: number
+      momentum: number | null
+      riskAppetite: number | null
+      valuation: number | null
+      macro: number | null
     }
     activeWarnings: number
     totalIndicators: number
@@ -83,7 +86,7 @@ export function CCPIChatModal({ isOpen, onClose, ccpiContext }: CCPIChatModalPro
             Ask AI about CCPI
           </DialogTitle>
           <p className="text-sm text-gray-600">
-            Get insights about your current CCPI score of {ccpiContext.ccpi}/100 ({ccpiContext.regime.name})
+            Get insights about your current CCPI score of {ccpiContext.ccpi ?? "—"}/100 ({ccpiContext.regime.name})
           </p>
         </DialogHeader>
 

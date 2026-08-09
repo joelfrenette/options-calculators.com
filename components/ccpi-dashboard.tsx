@@ -376,9 +376,11 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
         ccpi: Math.round(ccpiData.ccpi),
         certainty: ccpiData.certainty || 0,
         activeCanaries: ccpiData.canaries ? countActiveWarnings(ccpiData.canaries) : 0,
-        totalIndicators: ccpiData.canaries ? ccpiData.canaries.length : 0,
+        // The payload's scored-indicator count, not the canary-array length —
+        // "3 of 12" was being narrated against a 29-indicator index.
+        totalIndicators: ccpiData.totalIndicators ?? 0,
         regime: ccpiData.regime || { name: "Unknown", description: "Unknown" },
-        pillars: ccpiData.pillars || { momentum: 0, riskAppetite: 0, valuation: 0, macro: 0 },
+        pillars: ccpiData.pillars ?? { momentum: null, riskAppetite: null, valuation: null, macro: null },
       }
 
       const response = await fetch("/api/ccpi/executive-summary", {
@@ -3171,12 +3173,16 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
         ccpiContext={{
-          ccpi: data?.ccpi || 0,
-          certainty: data?.certainty || 0,
+          ccpi: data?.ccpi ?? null,
+          certainty: data?.certainty ?? null,
           regime: data?.regime || { name: "Unknown", description: "" },
-          pillars: data?.pillars || { momentum: 0, riskAppetite: 0, valuation: 0, macro: 0 },
+          // Nulls pass through: an unscored pillar reaching the assistant as 0
+          // told it "maximum crash signal" for data that does not exist.
+          pillars: data?.pillars ?? { momentum: null, riskAppetite: null, valuation: null, macro: null },
           activeWarnings: data ? countActiveWarnings(data.canaries) : 0,
-          totalIndicators: data?.canaries?.length || 0,
+          // The payload's own scored-indicator count. This was the canary-array
+          // length, so the prompt read "3 of 12" against a 29-indicator index.
+          totalIndicators: data?.totalIndicators ?? 0,
           crashAmplifiers: data?.crashAmplifiers?.map((ca) => ca.reason) || [],
           activeSignals:
             data?.canaries

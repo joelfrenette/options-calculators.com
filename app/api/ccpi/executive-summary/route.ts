@@ -6,6 +6,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { resolveApiKey } from "@/lib/api-keys"
 import { recordAiCall } from "@/lib/metered-fetch"
 import { ensureBudgetGuardFresh } from "@/lib/budget-guard"
+import { TOTAL_SCORED_INDICATORS } from "@/lib/ccpi/scoring"
 
 const OPENROUTER_FREE_MODEL = process.env.OPENROUTER_FREE_MODEL || "openrouter/free"
 
@@ -72,12 +73,18 @@ export async function POST(request: Request) {
       body.activeCanaries ?? (body.canaries ? body.canaries.filter((c: any) => c.active).length : 0)
     const totalIndicators = body.totalIndicators ?? (body.canaries ? body.canaries.length : 0)
     const regime = body.regime ?? { name: "Unknown", description: "Unknown" }
-    const pillars = body.pillars ?? { momentum: 0, riskAppetite: 0, valuation: 0, macro: 0 }
+    // Pillars arrive null when too little of their weight was live/AI-sourced.
+    // `?? { …: 0 }` and a bare `${pillars.momentum}/100` both told the model a
+    // hard zero — maximum crash signal — for a pillar that was never scored.
+    const pillars = body.pillars ?? { momentum: null, riskAppetite: null, valuation: null, macro: null }
+    const pillarLine = (label: string, score: number | null | undefined, weight: string) =>
+      `  * ${label}: ${score === null || score === undefined ? `insufficient data — excluded from the composite (Weight: ${weight})` : `${score}/100 (Weight: ${weight})`}`
+    const unscoredPillars = ["momentum", "riskAppetite", "valuation", "macro"].filter((k) => pillars[k] == null)
 
     const prompt = `You are a professional financial analyst providing an executive summary for the CCPI (Comprehensive Crash & Correction Prediction Index).
 
 ## CCPI METHODOLOGY CONTEXT:
-The CCPI is a proprietary market crash prediction index that aggregates 34 market indicators across 4 weighted pillars:
+The CCPI is a proprietary market crash prediction index that aggregates ${TOTAL_SCORED_INDICATORS} scored market indicators across 4 weighted pillars:
 - **Pillar 1: Momentum & Technical (35%)** - Tracks price trends, moving averages, breadth indicators
 - **Pillar 2: Risk Appetite & Volatility (30%)** - Measures VIX, put/call ratios, credit spreads, investor sentiment
 - **Pillar 3: Valuation & Market Structure (15%)** - Analyzes P/E ratios, CAPE, market concentration, equity risk premium
@@ -102,10 +109,15 @@ The ${certainty}% certainty score measures signal consistency and alignment:
 - Active Warning Signals: ${activeCanaries} of ${totalIndicators} indicators triggered
 - Market Regime: ${regime.name} (${regime.description})
 - Pillar Scores:
-  * Momentum & Technical: ${pillars.momentum}/100 (Weight: 35%)
-  * Risk Appetite & Volatility: ${pillars.riskAppetite}/100 (Weight: 30%)
-  * Valuation & Market Structure: ${pillars.valuation}/100 (Weight: 15%)
-  * Macro: ${pillars.macro}/100 (Weight: 20%)
+${pillarLine("Momentum & Technical", pillars.momentum, "35%")}
+${pillarLine("Risk Appetite & Volatility", pillars.riskAppetite, "30%")}
+${pillarLine("Valuation & Market Structure", pillars.valuation, "15%")}
+${pillarLine("Macro", pillars.macro, "20%")}${
+      unscoredPillars.length > 0
+        ? `
+- DATA GAP: ${unscoredPillars.length} of 4 pillars could not be scored. State this in the summary and do not infer a reading for them. "Insufficient data" means UNKNOWN — not zero, and not healthy.`
+        : ""
+    }
 
 ## YOUR TASK:
 Write a comprehensive 2-3 sentence executive summary that:

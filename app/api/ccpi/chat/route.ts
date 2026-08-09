@@ -5,6 +5,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { resolveApiKey } from "@/lib/api-keys"
 import { recordAiCall } from "@/lib/metered-fetch"
 import { ensureBudgetGuardFresh } from "@/lib/budget-guard"
+import { TOTAL_SCORED_INDICATORS } from "@/lib/ccpi/scoring"
 
 const OPENROUTER_FREE_MODEL = process.env.OPENROUTER_FREE_MODEL || "openrouter/free"
 
@@ -67,10 +68,21 @@ export async function POST(req: Request) {
   try {
     const { messages, ccpiContext }: { messages: UIMessage[]; ccpiContext: any } = await req.json()
 
+    // A pillar is null when under 40 of its 100 weight came from live or AI
+    // data — the composite renormalizes over the pillars that scored. Rendering
+    // that as "0/100" told the model MAXIMUM crash signal, the exact opposite
+    // of "we don't know", and it then reasoned and advised from there.
+    const pillarLine = (label: string, score: number | null | undefined) =>
+      `  * ${label}: ${score === null || score === undefined ? "insufficient data — excluded from the composite" : `${score}/100`}`
+
+    const unscoredPillars = ccpiContext
+      ? ["momentum", "riskAppetite", "valuation", "macro"].filter((k) => ccpiContext.pillars?.[k] == null)
+      : []
+
     const systemPrompt = `You are a professional financial analyst AI assistant specializing in the CCPI (Comprehensive Crash & Correction Prediction Index). You help options traders understand market crash risk and make informed decisions.
 
 ## CCPI METHODOLOGY:
-The CCPI aggregates 34 market indicators across 4 weighted pillars:
+The CCPI aggregates ${TOTAL_SCORED_INDICATORS} scored market indicators across 4 weighted pillars:
 - **Pillar 1: Momentum & Technical (35%)** - Price trends, moving averages (QQQ 20/50-day SMA), market breadth
 - **Pillar 2: Risk Appetite & Volatility (30%)** - VIX levels, put/call ratios, credit spreads, AAII sentiment
 - **Pillar 3: Valuation & Market Structure (15%)** - S&P P/E, CAPE, Buffett Indicator, Mag7 concentration, equity risk premium
@@ -89,14 +101,19 @@ Certainty Score: Measures signal consistency (how many indicators agree). Higher
 ${
   ccpiContext
     ? `
-- CCPI Score: ${ccpiContext.ccpi}/100 (${ccpiContext.regime?.name || "Unknown"} regime)
-- Certainty Score: ${ccpiContext.certainty}%
-- Active Warning Signals: ${ccpiContext.activeWarnings} of ${ccpiContext.totalIndicators}
+- CCPI Score: ${ccpiContext.ccpi ?? "unavailable"}/100 (${ccpiContext.regime?.name || "Unknown"} regime)
+- Certainty Score: ${ccpiContext.certainty ?? "unavailable"}%
+- Active Warning Signals: ${ccpiContext.activeWarnings ?? "unavailable"} of ${ccpiContext.totalIndicators ?? TOTAL_SCORED_INDICATORS}
 - Pillar Scores:
-  * Momentum & Technical: ${ccpiContext.pillars?.momentum || 0}/100
-  * Risk Appetite & Volatility: ${ccpiContext.pillars?.riskAppetite || 0}/100
-  * Valuation & Market Structure: ${ccpiContext.pillars?.valuation || 0}/100
-  * Macro: ${ccpiContext.pillars?.macro || 0}/100
+${pillarLine("Momentum & Technical", ccpiContext.pillars?.momentum)}
+${pillarLine("Risk Appetite & Volatility", ccpiContext.pillars?.riskAppetite)}
+${pillarLine("Valuation & Market Structure", ccpiContext.pillars?.valuation)}
+${pillarLine("Macro", ccpiContext.pillars?.macro)}${
+        unscoredPillars.length > 0
+          ? `
+- DATA GAP: ${unscoredPillars.length} of 4 pillars could not be scored. Say so when the user asks about them or about the composite, and do not infer a reading for them. A pillar marked "insufficient data" is UNKNOWN, not zero and not healthy.`
+          : ""
+      }
 ${ccpiContext.crashAmplifiers?.length > 0 ? `- Crash Amplifiers Active: ${ccpiContext.crashAmplifiers.join(", ")}` : ""}
 ${
   ccpiContext.activeSignals?.length > 0

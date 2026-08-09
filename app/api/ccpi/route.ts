@@ -24,6 +24,7 @@ import {
   computeCertainty,
   determineRegime,
   getPlaybook,
+  TOTAL_SCORED_INDICATORS,
   type Regime,
 } from "@/lib/ccpi/scoring"
 
@@ -70,9 +71,6 @@ const PILLAR_PCT = {
   valuation: PILLAR_WEIGHTS.valuation * 100,
   macro: PILLAR_WEIGHTS.macro * 100,
 } as const
-
-/** Count of indicators actually scored across the four pillars (10+4+7+8). */
-const TOTAL_SCORED_INDICATORS = 29
 
 export async function GET() {
   try {

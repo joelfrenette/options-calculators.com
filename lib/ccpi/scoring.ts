@@ -166,6 +166,14 @@ assertSumsTo100("RISK_APPETITE_WEIGHTS", RISK_APPETITE_WEIGHTS)
 assertSumsTo100("VALUATION_WEIGHTS", VALUATION_WEIGHTS)
 assertSumsTo100("MACRO_WEIGHTS", MACRO_WEIGHTS)
 
+/**
+ * Indicators actually scored across the four pillars — derived from the weight
+ * tables, not hand-counted, so it cannot drift the way the "34 indicators" and
+ * "32 indicators" copy did (it is 29: 10+4+7+8).
+ */
+export const TOTAL_SCORED_INDICATORS =
+  MOMENTUM_WEIGHTS.length + RISK_APPETITE_WEIGHTS.length + VALUATION_WEIGHTS.length + MACRO_WEIGHTS.length
+
 // ---------------------------------------------------------------------------
 // Generic pillar scorer with provenance-aware renormalization (P3-12)
 // ---------------------------------------------------------------------------

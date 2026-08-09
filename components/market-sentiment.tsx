@@ -26,15 +26,17 @@ import { Info } from "lucide-react"
 //   BarChart3,
 // } from "lucide-react"
 
+// Anything the route could not measure arrives as null. It is never a 0 or a
+// neutral 50 — those read as measurements on a 0-100 fear scale.
 interface MarketData {
-  vix: number
-  vixVs50DayMA: number
-  putCallRatio: number
-  marketMomentum: number
-  stockPriceStrength: number
-  stockBreadth: number
-  junkBondSpread: number
-  safeHavenDemand: number
+  vix: number | null
+  vixVs50DayMA: number | null
+  putCallRatio: number | null
+  marketMomentum: number | null
+  stockPriceStrength: number | null
+  stockBreadth: number | null
+  junkBondSpread: number | null
+  safeHavenDemand: number | null
   overallScore: number
   sentiment: string
   trend: "up" | "down" | "neutral"
@@ -42,10 +44,10 @@ interface MarketData {
   lastWeekChange: number
   lastMonthChange: number
   lastYearChange: number
-  volatilitySkew: number
-  openInterestPutCall: number
-  vixTermStructure: string
-  cboeSkewIndex: number
+  volatilitySkew: number | null
+  openInterestPutCall: number | null
+  vixTermStructure: string | number | null
+  cboeSkewIndex: number | null
   usingFallback?: boolean // Added flag to indicate fallback data
   timestamp?: string
   calculationDetails?: {
@@ -68,7 +70,8 @@ interface MarketData {
     primary: string
     nyseData?: string
   }
-  cnnComponents?: { score: number }[] // Array for CNN's 7 indicators
+  cnnComponents?: { score: number | null }[] // Array for CNN's 7 indicators
+  unavailableComponents?: string[] // Components CNN did not supply this fetch
   dataSource?: string // Added to fetch and display data source
   score: number // Ensure score is part of the interface for validation
   chartData?: {
@@ -401,7 +404,10 @@ const componentTooltips = {
   junkBond: cnnComponentTooltips.junkbonddemand,
 }
 
-const getIndicatorSentiment = (score: number): string => {
+// Null has no sentiment. Every comparison here is false against null, so an
+// unmeasured component used to come out labelled "NEUTRAL".
+const getIndicatorSentiment = (score: number | null): string => {
+  if (score === null) return "NO DATA"
   if (score < 25) return "EXTREME FEAR"
   if (score < 45) return "FEAR"
   if (score >= 55 && score < 75) return "GREED"
@@ -419,6 +425,10 @@ const getSentimentColor = (sentiment: string): string => {
       return "bg-green-500 text-white"
     case "EXTREME GREED":
       return "bg-emerald-600 text-white"
+    // Grey, not the neutral-yellow every other unrecognised label got — an
+    // unmeasured component must not look like a NEUTRAL reading.
+    case "NO DATA":
+      return "bg-gray-200 text-gray-600"
     default:
       return "bg-yellow-500 text-gray-900"
   }
@@ -455,48 +465,58 @@ export function MarketSentiment() {
     )
   }
 
-  // Define components based on CNN's Fear & Greed Index indicators
-  const components = [
+  // Define components based on CNN's Fear & Greed Index indicators.
+  //
+  // Every entry used to end in `?? 50`, so a component CNN never supplied
+  // rendered as a measured neutral reading. Two of them were worse than a
+  // default: `?? marketData?.vix` put a raw VIX level (say 18) on a 0-100
+  // sentiment scale, and `putCallRatio * 50` invented a score out of a ratio.
+  // A missing component is null and the card says so.
+  const componentScore = (index: number, flat: number | null | undefined): number | null => {
+    const fromCnn = marketData?.cnnComponents?.[index]?.score
+    if (fromCnn !== null && fromCnn !== undefined) return fromCnn
+    return flat ?? null
+  }
+
+  const components: { name: string; description: string; value: number | null }[] = [
     {
       name: "Market Momentum",
       description: "S&P 500 vs 125-Day MA",
-      value: marketData?.cnnComponents?.[0]?.score ?? marketData?.marketMomentum ?? 50,
+      value: componentScore(0, marketData?.marketMomentum),
     },
     {
       name: "Stock Price Strength",
       description: "52-week highs vs lows",
-      value: marketData?.cnnComponents?.[1]?.score ?? marketData?.stockPriceStrength ?? 50,
+      value: componentScore(1, marketData?.stockPriceStrength),
     },
     {
       name: "Stock Price Breadth",
       description: "McClellan Volume Summation",
-      value: marketData?.cnnComponents?.[2]?.score ?? marketData?.stockBreadth ?? 50,
+      value: componentScore(2, marketData?.stockBreadth),
     },
     {
       name: "Put and Call Options",
       description: "5-day average ratio",
-      value: marketData?.cnnComponents?.[3]?.score ?? (marketData?.putCallRatio ? marketData.putCallRatio * 50 : 50),
+      value: componentScore(3, null),
     },
     {
       name: "Market Volatility",
       description: "VIX vs 50-day MA",
-      value: marketData?.cnnComponents?.[4]?.score ?? marketData?.vix ?? 50,
+      value: componentScore(4, null),
     },
     {
       name: "Safe Haven Demand",
       description: "20-day stock vs bond returns",
-      value:
-        marketData?.cnnComponents?.[5]?.score ??
-        (marketData?.safeHavenDemand ? Math.min(100, Math.max(0, 50 + marketData.safeHavenDemand * 2)) : 50),
+      value: componentScore(5, marketData?.safeHavenDemand),
     },
     {
       name: "Junk Bond Demand",
       description: "Yield spread analysis",
-      value:
-        marketData?.cnnComponents?.[6]?.score ??
-        (marketData?.junkBondSpread ? Math.min(100, Math.max(0, marketData.junkBondSpread * 10)) : 50),
+      value: componentScore(6, marketData?.junkBondSpread),
     },
   ]
+
+  const missingComponents = components.filter((c) => c.value === null).map((c) => c.name)
 
   const cnnIndicatorCards = [
     {
@@ -1306,6 +1326,19 @@ export function MarketSentiment() {
             <TrendingUpIcon className="h-6 w-6 text-primary" />7 FEAR & GREED INDICATORS
           </div>
 
+          {/* Says which components CNN did not supply, so a "NO DATA" badge
+              reads as missing data rather than a rendering fault. */}
+          {missingComponents.length > 0 && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-sm text-amber-900">
+                <span className="font-semibold">Insufficient data:</span> CNN did not supply{" "}
+                {missingComponents.join(", ")} on this fetch. {missingComponents.length === 1 ? "It is" : "They are"}{" "}
+                shown as "—" and excluded — no neutral placeholder is substituted. The headline score is CNN's own
+                published figure and is unaffected.
+              </p>
+            </div>
+          )}
+
           {cnnIndicatorCards.map((indicator, index) => {
             const chartInfo = getChartDataForIndicator(indicator.name) // Use indicator.name to match tooltip keys
             console.log(`[v0] Chart for ${indicator.name}:`, {
@@ -1540,11 +1573,12 @@ export function MarketSentiment() {
                           </div>
                           <div className="p-3 bg-gray-50 rounded border border-gray-200">
                             <div className="text-xs font-semibold text-gray-700 uppercase mb-1">50-Day MA</div>
-                            <div className="text-lg font-bold text-gray-900">
-                              {marketData.vixVs50DayMA !== undefined
-                                ? (marketData.vixVs50DayMA * 50 + marketData.vix).toFixed(2)
-                                : "N/A"}
-                            </div>
+                            {/* Was `vixVs50DayMA * 50 + vix` — a linear combination
+                                of a ratio and the spot level, printed to two
+                                decimals as if it were a moving average. Nothing
+                                in the payload carries a VIX 50-day MA. */}
+                            <div className="text-lg font-bold text-gray-400">—</div>
+                            <div className="text-xs text-gray-500 mt-1">Not sourced</div>
                           </div>
                         </div>
                       </div>
