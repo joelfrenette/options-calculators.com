@@ -11,6 +11,7 @@
 
 import { resolveApiKey } from "@/lib/api-keys"
 import { getSeriesHistory } from "@/lib/market-series"
+import { computeTermStructure, BASELINE_RATIO, BASELINE_SPOT } from "@/lib/vix-term"
 
 export interface VIXTermStructureData {
   spotVIX: number
@@ -23,18 +24,10 @@ export interface VIXTermStructureData {
   timestamp: string
 }
 
-/** Long-run normal contango ratio, used only on the baseline path. */
-const BASELINE_RATIO = 1.08
-const BASELINE_SPOT = 18
-
-/** Pure helper so the ratio/inversion rule is unit-testable without I/O. */
-export function computeTermStructure(spotVIX: number, vix3m: number): { termStructure: number; isInverted: boolean } {
-  if (!(spotVIX > 0) || !(vix3m > 0)) {
-    return { termStructure: BASELINE_RATIO, isInverted: false }
-  }
-  const termStructure = vix3m / spotVIX
-  return { termStructure, isInverted: termStructure < 1 }
-}
+// The maths lives in lib/vix-term.ts, which stays import-free so the check
+// scripts can load it under node's type stripping. Re-exported here so
+// existing importers do not have to care which file it is in.
+export { computeTermStructure, BASELINE_RATIO, BASELINE_SPOT }
 
 function baseline(): VIXTermStructureData {
   return {

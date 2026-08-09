@@ -452,6 +452,18 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     tabs: [],
   },
   {
+    path: "/api/breadth-backtest",
+    method: "GET",
+    schema: z
+      .object({
+        verdict: z.enum(["insufficient-history", "no-lead-demonstrated", "lead-demonstrated"]),
+        episodes: z.array(anyObject),
+      })
+      .passthrough(),
+    budgetMs: 20000,
+    tabs: [],
+  },
+  {
     path: "/api/cron/market-snapshot",
     method: "GET",
     skip: "CRON_SECRET-authenticated pipeline (E-7c); a probe would spend a Polygon grouped call plus the whole FRED sweep and write to both stores.",

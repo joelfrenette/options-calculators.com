@@ -1,6 +1,6 @@
 /**
  * Invariant checks for the CCPI scoring core (lib/ccpi/scoring.ts) and the
- * VIX term-structure ratio convention (lib/vix-term-structure.ts).
+ * VIX term-structure ratio convention (lib/vix-term.ts).
  *
  * Run: node scripts/check-ccpi-scoring.ts
  *
@@ -34,7 +34,7 @@ import {
   type MacroTiers,
   type PillarResults,
 } from "../lib/ccpi/scoring.ts"
-import { computeTermStructure } from "../lib/vix-term-structure.ts"
+import { computeTermStructure } from "../lib/vix-term.ts"
 
 let failures = 0
 const check = (label: string, ok: boolean, detail = "") => {

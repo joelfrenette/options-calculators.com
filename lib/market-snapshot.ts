@@ -20,7 +20,7 @@
 import { meteredFetch, getMeteringSupabaseConfig } from "@/lib/metered-fetch"
 import { upsertSeriesPoints, upsertSeriesPoint, getSeriesHistory } from "@/lib/market-series"
 import { BREADTH_UNIVERSE, BREADTH_UNIVERSE_AS_OF } from "@/lib/breadth-universe"
-import { computeTermStructure } from "@/lib/vix-term-structure"
+import { computeTermStructure } from "@/lib/vix-term"
 
 /**
  * Index proxies charted by /api/trend-analysis. They are ordinary US-listed
