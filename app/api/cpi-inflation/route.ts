@@ -82,7 +82,6 @@ export async function GET() {
 
     // Generate forecast for next 24 months
     const forecastData = []
-    const today = new Date()
 
     // Calculate trend from last 6 months
     const recentMonths = historicalCPI.slice(-6)
@@ -91,11 +90,14 @@ export async function GET() {
         ? (recentMonths[recentMonths.length - 1].yoyChange - recentMonths[0].yoyChange) / (recentMonths.length - 1)
         : -0.1 // Default to declining trend
 
-    // Generate 24-month forecast
+    // Generate 24-month forecast. Months run forward from the LATEST PUBLISHED
+    // observation, not from today: CPI is released 4-6 weeks in arrears, so
+    // anchoring on today left the months between the last release and now
+    // missing from the chart entirely.
+    const [latestY, latestM] = historicalCPI[historicalCPI.length - 1].date.split("-").map(Number)
     let lastCPI = currentCPI
     for (let i = 1; i <= 24; i++) {
-      const forecastDate = new Date(today)
-      forecastDate.setMonth(today.getMonth() + i)
+      const forecastDate = new Date(Date.UTC(latestY, latestM - 1 + i, 1))
 
       // Apply gradual convergence to Fed target with some randomness
       const targetPull = (fedTarget - lastCPI) * 0.15 // 15% pull toward target each month
@@ -105,7 +107,7 @@ export async function GET() {
       lastCPI = Math.max(1.5, Math.min(5.0, lastCPI + monthlyChange)) // Keep within reasonable bounds
 
       forecastData.push({
-        month: forecastDate.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+        month: forecastDate.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" }),
         cpi: Number(lastCPI.toFixed(2)),
         yoyChange: Number((lastCPI - currentCPI).toFixed(2)),
       })
@@ -114,21 +116,36 @@ export async function GET() {
     // Generate chart data (2 years historical + 2 years forecast)
     const chartData = []
 
-    // Historical data (last 24 months)
+    // Historical data (last 24 months). FRED dates are YYYY-MM-01; formatting
+    // them through `new Date(...)` renders in local time, so west of UTC every
+    // point silently shifted to the previous month. Build the label from the
+    // date parts instead — same approach as /api/jobs-report.
+    const monthLabel = (isoDay: string) => {
+      const [y, m] = isoDay.split("-").map(Number)
+      return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-US", {
+        month: "short",
+        year: "numeric",
+        timeZone: "UTC",
+      })
+    }
+
     const historicalForChart = historicalCPI.slice(-24)
     historicalForChart.forEach((point) => {
-      const date = new Date(point.date)
       chartData.push({
-        date: date.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+        date: monthLabel(point.date),
         historical: point.yoyChange,
         forecast: null,
         type: "historical",
       })
     })
 
-    // Current point (connects historical to forecast)
+    // Bridge point joining history to forecast. It carries the LATEST PUBLISHED
+    // reading, so it must be labelled with that reading's month — labelling it
+    // with today's date drew the June figure at August and implied a release
+    // that has not happened (CPI runs 4-6 weeks in arrears).
+    const latestObservedMonth = historicalCPI[historicalCPI.length - 1].date
     chartData.push({
-      date: today.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+      date: monthLabel(latestObservedMonth),
       historical: currentCPI,
       forecast: currentCPI,
       type: "current",
