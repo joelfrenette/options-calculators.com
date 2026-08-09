@@ -26,10 +26,12 @@ interface NextMeeting {
   predictionBps: number
   confidence: number
   impliedRate: number
+  reliability: "full" | "degraded"
 }
 
 interface RatePath {
-  previousMeeting: number
+  // Null when FRED's DFF history is too short to reach back a meeting cycle.
+  previousMeeting: number | null
   current: number
   nextMeeting: number
   threeMonth: number
@@ -54,10 +56,10 @@ interface HistoricalRate {
 }
 
 interface EconomicFactors {
-  yieldCurve: string
-  yieldCurveSignal: string
-  treasuryTrend: string
-  treasurySignal: string
+  yieldCurve: string | null
+  yieldCurveSignal: string | null
+  treasuryTrend: string | null
+  treasurySignal: string | null
   marketExpectation: string
 }
 
@@ -67,23 +69,49 @@ interface EconomicIndicator {
   trend: "up" | "down" | "stable"
 }
 
+// Every indicator is null when its FRED series was unavailable. Nothing is
+// substituted, so the card renders "—" instead of a representative figure.
 interface EconomicIndicators {
-  unemployment: EconomicIndicator
-  cpi: EconomicIndicator
-  coreCPI: EconomicIndicator
-  pce: EconomicIndicator
-  gdp: EconomicIndicator
-  payrolls: EconomicIndicator
+  unemployment: EconomicIndicator | null
+  cpi: EconomicIndicator | null
+  coreCPI: EconomicIndicator | null
+  pce: EconomicIndicator | null
+  gdp: EconomicIndicator | null
+  payrolls: EconomicIndicator | null
 }
 
 interface FedDecisionFactors {
-  inflationPressure: string
-  inflationTrend: string
-  laborMarket: string
-  laborTrend: string
-  economicGrowth: string
-  growthTrend: string
+  inflationPressure: string | null
+  inflationTrend: string | null
+  laborMarket: string | null
+  laborTrend: string | null
+  economicGrowth: string | null
+  growthTrend: string | null
 }
+
+interface Provenance {
+  inputs: Record<string, { tier: "live" | "unavailable"; source: string }>
+  unavailable: string[]
+  keyInputsMissing: string[]
+  predictionReliability: "full" | "degraded" | "unavailable"
+  scoring?: { predictionScore: number; scoredInputs: string[]; excludedFromScore: string[] }
+}
+
+/** Human-readable names for the provenance keys the API reports. */
+const INPUT_LABELS: Record<string, string> = {
+  unemployment: "Unemployment (UNRATE)",
+  cpi: "CPI YoY (CPIAUCSL)",
+  coreCPI: "Core CPI YoY (CPILFESL)",
+  pce: "PCE YoY (PCEPI)",
+  gdp: "GDP growth (A191RL1Q225SBEA)",
+  payrolls: "Non-farm payrolls (PAYEMS)",
+  fedFundsRate: "Fed Funds rate (DFF)",
+  previousMeetingRate: "Rate at last meeting (DFF history)",
+  treasury10Y: "10Y Treasury (^TNX)",
+  treasury2Y: "2Y Treasury (^FVX)",
+}
+
+const labelFor = (key: string) => INPUT_LABELS[key] ?? key
 
 interface PredictionMethodology {
   description: string
@@ -112,13 +140,16 @@ interface OptionsStrategy {
 export function FomcPredictions() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [currentRate, setCurrentRate] = useState(4.375)
+  // No seed value: 4.375 was a made-up rate that rendered as live data for the
+  // whole first paint and for any request that came back without DFF.
+  const [currentRate, setCurrentRate] = useState<number | null>(null)
   const [historicalRates, setHistoricalRates] = useState<HistoricalRate[]>([])
   const [nextMeeting, setNextMeeting] = useState<NextMeeting | null>(null)
   const [ratePath, setRatePath] = useState<RatePath | null>(null)
   const [economicFactors, setEconomicFactors] = useState<EconomicFactors | null>(null)
   const [economicIndicators, setEconomicIndicators] = useState<EconomicIndicators | null>(null)
   const [fedDecisionFactors, setFedDecisionFactors] = useState<FedDecisionFactors | null>(null)
+  const [provenance, setProvenance] = useState<Provenance | null>(null)
   const [predictionMethodology, setPredictionMethodology] = useState<PredictionMethodology | null>(null)
   const [meetings, setMeetings] = useState<FomcMeeting[]>([])
   const [optionsStrategies, setOptionsStrategies] = useState<OptionsStrategy[]>([])
@@ -148,10 +179,25 @@ export function FomcPredictions() {
 
     try {
       const response = await fetch("/api/fomc-predictions")
-      if (!response.ok) throw new Error("Failed to fetch FOMC data")
+      const data = await response.json().catch(() => null)
 
-      const data = await response.json()
+      if (!response.ok) {
+        // 503 means the route refused to publish a forecast rather than
+        // anchoring it on a stand-in rate. Keep the provenance so the UI can
+        // say which input was missing instead of just "failed".
+        if (data?.provenance) setProvenance(data.provenance)
+        if (data?.economicIndicators) setEconomicIndicators(data.economicIndicators)
+        setNextMeeting(null)
+        setRatePath(null)
+        setMeetings([])
+        setOptionsStrategies([])
+        setChartData([])
+        setLastUpdated(new Date())
+        throw new Error(data?.error || "Failed to fetch FOMC data")
+      }
+
       setCurrentRate(data.currentRate)
+      setProvenance(data.provenance ?? null)
       setHistoricalRates(data.historicalRates || [])
       setNextMeeting(data.nextMeeting)
       setRatePath(data.ratePath)
@@ -161,9 +207,14 @@ export function FomcPredictions() {
       setPredictionMethodology(data.predictionMethodology)
       setMeetings(data.meetings)
 
-      if (data.nextMeeting) {
+      // Trade ideas are only as good as the forecast they sit on. When a key
+      // input is missing the prediction is published qualified, so the
+      // strategy list is withheld rather than dressed up as actionable.
+      if (data.nextMeeting && data.provenance?.predictionReliability === "full") {
         const strategies = generateOptionsStrategies(data.nextMeeting, data.currentRate)
         setOptionsStrategies(strategies)
+      } else {
+        setOptionsStrategies([])
       }
 
       const generateChartData = () => {
@@ -184,19 +235,9 @@ export function FomcPredictions() {
               type: "historical",
             })
           }
-        } else {
-          // Fallback: generate monthly points for 2 years
-          for (let i = 24; i >= 0; i--) {
-            const date = new Date(today)
-            date.setMonth(date.getMonth() - i)
-            chartPoints.push({
-              date: date.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
-              historical: data.currentRate,
-              forecast: null,
-              type: "historical",
-            })
-          }
         }
+        // No fallback series. The old one drew 24 flat months at today's rate,
+        // which read as "rates never moved" whenever FRED history was missing.
 
         // Current point (connects historical to forecast)
         chartPoints.push({
@@ -505,6 +546,50 @@ export function FomcPredictions() {
     }
   }
 
+  // One indicator card body. A null series renders "—" plus an explicit
+  // insufficient-data note — never a substituted figure, and never a 0.
+  const IndicatorBody = ({
+    indicator,
+    format,
+    footnote,
+  }: {
+    indicator: EconomicIndicator | null
+    format: (n: number) => string
+    footnote: string
+  }) => {
+    if (!indicator) {
+      return (
+        <>
+          <div className="flex items-center justify-between mb-2">
+            <Minus className="h-4 w-4 text-gray-300" />
+          </div>
+          <p className="text-3xl font-bold text-gray-400">—</p>
+          <p className="text-xs text-gray-500 mt-1">Insufficient data — series unavailable</p>
+          <p className="text-xs text-gray-500 mt-2">{footnote}</p>
+        </>
+      )
+    }
+    return (
+      <>
+        <div className="flex items-center justify-between mb-2">{getTrendIcon(indicator.trend)}</div>
+        <p className="text-3xl font-bold text-gray-900">{format(indicator.current)}</p>
+        <p className={`text-xs mt-1 ${getTrendColor(indicator.trend)}`}>Previous: {format(indicator.previous)}</p>
+        <p className="text-xs text-gray-500 mt-2">{footnote}</p>
+      </>
+    )
+  }
+
+  /** Fed-decision category, or "—" when the input behind it was missing. */
+  const FactorValue = ({ value }: { value: string | null }) =>
+    value === null ? (
+      <>
+        <p className="text-lg font-bold text-gray-400">—</p>
+        <p className="text-xs text-gray-500 mt-1">Insufficient data</p>
+      </>
+    ) : (
+      <p className="text-lg font-bold text-gray-900">{value}</p>
+    )
+
   const getInflationTrendStyle = (trend: string) => {
     // Heating inflation = hawkish (red), Cooling inflation = dovish (green)
     if (trend.toLowerCase().includes("heating") || trend.toLowerCase().includes("rising")) {
@@ -549,6 +634,11 @@ export function FomcPredictions() {
     return "bg-gray-50 text-gray-700 border border-gray-200"
   }
 
+  const unavailableInputs = provenance?.unavailable ?? []
+  const keyInputsMissing = provenance?.keyInputsMissing ?? []
+  const displayOnlyMissing = unavailableInputs.filter((k) => !keyInputsMissing.includes(k))
+  const isDegraded = provenance?.predictionReliability === "degraded"
+
   if (loading && !nextMeeting) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -590,6 +680,38 @@ export function FomcPredictions() {
               <div className="flex items-center gap-2 text-red-800">
                 <AlertTriangle className="h-5 w-5" />
                 <p className="font-semibold">{error}</p>
+              </div>
+              {unavailableInputs.length > 0 && (
+                <p className="mt-2 text-sm text-red-700">
+                  Unavailable inputs: {unavailableInputs.map(labelFor).join(", ")}.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Prediction is published, but a load-bearing input was missing. Say
+            so before any of the numbers below are read as a clean forecast. */}
+        {!error && isDegraded && (
+          <Card className="border-amber-300 bg-amber-50">
+            <CardContent className="pt-4">
+              <div className="flex items-start gap-2 text-amber-900">
+                <AlertTriangle className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-semibold">Prediction qualified — insufficient data</p>
+                  <p className="text-sm mt-1">
+                    {keyInputsMissing.map(labelFor).join(", ")} {keyInputsMissing.length === 1 ? "was" : "were"} not
+                    available, so {keyInputsMissing.length === 1 ? "it was" : "they were"} excluded from the model
+                    rather than replaced with a representative value. The rate path and probabilities below rest on
+                    fewer inputs than the stated methodology assumes. Rate-based options strategies are withheld until
+                    the missing data returns.
+                  </p>
+                  {unavailableInputs.length > keyInputsMissing.length && (
+                    <p className="text-xs mt-2 text-amber-800">
+                      Also unavailable (display only): {displayOnlyMissing.map(labelFor).join(", ")}.
+                    </p>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -688,10 +810,16 @@ export function FomcPredictions() {
                   <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
                     <Calendar className="h-6 w-6 text-primary" />
                     Next FOMC Meeting Prediction
+                    {isDegraded && (
+                      <span className="px-2 py-0.5 text-xs font-semibold rounded bg-amber-100 text-amber-800 border border-amber-300">
+                        Qualified — insufficient data
+                      </span>
+                    )}
                     <InfoTooltip content="FOMC meets 8 times per year to set rates. Markets move on rate decisions - unexpected cuts/hikes cause volatility. Trade IV expansion before meetings with straddles, or direction after decisions are announced." />
                   </CardTitle>
                   <CardDescription className="text-base">
                     {nextMeeting.daysUntil} days until announcement
+                    {isDegraded && ` · computed without ${keyInputsMissing.map(labelFor).join(", ")}`}
                   </CardDescription>
                 </div>
               </div>
@@ -737,7 +865,9 @@ export function FomcPredictions() {
                   <p className={`text-lg font-semibold ${getConfidenceLevel(nextMeeting.confidence).color}`}>
                     {getConfidenceLevel(nextMeeting.confidence).label}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">Based on market pricing</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {isDegraded ? "Model confidence only — key inputs missing" : "Based on market pricing"}
+                  </p>
                 </div>
 
                 {/* Rates */}
@@ -748,7 +878,9 @@ export function FomcPredictions() {
                         Current Rate
                         <InfoTooltip content="The current Federal Funds rate target range. Higher rates increase borrowing costs, slowing economic activity. Lower rates stimulate borrowing and spending." />
                       </p>
-                      <p className="text-2xl font-bold text-gray-900">{currentRate.toFixed(2)}%</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {currentRate === null ? <span className="text-gray-400">—</span> : `${currentRate.toFixed(2)}%`}
+                      </p>
                     </div>
                     <div className="h-px bg-gray-200" />
                     <div>
@@ -840,10 +972,18 @@ export function FomcPredictions() {
                 <div className="text-center">
                   <p className="text-xs text-gray-600 mb-2">Last Meeting</p>
                   <div className="bg-gray-100 rounded-lg p-3 border-2 border-gray-300">
-                    <p className="text-2xl font-bold text-gray-900">{ratePath.previousMeeting.toFixed(2)}%</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {ratePath.previousMeeting === null ? (
+                        <span className="text-gray-400">—</span>
+                      ) : (
+                        `${ratePath.previousMeeting.toFixed(2)}%`
+                      )}
+                    </p>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">~60 days ago</p>
-                  <p className="text-xs text-gray-400 mt-0.5">(Historical)</p>
+                  <p className="text-xs text-gray-500 mt-1">~45 sessions ago</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {ratePath.previousMeeting === null ? "(Insufficient data)" : "(Historical)"}
+                  </p>
                 </div>
 
                 <div className="text-center">
@@ -884,7 +1024,10 @@ export function FomcPredictions() {
                 Key Economic Indicators
                 <InfoTooltip content="The Fed watches these indicators to set policy. High inflation = hawkish (rate hikes). High unemployment = dovish (rate cuts). Strong GDP = less need for cuts. These drive Fed decisions and market expectations." />
               </CardTitle>
-              <CardDescription>Real-time data from Federal Reserve Economic Data (FRED)</CardDescription>
+              <CardDescription>
+                Real-time data from Federal Reserve Economic Data (FRED). Series that did not return show "—" — no
+                figure is substituted.
+              </CardDescription>
             </CardHeader>
             <CardContent className="pt-4">
               <div className="grid md:grid-cols-3 gap-4">
@@ -894,16 +1037,11 @@ export function FomcPredictions() {
                     Unemployment Rate
                     <InfoTooltip content="Rising unemployment makes the Fed more likely to cut rates to stimulate jobs. Low unemployment lets Fed focus on fighting inflation. Watch for surprises vs expectations." />
                   </p>
-                  <div className="flex items-center justify-between mb-2">
-                    {getTrendIcon(economicIndicators.unemployment.trend)}
-                  </div>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {economicIndicators.unemployment.current.toFixed(1)}%
-                  </p>
-                  <p className={`text-xs mt-1 ${getTrendColor(economicIndicators.unemployment.trend)}`}>
-                    Previous: {economicIndicators.unemployment.previous.toFixed(1)}%
-                  </p>
-                  <p className="text-xs text-gray-500 mt-2">Fed Target: 4.0-4.5% (Full Employment)</p>
+                  <IndicatorBody
+                    indicator={economicIndicators.unemployment}
+                    format={(n) => `${n.toFixed(1)}%`}
+                    footnote="Fed Target: 4.0-4.5% (Full Employment)"
+                  />
                 </div>
 
                 {/* CPI */}
@@ -912,14 +1050,11 @@ export function FomcPredictions() {
                     CPI (YoY)
                     <InfoTooltip content="Consumer Price Index measures inflation. Above Fed's 2% target = hawkish pressure (rates stay high). Below target = room for cuts. Hot CPI prints are bearish for stocks." />
                   </p>
-                  <div className="flex items-center justify-between mb-2">
-                    {getTrendIcon(economicIndicators.cpi.trend)}
-                  </div>
-                  <p className="text-3xl font-bold text-gray-900">{economicIndicators.cpi.current.toFixed(1)}%</p>
-                  <p className={`text-xs mt-1 ${getTrendColor(economicIndicators.cpi.trend)}`}>
-                    Previous: {economicIndicators.cpi.previous.toFixed(1)}%
-                  </p>
-                  <p className="text-xs text-gray-500 mt-2">Fed Target: 2.0% (Price Stability)</p>
+                  <IndicatorBody
+                    indicator={economicIndicators.cpi}
+                    format={(n) => `${n.toFixed(1)}%`}
+                    footnote="Fed Target: 2.0% (Price Stability)"
+                  />
                 </div>
 
                 {/* PCE */}
@@ -928,14 +1063,11 @@ export function FomcPredictions() {
                     PCE Inflation
                     <InfoTooltip content="Personal Consumption Expenditures price index is the Fed's preferred inflation measure. Similar trends to CPI but often smoother. High PCE also signals hawkish policy." />
                   </p>
-                  <div className="flex items-center justify-between mb-2">
-                    {getTrendIcon(economicIndicators.pce.trend)}
-                  </div>
-                  <p className="text-3xl font-bold text-gray-900">{economicIndicators.pce.current.toFixed(1)}%</p>
-                  <p className={`text-xs mt-1 ${getTrendColor(economicIndicators.pce.trend)}`}>
-                    Previous: {economicIndicators.pce.previous.toFixed(1)}%
-                  </p>
-                  <p className="text-xs text-gray-500 mt-2">Fed's preferred inflation measure</p>
+                  <IndicatorBody
+                    indicator={economicIndicators.pce}
+                    format={(n) => `${n.toFixed(1)}%`}
+                    footnote="Fed's preferred inflation measure"
+                  />
                 </div>
 
                 {/* Core CPI */}
@@ -944,14 +1076,11 @@ export function FomcPredictions() {
                     Core CPI
                     <InfoTooltip content="Core CPI excludes volatile food and energy prices, providing a clearer view of underlying inflation trends. Persistent high core inflation keeps the Fed hawkish." />
                   </p>
-                  <div className="flex items-center justify-between mb-2">
-                    {getTrendIcon(economicIndicators.coreCPI.trend)}
-                  </div>
-                  <p className="text-3xl font-bold text-gray-900">{economicIndicators.coreCPI.current.toFixed(1)}%</p>
-                  <p className={`text-xs mt-1 ${getTrendColor(economicIndicators.coreCPI.trend)}`}>
-                    Previous: {economicIndicators.coreCPI.previous.toFixed(1)}%
-                  </p>
-                  <p className="text-xs text-gray-500 mt-2">Excludes food & energy volatility</p>
+                  <IndicatorBody
+                    indicator={economicIndicators.coreCPI}
+                    format={(n) => `${n.toFixed(1)}%`}
+                    footnote="Excludes food & energy volatility"
+                  />
                 </div>
 
                 {/* GDP */}
@@ -960,14 +1089,11 @@ export function FomcPredictions() {
                     GDP Growth
                     <InfoTooltip content="Strong GDP growth reduces urgency for rate cuts. Weak GDP increases cut probability. Negative GDP (recession) typically triggers aggressive easing - very bullish for stocks." />
                   </p>
-                  <div className="flex items-center justify-between mb-2">
-                    {getTrendIcon(economicIndicators.gdp.trend)}
-                  </div>
-                  <p className="text-3xl font-bold text-gray-900">{economicIndicators.gdp.current.toFixed(1)}%</p>
-                  <p className={`text-xs mt-1 ${getTrendColor(economicIndicators.gdp.trend)}`}>
-                    Previous: {economicIndicators.gdp.previous.toFixed(1)}%
-                  </p>
-                  <p className="text-xs text-gray-500 mt-2">Annualized quarterly growth rate</p>
+                  <IndicatorBody
+                    indicator={economicIndicators.gdp}
+                    format={(n) => `${n.toFixed(1)}%`}
+                    footnote="Annualized quarterly growth rate"
+                  />
                 </div>
 
                 {/* Non-Farm Payrolls */}
@@ -976,16 +1102,11 @@ export function FomcPredictions() {
                     Non-Farm Payrolls
                     <InfoTooltip content="Job creation numbers are key to labor market health. Strong payrolls suggest a robust economy, allowing the Fed to stay hawkish. Weak numbers can signal slowdown and increase cut odds." />
                   </p>
-                  <div className="flex items-center justify-between mb-2">
-                    {getTrendIcon(economicIndicators.payrolls.trend)}
-                  </div>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {(economicIndicators.payrolls.current / 1000).toFixed(0)}M
-                  </p>
-                  <p className={`text-xs mt-1 ${getTrendColor(economicIndicators.payrolls.trend)}`}>
-                    Previous: {(economicIndicators.payrolls.previous / 1000).toFixed(0)}M
-                  </p>
-                  <p className="text-xs text-gray-500 mt-2">Total employed workers (thousands)</p>
+                  <IndicatorBody
+                    indicator={economicIndicators.payrolls}
+                    format={(n) => `${(n / 1000).toFixed(0)}M`}
+                    footnote="Total employed workers (thousands)"
+                  />
                 </div>
               </div>
             </CardContent>
@@ -1003,32 +1124,38 @@ export function FomcPredictions() {
               <div className="grid md:grid-cols-3 gap-4">
                 <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                   <p className="text-xs font-semibold text-gray-600 mb-1">Inflation Pressure</p>
-                  <p className="text-lg font-bold text-gray-900">{fedDecisionFactors.inflationPressure}</p>
-                  <span
-                    className={`inline-block mt-2 px-2 py-1 text-xs font-semibold rounded ${getInflationTrendStyle(fedDecisionFactors.inflationTrend)}`}
-                  >
-                    Trend: {fedDecisionFactors.inflationTrend}
-                  </span>
+                  <FactorValue value={fedDecisionFactors.inflationPressure} />
+                  {fedDecisionFactors.inflationTrend !== null && (
+                    <span
+                      className={`inline-block mt-2 px-2 py-1 text-xs font-semibold rounded ${getInflationTrendStyle(fedDecisionFactors.inflationTrend)}`}
+                    >
+                      Trend: {fedDecisionFactors.inflationTrend}
+                    </span>
+                  )}
                 </div>
 
                 <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                   <p className="text-xs font-semibold text-gray-600 mb-1">Labor Market</p>
-                  <p className="text-lg font-bold text-gray-900">{fedDecisionFactors.laborMarket}</p>
-                  <span
-                    className={`inline-block mt-2 px-2 py-1 text-xs font-semibold rounded ${getLaborTrendStyle(fedDecisionFactors.laborTrend)}`}
-                  >
-                    Trend: {fedDecisionFactors.laborTrend}
-                  </span>
+                  <FactorValue value={fedDecisionFactors.laborMarket} />
+                  {fedDecisionFactors.laborTrend !== null && (
+                    <span
+                      className={`inline-block mt-2 px-2 py-1 text-xs font-semibold rounded ${getLaborTrendStyle(fedDecisionFactors.laborTrend)}`}
+                    >
+                      Trend: {fedDecisionFactors.laborTrend}
+                    </span>
+                  )}
                 </div>
 
                 <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                   <p className="text-xs font-semibold text-gray-600 mb-1">Economic Growth</p>
-                  <p className="text-lg font-bold text-gray-900">{fedDecisionFactors.economicGrowth}</p>
-                  <span
-                    className={`inline-block mt-2 px-2 py-1 text-xs font-semibold rounded ${getGrowthTrendStyle(fedDecisionFactors.growthTrend)}`}
-                  >
-                    Trend: {fedDecisionFactors.growthTrend}
-                  </span>
+                  <FactorValue value={fedDecisionFactors.economicGrowth} />
+                  {fedDecisionFactors.growthTrend !== null && (
+                    <span
+                      className={`inline-block mt-2 px-2 py-1 text-xs font-semibold rounded ${getGrowthTrendStyle(fedDecisionFactors.growthTrend)}`}
+                    >
+                      Trend: {fedDecisionFactors.growthTrend}
+                    </span>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -1046,30 +1173,48 @@ export function FomcPredictions() {
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                   <p className="text-sm font-semibold text-gray-900 mb-1">Yield Curve</p>
-                  <p className="text-sm text-gray-700">{economicFactors.yieldCurve}</p>
-                  <span
-                    className={`inline-block mt-2 px-2 py-1 text-xs font-semibold rounded ${
-                      economicFactors.yieldCurveSignal === "bearish"
-                        ? "bg-red-100 text-red-700"
-                        : "bg-gray-100 text-gray-700"
-                    }`}
-                  >
-                    {economicFactors.yieldCurveSignal === "bearish" ? "Recession Signal" : "Normal"}
-                  </span>
+                  {economicFactors.yieldCurve === null ? (
+                    <>
+                      <p className="text-sm text-gray-400">—</p>
+                      <p className="text-xs text-gray-500 mt-1">Insufficient data — Treasury yields unavailable</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-gray-700">{economicFactors.yieldCurve}</p>
+                      <span
+                        className={`inline-block mt-2 px-2 py-1 text-xs font-semibold rounded ${
+                          economicFactors.yieldCurveSignal === "bearish"
+                            ? "bg-red-100 text-red-700"
+                            : "bg-gray-100 text-gray-700"
+                        }`}
+                      >
+                        {economicFactors.yieldCurveSignal === "bearish" ? "Recession Signal" : "Normal"}
+                      </span>
+                    </>
+                  )}
                 </div>
 
                 <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                   <p className="text-sm font-semibold text-gray-900 mb-1">Treasury Yields</p>
-                  <p className="text-sm text-gray-700">{economicFactors.treasuryTrend}</p>
-                  <span
-                    className={`inline-block mt-2 px-2 py-1 text-xs font-semibold rounded ${
-                      economicFactors.treasurySignal === "dovish"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
-                    }`}
-                  >
-                    {economicFactors.treasurySignal === "dovish" ? "Dovish Signal" : "Hawkish Signal"}
-                  </span>
+                  {economicFactors.treasuryTrend === null ? (
+                    <>
+                      <p className="text-sm text-gray-400">—</p>
+                      <p className="text-xs text-gray-500 mt-1">Insufficient data — 10Y Treasury unavailable</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-gray-700">{economicFactors.treasuryTrend}</p>
+                      <span
+                        className={`inline-block mt-2 px-2 py-1 text-xs font-semibold rounded ${
+                          economicFactors.treasurySignal === "dovish"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-red-100 text-red-700"
+                        }`}
+                      >
+                        {economicFactors.treasurySignal === "dovish" ? "Dovish Signal" : "Hawkish Signal"}
+                      </span>
+                    </>
+                  )}
                 </div>
 
                 <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 md:col-span-2">
@@ -1140,6 +1285,38 @@ export function FomcPredictions() {
                     ))}
                   </ul>
                 </div>
+
+                {/* What the model actually read. Unavailable inputs are listed
+                    rather than quietly replaced, so the weights above can be
+                    checked against the data that existed. */}
+                {provenance && (
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900 mb-2">Inputs Used:</p>
+                    <div className="grid md:grid-cols-2 gap-2">
+                      {Object.entries(provenance.inputs).map(([key, info]) => (
+                        <div
+                          key={key}
+                          className="text-xs bg-white p-2 rounded border border-blue-200 flex items-center justify-between gap-2"
+                        >
+                          <span className="text-gray-900">{labelFor(key)}</span>
+                          <span
+                            className={`px-2 py-0.5 rounded font-semibold ${
+                              info.tier === "live" ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"
+                            }`}
+                          >
+                            {info.tier === "live" ? info.source : "unavailable"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    {unavailableInputs.length > 0 && (
+                      <p className="text-xs text-gray-700 mt-2">
+                        Excluded from the model: {unavailableInputs.map(labelFor).join(", ")}. Missing inputs are never
+                        replaced with representative values.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
