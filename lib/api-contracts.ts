@@ -523,7 +523,10 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
   {
     path: "/api/serper-finance",
     method: "GET",
-    canary: { query: { q: "SPY" } },
+    // The route reads `ticker`, not `q` — the copied google-trends canary sent
+    // the wrong param name, so the health check probed it into its own 400
+    // guard and reported a working route as failing.
+    canary: { query: { ticker: "SPY", endpoint: "quote" } },
     schema: anyObject,
     budgetMs: 15000,
     requires: ["SERPER_API_KEY"],

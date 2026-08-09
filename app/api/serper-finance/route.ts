@@ -31,12 +31,14 @@ export async function GET(request: Request) {
 
   if (!SERPER_API_KEY) {
     console.log("[v0] Serper Finance: No SERPER_API_KEY found")
+    // 503, not 500: an unconfigured key is "this service is unavailable", not
+    // "the server broke" — same status every other key-gated route returns.
     return NextResponse.json(
       {
         error: "SERPER_API_KEY not configured",
         status: "no_api_key",
       },
-      { status: 500 },
+      { status: 503 },
     )
   }
 
