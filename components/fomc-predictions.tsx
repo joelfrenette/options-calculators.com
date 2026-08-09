@@ -1188,7 +1188,11 @@ export function FomcPredictions() {
                             : "bg-gray-100 text-gray-700"
                         }`}
                       >
-                        {economicFactors.yieldCurveSignal === "bearish" ? "Recession Signal" : "Normal"}
+                        {economicFactors.yieldCurveSignal === "bearish"
+                          ? "Recession Signal"
+                          : economicFactors.yieldCurve === "Flat"
+                            ? "Flattening"
+                            : "Normal"}
                       </span>
                     </>
                   )}

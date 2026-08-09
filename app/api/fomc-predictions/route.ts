@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getApiKey } from "@/lib/api-keys"
 import { fredHistoryFromStore, fredTrendFromStore, yoyTrend } from "@/lib/fred-store"
+import { readYieldCurve } from "@/lib/yield-curve"
 
 // E-7d: BLS/FRED series update monthly-to-daily, never intraday. ISR caches
 // the whole response at the edge for 15 min instead of re-pulling full
@@ -277,8 +278,16 @@ export async function GET() {
     console.log("[v0] 2Y Treasury:", treasury2Y)
     console.log("[v0] Unavailable inputs:", unavailable)
 
-    // Yield curve (2Y - 10Y spread) — null when either leg is missing.
-    const yieldCurveSpread = treasury2Y !== null && treasury10Y !== null ? treasury2Y - treasury10Y : null
+    // Yield curve via the shared reader, which owns the convention:
+    // spread = 10Y − 2Y, positive normal, negative inverted (P6-21).
+    //
+    // P6-17 fixed the wrong SERIES here (Yahoo ^FVX, a 5-year yield, labelled
+    // treasury2Y) but left the spread computed as 2Y − 10Y while the readout
+    // tested `spread < 0` for inversion — correct only for the 10Y − 2Y
+    // orientation. With a perfectly normal curve (2Y 4.25, 10Y 4.69) the tab
+    // reported "Inverted (Recession Signal)" with a bearish badge.
+    const curve = readYieldCurve(treasury10Y, treasury2Y)
+    const yieldCurveSpread = curve?.spread ?? null
 
     // Market signals. Every one is an assertion about the data: a missing
     // input cannot assert anything, so it stays false and simply never fires
@@ -498,8 +507,8 @@ export async function GET() {
     }
 
     const economicFactors = {
-      yieldCurve: yieldCurveSpread === null ? null : yieldCurveSpread < 0 ? "Inverted (Recession Signal)" : "Normal",
-      yieldCurveSignal: yieldCurveSpread === null ? null : yieldCurveSpread < 0 ? "bearish" : "neutral",
+      yieldCurve: curve?.label ?? null,
+      yieldCurveSignal: curve?.signal ?? null,
       treasuryTrend:
         treasury10Y === null
           ? null
