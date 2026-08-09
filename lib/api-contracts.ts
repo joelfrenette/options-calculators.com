@@ -436,6 +436,15 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     tabs: [],
   },
   {
+    path: "/api/federal-money",
+    method: "GET",
+    canary: { query: { ticker: "LMT", days: "365" } },
+    schema: anyObject,
+    budgetMs: 25000,
+    requires: ["QUIVER_API_KEY"],
+    tabs: [],
+  },
+  {
     path: "/api/cron/fred-snapshot",
     method: "GET",
     skip: "CRON_SECRET-authenticated pipeline; a probe would spend ~17 FRED calls and write to the market_series store.",

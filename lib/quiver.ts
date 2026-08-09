@@ -22,7 +22,21 @@
 import { resolveApiKey } from "@/lib/api-keys"
 import { meteredFetch } from "@/lib/metered-fetch"
 
-const QUIVER_URL = "https://api.quiverquant.com/beta/live/congresstrading"
+/**
+ * Datasets confirmed INCLUDED in the current plan by /api/cron/quiver-probe
+ * (2026-08-08). Everything else the probe touched answered 403 (not in plan:
+ * wallstreetbets, insiders, sec13f, sec13fchanges) or 404 (no such feed:
+ * wikipedia) and is deliberately absent — an endpoint we cannot call has no
+ * business being reachable from application code.
+ */
+export const QUIVER_DATASETS = {
+  congresstrading: "https://api.quiverquant.com/beta/live/congresstrading",
+  offexchange: "https://api.quiverquant.com/beta/live/offexchange",
+  govcontracts: "https://api.quiverquant.com/beta/live/govcontractsall",
+  lobbying: "https://api.quiverquant.com/beta/live/lobbying",
+} as const
+
+export type QuiverDataset = keyof typeof QUIVER_DATASETS
 
 export type QuiverFailure =
   /** No QUIVER_API_KEY configured. Not an outage — the feature is unconfigured. */
@@ -47,6 +61,23 @@ export function isQuiverConfigured(): boolean {
  * @param routeTag calling route, recorded with the metered call.
  */
 export async function fetchCongressTrading(routeTag: string): Promise<QuiverResult<unknown[]>> {
+  return fetchQuiverDataset("congresstrading", routeTag, "Congressional trading data")
+}
+
+/**
+ * Fetch any plan-included Quiver dataset. Same auth, metering, status mapping
+ * and array-shape guarantee as the congress feed — the error vocabulary above
+ * is what keeps a 403 from being described to users as a passing hiccup.
+ *
+ * @param dataset  key from QUIVER_DATASETS (the probe-confirmed set).
+ * @param routeTag calling route, recorded with the metered call.
+ * @param label    human name of the data, used in the not-configured message.
+ */
+export async function fetchQuiverDataset(
+  dataset: QuiverDataset,
+  routeTag: string,
+  label = "This Quiver dataset",
+): Promise<QuiverResult<unknown[]>> {
   const apiKey = resolveApiKey("QUIVER_API_KEY")
 
   if (!apiKey) {
@@ -55,7 +86,7 @@ export async function fetchCongressTrading(routeTag: string): Promise<QuiverResu
       kind: "not-configured",
       httpStatus: 503,
       message:
-        "Congressional trading data is unavailable: no Quiver Quantitative API key is configured. " +
+        `${label} is unavailable: no Quiver Quantitative API key is configured. ` +
         "This is a configuration gap, not an outage — retrying will not help.",
       transient: false,
     }
@@ -63,7 +94,7 @@ export async function fetchCongressTrading(routeTag: string): Promise<QuiverResu
 
   let res: Response
   try {
-    res = await meteredFetch("quiver", QUIVER_URL, {
+    res = await meteredFetch("quiver", QUIVER_DATASETS[dataset], {
       headers: {
         Accept: "application/json",
         Authorization: `Bearer ${apiKey}`,
