@@ -107,8 +107,8 @@ const INPUT_LABELS: Record<string, string> = {
   payrolls: "Non-farm payrolls (PAYEMS)",
   fedFundsRate: "Fed Funds rate (DFF)",
   previousMeetingRate: "Rate at last meeting (DFF history)",
-  treasury10Y: "10Y Treasury (^TNX)",
-  treasury2Y: "2Y Treasury (^FVX)",
+  treasury10Y: "10Y Treasury (DGS10)",
+  treasury2Y: "2Y Treasury (DGS2)",
 }
 
 const labelFor = (key: string) => INPUT_LABELS[key] ?? key

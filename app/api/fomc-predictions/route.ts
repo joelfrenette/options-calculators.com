@@ -121,24 +121,15 @@ export async function GET() {
     // since a wrong "previous rate" flips the cutting-cycle detection below.
     const previousMeetingRate = dffDesc.length >= 46 ? Number(dffDesc[45].rate.toFixed(2)) : null
 
-    // Treasury yields. A Yahoo outage means "unknown", not 4.5% / 4.3%: those
+    // Treasury yields from FRED constant-maturity series, store-first like
+    // everything else here. This route used to read Yahoo's ^FVX and label it
+    // `treasury2Y` — ^FVX is the FIVE-year yield, so the "Inverted (2Y > 10Y)"
+    // read was a 5s10s spread wearing a 2s10s label (P6-17). DGS2 is the
+    // actual 2-year. A missing leg means "unknown", not 4.5% / 4.3%: those
     // constants decided the yield-curve read and the market-expects-cuts flag.
-    const fetchYahooQuote = async (symbol: string): Promise<number | null> => {
-      try {
-        const response = await fetch(
-          `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=5d`,
-          { signal: AbortSignal.timeout(10000) },
-        )
-        if (!response.ok) return null
-        const data = await response.json()
-        const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice
-        return Number.isFinite(price) ? Number(price) : null
-      } catch {
-        return null
-      }
-    }
-
-    const [treasury10Y, treasury2Y] = await Promise.all([fetchYahooQuote("%5ETNX"), fetchYahooQuote("%5EFVX")])
+    const [dgs10, dgs2] = await Promise.all([fetchFredData("DGS10", false), fetchFredData("DGS2", false)])
+    const treasury10Y = dgs10 ? Number(dgs10.current.toFixed(2)) : null
+    const treasury2Y = dgs2 ? Number(dgs2.current.toFixed(2)) : null
 
     const tier = (v: unknown): Tier => (v === null || v === undefined ? "unavailable" : "live")
     const inputs: Record<string, InputProvenance> = {
@@ -150,8 +141,8 @@ export async function GET() {
       payrolls: { tier: tier(payrolls), source: "FRED:PAYEMS" },
       fedFundsRate: { tier: tier(fedFundsRate), source: "FRED:DFF" },
       previousMeetingRate: { tier: tier(previousMeetingRate), source: "FRED:DFF (~45 sessions back)" },
-      treasury10Y: { tier: tier(treasury10Y), source: "Yahoo Finance:^TNX" },
-      treasury2Y: { tier: tier(treasury2Y), source: "Yahoo Finance:^FVX" },
+      treasury10Y: { tier: tier(treasury10Y), source: "FRED:DGS10" },
+      treasury2Y: { tier: tier(treasury2Y), source: "FRED:DGS2" },
     }
     const unavailable = Object.keys(inputs).filter((k) => inputs[k].tier === "unavailable")
     const keyInputsMissing = KEY_INPUTS.filter((k) => inputs[k].tier === "unavailable")
@@ -577,7 +568,8 @@ export async function GET() {
           "Unavailable inputs are excluded from the score and the signal set — never replaced with representative values. See provenance.unavailable.",
       },
       lastUpdated: new Date().toISOString(),
-      dataSource: "FRED Economic Data (Fed Funds Rate, CPI, Employment), Treasury Yields (Yahoo Finance)",
+      dataSource:
+        "FRED Economic Data (Fed Funds Rate DFF, CPI, Employment, Treasury constant-maturity yields DGS10/DGS2)",
     })
   } catch (error) {
     console.error("Error fetching FOMC predictions:", error)

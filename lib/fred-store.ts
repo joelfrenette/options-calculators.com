@@ -22,6 +22,7 @@ export { yoyTrend, type SeriesTrend }
 const STALENESS_DAYS: Record<string, number> = {
   DFF: 7,
   DGS10: 7,
+  DGS2: 7,
   T10Y2Y: 7,
   BAMLH0A0HYM2: 7,
   DTWEXBGS: 7,

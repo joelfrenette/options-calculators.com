@@ -30,6 +30,7 @@ export const maxDuration = 300
 const SERIES: { id: string; cadence: "daily" | "weekly" | "monthly" | "quarterly"; dailyLimit: number }[] = [
   { id: "DFF", cadence: "daily", dailyLimit: 8 },
   { id: "DGS10", cadence: "daily", dailyLimit: 8 },
+  { id: "DGS2", cadence: "daily", dailyLimit: 8 }, // 2Y constant maturity (fomc-predictions yield curve)
   { id: "T10Y2Y", cadence: "daily", dailyLimit: 8 },
   { id: "BAMLH0A0HYM2", cadence: "daily", dailyLimit: 8 },
   { id: "DTWEXBGS", cadence: "daily", dailyLimit: 8 },
