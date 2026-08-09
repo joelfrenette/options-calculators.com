@@ -66,7 +66,10 @@ export function LearnCSP() {
           "Set aside $5,000 in cash (50 × 100 shares).",
           "Sell one $50 put for $2 → broker credits you $200 immediately.",
           "If AAPL is above $50 at expiration: the put expires worthless. You keep $200. Annualized return ≈ ($200 / $5,000) × (365 / 30) ≈ 48.7%.",
-          "If AAPL is at $47 at expiration: you're assigned. You buy 100 shares at $50 ($5,000), but you keep the $200 premium. Effective cost basis = $48/share. The shares are worth $4,700, so you have an unrealized loss of $300 ($4,700 − $5,000 + $200).",
+          // The stated total used to read $300 while the formula printed beside
+          // it evaluates to $100. Cost basis is $48 and the stock is at $47, so
+          // the loss is $1/share — $100, and the formula was the correct half.
+          "If AAPL is at $47 at expiration: you're assigned. You buy 100 shares at $50 ($5,000), but you keep the $200 premium. Effective cost basis = $48/share. The shares are worth $4,700, so you have an unrealized loss of $100 ($4,700 − $5,000 + $200).",
         ],
         outcome:
           "Best case you collect $200 and walk away. Worst case you own a stock you wanted anyway, at $48 net — and can start selling Covered Calls against it (that's how The Wheel begins).",

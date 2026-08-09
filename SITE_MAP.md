@@ -53,9 +53,9 @@
 | Tab id | Label | Component | File | Lines | Internal APIs |
 |---|---|---|---|---|---|
 | `wheel-strategy` | The Wheel | `OptionsStrategyToolbox strategy="wheel-strategy"` | `components/options-strategy-toolbox.tsx` | 1040 | `/api/strategy-scanner` |
-| `learn-csp` | Cash-Secured Puts | `LearnCSP` | `components/learn-csp.tsx` | 95 | none (static) |
+| `learn-csp` | Cash-Secured Puts | `LearnCSP` | `components/learn-csp.tsx` | 98 | none (static) |
 | `learn-cc` | Covered Calls | `LearnCC` | `components/learn-cc.tsx` | 102 | none (static) |
-| `learn-leaps` | LEAPS | `LearnLEAPS` | `components/learn-leaps.tsx` | 91 | none (static) |
+| `learn-leaps` | LEAPS | `LearnLEAPS` | `components/learn-leaps.tsx` | 95 | none (static) |
 | `learn-pmcc` | PMCC | `LearnPMCC` | `components/learn-pmcc.tsx` | 124 | none (static) |
 | `credit-spreads` | Credit Spreads | `OptionsStrategyToolbox strategy="credit-spreads"` | `components/options-strategy-toolbox.tsx` | 1040 | `/api/strategy-scanner` |
 | `iron-condors` | Iron Condors | `OptionsStrategyToolbox strategy="iron-condors"` | `components/options-strategy-toolbox.tsx` | 1040 | `/api/strategy-scanner` |
@@ -270,12 +270,12 @@ Marks survive `pnpm inventory` — they are read back and merged by tab id.
 | `top-performers` | ☑ | ☑ | ☐ | ☐ | ☑ | ☑ | ☐ | ☐ |
 | `hedge-fund-13f` | ☑ | ☑ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
 | `smart-money-etfs` | ☑ | ☑ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
-| `federal-money` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| `federal-money` | ☑ | ☐ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
 | `wheel-strategy` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
-| `learn-csp` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `learn-cc` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `learn-leaps` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `learn-pmcc` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| `learn-csp` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
+| `learn-cc` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
+| `learn-leaps` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
+| `learn-pmcc` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
 | `credit-spreads` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
 | `iron-condors` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
 | `straddles-strangles` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
