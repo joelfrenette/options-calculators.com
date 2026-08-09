@@ -75,17 +75,24 @@ export async function GET() {
     const fearKeywords = ["stock market crash", "recession"]
     const greedKeywords = ["buy the dip"]
 
-    const fearScore =
-      trendsData
-        .filter((t) => fearKeywords.includes(t.keyword) && t.interest !== null)
-        .reduce((sum, t) => sum + (t.interest || 0), 0) / fearKeywords.length
+    // Average over the keywords that actually returned, not over the keywords
+    // requested. Dividing the sum by `fearKeywords.length` meant one missing
+    // keyword halved the fear score — a data gap read as calm markets.
+    const meanInterest = (keywords: string[]): number | null => {
+      const values = trendsData
+        .filter((t) => keywords.includes(t.keyword) && t.interest !== null)
+        .map((t) => Number(t.interest))
+        .filter((v) => Number.isFinite(v))
+      if (values.length === 0) return null
+      return values.reduce((sum, v) => sum + v, 0) / values.length
+    }
 
-    const greedScore =
-      trendsData
-        .filter((t) => greedKeywords.includes(t.keyword) && t.interest !== null)
-        .reduce((sum, t) => sum + (t.interest || 0), 0) / greedKeywords.length
+    const fearScore = meanInterest(fearKeywords)
+    const greedScore = meanInterest(greedKeywords)
 
-    const sentimentIndex = fearScore - greedScore // Positive = fear, Negative = greed
+    // Positive = fear, Negative = greed. Null when either side has no data —
+    // a one-sided difference is not a sentiment reading.
+    const sentimentIndex = fearScore === null || greedScore === null ? null : fearScore - greedScore
 
     return NextResponse.json({
       status: "success",
@@ -93,15 +100,21 @@ export async function GET() {
       source: "serper",
       data: {
         keywords: trendsData,
+        fearScore,
+        greedScore,
         sentimentIndex,
+        // Null index has no interpretation. Every comparison below is false
+        // against null, so a missing index used to fall through to "Greed".
         interpretation:
-          sentimentIndex > 20
-            ? "High Fear"
-            : sentimentIndex > 0
-              ? "Moderate Fear"
-              : sentimentIndex > -20
-                ? "Neutral"
-                : "Greed",
+          sentimentIndex === null
+            ? null
+            : sentimentIndex > 20
+              ? "High Fear"
+              : sentimentIndex > 0
+                ? "Moderate Fear"
+                : sentimentIndex > -20
+                  ? "Neutral"
+                  : "Greed",
       },
     })
   } catch (error) {

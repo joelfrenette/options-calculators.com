@@ -547,15 +547,20 @@ export function computeBaseCCPI(results: PillarResults): number | null {
 // ---------------------------------------------------------------------------
 
 export interface AmplifierInputs {
-  qqqDailyReturn: number
-  qqqBelowSMA50: boolean
-  vix: number
-  putCallRatio: number
+  // Nullable throughout: the amplifiers sit OUTSIDE the pillar tier system, so
+  // a baseline-tier input reached them as a real reading. `qqqDailyReturn: 0`
+  // and `qqqBelowSMA50: false` are both assertions the data never made.
+  qqqDailyReturn: number | null
+  qqqBelowSMA50: boolean | null
+  vix: number | null
+  putCallRatio: number | null
 }
 
 export interface AmplifierResult {
   bonuses: Array<{ reason: string; points: number }>
   totalBonus: number
+  /** Amplifier inputs that were unavailable, so a 0 bonus is not read as "all clear". */
+  unavailableInputs: string[]
 }
 
 /**
@@ -567,9 +572,12 @@ export interface AmplifierResult {
  */
 export function calculateCrashAmplifiers(d: AmplifierInputs): AmplifierResult {
   const bonuses: Array<{ reason: string; points: number }> = []
+  const unavailableInputs: string[] = []
   let totalBonus = 0
 
-  if (d.qqqDailyReturn <= -9) {
+  if (d.qqqDailyReturn === null) {
+    unavailableInputs.push("qqqDailyReturn")
+  } else if (d.qqqDailyReturn <= -9) {
     bonuses.push({
       reason: `QQQ crashed ${Math.abs(d.qqqDailyReturn).toFixed(1)}% in one day (EXTREME)`,
       points: 40,
@@ -580,17 +588,23 @@ export function calculateCrashAmplifiers(d: AmplifierInputs): AmplifierResult {
     totalBonus += 25
   }
 
-  if (d.qqqBelowSMA50) {
+  if (d.qqqBelowSMA50 === null) {
+    unavailableInputs.push("qqqBelowSMA50")
+  } else if (d.qqqBelowSMA50) {
     bonuses.push({ reason: "QQQ broken below 50-day SMA", points: 20 })
     totalBonus += 20
   }
 
-  if (d.vix > 35) {
+  if (d.vix === null) {
+    unavailableInputs.push("vix")
+  } else if (d.vix > 35) {
     bonuses.push({ reason: `VIX spiked to ${d.vix.toFixed(1)} (panic level)`, points: 20 })
     totalBonus += 20
   }
 
-  if (d.putCallRatio > 1.3) {
+  if (d.putCallRatio === null) {
+    unavailableInputs.push("putCallRatio")
+  } else if (d.putCallRatio > 1.3) {
     bonuses.push({ reason: `Put/Call ratio ${d.putCallRatio.toFixed(2)} (extreme hedging)`, points: 15 })
     totalBonus += 15
   }
@@ -600,7 +614,7 @@ export function calculateCrashAmplifiers(d: AmplifierInputs): AmplifierResult {
     bonuses.push({ reason: "Bonus capped at maximum +100", points: 0 })
   }
 
-  return { bonuses, totalBonus }
+  return { bonuses, totalBonus, unavailableInputs }
 }
 
 // ---------------------------------------------------------------------------

@@ -91,16 +91,24 @@ async function fetchHistoricalData(symbol: string, days = 320) {
       const lows = quotes.low || []
       const volumes = quotes.volume || []
 
-      const prices = timestamps.map((ts: number, i: number) => ({
-        date: new Date(ts * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-        timestamp: ts,
-        price: closes[i] || 0,
-        high: highs[i] || 0,
-        low: lows[i] || 0,
-        volume: volumes[i] || 0,
-      }))
+      // Yahoo sends null for a bar it has no data for. `|| 0` turned those
+      // into a $0 high and a $0 low on bars that survived the price filter
+      // below, which then fed ATR and the Bollinger bands as real extremes.
+      // A bar missing any OHLC leg is dropped instead.
+      const prices = timestamps
+        .map((ts: number, i: number) => ({
+          date: new Date(ts * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+          timestamp: ts,
+          price: closes[i],
+          high: highs[i],
+          low: lows[i],
+          volume: Number.isFinite(volumes[i]) ? volumes[i] : null,
+        }))
+        .filter(
+          (p: any) => Number.isFinite(p.price) && Number.isFinite(p.high) && Number.isFinite(p.low) && p.price > 0,
+        )
 
-      return prices.filter((p: any) => p.price > 0)
+      return prices
     }
     return []
   } catch (error) {

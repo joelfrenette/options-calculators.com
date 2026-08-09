@@ -14,7 +14,8 @@ export function logCCPIDataLoaded(data: CCPIData): void {
     regime: data.regime.name,
     pillars: data.pillars,
     activeCanaries: countActiveWarnings(data.canaries),
-    totalIndicators: data.totalIndicators || 34,
+    // Was `|| 34`, a stale count from before the P3-19 indicator cull.
+    totalIndicators: data.totalIndicators ?? "unavailable",
     crashAmplifiers: data.crashAmplifiers?.length || 0,
     totalBonus: data.totalBonus || 0,
   })

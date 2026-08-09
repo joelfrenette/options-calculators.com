@@ -110,8 +110,10 @@ function normalizeRole(t: any): string {
 // Smart, plain-English note describing what the transaction implies.
 // Replaces boilerplate "Open market purchase" with a research-useful summary.
 // ---------------------------------------------------------------------------
-function buildCorporateNote(type: string, role: string, value: number): string {
-  const big = value >= 1_000_000
+function buildCorporateNote(type: string, role: string, value: number | null): string {
+  // Unknown size cannot be 'strong conviction' and cannot be 'notable' — with a
+  // null value the note simply drops the size claim instead of assuming small.
+  const big = value !== null && value >= 1_000_000
   const isCSuite = ["CEO", "CFO", "COO", "CMO", "CTO", "President", "Chairman"].includes(role)
   if (type === "Buy") {
     if (isCSuite && big) return `${role} open-market buy — strong insider conviction`
@@ -419,12 +421,15 @@ export async function GET(request: Request) {
         // revision said "prefer the signed change" while the code preferred the
         // post-trade holdings field.
         const shareCount = Math.abs(shareChange)
-        const unitPrice = Number(t.transactionPrice || 0)
+        // Unknown price is null, not 0 — a priced-at-nothing trade is not a
+        // $0 trade, and downstream this value is summed and size-classified.
+        const rawUnitPrice = Number(t.transactionPrice)
+        const unitPrice = Number.isFinite(rawUnitPrice) && rawUnitPrice > 0 ? rawUnitPrice : null
         // Total trade value = shares × price-per-share
-        const computedValue = shareCount > 0 && unitPrice > 0 ? shareCount * unitPrice : 0
+        const computedValue: number | null = shareCount > 0 && unitPrice !== null ? shareCount * unitPrice : null
 
         // Skip junk rows with no shares AND no value — they render as all-N/A
-        if (shareCount === 0 && computedValue === 0) continue
+        if (shareCount === 0 && computedValue === null) continue
 
         const role = normalizeRole(t)
 
@@ -437,8 +442,9 @@ export async function GET(request: Request) {
           category: "corporate",
           ticker: symbol,
           shares: formatShares(shareCount, shareChange >= 0 ? 1 : -1),
-          price: unitPrice > 0 ? `$${unitPrice.toFixed(2)}` : "N/A",
-          value: computedValue > 0 ? formatValue(computedValue) : "N/A",
+          price: unitPrice !== null ? `$${unitPrice.toFixed(2)}` : "N/A",
+          value: computedValue !== null ? formatValue(computedValue) : "N/A",
+          valueKnown: computedValue !== null,
           notes: buildCorporateNote(transactionType, role, computedValue),
           dataSource: "SEC Form 4 via Finnhub",
         })
@@ -491,9 +497,16 @@ export async function GET(request: Request) {
     transactions.sort((a, b) => toSortableDate(b._date) - toSortableDate(a._date))
 
     // Build volume chart data
+    // Unpriced trades are counted, not silently added as $0 — the chart bar
+    // would otherwise read as complete coverage of the ticker's activity.
+    let unpricedTransactions = 0
     const volumeMap: Record<string, { buys: number; sells: number }> = {}
     for (const t of transactions) {
       if (!t.ticker || t.ticker === "—" || t.ticker === "N/A") continue
+      if (t.value === "N/A") {
+        unpricedTransactions++
+        continue
+      }
       if (!volumeMap[t.ticker]) volumeMap[t.ticker] = { buys: 0, sells: 0 }
       const val = parseValueToMillions(String(t.value))
       if (t.type === "Buy") volumeMap[t.ticker].buys += val
@@ -510,6 +523,9 @@ export async function GET(request: Request) {
       // Keep _date on every transaction so the client can sort correctly
       transactions,
       volumeData,
+      // Rows with no usable price, excluded from volumeData rather than
+      // added as zero.
+      unpricedTransactions,
       source: usingLiveData ? "live" : "seed",
       lastUpdated: new Date().toISOString(),
       dataSources: {

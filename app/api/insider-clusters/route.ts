@@ -12,8 +12,11 @@ interface ClusterRow {
   ticker: string
   buyerCount: number // distinct insiders who bought
   totalBuys: number
-  totalDollarValue: number
-  buyers: Array<{ name: string; title: string; shares: number; value: number; date: string }>
+  // Null when no buy in the cluster carried a usable price.
+  totalDollarValue: number | null
+  pricedBuys: number
+  unpricedBuys: number
+  buyers: Array<{ name: string; title: string; shares: number; value: number | null; date: string }>
 }
 
 interface FinnhubInsider {
@@ -97,25 +100,37 @@ export async function GET(request: Request) {
     for (const [ticker, trades] of buysByTicker.entries()) {
       const distinctBuyers = new Set(trades.map((t) => t.name))
       if (distinctBuyers.size < minBuyers) continue
-      const buyers = trades.map((t) => ({
-        name: t.name || "Unknown",
-        title: t.position || "Insider",
-        shares: t.change, // shares transacted, not post-trade holdings
-        value: t.change * (t.transactionPrice || 0),
-        date: t.transactionDate,
-      }))
-      const totalDollarValue = buyers.reduce((s, b) => s + b.value, 0)
+      // A trade Finnhub gave no price for is worth "unknown", not $0. `|| 0`
+      // silently deflated the cluster total that the table then ranks on.
+      const buyers = trades.map((t) => {
+        const price = Number(t.transactionPrice)
+        const priced = Number.isFinite(price) && price > 0
+        return {
+          name: t.name || "Unknown",
+          title: t.position || "Insider",
+          shares: t.change, // shares transacted, not post-trade holdings
+          value: priced ? t.change * price : null,
+          date: t.transactionDate,
+        }
+      })
+      const pricedBuys = buyers.filter((b) => b.value !== null)
+      const totalDollarValue = pricedBuys.reduce((s, b) => s + (b.value as number), 0)
       clusters.push({
         ticker,
         buyerCount: distinctBuyers.size,
         totalBuys: trades.length,
-        totalDollarValue: Math.round(totalDollarValue),
+        // Null rather than a total that silently omits the unpriced trades.
+        totalDollarValue: pricedBuys.length === 0 ? null : Math.round(totalDollarValue),
+        // So the total is not read as covering every buy in the cluster.
+        pricedBuys: pricedBuys.length,
+        unpricedBuys: buyers.length - pricedBuys.length,
         buyers: buyers.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 8),
       })
     }
 
     // Rank: more buyers first, then bigger dollar volume.
-    clusters.sort((a, b) => b.buyerCount - a.buyerCount || b.totalDollarValue - a.totalDollarValue)
+    // Unpriced clusters sort last rather than tying with a genuine $0.
+    clusters.sort((a, b) => b.buyerCount - a.buyerCount || (b.totalDollarValue ?? -1) - (a.totalDollarValue ?? -1))
 
     return NextResponse.json({
       success: true,

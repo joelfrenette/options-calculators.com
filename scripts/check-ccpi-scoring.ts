@@ -230,6 +230,35 @@ check("-7% QQQ day earns the +25 amplifier", ampSevere.totalBonus === 25, `got $
 const ampFields = calculateCrashAmplifiers({ qqqDailyReturn: 0, qqqBelowSMA50: false, vix: 10, putCallRatio: 0.9 })
 check("no amplifiers on a calm day", ampFields.totalBonus === 0)
 
+// P6-20(a): the amplifiers sit outside the pillar tier system, so baseline
+// constants used to reach them as real readings. A null input must be reported
+// as unavailable, never scored, and never silently read as "all clear".
+const ampNull = calculateCrashAmplifiers({
+  qqqDailyReturn: null,
+  qqqBelowSMA50: null,
+  vix: null,
+  putCallRatio: null,
+})
+check("all-null amplifier inputs earn no bonus", ampNull.totalBonus === 0, `got ${ampNull.totalBonus}`)
+check(
+  "all-null amplifier inputs are reported unavailable, not scored",
+  ampNull.unavailableInputs.length === 4 && ampNull.bonuses.length === 0,
+  `unavailable=${ampNull.unavailableInputs.join(",")} bonuses=${ampNull.bonuses.length}`,
+)
+// A partially-available set still scores what it can and names the rest.
+const ampPartial = calculateCrashAmplifiers({
+  qqqDailyReturn: null,
+  qqqBelowSMA50: true,
+  vix: 40,
+  putCallRatio: null,
+})
+check(
+  "available amplifier inputs still score alongside null ones",
+  ampPartial.totalBonus === 40 &&
+    ampPartial.unavailableInputs.join(",") === "qqqDailyReturn,putCallRatio",
+  `got ${ampPartial.totalBonus} / ${ampPartial.unavailableInputs.join(",")}`,
+)
+
 // ---------------------------------------------------------------------------
 // 7. VIX term structure ratio convention (P3-14)
 // ---------------------------------------------------------------------------

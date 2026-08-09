@@ -111,11 +111,17 @@ export async function GET() {
       )
     }
 
+    // The amplifiers sit outside the pillar tier system, so they used to read
+    // the assembly layer's baseline constants as real market data: with QQQ
+    // unavailable, `qqqDailyReturn` arrived as 0 and `qqqBelowSMA50` as false —
+    // two assertions the data never made. Baseline-tier inputs are passed as
+    // null and simply do not fire their bonus.
+    const notBaseline = <T,>(value: T, tier: Tier): T | null => (tier === "baseline" ? null : value)
     const crashAmplifiers = calculateCrashAmplifiers({
-      qqqDailyReturn: data.qqqDailyReturn,
-      qqqBelowSMA50: data.qqqBelowSMA50,
-      vix: data.vix,
-      putCallRatio: data.putCallRatio,
+      qqqDailyReturn: notBaseline(data.qqqDailyReturn, data.tiers.momentum.qqqDailyReturn),
+      qqqBelowSMA50: notBaseline(data.qqqBelowSMA50, data.tiers.momentum.qqqSMA50),
+      vix: notBaseline(data.vix, data.tiers.momentum.vix),
+      putCallRatio: notBaseline(data.putCallRatio, data.tiers.riskAppetite.putCallRatio),
     })
     const finalCCPI = Math.min(100, baseCCPI + crashAmplifiers.totalBonus)
 
@@ -152,6 +158,9 @@ export async function GET() {
       baseCCPI,
       crashAmplifiers: crashAmplifiers.bonuses,
       totalBonus: crashAmplifiers.totalBonus,
+      // Amplifier inputs that were unavailable, so a +0 bonus is not read as
+      // "no acute event detected" when it means "could not check".
+      amplifierInputsUnavailable: crashAmplifiers.unavailableInputs,
       confidence,
       certainty: confidence,
       regime,

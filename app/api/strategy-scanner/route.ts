@@ -192,7 +192,7 @@ async function getEarningsDateMap(tickers: string[]): Promise<Map<string, string
 }
 
 // Fetch company profile from Finnhub
-async function getCompanyProfile(ticker: string): Promise<{ name: string; marketCap: number }> {
+async function getCompanyProfile(ticker: string): Promise<{ name: string; marketCap: number | null }> {
   const COMPANY_NAMES: Record<string, string> = {
     SPY: "SPDR S&P 500 ETF",
     QQQ: "Invesco QQQ Trust",
@@ -211,7 +211,7 @@ async function getCompanyProfile(ticker: string): Promise<{ name: string; market
   }
 
   if (!FINNHUB_API_KEY) {
-    return { name: COMPANY_NAMES[ticker] || ticker, marketCap: 0 }
+    return { name: COMPANY_NAMES[ticker] || ticker, marketCap: null }
   }
 
   try {
@@ -219,14 +219,15 @@ async function getCompanyProfile(ticker: string): Promise<{ name: string; market
       next: { revalidate: 86400 },
       routeTag: "strategy-scanner",
     })
-    if (!res.ok) return { name: COMPANY_NAMES[ticker] || ticker, marketCap: 0 }
+    if (!res.ok) return { name: COMPANY_NAMES[ticker] || ticker, marketCap: null }
     const data = await res.json()
     return {
       name: data.name || COMPANY_NAMES[ticker] || ticker,
-      marketCap: data.marketCapitalization || 0,
+      // Unknown cap is null. `|| 0` classified the ticker "small-cap" below.
+      marketCap: Number.isFinite(data.marketCapitalization) ? Number(data.marketCapitalization) : null,
     }
   } catch {
-    return { name: COMPANY_NAMES[ticker] || ticker, marketCap: 0 }
+    return { name: COMPANY_NAMES[ticker] || ticker, marketCap: null }
   }
 }
 
@@ -656,9 +657,19 @@ async function generateWheelCandidates(tickers: string[]) {
     // Market-cap tiers only — this is a SIZE band, not a fundamentals grade. The
     // field was previously called "fundamentals" and rendered as an A+/B grade,
     // implying balance-sheet analysis that never happened.
-    const marketCap = profile?.marketCap || 0
+    // Null cap means unknown size, not the smallest band: `|| 0` fell through
+    // every threshold and labelled the ticker "small-cap".
+    const marketCap = profile?.marketCap ?? null
     const sizeTier =
-      marketCap > 100000 ? "mega-cap" : marketCap > 50000 ? "large-cap" : marketCap > 10000 ? "mid-cap" : "small-cap"
+      marketCap === null
+        ? null
+        : marketCap > 100000
+          ? "mega-cap"
+          : marketCap > 50000
+            ? "large-cap"
+            : marketCap > 10000
+              ? "mid-cap"
+              : "small-cap"
 
     candidates.push({
       ticker,

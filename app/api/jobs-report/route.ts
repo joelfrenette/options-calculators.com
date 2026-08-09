@@ -209,10 +209,13 @@ export async function GET() {
     const u6Prediction = Number(Math.max(4, Math.min(18, u6Current + u6Slope)).toFixed(1))
 
     // ---- NFP forecast (3-month average as the central estimate) ----
-    const nfpBase = nfp3MonthAvg ?? nfpCurrent ?? 150
+    // `?? 150` invented a payrolls figure and forecast a ±35K band around it.
+    // With no NFP observation there is no central estimate to publish.
+    const nfpBase = nfp3MonthAvg ?? nfpCurrent ?? null
     const fmtK = (v: number) => `${v >= 0 ? "+" : ""}${v}K`
-    const nfpPrediction = fmtK(Math.round(nfpBase))
-    const nfpRange = { low: fmtK(Math.round(nfpBase - 35)), high: fmtK(Math.round(nfpBase + 35)) }
+    const nfpPrediction = nfpBase === null ? null : fmtK(Math.round(nfpBase))
+    const nfpRange =
+      nfpBase === null ? null : { low: fmtK(Math.round(nfpBase - 35)), high: fmtK(Math.round(nfpBase + 35)) }
 
     // Confidence: tighter when the labor market is steady, looser when moving fast
     const volatility = Math.abs(unrateSlope) + Math.abs(u6Slope)
@@ -229,7 +232,7 @@ export async function GET() {
       keyFactors = [
         `UNRATE rising ${(unrateSlope * 100).toFixed(0)} bps/month over the last 6 months`,
         `U-6 at ${u6Current.toFixed(1)}% (${unrateU6Diff > 0 ? "+" : ""}${unrateU6Diff}% above U-3), signaling hidden slack`,
-        nfpCurrent !== null ? `Latest NFP at ${fmtK(nfpCurrent)}, ${nfpCurrent < 100 ? "below" : "near"} trend` : "Payroll momentum softening",
+        nfpCurrent !== null ? `Latest NFP at ${fmtK(nfpCurrent)}, ${nfpCurrent < 100 ? "below" : "near"} trend` : "Payrolls data unavailable",
         "Continuing claims and Fed policy lag effects materializing",
       ]
       tradingImplications = [
@@ -242,8 +245,8 @@ export async function GET() {
       keyFactors = [
         `UNRATE falling ${Math.abs(unrateSlope * 100).toFixed(0)} bps/month over the last 6 months`,
         `U-6 at ${u6Current.toFixed(1)}%, ${u6Slope < 0 ? "improving" : "stable"}`,
-        nfpCurrent !== null ? `Latest NFP at ${fmtK(nfpCurrent)}, indicating resilient hiring` : "Hiring remains resilient",
-        earningsYoY !== null ? `Wage growth at ${earningsYoY}% YoY keeps Fed cautious` : "Wage pressures persist",
+        nfpCurrent !== null ? `Latest NFP at ${fmtK(nfpCurrent)}, indicating resilient hiring` : "Payrolls data unavailable",
+        earningsYoY !== null ? `Wage growth at ${earningsYoY}% YoY keeps Fed cautious` : "Wage growth data unavailable",
       ]
       tradingImplications = [
         "Bullish Call Spreads on cyclicals (XLF, XLI) as labor strength supports growth",
@@ -255,8 +258,13 @@ export async function GET() {
       keyFactors = [
         `UNRATE stable near ${unrateCurrent.toFixed(1)}% over the last 6 months`,
         `U-6 at ${u6Current.toFixed(1)}% (${unrateU6Diff > 0 ? "+" : ""}${unrateU6Diff}% above U-3)`,
-        nfpCurrent !== null ? `Latest NFP at ${fmtK(nfpCurrent)}, near the 3-month average of ${fmtK(nfp3MonthAvg ?? 0)}` : "Payrolls near trend",
-        earningsYoY !== null ? `Average hourly earnings up ${earningsYoY}% YoY` : "Wage growth steady",
+        // `fmtK(nfp3MonthAvg ?? 0)` printed "+0K" as a 3-month average.
+        nfpCurrent !== null
+          ? nfp3MonthAvg !== null
+            ? `Latest NFP at ${fmtK(nfpCurrent)}, near the 3-month average of ${fmtK(nfp3MonthAvg)}`
+            : `Latest NFP at ${fmtK(nfpCurrent)}; 3-month average unavailable`
+          : "Payrolls data unavailable",
+        earningsYoY !== null ? `Average hourly earnings up ${earningsYoY}% YoY` : "Wage growth data unavailable",
       ]
       tradingImplications = [
         "Iron Condors on SPY: Range-bound employment data supports neutral, premium-selling strategies",
