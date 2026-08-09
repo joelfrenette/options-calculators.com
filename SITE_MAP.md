@@ -15,7 +15,7 @@
 | `earnings-calendar` | Earnings & Economic Calendar | `EarningsEconomicCalendar` | `components/earnings-economic-calendar.tsx` | 585 | `/api/earnings-calendar/insights`<br>`/api/earnings-calendar` |
 | `trend-analysis` | Index Trend Analysis | `TrendAnalysis` | `components/trend-analysis.tsx` | 1173 | `/api/trend-analysis` |
 | `risk-management` | CBOE VIX Volatility Index | `RiskCalculator` | `components/risk-calculator.tsx` | 845 | `/api/vix`<br>`/api/vix-history` |
-| `market-sentiment` | CNN's Fear & Greed | `MarketSentiment` | `components/market-sentiment.tsx` | 1635 | `/api/market-sentiment`<br>`/api/sentiment-heatmap` |
+| `market-sentiment` | CNN's Fear & Greed | `MarketSentiment` | `components/market-sentiment.tsx` | 1664 | `/api/market-sentiment`<br>`/api/sentiment-heatmap` |
 | `panic-euphoria` | Citibank's Panic & Euphoria Index | `PanicEuphoria` | `components/panic-euphoria.tsx` | 1157 | `/api/panic-euphoria` |
 | `social-sentiment` | Social Sentiment Index | `SocialSentiment` | `components/social-sentiment.tsx` | 693 | `/api/social-sentiment` |
 | `fomc-predictions` | FOMC Fed Rate Forecaster | `FomcPredictions` | `components/fomc-predictions.tsx` | 1439 | `/api/fomc-predictions` |
@@ -219,8 +219,8 @@ _None._
 | File | Lines | Over by |
 |---|---|---|
 | `components/ccpi-dashboard.tsx` | 3196 | 2596 |
+| `components/market-sentiment.tsx` | 1664 | 1064 |
 | `components/ccpi-audit-admin.tsx` | 1635 | 1035 |
-| `components/market-sentiment.tsx` | 1635 | 1035 |
 | `components/fomc-predictions.tsx` | 1439 | 839 |
 | `components/trend-analysis.tsx` | 1173 | 573 |
 | `components/panic-euphoria.tsx` | 1157 | 557 |
@@ -241,49 +241,51 @@ _None._
 Hand-maintained. Legend: `data` live/labeled · `api` verified · `math` verified ·
 `fb` fallbacks fire · `copy` accurate · `err` handled · `mob` mobile · `size` ≤600 lines/module.
 
+Marks survive `pnpm inventory` — they are read back and merged by tab id.
+
 | Tab | data | api | math | fb | copy | err | mob | size |
 |---|---|---|---|---|---|---|---|---|
-| `ccpi` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `earnings-calendar` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `trend-analysis` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `risk-management` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `market-sentiment` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `panic-euphoria` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `social-sentiment` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `fomc-predictions` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `cpi-inflation` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `jobs` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| `ccpi` | ☑ | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☐ |
+| `earnings-calendar` | ☐ | ☑ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
+| `trend-analysis` | ☑ | ☑ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
+| `risk-management` | ☑ | ☑ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
+| `market-sentiment` | ☐ | ☐ | ☑ | ☐ | ☐ | ☑ | ☐ | ☐ |
+| `panic-euphoria` | ☑ | ☑ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
+| `social-sentiment` | ☑ | ☑ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
+| `fomc-predictions` | ☑ | ☑ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
+| `cpi-inflation` | ☑ | ☑ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
+| `jobs` | ☑ | ☑ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
 | `wheel-scanner` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `calendar-spread-scanner` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `credit-spread-scanner` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `iron-condor-scanner` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `butterfly-scanner` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `leaps-scanner` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `zebra-scanner` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `insiders` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `insider-clusters` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `form-144` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `congress-feed` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `politician-spotlight` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `top-performers` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `hedge-fund-13f` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `smart-money-etfs` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| `calendar-spread-scanner` | ☐ | ☑ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| `credit-spread-scanner` | ☐ | ☑ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| `iron-condor-scanner` | ☐ | ☑ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| `butterfly-scanner` | ☐ | ☑ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| `leaps-scanner` | ☐ | ☑ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| `zebra-scanner` | ☐ | ☑ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| `insiders` | ☑ | ☑ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
+| `insider-clusters` | ☑ | ☑ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
+| `form-144` | ☑ | ☑ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
+| `congress-feed` | ☑ | ☑ | ☐ | ☐ | ☑ | ☑ | ☐ | ☐ |
+| `politician-spotlight` | ☑ | ☑ | ☐ | ☐ | ☑ | ☑ | ☐ | ☐ |
+| `top-performers` | ☑ | ☑ | ☐ | ☐ | ☑ | ☑ | ☐ | ☐ |
+| `hedge-fund-13f` | ☑ | ☑ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
+| `smart-money-etfs` | ☑ | ☑ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
 | `federal-money` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `wheel-strategy` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| `wheel-strategy` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
 | `learn-csp` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 | `learn-cc` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 | `learn-leaps` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 | `learn-pmcc` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `credit-spreads` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `iron-condors` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `straddles-strangles` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `diagonals` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `calendar-spreads` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `butterflies` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `collars` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| `credit-spreads` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
+| `iron-condors` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
+| `straddles-strangles` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
+| `diagonals` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
+| `calendar-spreads` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
+| `butterflies` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
+| `collars` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
 | `exit-rules` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 | `earnings-iv-crusher` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `greeks` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| `greeks` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
 | `risk-rewards` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 
 ## 7. CLIENT-SIDE CACHE KEYS

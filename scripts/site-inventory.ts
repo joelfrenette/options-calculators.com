@@ -17,6 +17,35 @@ import { join, relative, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..")
+
+/**
+ * Reads the sign-off marks out of the CURRENT SITE_MAP.md so a regeneration
+ * does not wipe them. Returns tab id -> the 8 cells, verbatim.
+ *
+ * Deliberately forgiving about the cell characters: the ledger has used ☑/☐
+ * and could use anything else tomorrow. Whatever a human wrote is preserved
+ * as-is; this function's job is not to interpret it.
+ */
+function readExistingLedger(): Map<string, string[]> {
+  const marks = new Map<string, string[]>()
+  let text: string
+  try {
+    text = readFileSync(join(ROOT, "SITE_MAP.md"), "utf8")
+  } catch {
+    return marks // first run, no file yet
+  }
+  const section = text.split("## 6. PHASE 6 SIGN-OFF LEDGER")[1]
+  if (!section) return marks
+  const body = section.split(/^## /m)[0]
+  for (const line of body.split(/\r?\n/)) {
+    const m = line.match(/^\|\s*`([^`]+)`\s*\|(.+)\|\s*$/)
+    if (!m) continue
+    const cells = m[2].split("|").map((c) => c.trim())
+    if (cells.length !== 8) continue
+    marks.set(m[1], cells)
+  }
+  return marks
+}
 const rel = (p: string) => relative(ROOT, p).split(sep).join("/")
 
 // ---------------------------------------------------------------- fs helpers
@@ -390,18 +419,42 @@ function render(): string {
   out.push("")
 
   // 6. Sign-off ledger (Phase 6)
+  //
+  // HAND-MAINTAINED ROWS INSIDE A GENERATED FILE. Every previous run emitted a
+  // fresh all-☐ table, so `pnpm inventory` — which CLAUDE.md tells you to run
+  // whenever routes change — silently erased the audit sign-off record. It
+  // already did: 33 ticks were wiped in af2e324 and nobody noticed, because a
+  // blank ledger looks exactly like a ledger nobody has filled in yet.
+  // Existing marks are now read back out of SITE_MAP.md and merged by tab id.
+  const existingMarks = readExistingLedger()
+  const newTabs = tabs.filter((t) => !existingMarks.has(t.id)).map((t) => t.id)
+  const droppedTabs = [...existingMarks.keys()].filter((id) => !tabs.some((t) => t.id === id))
+
   out.push("## 6. PHASE 6 SIGN-OFF LEDGER")
   out.push("")
   out.push("Hand-maintained. Legend: `data` live/labeled · `api` verified · `math` verified ·")
   out.push("`fb` fallbacks fire · `copy` accurate · `err` handled · `mob` mobile · `size` ≤600 lines/module.")
   out.push("")
+  out.push("Marks survive `pnpm inventory` — they are read back and merged by tab id.")
+  out.push("")
   out.push(
     table(
       ["Tab", "data", "api", "math", "fb", "copy", "err", "mob", "size"],
-      tabs.map((t) => [`\`${t.id}\``, ...Array(8).fill("☐")]),
+      tabs.map((t) => [`\`${t.id}\``, ...(existingMarks.get(t.id) ?? Array(8).fill("☐"))]),
     ),
   )
   out.push("")
+  if (newTabs.length > 0) {
+    out.push(`_New since the last run, unverified: ${newTabs.map((t) => `\`${t}\``).join(", ")}._`)
+    out.push("")
+  }
+  if (droppedTabs.length > 0) {
+    // Say what was dropped rather than letting rows vanish silently — a tab
+    // that disappears from the ledger is indistinguishable from one that was
+    // never audited.
+    out.push(`_Dropped (tab no longer exists): ${droppedTabs.map((t) => `\`${t}\``).join(", ")}._`)
+    out.push("")
+  }
 
   // 7. Client-side cache keys
   const withStorage = [...components, ...libs].filter((c) => c.storage.length)
