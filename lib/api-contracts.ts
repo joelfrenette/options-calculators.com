@@ -452,6 +452,13 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     tabs: [],
   },
   {
+    path: "/api/cron/market-snapshot",
+    method: "GET",
+    skip: "CRON_SECRET-authenticated pipeline (E-7c); a probe would spend a Polygon grouped call plus the whole FRED sweep and write to both stores.",
+    budgetMs: 300000,
+    tabs: [],
+  },
+  {
     path: "/api/cron/quiver-probe",
     method: "GET",
     skip: "CRON_SECRET-gated operator probe; each run spends ~8 metered Quiver calls.",

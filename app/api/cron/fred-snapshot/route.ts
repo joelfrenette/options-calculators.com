@@ -1,75 +1,34 @@
 import { NextResponse } from "next/server"
 import { resolveApiKey } from "@/lib/api-keys"
-import { meteredFetch } from "@/lib/metered-fetch"
-import { upsertSeriesPoints } from "@/lib/market-series"
+import { checkCronAuth } from "@/lib/cron-auth"
+import { runFredSnapshot } from "@/lib/market-snapshot"
 
 /**
- * FRED snapshot cron — E-7b.
+ * FRED series snapshot — E-7b, now a thin wrapper over the shared job.
+ *
+ * The daily schedule moved to the consolidated /api/cron/market-snapshot
+ * (E-7c), which runs this between the closes pull and the computed indicators
+ * that depend on it. This route stays because the one-off backfill URL is in
+ * use — `?backfill=800` deep-loads every series' history in a single sweep.
  *
  * Daily mode (no params): pull the last few observations of every series the
- * site consumes (~17 FRED calls total) and upsert them into `market_series`
- * under `fred:<SERIES_ID>` keys. Routes then read the store instead of
- * re-fetching FRED per page view (sub-second tabs, FRED-outage-proof).
+ * site consumes and upsert them into `market_series` under `fred:<SERIES_ID>`
+ * keys. Routes then read Supabase instead of re-fetching FRED per page view
+ * (sub-second tabs, FRED-outage-proof).
  *
  * Backfill mode (?backfill=obs, cap 800): same sweep with a deep per-series
- * limit, one-time, so history-consumers (FOMC dot history, CPI trend, charts)
- * have depth on day one.
+ * limit, so charts have history immediately instead of accumulating it daily.
  *
- * Honesty: FRED observations with value "." (not yet posted) are skipped —
- * a missing point is absent from the store, never invented. Revisions are
- * handled by the daily window re-upserting the trailing observations.
+ * The series list itself now lives in lib/market-snapshot.ts (FRED_SERIES).
  */
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 300
 
-// Every FRED series consumed anywhere on the site (ccpi, fomc-predictions,
-// cpi-inflation, jobs-report, macro-indicators, panic-euphoria).
-// dailyLimit = observations re-pulled each run: enough to absorb revisions
-// and posting lag at each series' cadence.
-const SERIES: { id: string; cadence: "daily" | "weekly" | "monthly" | "quarterly"; dailyLimit: number }[] = [
-  { id: "DFF", cadence: "daily", dailyLimit: 8 },
-  { id: "DGS10", cadence: "daily", dailyLimit: 8 },
-  { id: "DGS2", cadence: "daily", dailyLimit: 8 }, // 2Y constant maturity (fomc-predictions yield curve)
-  { id: "T10Y2Y", cadence: "daily", dailyLimit: 8 },
-  { id: "BAMLH0A0HYM2", cadence: "daily", dailyLimit: 8 },
-  { id: "DTWEXBGS", cadence: "daily", dailyLimit: 8 },
-  { id: "RRPONTSYD", cadence: "daily", dailyLimit: 8 },
-  { id: "TEDRATE", cadence: "daily", dailyLimit: 8 }, // discontinued 2022; kept for the stored tail
-  { id: "GASREGW", cadence: "weekly", dailyLimit: 4 },
-  { id: "WRMFSL", cadence: "weekly", dailyLimit: 4 }, // retail MMF (panic-euphoria)
-  { id: "BOGZ1FL663067003Q", cadence: "quarterly", dailyLimit: 2 }, // Z.1 margin debt (panic-euphoria)
-  { id: "UNRATE", cadence: "monthly", dailyLimit: 3 },
-  { id: "CPIAUCSL", cadence: "monthly", dailyLimit: 3 },
-  { id: "CPILFESL", cadence: "monthly", dailyLimit: 3 },
-  { id: "PCEPI", cadence: "monthly", dailyLimit: 3 },
-  { id: "PAYEMS", cadence: "monthly", dailyLimit: 3 },
-  { id: "U6RATE", cadence: "monthly", dailyLimit: 3 }, // broad unemployment (jobs-report)
-  { id: "CES0500000003", cadence: "monthly", dailyLimit: 3 }, // avg hourly earnings (jobs-report)
-  { id: "M2SL", cadence: "monthly", dailyLimit: 3 },
-  { id: "PPIACO", cadence: "monthly", dailyLimit: 3 },
-  { id: "A191RL1Q225SBEA", cadence: "quarterly", dailyLimit: 2 },
-  { id: "GFDEGDQ188S", cadence: "quarterly", dailyLimit: 2 },
-]
-
-function authorized(request: Request): boolean {
-  const secret = process.env.CRON_SECRET
-  if (!secret) return false
-  const header = request.headers.get("authorization") ?? ""
-  const expected = `Bearer ${secret}`
-  if (header.length !== expected.length) return false
-  let diff = 0
-  for (let i = 0; i < expected.length; i++) diff |= header.charCodeAt(i) ^ expected.charCodeAt(i)
-  return diff === 0
-}
-
 export async function GET(request: Request) {
-  if (!authorized(request)) {
-    return NextResponse.json(
-      { error: process.env.CRON_SECRET ? "Unauthorized" : "CRON_SECRET not configured" },
-      { status: process.env.CRON_SECRET ? 401 : 503 },
-    )
-  }
+  const auth = checkCronAuth(request)
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
+
   const fredKey = resolveApiKey("FRED_API_KEY")
   if (!fredKey) {
     return NextResponse.json({ error: "FRED_API_KEY not configured" }, { status: 503 })
@@ -78,38 +37,5 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const backfill = Math.min(800, Math.max(0, Number.parseInt(url.searchParams.get("backfill") || "0", 10) || 0))
 
-  const results: { series: string; fetched: number; stored: number; httpStatus: number }[] = []
-  for (const s of SERIES) {
-    const limit = backfill > 0 ? backfill : s.dailyLimit
-    try {
-      const r = await meteredFetch(
-        "fred",
-        `https://api.stlouisfed.org/fred/series/observations?series_id=${s.id}&api_key=${fredKey}&file_type=json&sort_order=desc&limit=${limit}`,
-        { signal: AbortSignal.timeout(15000), routeTag: "/api/cron/fred-snapshot" },
-      )
-      if (!r.ok) {
-        results.push({ series: s.id, fetched: 0, stored: 0, httpStatus: r.status })
-        continue
-      }
-      const j = await r.json().catch(() => null)
-      const obs = Array.isArray(j?.observations) ? j.observations : []
-      const points = obs
-        .map((o: any) => ({ series: `fred:${s.id}`, day: String(o.date), value: Number.parseFloat(o.value) }))
-        .filter((p: { value: number }) => Number.isFinite(p.value))
-      const stored = await upsertSeriesPoints(points)
-      results.push({ series: s.id, fetched: obs.length, stored, httpStatus: r.status })
-    } catch (err) {
-      results.push({ series: s.id, fetched: 0, stored: 0, httpStatus: 0 })
-    }
-  }
-
-  const totalStored = results.reduce((a, r) => a + r.stored, 0)
-  const failed = results.filter((r) => r.httpStatus !== 200).map((r) => r.series)
-  return NextResponse.json({
-    ok: failed.length < SERIES.length / 2,
-    mode: backfill > 0 ? `backfill(${backfill})` : "daily",
-    totalStored,
-    failedSeries: failed,
-    results,
-  })
+  return NextResponse.json(await runFredSnapshot(fredKey, backfill))
 }

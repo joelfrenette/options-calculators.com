@@ -9,6 +9,9 @@
 // `spot × 1.08`, which made isInverted mathematically always false and the
 // module's stated purpose (backwardation detection) impossible (AUDIT P3-14).
 
+import { resolveApiKey } from "@/lib/api-keys"
+import { getSeriesHistory } from "@/lib/market-series"
+
 export interface VIXTermStructureData {
   spotVIX: number
   /** Cboe 3-month volatility index (VIX3M / VXVCLS) */
@@ -61,8 +64,38 @@ async function fetchLatestFredValue(seriesId: string, apiKey: string): Promise<n
   throw new Error(`FRED ${seriesId}: no numeric observations`)
 }
 
+/**
+ * Store-first read of the pair (E-7c). Both legs must come from the SAME day:
+ * pairing a stale spot VIX with a fresh VIX3M manufactures a ratio move out of
+ * a data gap, and this ratio crossing 1 IS the backwardation signal.
+ */
+async function fetchFromStore(): Promise<{ spotVIX: number; vix3m: number } | null> {
+  const [spotRows, vix3mRows] = await Promise.all([
+    getSeriesHistory("fred:VIXCLS", 10),
+    getSeriesHistory("fred:VXVCLS", 10),
+  ])
+  if (!spotRows?.length || !vix3mRows?.length) return null
+  const vix3mByDay = new Map(vix3mRows.map((r) => [r.day, r.value]))
+  const paired = spotRows.find((r) => vix3mByDay.has(r.day))
+  if (!paired) return null
+  const spotVIX = paired.value
+  const vix3m = vix3mByDay.get(paired.day) as number
+  if (!(spotVIX > 0) || !(vix3m > 0)) return null
+  return { spotVIX, vix3m }
+}
+
 export async function fetchVIXTermStructure(): Promise<VIXTermStructureData> {
-  const FRED_API_KEY = process.env.FRED_API_KEY
+  // E-7c: the daily market-snapshot cron stores both legs, so the common path
+  // costs no FRED call at all.
+  const stored = await fetchFromStore()
+  if (stored) {
+    const { termStructure, isInverted } = computeTermStructure(stored.spotVIX, stored.vix3m)
+    return { ...stored, termStructure, isInverted, source: "live", timestamp: new Date().toISOString() }
+  }
+
+  // P6-12: through resolveApiKey, so DISABLED_APIS and the admin key panel
+  // apply. This read `process.env.FRED_API_KEY` directly.
+  const FRED_API_KEY = resolveApiKey("FRED_API_KEY")
 
   if (!FRED_API_KEY) {
     console.log("[v0] VIX Term Structure: Using baseline (no FRED API key)")
