@@ -32,6 +32,12 @@ export function RiskRewardCalculator() {
   const vsDividendDiff = annualizedROI - dividendETFReturn
 
   const getTradeQuality = () => {
+    // An unfilled form used to grade itself "Poor" in red: every input parses
+    // to 0, annualizedROI is 0, and 0 falls through to the last branch. A
+    // missing input is not a bad trade.
+    if (!(premiumNum > 0) || !(capitalNum > 0) || !(daysNum > 0)) {
+      return { label: "—", color: "text-gray-400", bg: "bg-gray-50", incomplete: true }
+    }
     if (annualizedROI >= 20) return { label: "Excellent", color: "text-green-600", bg: "bg-green-50" }
     if (annualizedROI >= 15) return { label: "Very Good", color: "text-green-600", bg: "bg-green-50" }
     if (annualizedROI >= 10) return { label: "Good", color: "text-blue-600", bg: "bg-blue-50" }
@@ -181,6 +187,9 @@ export function RiskRewardCalculator() {
                       <InfoTooltip content="A quick assessment of whether this trade is worth your time and risk. Excellent (20%+) means outstanding risk-adjusted returns. Poor (<5%) means you might be better off in index funds." />
                     </p>
                     <p className={`text-2xl font-bold ${tradeQuality.color}`}>{tradeQuality.label}</p>
+                    {"incomplete" in tradeQuality && tradeQuality.incomplete && (
+                      <p className="text-xs text-gray-500 mt-1">Enter premium, capital and days to expiration</p>
+                    )}
                   </div>
 
                   <div className="space-y-3">

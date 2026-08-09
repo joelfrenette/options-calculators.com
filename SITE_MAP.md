@@ -65,9 +65,9 @@
 | `butterflies` | Butterflies | `OptionsStrategyToolbox strategy="butterflies"` | `components/options-strategy-toolbox.tsx` | 1040 | `/api/strategy-scanner` |
 | `collars` | Collars | `OptionsStrategyToolbox strategy="collars"` | `components/options-strategy-toolbox.tsx` | 1040 | `/api/strategy-scanner` |
 | `exit-rules` | Exit Rules | `ExitRulesDashboard` | `components/exit-rules-dashboard.tsx` | 558 | none (static) |
-| `earnings-iv-crusher` | Earnings EM | `EarningsVolatilityCalculator` | `components/earnings-volatility-calculator.tsx` | 484 | none (static) |
+| `earnings-iv-crusher` | Earnings EM | `EarningsVolatilityCalculator` | `components/earnings-volatility-calculator.tsx` | 533 | none (static) |
 | `greeks` | Greeks Calc | `GreeksCalculator` | `components/greeks-calculator.tsx` | 487 | none (static) |
-| `risk-rewards` | ROI Calc | `RiskRewardCalculator` | `components/risk-reward-calculator.tsx` | 304 | none (static) |
+| `risk-rewards` | ROI Calc | `RiskRewardCalculator` | `components/risk-reward-calculator.tsx` | 313 | none (static) |
 
 ## 2. API DEPENDENCY GRAPH
 
@@ -284,9 +284,9 @@ Marks survive `pnpm inventory` — they are read back and merged by tab id.
 | `butterflies` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
 | `collars` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
 | `exit-rules` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `earnings-iv-crusher` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| `earnings-iv-crusher` | ☑ | ☐ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
 | `greeks` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
-| `risk-rewards` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| `risk-rewards` | ☑ | ☐ | ☐ | ☐ | ☑ | ☑ | ☐ | ☐ |
 
 ## 7. CLIENT-SIDE CACHE KEYS
 

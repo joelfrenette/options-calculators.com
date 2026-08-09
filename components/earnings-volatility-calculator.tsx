@@ -29,14 +29,30 @@ export function EarningsVolatilityCalculator() {
   const callStrikeNum = Number.parseFloat(callStrike) || price
   const putStrikeNum = Number.parseFloat(putStrike) || price
 
-  // Calculate IV Crush Risk
-  const ivCrushRisk = hv > 0 ? ((iv - hv) / hv) * 100 : 0
-  const ivCrushLevel = ivCrushRisk > 50 ? "EXTREME" : ivCrushRisk > 30 ? "HIGH" : ivCrushRisk > 15 ? "MODERATE" : "LOW"
+  // Calculate IV Crush Risk.
+  //
+  // An untouched form used to parse to 0/0, land in the final `else`, and
+  // render "LOW" in green with a trading recommendation underneath — a verdict
+  // on numbers nobody had entered. The comparison needs both legs.
+  const hasIvInputs = iv > 0 && hv > 0
+  const ivCrushRisk = hasIvInputs ? ((iv - hv) / hv) * 100 : null
+  const ivCrushLevel =
+    ivCrushRisk === null
+      ? null
+      : ivCrushRisk > 50
+        ? "EXTREME"
+        : ivCrushRisk > 30
+          ? "HIGH"
+          : ivCrushRisk > 15
+            ? "MODERATE"
+            : "LOW"
 
   // Calculate Expected Move
   const straddlePrice = callPrice + putPrice
-  const expectedMovePercent = price > 0 ? (straddlePrice / price) * 100 : 0
-  const expectedMoveDollars = (price * expectedMovePercent) / 100
+  // Needs a price AND a straddle; either missing makes the move unknown, not 0%.
+  const hasMoveInputs = price > 0 && straddlePrice > 0
+  const expectedMovePercent = hasMoveInputs ? (straddlePrice / price) * 100 : null
+  const expectedMoveDollars = expectedMovePercent === null ? null : (price * expectedMovePercent) / 100
 
   // Calculate Straddle Breakevens (ATM)
   const straddleUpperBreakeven = price + straddlePrice
@@ -52,7 +68,7 @@ export function EarningsVolatilityCalculator() {
     ? Math.ceil((new Date(earningsDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
     : 0
 
-  const getRiskColor = (level: string) => {
+  const getRiskColor = (level: string | null) => {
     switch (level) {
       case "EXTREME":
         return "text-red-600 bg-red-50 border-red-200"
@@ -60,12 +76,17 @@ export function EarningsVolatilityCalculator() {
         return "text-orange-600 bg-orange-50 border-orange-200"
       case "MODERATE":
         return "text-yellow-600 bg-yellow-50 border-yellow-200"
-      default:
+      case "LOW":
         return "text-green-600 bg-green-50 border-green-200"
+      // Unknown is grey, not the green that "LOW" gets.
+      default:
+        return "text-gray-500 bg-gray-50 border-gray-200"
     }
   }
 
-  const getRecommendation = () => {
+  const getRecommendation = (): string | null => {
+    // No inputs, no advice. This used to fall through to the LOW-risk line.
+    if (ivCrushRisk === null) return null
     if (ivCrushRisk > 50) {
       return "AVOID opening new long options positions. Consider selling premium or staying flat."
     } else if (ivCrushRisk > 30) {
@@ -281,24 +302,48 @@ export function EarningsVolatilityCalculator() {
                       Expected Move
                       <InfoTooltip content="The market's prediction of the stock's price range by expiration. The stock could move this much in either direction. Calculated as: (Call + Put Price) ÷ Stock Price × 100" />
                     </p>
-                    <p className="text-3xl font-bold text-blue-600">±{expectedMovePercent.toFixed(2)}%</p>
-                    <p className="text-lg text-gray-600 mt-1">±${expectedMoveDollars.toFixed(2)}</p>
+                    <p className="text-3xl font-bold text-blue-600">
+                      {expectedMovePercent === null ? (
+                        <span className="text-gray-400">—</span>
+                      ) : (
+                        `±${expectedMovePercent.toFixed(2)}%`
+                      )}
+                    </p>
+                    <p className="text-lg text-gray-600 mt-1">
+                      {expectedMoveDollars === null ? "—" : `±$${expectedMoveDollars.toFixed(2)}`}
+                    </p>
                   </div>
                   <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
                     <p className="text-sm font-semibold text-gray-600 mb-1 flex items-center justify-center">
                       Upper Target
                       <InfoTooltip content="If the stock rallies, this is where the market expects it could reach. To profit from buying calls, the stock needs to close ABOVE this price by expiration." />
                     </p>
-                    <p className="text-3xl font-bold text-green-600">${(price + expectedMoveDollars).toFixed(2)}</p>
-                    <p className="text-sm text-gray-600 mt-1">+{expectedMovePercent.toFixed(2)}%</p>
+                    <p className="text-3xl font-bold text-green-600">
+                      {expectedMoveDollars === null ? (
+                        <span className="text-gray-400">—</span>
+                      ) : (
+                        `$${(price + expectedMoveDollars).toFixed(2)}`
+                      )}
+                    </p>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {expectedMovePercent === null ? "—" : `+${expectedMovePercent.toFixed(2)}%`}
+                    </p>
                   </div>
                   <div className="text-center p-4 bg-red-50 rounded-lg border border-red-200">
                     <p className="text-sm font-semibold text-gray-600 mb-1 flex items-center justify-center">
                       Lower Target
                       <InfoTooltip content="If the stock drops, this is where the market expects it could fall to. To profit from buying puts, the stock needs to close BELOW this price by expiration." />
                     </p>
-                    <p className="text-3xl font-bold text-red-600">${(price - expectedMoveDollars).toFixed(2)}</p>
-                    <p className="text-sm text-gray-600 mt-1">-{expectedMovePercent.toFixed(2)}%</p>
+                    <p className="text-3xl font-bold text-red-600">
+                      {expectedMoveDollars === null ? (
+                        <span className="text-gray-400">—</span>
+                      ) : (
+                        `$${(price - expectedMoveDollars).toFixed(2)}`
+                      )}
+                    </p>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {expectedMovePercent === null ? "—" : `-${expectedMovePercent.toFixed(2)}%`}
+                    </p>
                   </div>
                 </div>
 
@@ -327,7 +372,7 @@ export function EarningsVolatilityCalculator() {
                     IV Crush Risk Analysis
                     <InfoTooltip content="IV Crush is when implied volatility drops sharply after an event like earnings. If you BUY options before earnings, you lose money from IV crush even if you're right about direction. Higher IV crush risk = more dangerous to buy options." />
                   </span>
-                  <span className="text-2xl font-bold">{ivCrushLevel}</span>
+                  <span className="text-2xl font-bold">{ivCrushLevel ?? "—"}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -351,7 +396,9 @@ export function EarningsVolatilityCalculator() {
                       IV Premium
                       <InfoTooltip content="How much 'extra' IV is priced in for earnings. This is the percentage above normal that you're paying. After earnings, this premium disappears immediately (IV crush)." />
                     </p>
-                    <p className="text-2xl font-bold">{ivCrushRisk.toFixed(1)}%</p>
+                    <p className="text-2xl font-bold">
+                      {ivCrushRisk === null ? <span className="text-gray-400">—</span> : `${ivCrushRisk.toFixed(1)}%`}
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-gray-600 flex items-center">
@@ -364,7 +411,9 @@ export function EarningsVolatilityCalculator() {
 
                 <div className="pt-3 border-t border-current/20">
                   <p className="text-sm font-semibold mb-1">Recommendation:</p>
-                  <p className="text-sm">{getRecommendation()}</p>
+                  <p className="text-sm">
+                    {getRecommendation() ?? "Enter the current and historical IV to get a read."}
+                  </p>
                 </div>
               </CardContent>
             </Card>
