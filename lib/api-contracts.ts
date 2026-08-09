@@ -442,7 +442,7 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     schema: anyObject,
     budgetMs: 25000,
     requires: ["QUIVER_API_KEY"],
-    tabs: [],
+    tabs: ["federal-money"],
   },
   {
     path: "/api/cron/fred-snapshot",

@@ -21,6 +21,7 @@ import { CongressTradeFeed } from "@/components/congress-trade-feed"
 import { PoliticianSpotlight } from "@/components/politician-spotlight"
 import { TopPerformers } from "@/components/top-performers"
 import { SmartMoneyEtfs } from "@/components/smart-money-etfs"
+import { FederalMoneyTrail } from "@/components/federal-money-trail"
 import { InsiderClusters } from "@/components/insider-clusters"
 import { Form144Watch } from "@/components/form-144-watch"
 import { HedgeFund13F } from "@/components/hedge-fund-13f"
@@ -172,6 +173,7 @@ const COPY_TABS = [
   { id: "top-performers", label: "Top Performers" },
   { id: "hedge-fund-13f", label: "Hedge Fund 13F" },
   { id: "smart-money-etfs", label: "Smart-Money ETFs" },
+  { id: "federal-money", label: "Federal Money Trail" },
 ]
 
 // LEARN tabs — ordered around the Wheel as the flagship teaching strategy:
@@ -294,6 +296,8 @@ export default function Home() {
         return <TopPerformers />
       case "smart-money-etfs":
         return <SmartMoneyEtfs />
+      case "federal-money":
+        return <FederalMoneyTrail />
       case "insider-clusters":
         return <InsiderClusters />
       case "form-144":
