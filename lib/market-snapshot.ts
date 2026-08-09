@@ -85,7 +85,33 @@ export interface ClosesResult {
   error?: string
 }
 
-async function upsertCloses(rows: { ticker: string; day: string; close: number }[]): Promise<boolean> {
+/**
+ * A stored bar. high/low/volume are nullable because rows written before
+ * migration 0009 have none — never substitute the close for a missing leg, a
+ * bar whose high and low equal the close is a fabricated zero-range day.
+ */
+export interface CloseRow {
+  ticker: string
+  day: string
+  close: number
+  high: number | null
+  low: number | null
+  volume: number | null
+}
+
+/** Polygon bars carry h/l/v alongside c; they were simply being discarded. */
+function toRow(ticker: string, day: string, b: any): CloseRow {
+  return {
+    ticker,
+    day,
+    close: b.c,
+    high: Number.isFinite(b.h) ? b.h : null,
+    low: Number.isFinite(b.l) ? b.l : null,
+    volume: Number.isFinite(b.v) ? Math.round(b.v) : null,
+  }
+}
+
+async function upsertCloses(rows: CloseRow[]): Promise<boolean> {
   const cfg = getMeteringSupabaseConfig()
   if (!cfg || rows.length === 0) return false
   // Chunked upserts — PostgREST handles arrays natively.
@@ -125,11 +151,7 @@ export async function runClosesSnapshot(polygonKey: string, backfillDays = 0): P
       }
       const j = await r.json()
       const bars = Array.isArray(j?.results) ? j.results : []
-      const rows = bars.map((b: any) => ({
-        ticker: t,
-        day: new Date(b.t).toISOString().slice(0, 10),
-        close: b.c,
-      }))
+      const rows = bars.map((b: any) => toRow(t, new Date(b.t).toISOString().slice(0, 10), b))
       if (await upsertCloses(rows)) stored += rows.length
     }
     return {
@@ -146,7 +168,7 @@ export async function runClosesSnapshot(polygonKey: string, backfillDays = 0): P
   // Try today backwards up to 5 days to find the last session.
   const wanted = new Set(STORED_TICKERS)
   let day = ""
-  let closes: { ticker: string; day: string; close: number }[] = []
+  let closes: CloseRow[] = []
   for (let back = 0; back < 6; back++) {
     const d = new Date(Date.now() - back * 86400000).toISOString().slice(0, 10)
     const r = await meteredFetch(
@@ -158,7 +180,7 @@ export async function runClosesSnapshot(polygonKey: string, backfillDays = 0): P
     const j = await r.json()
     const bars = Array.isArray(j?.results) ? j.results : []
     if (bars.length === 0) continue
-    closes = bars.filter((b: any) => wanted.has(b.T)).map((b: any) => ({ ticker: b.T, day: d, close: b.c }))
+    closes = bars.filter((b: any) => wanted.has(b.T)).map((b: any) => toRow(b.T, d, b))
     day = d
     break
   }

@@ -28,8 +28,14 @@ interface TrendData {
   name: string
   symbol: string
   currentPrice: number
-  change: number
-  changePercent: number
+  // Null when the price came from the last stored close rather than a live
+  // quote: the previous close is what a change is measured FROM, so a stored
+  // close cannot supply its own delta.
+  change: number | null
+  changePercent: number | null
+  historySource?: "store" | "yahoo"
+  priceSource?: "yahoo-quote" | "stored-close"
+  priceAsOf?: string | null
   ma20: number
   ma50: number
   ma200: number
@@ -572,10 +578,18 @@ export function TrendAnalysis() {
                 >
                   <div className="flex flex-col items-center gap-1">
                     <span className="text-lg font-bold text-gray-900">{item.name}</span>
-                    <span className={(item.changePercent ?? 0) >= 0 ? "text-green-600" : "text-red-600"}>
-                      {(item.changePercent ?? 0) >= 0 ? "+" : ""}
-                      {(item.changePercent ?? 0).toFixed(3)}%
-                    </span>
+                    {/* `?? 0` printed "+0.000%" — a flat day — whenever the
+                        change was unavailable. */}
+                    {item.changePercent === null || item.changePercent === undefined ? (
+                      <span className="text-gray-400" title={`Close of ${item.priceAsOf ?? "an earlier session"}; no live quote`}>
+                        —
+                      </span>
+                    ) : (
+                      <span className={item.changePercent >= 0 ? "text-green-600" : "text-red-600"}>
+                        {item.changePercent >= 0 ? "+" : ""}
+                        {item.changePercent.toFixed(3)}%
+                      </span>
+                    )}
                   </div>
                 </button>
               ))}

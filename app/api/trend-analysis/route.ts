@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server"
 import { sma, rsi as calcRSI, macd as calcMACD, bollinger as calcBollinger, atr as calcATR } from "@/lib/indicators"
+import { getStoredBars } from "@/lib/market-closes"
 
 export const dynamic = "force-dynamic"
+
+/** How each symbol's history and its current price were actually sourced. */
+type HistorySource = "store" | "yahoo"
+type PriceSource = "yahoo-quote" | "stored-close"
 
 interface YahooQuote {
   regularMarketPrice: number
@@ -65,6 +70,41 @@ async function fetchYahooQuote(symbol: string): Promise<YahooQuote | null> {
     console.error(`Error fetching ${symbol}:`, error)
     return null
   }
+}
+
+/**
+ * Stored Polygon bars for one symbol, shaped exactly like fetchHistoricalData's
+ * output (oldest-first) so the indicator block below cannot tell them apart.
+ *
+ * Returns null — never a short array — when the store cannot supply 200 bars
+ * with every OHLC leg present. That is the whole point: a partial history is
+ * what produced the "200-day MA" that was really the last close, and a bar
+ * missing its high and low would make ATR read a violent session as calm.
+ * Volume is required too, since the volume-ratio and volume-trend signals sum
+ * over the window and a null would poison the arithmetic.
+ */
+async function fetchStoredHistorical(symbol: string) {
+  const bars = await getStoredBars(symbol, 320, 200)
+  if (!bars) return null
+  if (bars.some((b) => b.volume === null)) return null
+
+  // Newest-first in the store, oldest-first for the indicators.
+  return bars
+    .slice()
+    .reverse()
+    .map((b) => {
+      const ms = new Date(b.day + "T00:00:00Z").getTime()
+      return {
+        // UTC-pinned: rendering a date-only bar in local time shifts every
+        // label a day west of UTC (the CPI-chart defect, E-7b).
+        date: new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }),
+        timestamp: Math.floor(ms / 1000),
+        price: b.close,
+        high: b.high,
+        low: b.low,
+        volume: b.volume as number,
+      }
+    })
 }
 
 // 320 calendar days ≈ 220 trading bars. Previously 180 (~124 bars), which is
@@ -349,29 +389,45 @@ export async function GET() {
     const processSymbol = async (item: { name: string; symbol: string }) => {
       console.log(`[v0] Processing ${item.name} (${item.symbol})`)
 
-      const quote = await fetchYahooQuote(item.symbol)
-      // No explicit day-count override: the 180 previously passed here silently
-      // defeated the 320-day default the fetch window was raised to (~220
-      // trading bars, enough for the 200-day MA — see fetchHistoricalData).
-      const historical = await fetchHistoricalData(item.symbol)
+      // E-7c: stored Polygon bars first, live Yahoo only as the fallback.
+      // Yahoo was being hit twice per symbol on every page view for data that
+      // changes once a day. ^SPX has no stored bars — Polygon's grouped stock
+      // endpoint carries no indices — so it stays on the live path.
+      const stored = await fetchStoredHistorical(item.symbol)
+      const historySource: HistorySource = stored ? "store" : "yahoo"
+      // No explicit day-count override on the fallback: the 180 previously
+      // passed here silently defeated the 320-day default the fetch window was
+      // raised to (~220 trading bars, enough for the 200-day MA).
+      const historical: { date: string; timestamp: number; price: number; high: number; low: number; volume: number }[] =
+        stored ?? (await fetchHistoricalData(item.symbol))
 
-      if (!quote || historical.length === 0) {
-        console.log(`[v0] ${item.name} - No quote or historical data available`)
+      const quote = await fetchYahooQuote(item.symbol)
+
+      if (historical.length === 0) {
+        console.log(`[v0] ${item.name} - No historical data available`)
         return null
       }
 
-      console.log(`[v0] ${item.name} final quote:`, {
-        currentPrice: quote.regularMarketPrice,
-        change: quote.regularMarketChange,
-        changePercent: quote.regularMarketChangePercent,
-      })
+      // A Yahoo outage no longer blanks the symbol when the store has bars:
+      // the last stored close stands in for the live price, and priceSource
+      // says so rather than presenting a close as a quote. Change and
+      // change-percent stay null — the previous close is what the change is
+      // measured FROM, so a stored close cannot supply its own delta.
+      const lastBar = historical[historical.length - 1]
+      const priceSource: PriceSource = quote ? "yahoo-quote" : "stored-close"
+      if (!quote && historySource !== "store") {
+        console.log(`[v0] ${item.name} - No quote and no stored history`)
+        return null
+      }
+
+      console.log(`[v0] ${item.name} sources:`, { historySource, priceSource })
 
       const prices = historical.map((h: any) => h.price)
       const volumes = historical.map((h: any) => h.volume)
-      const currentPrice = quote.regularMarketPrice
+      const currentPrice = quote ? quote.regularMarketPrice : lastBar.price
 
-      let currentVolume = quote.regularMarketVolume
-      let avgVolume = quote.averageDailyVolume10Day
+      let currentVolume = quote ? quote.regularMarketVolume : 0
+      let avgVolume = quote ? quote.averageDailyVolume10Day : 0
 
       // If current volume is 0 (market closed), use the most recent historical volume
       if (currentVolume === 0 && volumes.length > 0) {
@@ -464,7 +520,7 @@ export async function GET() {
           ma200: sma(pricesUpToIndex, 200),
           bollingerUpper: bollingerBands?.upper ?? null,
           bollingerLower: bollingerBands?.lower ?? null,
-          forecast: null, // No forecast in historical section
+          forecast: null as number | null, // No forecast in historical section
           support: support,
           resistance: resistance,
         }
@@ -505,8 +561,14 @@ export async function GET() {
         name: item.name,
         symbol: item.symbol,
         currentPrice,
-        change: quote.regularMarketChange,
-        changePercent: quote.regularMarketChangePercent,
+        change: quote ? quote.regularMarketChange : null,
+        changePercent: quote ? quote.regularMarketChangePercent : null,
+        // Provenance travels with the numbers: which source the 320-bar
+        // history came from, how the current price was obtained, and — when
+        // it is a stored close rather than a quote — the day it belongs to.
+        historySource,
+        priceSource,
+        priceAsOf: quote ? null : lastBar.date,
         ma20,
         ma50,
         ma200,
