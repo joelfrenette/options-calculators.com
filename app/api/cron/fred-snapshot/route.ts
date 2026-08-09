@@ -43,6 +43,8 @@ const SERIES: { id: string; cadence: "daily" | "weekly" | "monthly" | "quarterly
   { id: "CPILFESL", cadence: "monthly", dailyLimit: 3 },
   { id: "PCEPI", cadence: "monthly", dailyLimit: 3 },
   { id: "PAYEMS", cadence: "monthly", dailyLimit: 3 },
+  { id: "U6RATE", cadence: "monthly", dailyLimit: 3 }, // broad unemployment (jobs-report)
+  { id: "CES0500000003", cadence: "monthly", dailyLimit: 3 }, // avg hourly earnings (jobs-report)
   { id: "M2SL", cadence: "monthly", dailyLimit: 3 },
   { id: "PPIACO", cadence: "monthly", dailyLimit: 3 },
   { id: "A191RL1Q225SBEA", cadence: "quarterly", dailyLimit: 2 },

@@ -32,6 +32,8 @@ const STALENESS_DAYS: Record<string, number> = {
   CPILFESL: 60,
   PCEPI: 60,
   PAYEMS: 60,
+  U6RATE: 60,
+  CES0500000003: 60,
   M2SL: 60,
   PPIACO: 60,
   A191RL1Q225SBEA: 150,
@@ -51,6 +53,38 @@ export async function fredLatestFromStore(seriesId: string): Promise<{ value: nu
   if (!rows || rows.length === 0) return null
   const latest = rows[0]
   return fresh(latest.day, seriesId) ? { value: latest.value, day: latest.day } : null
+}
+
+/**
+ * Latest / previous / trend for one series, computed over stored observations.
+ *
+ * `yoy: true` returns year-over-year percent change for a monthly index (CPI,
+ * core CPI, PCE) and needs 14 observations: 13 for the current comparison and
+ * one more so the PREVIOUS month's YoY spans a full 12 months too. The old
+ * per-route version asked FRED for 13 and then read index 13, which is
+ * undefined — it silently fell back to index 12 and compared an 11-month span
+ * against a 12-month one, so "last month's inflation rate" was consistently
+ * wrong by one month of base effect.
+ */
+export async function fredTrendFromStore(
+  seriesId: string,
+  yoy: boolean,
+): Promise<{ current: number; previous: number; trend: "up" | "down" | "stable" } | null> {
+  const need = yoy ? 14 : 2
+  const rows = await fredHistoryFromStore(seriesId, need)
+  if (!rows || rows.length < need) return null
+
+  const v = rows.map((r) => r.value)
+  const [current, previous] = yoy
+    ? [((v[0] - v[12]) / v[12]) * 100, ((v[1] - v[13]) / v[13]) * 100]
+    : [v[0], v[1]]
+  if (!Number.isFinite(current) || !Number.isFinite(previous)) return null
+
+  return {
+    current: Number(current.toFixed(2)),
+    previous: Number(previous.toFixed(2)),
+    trend: current > previous ? "up" : current < previous ? "down" : "stable",
+  }
 }
 
 /** Latest stored value + percentile within stored history — the house

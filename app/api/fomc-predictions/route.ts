@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { getApiKey } from "@/lib/api-keys"
+import { fredHistoryFromStore, fredTrendFromStore } from "@/lib/fred-store"
 
 // E-7d: BLS/FRED series update monthly-to-daily, never intraday. ISR caches
 // the whole response at the edge for 15 min instead of re-pulling full
@@ -11,47 +12,45 @@ export async function GET() {
   try {
     const fredApiKey = getApiKey("FRED_API_KEY")
 
+    // E-7b: store first (the daily fred-snapshot cron holds every series this
+    // route reads), live FRED only when the store is empty or stale. The YoY
+    // maths — and the off-by-one it used to carry — now live in one place in
+    // lib/fred-store.ts rather than being re-derived per route.
     const fetchFredData = async (seriesId: string, calculateYoY = false) => {
+      const stored = await fredTrendFromStore(seriesId, calculateYoY)
+      if (stored) return stored
       if (!fredApiKey) return null
       try {
-        // Fetch 13 observations to get 12 months of YoY data
-        const limit = calculateYoY ? 13 : 2
+        // 14 observations for YoY: 13 for the current comparison plus one more
+        // so the previous month's YoY also spans a full 12 months.
+        const limit = calculateYoY ? 14 : 2
         const response = await fetch(
           `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${fredApiKey}&file_type=json&sort_order=desc&limit=${limit}`,
         )
         if (!response.ok) return null
         const data = await response.json()
-        if (data.observations && data.observations.length > 0) {
-          const latest = Number.parseFloat(data.observations[0].value)
+        const obs = Array.isArray(data?.observations) ? data.observations : []
+        const v = obs.map((o: any) => Number.parseFloat(o.value)).filter((n: number) => Number.isFinite(n))
+        if (v.length === 0) return null
 
-          if (calculateYoY && data.observations.length >= 13) {
-            // Calculate year-over-year percentage change
-            const yearAgo = Number.parseFloat(data.observations[12].value)
-            const yoyChange = ((latest - yearAgo) / yearAgo) * 100
-
-            // Also get previous month for trend
-            const previousMonth = Number.parseFloat(data.observations[1].value)
-            const monthAgo = Number.parseFloat(
-              data.observations[13] ? data.observations[13].value : data.observations[12].value,
-            )
-            const previousYoY = ((previousMonth - monthAgo) / monthAgo) * 100
-
-            return {
-              current: Number(yoyChange.toFixed(2)),
-              previous: Number(previousYoY.toFixed(2)),
-              trend: yoyChange > previousYoY ? "up" : yoyChange < previousYoY ? "down" : "stable",
-            }
-          } else {
-            // For non-YoY metrics (unemployment, payrolls)
-            const previous = data.observations.length > 1 ? Number.parseFloat(data.observations[1].value) : latest
-            return {
-              current: latest,
-              previous,
-              trend: latest > previous ? "up" : latest < previous ? "down" : "stable",
-            }
+        if (calculateYoY) {
+          if (v.length < 14) return null
+          const current = ((v[0] - v[12]) / v[12]) * 100
+          const previous = ((v[1] - v[13]) / v[13]) * 100
+          if (!Number.isFinite(current) || !Number.isFinite(previous)) return null
+          return {
+            current: Number(current.toFixed(2)),
+            previous: Number(previous.toFixed(2)),
+            trend: current > previous ? "up" : current < previous ? "down" : "stable",
           }
         }
-        return null
+        const current = v[0]
+        const previous = v.length > 1 ? v[1] : current
+        return {
+          current,
+          previous,
+          trend: current > previous ? "up" : current < previous ? "down" : "stable",
+        }
       } catch {
         return null
       }
@@ -163,51 +162,36 @@ export async function GET() {
     const fedFundsRate = await fetchFredData("DFF", false) // Daily Fed Funds Effective Rate
     const currentRate = fedFundsRate ? Number(fedFundsRate.current.toFixed(2)) : 4.5
 
-    const fetchHistoricalRates = async () => {
+    // One DFF read serves both the 2-year chart and the ~45-days-ago
+    // comparison. This route used to pull DFF from FRED three separate times
+    // per page view (limit 2, 730, 60) for data that changes once a day.
+    const fetchDffHistory = async (): Promise<{ date: string; rate: number }[]> => {
+      const stored = await fredHistoryFromStore("DFF", 730)
+      if (stored && stored.length > 0) return stored.map((r) => ({ date: r.day, rate: r.value }))
       if (!fredApiKey) return []
       try {
-        // Get 730 days of historical data (2 years)
         const response = await fetch(
           `https://api.stlouisfed.org/fred/series/observations?series_id=DFF&api_key=${fredApiKey}&file_type=json&sort_order=desc&limit=730`,
         )
         if (!response.ok) return []
         const data = await response.json()
-        if (data.observations && data.observations.length > 0) {
-          // Return array of {date, rate} objects
-          return data.observations.reverse().map((obs: any) => ({
-            date: obs.date,
-            rate: Number.parseFloat(obs.value),
-          }))
-        }
-        return []
+        const obs = Array.isArray(data?.observations) ? data.observations : []
+        return obs
+          .map((o: any) => ({ date: String(o.date), rate: Number.parseFloat(o.value) }))
+          .filter((r: { rate: number }) => Number.isFinite(r.rate))
       } catch {
         return []
       }
     }
 
-    const historicalRates = await fetchHistoricalRates()
+    // Newest-first while we index into it, oldest-first for the chart.
+    const dffDesc = await fetchDffHistory()
+    const historicalRates = [...dffDesc].reverse()
 
-    const fetchHistoricalRate = async () => {
-      if (!fredApiKey) return null
-      try {
-        // Get last 60 days of data to find rate from previous meeting
-        const response = await fetch(
-          `https://api.stlouisfed.org/fred/series/observations?series_id=DFF&api_key=${fredApiKey}&file_type=json&sort_order=desc&limit=60`,
-        )
-        if (!response.ok) return null
-        const data = await response.json()
-        if (data.observations && data.observations.length >= 45) {
-          // Get rate from ~45 days ago (previous meeting)
-          const historicalRate = Number.parseFloat(data.observations[45].value)
-          return Number(historicalRate.toFixed(2))
-        }
-        return null
-      } catch {
-        return null
-      }
-    }
-
-    const previousMeetingRate = await fetchHistoricalRate()
+    // Rate from ~45 days ago, the span between FOMC meetings. Null when the
+    // history is too short to reach back that far — never a stand-in value,
+    // since a wrong "previous rate" flips the cutting-cycle detection below.
+    const previousMeetingRate = dffDesc.length >= 46 ? Number(dffDesc[45].rate.toFixed(2)) : null
 
     console.log("[v0] Fed Funds Rate from FRED:", fedFundsRate?.current)
     console.log("[v0] Current Rate after processing:", currentRate)

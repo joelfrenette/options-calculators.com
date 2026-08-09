@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { getApiKey } from "@/lib/api-keys"
+import { fredHistoryFromStore } from "@/lib/fred-store"
 
 // E-7d: BLS/FRED series update monthly-to-daily, never intraday. ISR caches
 // the whole response at the edge for 15 min instead of re-pulling full
@@ -11,39 +12,41 @@ export async function GET() {
   try {
     const fredApiKey = getApiKey("FRED_API_KEY")
 
-    // Fetch CPI data from FRED
-    const fetchCPIData = async () => {
-      if (!fredApiKey) return null
+    /** Index level series, oldest-first. E-7b: store first, live FRED after. */
+    const fetchCpiLevels = async (): Promise<{ date: string; value: number }[]> => {
+      const stored = await fredHistoryFromStore("CPIAUCSL", 36)
+      if (stored && stored.length >= 13) {
+        return stored.map((r) => ({ date: r.day, value: r.value })).reverse()
+      }
+      if (!fredApiKey) return []
       try {
-        // Fetch 36 months of CPI data (3 years for better trend analysis)
         const response = await fetch(
           `https://api.stlouisfed.org/fred/series/observations?series_id=CPIAUCSL&api_key=${fredApiKey}&file_type=json&sort_order=desc&limit=36`,
         )
-        if (!response.ok) return null
+        if (!response.ok) return []
         const data = await response.json()
-
-        if (data.observations && data.observations.length >= 13) {
-          const observations = data.observations.reverse() // Oldest to newest
-
-          // Calculate YoY % change for each month
-          const cpiData = []
-          for (let i = 12; i < observations.length; i++) {
-            const current = Number.parseFloat(observations[i].value)
-            const yearAgo = Number.parseFloat(observations[i - 12].value)
-            const yoyChange = ((current - yearAgo) / yearAgo) * 100
-
-            cpiData.push({
-              date: observations[i].date,
-              yoyChange: Number(yoyChange.toFixed(2)),
-            })
-          }
-
-          return cpiData
-        }
-        return null
+        const obs = Array.isArray(data?.observations) ? data.observations : []
+        return obs
+          .map((o: any) => ({ date: String(o.date), value: Number.parseFloat(o.value) }))
+          .filter((r: { value: number }) => Number.isFinite(r.value))
+          .reverse()
       } catch {
-        return null
+        return []
       }
+    }
+
+    const fetchCPIData = async () => {
+      const levels = await fetchCpiLevels()
+      if (levels.length < 13) return null
+      // YoY per month: each point needs its own value 12 months earlier, so the
+      // first 12 levels are the base and produce no output point.
+      return levels.slice(12).map((row, i) => {
+        const yearAgo = levels[i].value
+        return {
+          date: row.date,
+          yoyChange: Number((((row.value - yearAgo) / yearAgo) * 100).toFixed(2)),
+        }
+      })
     }
 
     const historicalCPI = await fetchCPIData()

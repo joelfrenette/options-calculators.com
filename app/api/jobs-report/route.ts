@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { getApiKey } from "@/lib/api-keys"
+import { fredHistoryFromStore } from "@/lib/fred-store"
 
 // E-7d: BLS/FRED series update monthly-to-daily, never intraday. ISR caches
 // the whole response at the edge for 15 min instead of re-pulling full
@@ -18,7 +19,16 @@ const FRED_BASE = "https://api.stlouisfed.org/fred/series/observations"
 
 type Obs = { date: string; value: string }
 
+/**
+ * Observations oldest -> newest. E-7b: the daily fred-snapshot cron holds all
+ * four series, so the store answers first; live FRED remains the fallback when
+ * the store is empty or has gone stale for the series' cadence.
+ */
 async function fetchSeries(seriesId: string, apiKey: string, limit: number): Promise<Obs[] | null> {
+  const stored = await fredHistoryFromStore(seriesId, limit)
+  if (stored && stored.length > 0) {
+    return stored.map((r) => ({ date: r.day, value: String(r.value) })).reverse()
+  }
   try {
     const res = await fetch(
       `${FRED_BASE}?series_id=${seriesId}&api_key=${apiKey}&file_type=json&sort_order=desc&limit=${limit}`,
@@ -59,10 +69,10 @@ function nextFirstFriday(from: Date) {
 
 export async function GET() {
   try {
+    // No early bail on a missing key: with the E-7b store warm this route
+    // serves entirely from Supabase, and FRED being unconfigured is only fatal
+    // once the store also comes back empty (handled below, as 503).
     const fredApiKey = getApiKey("FRED_API_KEY")
-    if (!fredApiKey) {
-      return NextResponse.json({ error: "FRED_API_KEY not configured" }, { status: 500 })
-    }
 
     const [unrateObs, u6Obs, payemsObs, earningsObs] = await Promise.all([
       fetchSeries("UNRATE", fredApiKey, 40),
@@ -72,7 +82,16 @@ export async function GET() {
     ])
 
     if (!unrateObs || unrateObs.length < 14 || !u6Obs || u6Obs.length < 2) {
-      throw new Error("Insufficient FRED data for UNRATE/U6")
+      // Neither the store nor FRED could supply the labour series. 503 (not
+      // 500): the data source is unavailable, the route itself is fine.
+      return NextResponse.json(
+        {
+          error: fredApiKey
+            ? "Labour-market data is unavailable: neither the stored series nor FRED returned enough observations."
+            : "Labour-market data is unavailable: FRED_API_KEY is not configured and the stored series is empty.",
+        },
+        { status: 503 },
+      )
     }
 
     const num = (o?: Obs) => (o ? Number.parseFloat(o.value) : Number.NaN)
