@@ -390,12 +390,16 @@ import type { QualifyingStock } from "./types"
             continue
           }
 
-          // Sort by proximity to -0.30 delta
-          optionsWithData.sort((a, b) => {
-            const aDist = Math.abs((a.delta || 0) - -0.3)
-            const bDist = Math.abs((b.delta || 0) - -0.3)
-            return aDist - bDist
-          })
+          // Sort by proximity to -0.30 delta.
+          //
+          // `(a.delta || 0)` treated a contract with no delta as delta 0, which
+          // is 0.30 away from the target — the same distance as a perfectly
+          // respectable -0.60 — so unknown-delta contracts were ranked into the
+          // middle of the pack and could be picked as the "closest to -0.30".
+          // Unknown sorts last instead of competing on an invented value.
+          const distanceFromTarget = (delta: number | null | undefined) =>
+            typeof delta === "number" && Number.isFinite(delta) ? Math.abs(delta - -0.3) : Number.POSITIVE_INFINITY
+          optionsWithData.sort((a, b) => distanceFromTarget(a.delta) - distanceFromTarget(b.delta))
 
           const top3Options = optionsWithData.slice(0, 3)
 

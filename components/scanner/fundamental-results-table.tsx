@@ -42,16 +42,18 @@ export function FundamentalResultsTable({
         bValue = b.currentPrice
         break
       case "peRatio":
-        aValue = a.peRatio
-        bValue = b.peRatio
+        aValue = a.peRatio ?? Number.NEGATIVE_INFINITY
+        bValue = b.peRatio ?? Number.NEGATIVE_INFINITY
         break
       case "marketCap":
-        aValue = a.marketCap
-        bValue = b.marketCap
+        // Unknown sorts last in either direction rather than tying with a
+        // genuine zero.
+        aValue = a.marketCap ?? Number.NEGATIVE_INFINITY
+        bValue = b.marketCap ?? Number.NEGATIVE_INFINITY
         break
       case "roe":
-        aValue = a.roe
-        bValue = b.roe
+        aValue = a.roe ?? Number.NEGATIVE_INFINITY
+        bValue = b.roe ?? Number.NEGATIVE_INFINITY
         break
       case "avgVolume":
         aValue = a.avgVolume
@@ -225,13 +227,36 @@ export function FundamentalResultsTable({
                         </td>
                         <td className="text-right py-2 px-3 text-gray-900">${stock.currentPrice.toFixed(2)}</td>
                         <td className="text-right py-2 px-3 text-gray-600">
-                          {stock.peRatio > 0 ? stock.peRatio.toFixed(1) : "-"}
+                          {stock.peRatio !== null && stock.peRatio > 0 ? (
+                            stock.peRatio.toFixed(1)
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
                         </td>
                         <td className="text-right py-2 px-3 text-gray-600">
-                          {stock.marketCap > 0 ? `$${stock.marketCap.toFixed(1)}B` : "$0.0B"}
+                          {stock.marketCap !== null && stock.marketCap > 0 ? (
+                            `$${stock.marketCap.toFixed(1)}B`
+                          ) : (
+                            <span className="text-gray-400" title="No shares outstanding and no complete trailing-twelve-month figure">
+                              —
+                            </span>
+                          )}
                         </td>
                         <td className="text-right py-2 px-3 text-gray-600">
-                          {stock.roe > 0 ? `${stock.roe.toFixed(1)}%` : "0.0%"}
+                          {stock.roe !== null && stock.roe > 0 ? (
+                            `${stock.roe.toFixed(1)}%`
+                          ) : (
+                            <span
+                              className="text-gray-400"
+                              title={
+                                stock.ttmQuarters !== undefined && stock.ttmQuarters < 4
+                                  ? `Trailing twelve months covers only ${stock.ttmQuarters} of 4 quarters`
+                                  : "Equity not reported"
+                              }
+                            >
+                              —
+                            </span>
+                          )}
                         </td>
                         <td className="text-right py-2 px-3 text-gray-600">
                           {stock.profitableQuarters !== undefined ? stock.profitableQuarters : "-"}

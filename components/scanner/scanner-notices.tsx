@@ -56,6 +56,8 @@ export function RejectionSummaryCard({
                       {reason === "volume" && "Volume below Min Volume"}
                       {reason === "debtEquity" && "Debt/Equity above Max"}
                       {reason === "roe" && "ROE below Min ROE %"}
+                      {reason === "fundamentalsIncomplete" &&
+                        "Financials incomplete — fewer than 4 reported quarters, so ROE/market cap could not be computed"}
                       {reason === "profitableQuarters" && "Fewer consecutive profitable quarters than required"}
                       {reason === "marketCap" && "Market cap below Min"}
                     </span>

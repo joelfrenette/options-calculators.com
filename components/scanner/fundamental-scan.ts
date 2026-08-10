@@ -193,14 +193,33 @@ export const runFundamentalScan = async ({
               else break
             }
 
-            // TTM figures from the last 4 quarterly rows (graceful when fewer exist)
+            // TTM figures — FOUR quarters, each of them actually reported.
+            //
+            // This used to read "graceful when fewer exist": `qRows.slice(0, 4)`
+            // summed with `|| 0` per quarter, so a company with two filings on
+            // record produced a TWO-quarter sum labelled trailing-twelve-month.
+            // That understates earnings and inflates every P/E, EPS and ROE
+            // derived from it — and the shorter the history, the more confident
+            // and the more wrong the number looked. A partial year is not a
+            // year, so it is null.
             const ttmRows = qRows.slice(0, 4)
-            const net_income = ttmRows.reduce(
-              (sum: number, row: any) => sum + (row.financials?.income_statement?.net_income_loss?.value || 0),
-              0,
+            const ttmQuarters = ttmRows.length
+            const quarterlyNetIncome = ttmRows.map(
+              (row: any) => row.financials?.income_statement?.net_income_loss?.value,
             )
-            const stockholders_equity = balance_sheet.equity?.value || 0
-            const total_liabilities = balance_sheet.liabilities?.value || 0
+            const net_income: number | null =
+              ttmQuarters === 4 && quarterlyNetIncome.every((v: any) => typeof v === "number" && Number.isFinite(v))
+                ? quarterlyNetIncome.reduce((sum: number, v: number) => sum + v, 0)
+                : null
+
+            // Balance-sheet legs: absent is unknown, not zero. `total_liabilities
+            // || 0` reported a company with no balance sheet as debt-free.
+            const rawEquity = balance_sheet.equity?.value
+            const rawLiabilities = balance_sheet.liabilities?.value
+            const stockholders_equity: number | null =
+              typeof rawEquity === "number" && Number.isFinite(rawEquity) ? rawEquity : null
+            const total_liabilities: number | null =
+              typeof rawLiabilities === "number" && Number.isFinite(rawLiabilities) ? rawLiabilities : null
 
             // Extract shares outstanding from multiple possible sources
             const basic_shares = income_statement.basic_average_shares?.value || 0
@@ -211,18 +230,26 @@ export const runFundamentalScan = async ({
               basic_shares ||
               0
 
-            // TTM EPS = sum of the last 4 quarterly EPS figures (REAL DATA)
+            // TTM EPS = sum of the last 4 quarterly EPS figures. Same rule as
+            // net income: a quarter with no reported EPS used to contribute 0,
+            // turning three quarters of earnings into a "twelve-month" total.
             const quarterEPS = ttmRows.map((row: any) => {
               const is = row.financials?.income_statement || {}
-              return is.diluted_earnings_per_share?.value ?? is.basic_earnings_per_share?.value ?? 0
+              const v = is.diluted_earnings_per_share?.value ?? is.basic_earnings_per_share?.value
+              return typeof v === "number" && Number.isFinite(v) ? v : null
             })
-            let eps = quarterEPS.reduce((a: number, b: number) => a + b, 0)
-            if (!(eps > 0) && shares_outstanding > 0 && net_income) {
+            let eps: number | null =
+              ttmQuarters === 4 && quarterEPS.every((v: number | null) => v !== null)
+                ? (quarterEPS as number[]).reduce((a: number, b: number) => a + b, 0)
+                : null
+            if (eps === null && shares_outstanding > 0 && net_income !== null && net_income !== 0) {
+              // Derivable from a complete TTM net income, which is itself
+              // already gated on four reported quarters.
               eps = net_income / shares_outstanding
             }
 
             // Calculate Market Cap: Price × Shares Outstanding
-            let marketCap = 0
+            let marketCap: number | null = null
             if (shares_outstanding > 0) {
               marketCap = currentPrice * shares_outstanding
             } else if (ticker_data?.market_cap) {
@@ -230,25 +257,33 @@ export const runFundamentalScan = async ({
             } else {
               // Fallback: estimate from financials (PE ratio method)
               // If PE is typically 15-20 for large caps, and we have net income
-              if (net_income > 0 && eps > 0) {
+              if (net_income !== null && net_income > 0 && eps !== null && eps > 0) {
                 marketCap = (currentPrice / eps) * net_income
               }
             }
 
-            // Calculate PE Ratio
-            let peRatio = 0
-            if (eps > 0) {
+            // Calculate PE Ratio — null when neither route has complete inputs.
+            let peRatio: number | null = null
+            if (eps !== null && eps > 0) {
               peRatio = currentPrice / eps
-            } else if (marketCap > 0 && net_income > 0) {
+            } else if (marketCap !== null && marketCap > 0 && net_income !== null && net_income > 0) {
               // Fallback: use market cap / net income as approximation
               peRatio = marketCap / net_income
             }
 
-            // Calculate Debt-to-Equity
-            const debtToEquity = stockholders_equity > 0 ? total_liabilities / stockholders_equity : 0
+            // Debt-to-Equity. Unknown equity gave 0, which reads as "no debt" —
+            // the most flattering possible value for a company we know nothing
+            // about.
+            const debtToEquity: number | null =
+              stockholders_equity !== null && stockholders_equity > 0 && total_liabilities !== null
+                ? total_liabilities / stockholders_equity
+                : null
 
-            // Calculate ROE (Return on Equity) - REAL DATA
-            const roe = stockholders_equity > 0 ? (net_income / stockholders_equity) * 100 : 0
+            // ROE needs a complete TTM net income AND positive equity.
+            const roe: number | null =
+              net_income !== null && stockholders_equity !== null && stockholders_equity > 0
+                ? (net_income / stockholders_equity) * 100
+                : null
 
             const earningsTimestamp =
               snapshotData.ticker?.earnings?.announcement_date ||
@@ -267,7 +302,7 @@ export const runFundamentalScan = async ({
             }
 
             console.log(
-              `[v0] ${ticker}: Price=$${currentPrice.toFixed(2)}, EPS(TTM)=$${eps.toFixed(4)}, PE=${peRatio.toFixed(1)}, MarketCap=$${(marketCap / 1e9).toFixed(1)}B, Vol=${volumeInMillions.toFixed(1)}M, D/E=${debtToEquity.toFixed(2)}, ROE=${roe.toFixed(1)}%, ProfitQtrs=${profitableQuarters}/${qRows.length}${earningsDate ? `, Earnings: ${earningsDate} (${daysToEarnings}d)` : " (no earnings date)"}`,
+              `[v0] ${ticker}: Price=$${currentPrice.toFixed(2)}, EPS(TTM)=${eps === null ? "n/a" : `$${eps.toFixed(4)}`}, PE=${peRatio === null ? "n/a" : peRatio.toFixed(1)}, MarketCap=${marketCap === null ? "n/a" : `$${(marketCap / 1e9).toFixed(1)}B`}, Vol=${volumeInMillions.toFixed(1)}M, D/E=${debtToEquity === null ? "n/a" : debtToEquity.toFixed(2)}, ROE=${roe === null ? "n/a" : `${roe.toFixed(1)}%`}, TTMQtrs=${ttmQuarters}/4, ProfitQtrs=${profitableQuarters}/${qRows.length}${earningsDate ? `, Earnings: ${earningsDate} (${daysToEarnings}d)` : " (no earnings date)"}`,
             )
 
             // Apply filters with REAL data from Polygon — record which ones fail so we
@@ -282,12 +317,21 @@ export const runFundamentalScan = async ({
               rejectionBuckets.volume.push(`${ticker}(${volumeInMillions.toFixed(1)}M)`)
               failedFilters.push("volume")
             }
-            if (debtToEquity > 0 && debtToEquity > maxDebtValue) {
+            if (debtToEquity !== null && debtToEquity > 0 && debtToEquity > maxDebtValue) {
               console.log(`[v0]   ❌ ${ticker}: D/E ${debtToEquity.toFixed(2)} > ${maxDebtValue}`)
               rejectionBuckets.debtEquity.push(`${ticker}(${debtToEquity.toFixed(2)})`)
               failedFilters.push("debtEquity")
             }
-            if (roe < minROEValue) {
+            // An unknown ROE is not an ROE of 0%. It used to be compared as 0
+            // and rejected under the "ROE below minimum" reason, which told the
+            // user a measured fact about a company whose earnings never
+            // reported. It now fails under its own reason, so the notice says
+            // "incomplete financials" instead of quoting a fabricated 0.0%.
+            if (roe === null) {
+              console.log(`[v0]   ❌ ${ticker}: ROE unknown (TTM covers ${ttmQuarters}/4 quarters)`)
+              rejectionBuckets.roe.push(`${ticker}(ROE unknown)`)
+              failedFilters.push("fundamentalsIncomplete")
+            } else if (roe < minROEValue) {
               console.log(`[v0]   ❌ ${ticker}: ROE ${roe.toFixed(1)}% < ${minROEValue}%`)
               rejectionBuckets.roe.push(`${ticker}(${roe.toFixed(1)}%)`)
               failedFilters.push("roe")
@@ -305,7 +349,13 @@ export const runFundamentalScan = async ({
               }
             }
             const minMarketCapValue = PRE_FILTER_MARKET_CAP_TIERS[minMarketCapCategory[0]]?.value ?? 0
-            if (minMarketCapValue > 0 && marketCap < minMarketCapValue) {
+            if (minMarketCapValue > 0 && marketCap === null) {
+              // Unknown cap used to compare as 0 and be rejected as "below
+              // minimum", quoting a $0.0B figure that was never measured.
+              console.log(`[v0]   ❌ ${ticker}: Market Cap unknown (no shares outstanding and no complete TTM)`)
+              rejectionBuckets.marketCap.push(`${ticker}(unknown)`)
+              if (!failedFilters.includes("fundamentalsIncomplete")) failedFilters.push("fundamentalsIncomplete")
+            } else if (minMarketCapValue > 0 && marketCap !== null && marketCap < minMarketCapValue) {
               console.log(
                 `[v0]   ❌ ${ticker}: Market Cap $${(marketCap / 1e9).toFixed(1)}B < $${(minMarketCapValue / 1e9).toFixed(1)}B`,
               )
@@ -382,9 +432,17 @@ export const runFundamentalScan = async ({
             return {
               ticker,
               currentPrice,
-              peRatio: peRatio > 0 ? Number(peRatio.toFixed(1)) : 0,
+              peRatio: peRatio !== null && peRatio > 0 ? Number(peRatio.toFixed(1)) : null,
               avgVolume: Number(volumeInMillions.toFixed(2)),
-              last4EPS: quarterEPS.length === 4 ? quarterEPS : [eps, eps, eps, eps].map((v) => v / 4), // Real per-quarter EPS when available
+              // Real per-quarter EPS, or null. The fallback used to be
+              // `[eps, eps, eps, eps].map(v => v / 4)` — four identical
+              // synthetic quarters manufactured from the TTM total, i.e. an
+              // invented earnings history with no variance at all, sitting
+              // under a comment claiming it was real.
+              last4EPS:
+                quarterEPS.length === 4 && quarterEPS.every((v: number | null) => v !== null)
+                  ? (quarterEPS as number[])
+                  : null,
               sma50,
               sma100,
               sma200,
@@ -402,16 +460,21 @@ export const runFundamentalScan = async ({
               yield: Number(finalYield.toFixed(2)),
               delta: estimatedDelta,
               deltaSource: "estimated" as const, // Default to estimated for fundamental scan
-              marketCap: marketCap > 0 ? Number((marketCap / 1_000_000_000).toFixed(1)) : 0, // Store market cap in billions
+              // Billions, or null when unknown. Zero used to render as a
+              // confident "$0.0B".
+              marketCap: marketCap !== null && marketCap > 0 ? Number((marketCap / 1_000_000_000).toFixed(1)) : null,
               redDay,
               earningsDate: stockEarningsDate, // Use real earnings date
               daysToEarnings: stockDaysToEarnings, // Use real days to earnings
               expectedMove: fundamentalExpectedMove,
               volume: volume, // Store raw volume
-              roe: Number(roe.toFixed(1)), // Return on Equity percentage
-              debtToEquity: Number(debtToEquity.toFixed(2)), // Debt-to-Equity ratio
+              roe: roe === null ? null : Number(roe.toFixed(1)), // Return on Equity %, null when TTM is incomplete
+              debtToEquity: debtToEquity === null ? null : Number(debtToEquity.toFixed(2)),
               failedFilters, // [] on strict pass; 1–2 entries → near miss for relaxed Step 4
               profitableQuarters,
+              // How many of the four TTM quarters actually reported, so the UI
+              // can say why a fundamental is "—" rather than leaving it blank.
+              ttmQuarters,
             }
           } catch (err) {
             console.log(`[v0] Error processing ${ticker}:`, err)

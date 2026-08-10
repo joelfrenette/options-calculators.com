@@ -4,9 +4,9 @@
 export interface QualifyingStock {
   ticker: string
   currentPrice: number
-  peRatio: number
+  peRatio: number | null // null when neither EPS nor a complete TTM supports it
   avgVolume: number
-  last4EPS: number[]
+  last4EPS: number[] | null // the four REAL quarters, or null — never synthesised
   // Indicator fields are null when the price history is too short to compute
   // them (lib/indicators.ts contract) — gates fail-safe and the UI shows ✗/—,
   // never a fabricated 0. Kills the false Golden Cross on IPOs (FORMULAS.md §1).
@@ -25,14 +25,18 @@ export interface QualifyingStock {
   yield: number // This will be updated with real option yield
   delta: number
   deltaSource?: "polygon" | "calculated" | "estimated" // Track source of delta
-  marketCap: number // Store market cap in billions
+  // Billions. Null when shares outstanding and a complete TTM are both
+  // missing — never 0, which rendered as a confident "$0.0B".
+  marketCap: number | null
   redDay: boolean
   earningsDate?: string
   daysToEarnings?: number
   expectedMove?: number // This will be updated with expected move from IV
   volume: number // Added volume field
-  roe: number // Return on Equity percentage
-  debtToEquity: number // Debt-to-Equity ratio
+  roe: number | null // Return on Equity %, null when the TTM is incomplete
+  debtToEquity: number | null // null when equity is unknown — 0 read as "no debt"
+  /** How many of the four TTM quarters actually reported. 4 = a real year. */
+  ttmQuarters?: number
   expiryDate?: string // Options expiration date
   daysToExpiry?: number // Days until option expiration
   annualizedYield?: number // Annualized yield percentage
