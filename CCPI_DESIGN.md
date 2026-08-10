@@ -335,50 +335,51 @@ run; it is now the single gate between here and a scored gauge.
 
 ---
 
-## 6b. WALK-FORWARD VERDICT — 2026-08-10. Nothing is confirmed.
+## 6b. WALK-FORWARD VERDICT — 2026-08-10, FINAL. Nothing is confirmed.
 
-| Signal | Verdict | Fit lift (3 events) | Test lift (8 events) |
-|---|---|---|---|
-| nfci-tightening | `fit-only` | **4.01** | **0** |
-| curve-10y3m | `fit-only` | 2.85 | 1.11 |
-| stlfsi-stress | `fit-only` | 2.14 | 0 |
-| claims-rising | `failed` | 0 | 0 |
-| vix-backwardation | `insufficient` | — | 0.49 |
+Run with the window chosen on the **fit period only** (the leaky version and its
+two spurious `test-only` verdicts are described as lesson 3 in §6a).
 
-**NFCI scored lift 4.01 in-sample and exactly 0 out of sample.** It was the
-best-looking signal in the table, and on in-sample evidence alone it would have
-been weighted. That single pair of numbers justifies the entire harness.
+| Signal | Window | Fit lift | Test lift | Verdict |
+|---|---|---|---|---|
+| nfci-tightening | 60d | 5.79 | **0** | `fit-only` |
+| stlfsi-stress | 60d | 3.09 | **0** | `fit-only` |
+| curve-10y3m | 90d | 2.85 | **1.11** | `fit-only` |
+| claims-rising | 30d | 0 | 0 | `failed` |
+| vix-backwardation | — | — | 0.49 | `insufficient` |
 
-`curve-10y3m` fell from 2.85 to 1.11 — below the 1.2 bar, indistinguishable
-from chance. And the halves are not equal: **3 events before the 2010 split, 8
-after.** The larger and more meaningful sample is the one reporting nothing.
+**Read the pattern rather than the rows.** Every signal with an in-sample case —
+5.79, 3.09, 2.85 — collapsed out of sample to 0, 0 and 1.11. That is not one
+weak indicator; it is the systematic signature of overfitting across the whole
+candidate set, produced independently by three unrelated series. Closing the
+window-selection leak also removed both `test-only` verdicts, which is
+corroboration that the fix was correct rather than merely different.
 
-### The conclusion
+### Conclusion
 
-**None of the freely available macro series times equity drawdowns at any
-horizon tested.** Twenty tests produced two in-sample positives and zero
-confirmed. **Trigger ships empty**, exactly as §7a specified it should when
-nothing has earned weight.
+**No freely available macro series times equity drawdowns at any horizon
+tested (30 to 540 days).** Twenty-eight window-tests, three in-sample
+positives, **zero confirmed**. **Trigger ships empty**, exactly as §7a
+specified it should when nothing has earned weight.
 
-This is a result, not a failure. The requirement was a gauge that warns before
-a drawdown; the honest answer from this site's own data is that these inputs do
-not, and that is known now rather than after trading on it. The alternative —
-shipping NFCI at lift 4.01 — would have looked authoritative and been worthless.
+A result, not a failure. The requirement was a gauge that warns before a
+drawdown; the honest answer from this site's own data is that these inputs do
+not, and it is known now rather than after trading on it. Shipping NFCI on its
+5.79 in-sample lift would have produced an authoritative-looking gauge with zero
+out-of-sample value — and without the walk-forward gate, that is exactly what
+would have happened.
 
-### What is still genuinely open
+### What is still open, in priority order
 
-1. **Breadth divergence.** Needs price history rather than FRED series, and the
-   signal is not built. The one candidate the literature supports that this run
-   never tested.
-2. **Credit with real history.** The ICE licence cap (§5) made the best-
-   documented precursor untestable. A paid source with history back to 1996 is
-   the only way to answer it — a §8 budget question, and now the only one worth
-   asking, because it is the single untested hypothesis with prior support.
-3. **A shorter window than 90 days.** Lift rose as the window narrowed, at every
-   signal, without exception. 30 and 60 days were never tried, and the trend
-   points there.
-
-Nothing else should be added to Gauge B without a `confirmed` verdict.
+1. **Breadth divergence.** Logic built and proven (`breadthDivergence` in
+   `lib/ccpi/signals.ts`, 5 checks), **not wired**. Needs stored closes plus
+   `breadth_daily` rather than FRED, and ~2 years of breadth accumulation before
+   it can say anything. The only candidate with prior support never tested here.
+2. **Credit with real history.** The ICE licence cap (§5) made the
+   best-documented precursor untestable. A paid source reaching 1996 is the only
+   way to answer it, and it is now the single budget question worth asking.
+3. **Everything else is closed.** NFCI, STLFSI4, ICSA, both curves and the VIX
+   term structure have been measured and none earns weight.
 
 ---
 
