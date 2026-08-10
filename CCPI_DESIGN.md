@@ -325,6 +325,53 @@ run; it is now the single gate between here and a scored gauge.
 
 ---
 
+## 6b. WALK-FORWARD VERDICT — 2026-08-10. Nothing is confirmed.
+
+| Signal | Verdict | Fit lift (3 events) | Test lift (8 events) |
+|---|---|---|---|
+| nfci-tightening | `fit-only` | **4.01** | **0** |
+| curve-10y3m | `fit-only` | 2.85 | 1.11 |
+| stlfsi-stress | `fit-only` | 2.14 | 0 |
+| claims-rising | `failed` | 0 | 0 |
+| vix-backwardation | `insufficient` | — | 0.49 |
+
+**NFCI scored lift 4.01 in-sample and exactly 0 out of sample.** It was the
+best-looking signal in the table, and on in-sample evidence alone it would have
+been weighted. That single pair of numbers justifies the entire harness.
+
+`curve-10y3m` fell from 2.85 to 1.11 — below the 1.2 bar, indistinguishable
+from chance. And the halves are not equal: **3 events before the 2010 split, 8
+after.** The larger and more meaningful sample is the one reporting nothing.
+
+### The conclusion
+
+**None of the freely available macro series times equity drawdowns at any
+horizon tested.** Twenty tests produced two in-sample positives and zero
+confirmed. **Trigger ships empty**, exactly as §7a specified it should when
+nothing has earned weight.
+
+This is a result, not a failure. The requirement was a gauge that warns before
+a drawdown; the honest answer from this site's own data is that these inputs do
+not, and that is known now rather than after trading on it. The alternative —
+shipping NFCI at lift 4.01 — would have looked authoritative and been worthless.
+
+### What is still genuinely open
+
+1. **Breadth divergence.** Needs price history rather than FRED series, and the
+   signal is not built. The one candidate the literature supports that this run
+   never tested.
+2. **Credit with real history.** The ICE licence cap (§5) made the best-
+   documented precursor untestable. A paid source with history back to 1996 is
+   the only way to answer it — a §8 budget question, and now the only one worth
+   asking, because it is the single untested hypothesis with prior support.
+3. **A shorter window than 90 days.** Lift rose as the window narrowed, at every
+   signal, without exception. 30 and 60 days were never tried, and the trend
+   points there.
+
+Nothing else should be added to Gauge B without a `confirmed` verdict.
+
+---
+
 ## 7. Migration
 
 Phased so the site is never in a broken half-state:
