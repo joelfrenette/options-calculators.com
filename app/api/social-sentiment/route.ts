@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { resolveApiKey } from "@/lib/api-keys"
 import { generateWithFallback } from "@/lib/ai-providers"
+import { parseAAII } from "@/lib/aaii-sentiment"
 import {
   getGoogleNewsSentiment,
   getCNNFearGreedSentiment,
@@ -165,19 +166,15 @@ async function getNewsFearGreed(): Promise<{ score: number; source: string }> {
 }
 
 // ========== AAII INVESTOR SURVEY ==========
-// Free-first: fetch aaii.com directly (the weekly survey numbers are public).
+// Free-first: fetch aaii.com directly. The public page is a chart script with
+// ~121 undated historical tooltips, so the parser usually declines it (see
+// lib/aaii-sentiment.ts) and this pillar reports UNAVAILABLE rather than
+// publishing a week it cannot identify.
 // Only fall back to ScrapingBee if its key is still enabled. -1 if all fail —
 // never a fabricated/historical value.
-function parseAAII(html: string): { score: number; source: string; bullish: number } | null {
-  const bullMatch = html.match(/Bullish[:\s]*(\d+(?:\.\d+)?)\s*%/i) || html.match(/(\d+(?:\.\d+)?)\s*%\s*Bullish/i)
-  const bearMatch = html.match(/Bearish[:\s]*(\d+(?:\.\d+)?)\s*%/i) || html.match(/(\d+(?:\.\d+)?)\s*%\s*Bearish/i)
-  if (!bullMatch) return null
-  const bullish = Number.parseFloat(bullMatch[1])
-  const bearish = bearMatch ? Number.parseFloat(bearMatch[1]) : (100 - bullish) / 2
-  if (!(bullish > 0 && bullish < 100)) return null
-  const score = Math.round((bullish / (bullish + bearish)) * 100)
-  return { score, source: "aaii_live", bullish }
-}
+// Parsing lives in lib/aaii-sentiment.ts so scripts/check-aaii-sentiment.ts can
+// exercise it against real page fixtures. See that module for why a reading is
+// only accepted as a co-located bullish/neutral/bearish triple summing to 100.
 
 async function getAAIISentiment(): Promise<{ score: number; source: string; bullish: number }> {
   // 1) Direct free fetch (no scraper) — browser-like UA, weekly data so cacheable.
@@ -230,9 +227,20 @@ async function getAAIISentiment(): Promise<{ score: number; source: string; bull
 
 // ========== AI EXECUTIVE SUMMARY (analysis of the REAL scores above) ==========
 async function generateExecutiveSummary(
-  globalScore: number,
+  globalScore: number | null,
   indicators: Array<{ name: string; score: number; status: string }>,
 ): Promise<{ summary: string; outlook: string; strategies: string[] }> {
+  // No live source means no reading to analyse. Asking the model to interpret a
+  // stand-in 50 is how a blank feed became "neutral conditions" and a strategy
+  // list (same defect class as P6-19).
+  if (globalScore === null) {
+    return {
+      summary:
+        "No live sentiment source returned a reading, so there is no sentiment score to report. This is missing data, not a neutral market.",
+      outlook: "No outlook — the inputs this section depends on are unavailable.",
+      strategies: [],
+    }
+  }
   try {
     const active = indicators.filter((i) => i.status === "LIVE" && i.score >= 0)
     const indicatorSummary = active.map((i) => `${i.name}: ${i.score}/100`).join(", ")
@@ -334,19 +342,26 @@ export async function GET() {
 
     const valid = indicators.filter((i) => i.score >= 0)
 
-    // Weighted global score across only the live sources
-    let globalScore = 50
-    if (valid.length > 0) {
-      const totalWeight = valid.reduce((s, i) => s + i.weight, 0)
-      globalScore = Math.round(valid.reduce((s, i) => s + i.score * i.weight, 0) / totalWeight)
-    }
+    // Weighted global score across only the live sources. With nothing live the
+    // answer is null, not 50: on a 0-100 sentiment scale 50 is a real NEUTRAL
+    // reading, and it was being published as one, fed to the LLM summary, and
+    // turned into "Neutral conditions - consider iron condors or strangles".
+    const totalWeight = valid.reduce((s, i) => s + i.weight, 0)
+    const globalScore =
+      valid.length > 0 ? Math.round(valid.reduce((s, i) => s + i.score * i.weight, 0) / totalWeight) : null
 
+    // Each band reports its OWN sources or nothing. Falling back to globalScore
+    // made the macro band echo a purely social reading and vice versa.
     const socialValid = valid.filter((i) => i.group === "social")
     const macroValid = valid.filter((i) => i.group === "macro")
-    const socialSentiment = socialValid.length ? Math.round(socialValid.reduce((s, i) => s + i.score, 0) / socialValid.length) : globalScore
-    const macroSentiment = macroValid.length ? Math.round(macroValid.reduce((s, i) => s + i.score, 0) / macroValid.length) : globalScore
+    const socialSentiment = socialValid.length
+      ? Math.round(socialValid.reduce((s, i) => s + i.score, 0) / socialValid.length)
+      : null
+    const macroSentiment = macroValid.length
+      ? Math.round(macroValid.reduce((s, i) => s + i.score, 0) / macroValid.length)
+      : null
 
-    console.log(`[v0] ====== GLOBAL: ${globalScore}/100 | social ${socialSentiment} | macro ${macroSentiment} | ${valid.length}/${indicators.length} live ======`)
+    console.log(`[v0] ====== GLOBAL: ${globalScore ?? "—"}/100 | social ${socialSentiment ?? "—"} | macro ${macroSentiment ?? "—"} | ${valid.length}/${indicators.length} live ======`)
 
     // Per-symbol: real StockTwits scores only (null when no live signal)
     const perSymbolRaw = [
@@ -370,7 +385,7 @@ export async function GET() {
     })
 
     const executiveSummary = await generateExecutiveSummary(globalScore, indicators)
-    const dataQuality = valid.length >= 6 ? "HIGH" : valid.length >= 3 ? "MEDIUM" : "LOW"
+    const dataQuality = valid.length === 0 ? "NONE" : valid.length >= 6 ? "HIGH" : valid.length >= 3 ? "MEDIUM" : "LOW"
 
     return NextResponse.json({
       success: true,

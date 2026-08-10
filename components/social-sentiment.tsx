@@ -22,11 +22,13 @@ import {
   Database,
 } from "lucide-react"
 
+// The four scores are null whenever no source in that band returned a reading.
+// They are never 50 — on a 0-100 sentiment scale 50 is a real neutral market.
 interface SentimentData {
-  global_social_sentiment: number
-  macro_sentiment: number
-  social_sentiment: number
-  headline_market_mood: number
+  global_social_sentiment: number | null
+  macro_sentiment: number | null
+  social_sentiment: number | null
+  headline_market_mood: number | null
   api_version?: string
   timestamp?: string
   sources_available?: number
@@ -77,6 +79,19 @@ function getSentimentLabel(score: number): string {
   return "Extreme Bearish"
 }
 
+/**
+ * Formats a score for prose and for the AI context string. A missing score
+ * renders as "no data" — never as a number, and never as 50.
+ */
+function fmtScore(score: number | null | undefined): string {
+  return score == null || Number.isNaN(score) ? "no data" : `${Math.round(score)}/100`
+}
+
+// NOTE: safeNumber is for RAW COUNTS only (StockTwits bullish/bearish tags,
+// where the row already declares "No live data" beside them). It used to back
+// the gauge needles at a fallback of 50, which drew an unmeasured "Neutral" —
+// those now hide instead. Never use it for a score or for a branch that
+// produces advice.
 function safeNumber(value: number | null | undefined, fallback = 0): number {
   if (value === null || value === undefined || isNaN(value)) {
     return fallback
@@ -393,20 +408,24 @@ export function SocialSentiment() {
                     </div>
                   </div>
 
-                  {data && (
+                  {/* A needle is a POSITION claim. With no reading there is no
+                      position to claim, and parking it at 50% draws a "Neutral"
+                      that nobody measured — so the gauge is covered instead. */}
+                  {data && data.global_social_sentiment == null && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-gray-200/90">
+                      <span className="text-sm font-semibold text-gray-600">No live sentiment reading</span>
+                    </div>
+                  )}
+                  {data && data.global_social_sentiment != null && (
                     <div
                       className="absolute top-0 bottom-0 w-2 bg-black shadow-lg transition-all duration-500"
-                      style={{ left: `calc(${100 - safeNumber(data.global_social_sentiment, 50)}% - 4px)` }}
+                      style={{ left: `calc(${100 - data.global_social_sentiment}% - 4px)` }}
                     >
                       <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap">
                         <div className="bg-black text-white px-4 py-2 rounded-lg shadow-xl">
                           <div className="text-xs font-semibold">TODAY</div>
-                          <div className="text-2xl font-bold">
-                            {data.global_social_sentiment != null ? Math.round(data.global_social_sentiment) : "—"}
-                          </div>
-                          <div className="text-xs text-center">
-                            {data.global_social_sentiment != null ? getSentimentLabel(data.global_social_sentiment) : "no data"}
-                          </div>
+                          <div className="text-2xl font-bold">{Math.round(data.global_social_sentiment)}</div>
+                          <div className="text-xs text-center">{getSentimentLabel(data.global_social_sentiment)}</div>
                         </div>
                         <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-black mx-auto" />
                       </div>
@@ -427,13 +446,17 @@ export function SocialSentiment() {
                     <div className="relative h-3 rounded-full overflow-hidden mb-1">
                       {/* Green/bullish LEFT, red/bearish RIGHT */}
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-400 to-red-500" />
-                      <div
-                        className="absolute top-0 bottom-0 w-1 bg-gray-900 rounded"
-                        style={{
-                          left: `${100 - safeNumber(data?.macro_sentiment, 50)}%`,
-                          transform: "translateX(-50%)",
-                        }}
-                      />
+                      {data?.macro_sentiment == null ? (
+                        <div className="absolute inset-0 bg-gray-200" />
+                      ) : (
+                        <div
+                          className="absolute top-0 bottom-0 w-1 bg-gray-900 rounded"
+                          style={{
+                            left: `${100 - data.macro_sentiment}%`,
+                            transform: "translateX(-50%)",
+                          }}
+                        />
+                      )}
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
                       {data?.macro_sentiment != null ? getSentimentLabel(data.macro_sentiment) : "no data"}
@@ -451,13 +474,17 @@ export function SocialSentiment() {
                     <div className="relative h-3 rounded-full overflow-hidden mb-1">
                       {/* Green/bullish LEFT, red/bearish RIGHT */}
                       <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-400 to-red-500" />
-                      <div
-                        className="absolute top-0 bottom-0 w-1 bg-gray-900 rounded"
-                        style={{
-                          left: `${100 - safeNumber(data?.social_sentiment, 50)}%`,
-                          transform: "translateX(-50%)",
-                        }}
-                      />
+                      {data?.social_sentiment == null ? (
+                        <div className="absolute inset-0 bg-gray-200" />
+                      ) : (
+                        <div
+                          className="absolute top-0 bottom-0 w-1 bg-gray-900 rounded"
+                          style={{
+                            left: `${100 - data.social_sentiment}%`,
+                            transform: "translateX(-50%)",
+                          }}
+                        />
+                      )}
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
                       {data?.social_sentiment != null ? getSentimentLabel(data.social_sentiment) : "no data"}
@@ -633,7 +660,13 @@ export function SocialSentiment() {
                 context={{
                   type: "sentiment",
                   title: "Social Sentiment Analysis",
-                  details: `Current global sentiment score: ${data?.global_social_sentiment ?? 50}/100 (${getSentimentLabel(data?.global_social_sentiment ?? 50)}). Macro sentiment: ${data?.macro_sentiment ?? 50}/100. Social sentiment: ${data?.social_sentiment ?? 50}/100. Headline mood: ${data?.headline_market_mood ?? 50}/100. Data quality: ${data?.data_quality || "N/A"} with ${data?.sources_available || 0}/${data?.sources_total || 0} sources available. ${(data?.global_social_sentiment ?? 50) >= 70 ? "Bullish conditions - consider selling puts or buying calls." : (data?.global_social_sentiment ?? 50) <= 30 ? "Bearish conditions - consider defensive strategies or puts." : "Neutral conditions - consider iron condors or strangles."}`,
+                  // A missing score is missing, not 50. `?? 50` handed the AI a
+                  // neutral reading nobody measured and then read a strategy off
+                  // it — the P6-19 defect, one tab over.
+                  details:
+                    data?.global_social_sentiment == null
+                      ? `No live sentiment reading is available (${data?.sources_available ?? 0}/${data?.sources_total ?? 0} sources responded, data quality ${data?.data_quality || "NONE"}). Do not infer a neutral market from the absence of a score, and do not recommend a strategy from it.`
+                      : `Current global sentiment score: ${data.global_social_sentiment}/100 (${getSentimentLabel(data.global_social_sentiment)}). Macro sentiment: ${fmtScore(data.macro_sentiment)}. Social sentiment: ${fmtScore(data.social_sentiment)}. Headline mood: ${fmtScore(data.headline_market_mood)}. Data quality: ${data.data_quality || "N/A"} with ${data.sources_available ?? 0}/${data.sources_total ?? 0} sources available. ${data.global_social_sentiment >= 70 ? "Bullish conditions - consider selling puts or buying calls." : data.global_social_sentiment <= 30 ? "Bearish conditions - consider defensive strategies or puts." : "Neutral conditions - consider iron condors or strangles."}`,
                 }}
               />
             </div>
@@ -646,9 +679,11 @@ export function SocialSentiment() {
               </h4>
               <p className="text-sm text-gray-700 leading-relaxed">
                 {data?.executive_summary ||
-                  `Social sentiment is currently at ${data?.global_social_sentiment ?? 50}/100 (${getSentimentLabel(
-                    data?.global_social_sentiment ?? 50,
-                  )}). ${getSentimentInterpretation(data?.global_social_sentiment ?? 50)}`}
+                  (data?.global_social_sentiment == null
+                    ? "No live sentiment source returned a reading, so there is no score to interpret. Missing data is not a neutral market."
+                    : `Social sentiment is currently at ${data.global_social_sentiment}/100 (${getSentimentLabel(
+                        data.global_social_sentiment,
+                      )}). ${getSentimentInterpretation(data.global_social_sentiment)}`)}
               </p>
             </div>
 
@@ -657,30 +692,48 @@ export function SocialSentiment() {
                 <TrendingUp className="h-4 w-4" />
                 Weekly Outlook
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {(data?.recommended_strategies && data?.recommended_strategies.length > 0
-                  ? data?.recommended_strategies
-                  : // `?? 0` preserves the prior runtime behavior (undefined fell through to the last branch)
-                    (data?.global_social_sentiment ?? 0) >= 60
-                    ? ["Sell call credit spreads", "Protective puts on longs", "Iron condors on high IV"]
-                    : (data?.global_social_sentiment ?? 0) >= 40
-                      ? ["Iron condors on indices", "Calendar spreads", "Covered calls"]
-                      : ["Bull put spreads at support", "Cash-secured puts", "Long calls on quality names"]
-                ).map((strategy, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3 bg-teal-50 rounded-lg border border-teal-200 text-sm font-medium text-teal-800"
-                  >
-                    {strategy}
+              {(() => {
+                // No score means no strategy list. The old `?? 0` fell through to
+                // the bullish-contrarian branch and recommended trades off a
+                // reading that did not exist.
+                const strategies =
+                  data?.recommended_strategies && data.recommended_strategies.length > 0
+                    ? data.recommended_strategies
+                    : data?.global_social_sentiment == null
+                      ? []
+                      : data.global_social_sentiment >= 60
+                        ? ["Sell call credit spreads", "Protective puts on longs", "Iron condors on high IV"]
+                        : data.global_social_sentiment >= 40
+                          ? ["Iron condors on indices", "Calendar spreads", "Covered calls"]
+                          : ["Bull put spreads at support", "Cash-secured puts", "Long calls on quality names"]
+
+                if (strategies.length === 0) {
+                  return (
+                    <p className="text-sm text-gray-500 italic">
+                      No strategy suggestions — there is no live sentiment reading to base them on.
+                    </p>
+                  )
+                }
+
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {strategies.map((strategy, idx) => (
+                      <div
+                        key={idx}
+                        className="p-3 bg-teal-50 rounded-lg border border-teal-200 text-sm font-medium text-teal-800"
+                      >
+                        {strategy}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                )
+              })()}
             </div>
 
             <div className="flex items-center justify-between pt-4 border-t border-teal-100 text-xs text-gray-500">
               <span>
-                Data Quality: {data?.data_quality || "MEDIUM"} ({data?.sources_available || 0}/
-                {data?.sources_total || 10} sources)
+                Data Quality: {data?.data_quality || "NONE"} ({data?.sources_available ?? 0}/
+                {data?.sources_total ?? 0} sources)
               </span>
               {lastUpdated && <span>Last updated: {lastUpdated.toLocaleTimeString()}</span>}
             </div>
