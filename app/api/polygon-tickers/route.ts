@@ -5,17 +5,54 @@ import { meteredFetch } from "@/lib/metered-fetch"
 export const runtime = "edge"
 export const dynamic = "force-dynamic"
 
+/**
+ * Why this path reports its own status (S-14).
+ *
+ * `/api/v3/stock-screener` is a PAID FMP endpoint. On the free tier it answers
+ * 403, the screener returns null, and the route quietly falls through to a
+ * different universe. That silence was the whole defect: the caller could not
+ * tell whether it was looking at FMP's market-cap-ranked universe or Polygon's
+ * grouped bars, and the backlog could not tell whether the path was broken,
+ * unconfigured, or simply not in the plan. The 403-vs-404-vs-401 distinction is
+ * the same one that settled the Quiver datasets: 403 is an answer, not a fault.
+ *
+ * So every outcome is named, returned to the caller in `universe.fmp`, and a
+ * 403 additionally latches — there is no point spending a metered call per scan
+ * on an endpoint the plan has already refused.
+ */
+type FMPScreenerStatus =
+  | "ok"
+  | "no-key"
+  | "not-in-plan" // 403 — paid tier required
+  | "unauthorized" // 401 — key present but rejected
+  | "http-error"
+  | "bad-payload"
+  | "network-error"
+  | "skipped-latched" // a 403 was seen earlier in this process
+  | "skipped-range-filter" // FMP has no daily-range filter; grouped bars must serve
+
+interface FMPScreenerResult {
+  tickers: string[] | null
+  status: FMPScreenerStatus
+  detail?: string
+}
+
+// Latches on the first 403. Process-lifetime only, so a plan upgrade takes
+// effect on the next deploy or cold start rather than needing a code change.
+let fmpNotInPlan = false
+
 // FMP stock-screener: proper universe, filters by market cap / volume / price
-// server-side, pre-sorted by market cap desc. Returns null on error so the
-// caller can fall through to the hardcoded Polygon list.
+// server-side, pre-sorted by market cap desc.
 async function fetchFMPScreener(params: {
   minMarketCap: number
   minVolume: number
   maxPrice: number | null
   limit: number
-}): Promise<string[] | null> {
+}): Promise<FMPScreenerResult> {
+  if (fmpNotInPlan) return { tickers: null, status: "skipped-latched" }
+
   const key = resolveApiKey("FMP_API_KEY") // respects DISABLED_APIS
-  if (!key) return null
+  if (!key) return { tickers: null, status: "no-key" }
 
   const qs = new URLSearchParams()
   if (params.minMarketCap > 0) qs.set("marketCapMoreThan", String(params.minMarketCap))
@@ -34,14 +71,23 @@ async function fetchFMPScreener(params: {
 
   try {
     const res = await meteredFetch("fmp", url, { signal: AbortSignal.timeout(15000), routeTag: "polygon-tickers" })
+    if (res.status === 403) {
+      fmpNotInPlan = true
+      console.log(`[v0] FMP screener: 403 — stock-screener is not on this plan. Latched off for this process.`)
+      return { tickers: null, status: "not-in-plan", detail: "HTTP 403 from /api/v3/stock-screener" }
+    }
+    if (res.status === 401) {
+      console.error(`[v0] FMP screener: 401 — the key was rejected.`)
+      return { tickers: null, status: "unauthorized", detail: "HTTP 401" }
+    }
     if (!res.ok) {
       console.error(`[v0] FMP screener HTTP ${res.status}`)
-      return null
+      return { tickers: null, status: "http-error", detail: `HTTP ${res.status}` }
     }
     const rows: Array<{ symbol: string; marketCap?: number; price?: number; volume?: number }> = await res.json()
     if (!Array.isArray(rows)) {
       console.error(`[v0] FMP screener returned non-array`)
-      return null
+      return { tickers: null, status: "bad-payload", detail: "response was not an array" }
     }
     // FMP returns market-cap-desc by default; sort explicitly to be safe.
     rows.sort((a, b) => (b.marketCap ?? 0) - (a.marketCap ?? 0))
@@ -51,10 +97,11 @@ async function fetchFMPScreener(params: {
     console.log(
       `[v0] FMP screener returned ${tickers.length} tickers (top 5: ${tickers.slice(0, 5).join(", ")})`,
     )
-    return tickers.slice(0, params.limit)
+    return { tickers: tickers.slice(0, params.limit), status: "ok" }
   } catch (err) {
-    console.error(`[v0] FMP screener fetch error:`, err instanceof Error ? err.message : String(err))
-    return null
+    const detail = err instanceof Error ? err.message : String(err)
+    console.error(`[v0] FMP screener fetch error:`, detail)
+    return { tickers: null, status: "network-error", detail }
   }
 }
 
@@ -430,18 +477,25 @@ export async function GET(request: NextRequest) {
     )
 
     // Preferred: FMP stock-screener does all filtering server-side and
-    // returns up to `limit` tickers pre-sorted by market cap. Requires a
-    // paid FMP tier — returns null / HTTPS 403 on the free plan.
+    // returns up to `limit` tickers pre-sorted by market cap. Paid tier only.
     // FMP has no daily-range filter, so when the volatility slider is active
     // we go straight to grouped bars (the only source that can honor it).
-    const fmpTickers =
-      minRangePct > 0 ? null : await fetchFMPScreener({ minMarketCap, minVolume, maxPrice, limit })
-    if (fmpTickers && fmpTickers.length > 0) {
-      console.log(`[v0] Returning ${fmpTickers.length} tickers from FMP screener`)
+    const fmp: FMPScreenerResult =
+      minRangePct > 0
+        ? { tickers: null, status: "skipped-range-filter" }
+        : await fetchFMPScreener({ minMarketCap, minVolume, maxPrice, limit })
+
+    // Which universe served the request, and why the preferred one did not.
+    // Callers were previously given no way to tell these apart (S-14).
+    const universe = { fmp: { status: fmp.status, ...(fmp.detail ? { detail: fmp.detail } : {}) } }
+
+    if (fmp.tickers && fmp.tickers.length > 0) {
+      console.log(`[v0] Returning ${fmp.tickers.length} tickers from FMP screener`)
       return NextResponse.json({
-        tickers: fmpTickers,
-        count: fmpTickers.length,
+        tickers: fmp.tickers,
+        count: fmp.tickers.length,
         source: "fmp-screener",
+        universe,
       })
     }
 
@@ -460,6 +514,7 @@ export async function GET(request: NextRequest) {
         tickers,
         count: tickers.length,
         source: "polygon-grouped-bars",
+        universe,
         note:
           minMarketCap > 0
             ? "Market cap threshold not applied at this stage (grouped bars have no market cap). Step 3 fundamentals scan enforces it per ticker."
@@ -634,6 +689,7 @@ export async function GET(request: NextRequest) {
       tickers: finalTickers,
       count: finalTickers.length,
       source: "polygon-hardcoded-fallback",
+      universe,
     })
   } catch (error) {
     console.error("[v0] Error in polygon-tickers API:", error)
