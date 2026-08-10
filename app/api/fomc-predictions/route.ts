@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getApiKey } from "@/lib/api-keys"
 import { fredHistoryFromStore, fredTrendFromStore, yoyTrend } from "@/lib/fred-store"
+import { FOMC_MEETINGS, FOMC_SCHEDULE_THROUGH } from "@/lib/fomc-schedule"
 import { readYieldCurve } from "@/lib/yield-curve"
 
 // E-7d: BLS/FRED series update monthly-to-daily, never intraday. ISR caches
@@ -164,28 +165,11 @@ export async function GET() {
     }
     const currentRate = Number(fedFundsRate.current.toFixed(2))
 
-    const allUpcomingMeetings = [
-      { date: "Nov 6-7, 2024", endDate: new Date("2024-11-07") },
-      { date: "Dec 17-18, 2024", endDate: new Date("2024-12-18") },
-      { date: "Jan 28-29, 2025", endDate: new Date("2025-01-29") },
-      { date: "Mar 18-19, 2025", endDate: new Date("2025-03-19") },
-      { date: "May 6-7, 2025", endDate: new Date("2025-05-07") },
-      { date: "Jun 17-18, 2025", endDate: new Date("2025-06-18") },
-      { date: "Jul 29-30, 2025", endDate: new Date("2025-07-30") },
-      { date: "Sep 16-17, 2025", endDate: new Date("2025-09-17") },
-      { date: "Oct 28-29, 2025", endDate: new Date("2025-10-29") },
-      { date: "Dec 9-10, 2025", endDate: new Date("2025-12-10") },
-      { date: "Jan 27-28, 2026", endDate: new Date("2026-01-28") },
-      { date: "Mar 17-18, 2026", endDate: new Date("2026-03-18") },
-      { date: "Apr 28-29, 2026", endDate: new Date("2026-04-29") },
-      { date: "Jun 16-17, 2026", endDate: new Date("2026-06-17") },
-      { date: "Jul 28-29, 2026", endDate: new Date("2026-07-29") },
-      { date: "Sep 22-23, 2026", endDate: new Date("2026-09-23") },
-      { date: "Nov 3-4, 2026", endDate: new Date("2026-11-04") },
-      { date: "Dec 15-16, 2026", endDate: new Date("2026-12-16") },
-      { date: "Jan 26-27, 2027", endDate: new Date("2027-01-27") },
-      { date: "Mar 16-17, 2027", endDate: new Date("2027-03-17") },
-    ]
+    // The committed schedule now lives in lib/fomc-schedule.ts, shared with
+    // lib/economic-events.ts. It was duplicated here while that module inferred
+    // FOMC dates from `month === 11 && day === 17|18`, so the two surfaces
+    // could — and did — disagree about when the Fed meets.
+    const allUpcomingMeetings = FOMC_MEETINGS.map((m) => ({ date: m.label, endDate: new Date(`${m.end}T00:00:00Z`) }))
 
     const now = new Date()
 
@@ -197,7 +181,7 @@ export async function GET() {
     if (upcomingMeetings.length === 0) {
       return NextResponse.json(
         {
-          error: "FOMC prediction cannot be computed: the committed meeting schedule has no future meetings left",
+          error: `FOMC prediction cannot be computed: the committed meeting schedule ends ${FOMC_SCHEDULE_THROUGH} and has no future meetings left. Add the Fed's published dates to lib/fomc-schedule.ts.`,
           provenance: { inputs, unavailable, keyInputsMissing, predictionReliability: "unavailable" },
           currentRate,
           economicIndicators,
