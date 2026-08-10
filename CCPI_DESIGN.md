@@ -266,6 +266,65 @@ Nothing above becomes a weight until the site measures it. Required, in order:
 
 ---
 
+## 6a. FIRST MEASUREMENT — 2026-08-10
+
+Phase 1 ran end to end against real history. **This section is a result, not a
+proposal.** Every number came from `/api/admin/ccpi-backtest` over 22,560 stored
+observations and the 11 reference drawdowns.
+
+### Lift by lead window (1.0 = chance; 1.2 is the bar to earn weight)
+
+| Signal | 90d | 180d | 365d | 540d | FP/decade |
+|---|---|---|---|---|---|
+| **curve-10y3m** | **1.74** | 0.88 | 1.04 | 0.85 | 5.8 |
+| **nfci-tightening** | **1.45** | 0.73 | 0.37 | 0.53 | 2.3 |
+| stlfsi-stress | 0.92 | 0.46 | 0.23 | 0.34 | 3.7 |
+| vix-backwardation | 0.41 | 0.51 | 0.74 | 0.97 | 23 |
+| claims-rising | 0.00 | 0.28 | 0.28 | 0.20 | 6.5 |
+
+`curve-10y2y` and `hy-spread-widening` returned `insufficient-history` at every
+window — both series are capped at ~3 years (§5).
+
+### Two lessons that must not be relearned
+
+**1. A hit rate without a base rate is worthless.** `vix-backwardation` at 540
+days caught **100% of drawdowns** — every one — with precision 0.54. Its base
+rate was 0.56. **Lift 0.97: worse than a coin flip.** With 11 events and an
+18-month window, most of history *is* "before a drawdown", so a signal firing
+twice a year cannot avoid preceding things. On the first metric it ranked top;
+it is in fact the worst signal tested. Any future metric that cannot produce
+this result is the wrong metric.
+
+**2. Widening the window destroys lift.** This document originally argued the
+opposite — that a 180-day cap suppressed the curve's documented 12-18 month
+lead, and that testing at its own horizon would vindicate it. **Measured, the
+reverse holds for every signal without exception:** lift falls monotonically as
+the window widens, because the base rate grows faster than precision. A wider
+net catches more events and proportionally more noise. Whatever information
+exists here is at **90 days**, not 12-18 months.
+
+### Assignment
+
+- **Trigger — two PROVISIONAL candidates, at 90 days only.** `curve-10y3m`
+  (lift 1.74) and `nfci-tightening` (lift 1.45). Both clear the bar. Both also
+  miss 9 or 10 of 11 drawdowns, so they are a tilt, not an alarm — and neither
+  earns weight yet, for the reason below.
+- **Coincident:** `vix-backwardation`. Below chance at every window, exactly as
+  its own recorded hypothesis predicted.
+- **Dropped:** `stlfsi-stress` (never beats chance; the "redundant with NFCI"
+  prediction confirmed) and `claims-rising` (worst at every window).
+- **Untestable:** `curve-10y2y`, `hy-spread-widening`.
+
+### Why nothing scores yet
+
+**Five signals × four windows is twenty tests, and two came back positive.**
+That is precisely the yield you would expect from noise. Neither survivor earns
+weight until walk-forward — fit on 1990-2010, score on 2010-2026 — reproduces
+the 90-day result out of sample. §6 step 6 required this before any of it was
+run; it is now the single gate between here and a scored gauge.
+
+---
+
 ## 7. Migration
 
 Phased so the site is never in a broken half-state:
