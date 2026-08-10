@@ -115,8 +115,8 @@ export async function GET() {
     // the assembly layer's baseline constants as real market data: with QQQ
     // unavailable, `qqqDailyReturn` arrived as 0 and `qqqBelowSMA50` as false —
     // two assertions the data never made. Baseline-tier inputs are passed as
-    // null and simply do not fire their bonus.
-    const notBaseline = <T,>(value: T, tier: Tier): T | null => (tier === "baseline" ? null : value)
+    // null and simply do not fire their bonus. `notBaseline` is module-scope
+    // now — the canary signals need the same guard (P6-31).
     const crashAmplifiers = calculateCrashAmplifiers({
       qqqDailyReturn: notBaseline(data.qqqDailyReturn, data.tiers.momentum.qqqDailyReturn),
       qqqBelowSMA50: notBaseline(data.qqqBelowSMA50, data.tiers.momentum.qqqSMA50),
@@ -286,6 +286,17 @@ function buildProvenance(
     valuation: pack(results.valuation, tiers.valuation),
     macro: pack(results.macro, tiers.macro),
   }
+}
+
+/**
+ * A baseline-tier value is the assembly layer's own fallback constant, not a
+ * measurement. Reading one as fact is the P6-20 defect; this returns null so
+ * the caller has to decide what to do about missing data rather than
+ * evaluating a constant. Module-scope because both the crash amplifiers and
+ * the canary signals need it.
+ */
+function notBaseline<T>(value: T, tier: Tier): T | null {
+  return tier === "baseline" ? null : value
 }
 
 /** AI-fallback source string → provenance tier. */
@@ -977,20 +988,33 @@ function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarketData>>
     }
   }
 
-  // AAII Bullish (26)
-  const aaiiBullish = data.aaiiBullish || 35
-  if (aaiiBullish > 55) {
-    push(`AAII Bullish at ${aaiiBullish}% - Retail euphoria`, RISK, "high", 26, PILLAR_PCT.riskAppetite)
-  } else if (aaiiBullish > 45) {
-    push(`AAII Bullish at ${aaiiBullish}% - Elevated retail optimism`, RISK, "medium", 26, PILLAR_PCT.riskAppetite)
+  // AAII Bullish (26) — skipped entirely when the input is baseline-tier.
+  //
+  // `|| 35` was reading the assembly layer's own fallback as fact (P6-31). It
+  // was the SECOND copy of that constant: getAAIIBullish() already returns 35
+  // with source "baseline" when the whole AI chain fails, so a total outage
+  // produced a confident "35% bullish, no signal" rather than silence. 35 sits
+  // just under the 45 threshold, which is why it never fired and never looked
+  // wrong — a constant that happens to be quiet is still a constant.
+  const aaiiBullish = notBaseline(data.aaiiBullish, data.tiers.riskAppetite.aaiiBullish)
+  if (aaiiBullish !== null) {
+    if (aaiiBullish > 55) {
+      push(`AAII Bullish at ${aaiiBullish}% - Retail euphoria`, RISK, "high", 26, PILLAR_PCT.riskAppetite)
+    } else if (aaiiBullish > 45) {
+      push(`AAII Bullish at ${aaiiBullish}% - Elevated retail optimism`, RISK, "medium", 26, PILLAR_PCT.riskAppetite)
+    }
   }
 
-  // Short Interest (21)
-  const shortInterest = data.shortInterest || 2.5
-  if (shortInterest < 1.5) {
-    push(`Short Interest at ${shortInterest.toFixed(1)}% - Extreme complacency`, RISK, "high", 21, PILLAR_PCT.riskAppetite)
-  } else if (shortInterest < 2.5) {
-    push(`Short Interest at ${shortInterest.toFixed(1)}% - Low positioning`, RISK, "medium", 21, PILLAR_PCT.riskAppetite)
+  // Short Interest (21) — same treatment. Here the constant was NOT quiet:
+  // `|| 2.5` fed a `< 2.5` test, so a missing reading landed exactly on the
+  // boundary and the canary's behaviour depended on a floating-point tie.
+  const shortInterest = notBaseline(data.shortInterest, data.tiers.riskAppetite.shortInterest)
+  if (shortInterest !== null) {
+    if (shortInterest < 1.5) {
+      push(`Short Interest at ${shortInterest.toFixed(1)}% - Extreme complacency`, RISK, "high", 21, PILLAR_PCT.riskAppetite)
+    } else if (shortInterest < 2.5) {
+      push(`Short Interest at ${shortInterest.toFixed(1)}% - Low positioning`, RISK, "medium", 21, PILLAR_PCT.riskAppetite)
+    }
   }
 
   // ETF Flows — informational only; not part of any pillar's WEIGHTS (weight 0)
@@ -1018,12 +1042,16 @@ function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarketData>>
     push(`S&P 500 P/S at ${data.spxPS.toFixed(1)} - Elevated valuation`, VALUATION, "medium", 12, PILLAR_PCT.valuation)
   }
 
-  // Buffett Indicator (16)
-  const buffett = data.buffettIndicator || 180
-  if (buffett > 200) {
-    push(`Buffett Indicator at ${buffett.toFixed(0)}% - Significantly overvalued`, VALUATION, "high", 16, PILLAR_PCT.valuation)
-  } else if (buffett > 150) {
-    push(`Buffett Indicator at ${buffett.toFixed(0)}% - Above fair value`, VALUATION, "medium", 16, PILLAR_PCT.valuation)
+  // Buffett Indicator (16) — the loudest of the three. `|| 180` sat ABOVE the
+  // 150 threshold, so a missing reading did not merely fail to fire: it fired
+  // "Above fair value" as a medium warning, every load, on no data at all.
+  const buffett = notBaseline(data.buffettIndicator, data.tiers.valuation.buffettIndicator)
+  if (buffett !== null) {
+    if (buffett > 200) {
+      push(`Buffett Indicator at ${buffett.toFixed(0)}% - Significantly overvalued`, VALUATION, "high", 16, PILLAR_PCT.valuation)
+    } else if (buffett > 150) {
+      push(`Buffett Indicator at ${buffett.toFixed(0)}% - Above fair value`, VALUATION, "medium", 16, PILLAR_PCT.valuation)
+    }
   }
 
   // QQQ P/E (16)
