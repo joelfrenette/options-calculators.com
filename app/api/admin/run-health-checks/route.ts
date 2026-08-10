@@ -368,7 +368,8 @@ function securityPosture() {
 function contractCoverage() {
   const KNOWN_ROUTES = [
     "/api/admin/ads", "/api/admin/api-keys", "/api/admin/api-status",
-    "/api/admin/backup", "/api/admin/budget-guard", "/api/admin/run-health-checks",
+    "/api/admin/backup", "/api/admin/budget-guard", "/api/admin/ccpi-backtest",
+    "/api/admin/run-health-checks",
     "/api/admin/usage",
     "/api/ai-status", "/api/apify-proxy",
     "/api/auth/login", "/api/auth/logout", "/api/auth/reset-password",
