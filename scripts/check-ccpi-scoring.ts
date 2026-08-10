@@ -212,9 +212,12 @@ const certLive = computeCertainty(mkResults("live"))
 const certAI = computeCertainty(mkResults("ai-estimate"))
 const certBaseline = computeCertainty(mkResults("baseline"))
 check("all-live certainty = 100", certLive === 100, `got ${certLive}`)
-check("all-AI certainty = 50", certAI === 50, `got ${certAI}`)
+// P6-34: an AI estimate of a published figure earns no certainty credit. The
+// old rule gave it half, which was the same claim as scoring it, made quieter.
+check("all-AI certainty = 0 — an estimate is not a measurement", certAI === 0, `got ${certAI}`)
 check("all-baseline certainty = 0", certBaseline === 0, `got ${certBaseline}`)
-check("certainty strictly decreases live → ai → baseline", certLive > certAI && certAI > certBaseline)
+check("live certainty is strictly above both non-live tiers", certLive > certAI && certLive > certBaseline)
+check("AI and baseline are indistinguishable to certainty", certAI === certBaseline)
 // computeCertainty takes only pillar provenance — there is no canary-count
 // input to inflate it (the old formula ADDED certainty as canaries fired).
 check("certainty has no canary-count parameter", computeCertainty.length === 1)

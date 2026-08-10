@@ -1012,8 +1012,10 @@ export function CcpiAuditAdmin() {
     switch (status) {
       case "live":
         return <Badge className="bg-green-500 text-white">🟢 Live</Badge>
+      // P6-34: an AI estimate no longer scores, so the badge has to say so.
+      // "AI estimate" alone read as a weaker source; it is now an excluded one.
       case "ai-estimate":
-        return <Badge className="bg-yellow-500 text-white">🟡 AI estimate</Badge>
+        return <Badge className="bg-yellow-500 text-white">🟡 AI estimate — not scored</Badge>
       case "baseline":
         return <Badge className="bg-orange-500 text-white">🟠 Baseline (not scored)</Badge>
       default:

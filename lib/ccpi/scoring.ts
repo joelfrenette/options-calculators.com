@@ -5,12 +5,20 @@
 // so a pillar score of N genuinely means "N% of the risk this pillar can express".
 //
 // Three-tier provenance (P3-12): every scored input carries a tier —
-//   "live"        real market data from an API/scrape
-//   "ai-estimate" an LLM's recollection of the value (scored, but flagged)
-//   "baseline"    a hardcoded constant (NOT scored; the pillar renormalizes
-//                 over the weight actually backed by data)
-// If less than MIN_SCORED_MAX of a pillar's weight is backed by live/AI data,
-// the pillar reports null rather than a number built mostly on air.
+//   "live"        real market data from an API/scrape — the only tier that scores
+//   "ai-estimate" an LLM's recollection of the value (NOT scored since P6-34;
+//                 still recorded so the UI can explain the exclusion)
+//   "baseline"    a hardcoded constant (NOT scored)
+// The pillar renormalizes over the weight actually backed by live data. If less
+// than MIN_SCORED_MAX of a pillar's weight is live, the pillar reports null
+// rather than a number built mostly on air.
+//
+// P6-34 (owner decision, 2026-08-10): ai-estimate stopped scoring. The eleven
+// indicators on the LLM fallback chain are all PUBLISHED figures — the VIX, a
+// share price, the CBOE put/call ratio, ISM PMI. An LLM asked for one of those
+// returns a plausible number rather than the number, and the plausibility band
+// is wide enough (VIX: 5-100) that a hallucination passes every check the code
+// makes. Scoring them meant the headline index moved on guesses.
 //
 // Design changes vs. the pre-rework route (documented for FORMULAS.md §3):
 //   - Yield curve is scored ONCE, in the Macro pillar (was: Pillar 1 @10,
@@ -193,8 +201,21 @@ function scorePillar<K extends string>(
   for (const { key, max } of weights) {
     const tier = tiers[key]
     const p = points[key]
-    if (tier === "baseline" || p === null) {
+    // Owner decision 2026-08-10 (P6-34): an AI estimate no longer scores.
+    // Eleven of these indicators are figures somebody publishes — the VIX, a
+    // share price, the CBOE put/call ratio — and an LLM asked for one returns
+    // a plausible number, not the number. The plausibility band is wide enough
+    // (VIX: 5-100) that a hallucination is indistinguishable from a reading.
+    // Scoring it meant the headline crash index moved on guesses. The tier is
+    // still recorded and still reported, so the UI can say WHY a pillar's
+    // scored weight fell — it just does not earn weight.
+    if (tier === "baseline" || tier === "ai-estimate" || p === null) {
       excluded.push(key)
+      // Still counted, so the provenance line can say how much of the pillar
+      // was dropped for being estimated rather than simply absent. Reporting
+      // aiMax as 0 would read as "no AI estimates involved", which is the
+      // opposite of what happened.
+      if (tier === "ai-estimate") aiMax += max
       continue
     }
     if (!Number.isFinite(p) || p < 0 || p > max) {
@@ -202,8 +223,7 @@ function scorePillar<K extends string>(
     }
     rawPoints += p
     scoredMax += max
-    if (tier === "live") liveMax += max
-    else aiMax += max
+    liveMax += max // only "live" reaches here now
   }
 
   const score =
@@ -622,14 +642,18 @@ export function calculateCrashAmplifiers(d: AmplifierInputs): AmplifierResult {
 // ---------------------------------------------------------------------------
 
 /**
- * certainty = round(100 × (liveWeight + 0.5·aiWeight) / totalWeight),
- * where weights are indicator maxima scaled by the pillar's share of the
- * composite. 100 = every input live; 50 = everything AI-estimated; 0 = all
- * baseline. Canary count deliberately plays NO part — the old formula RAISED
- * certainty as more warning canaries fired.
+ * certainty = round(100 × liveWeight / totalWeight), where weights are
+ * indicator maxima scaled by the pillar's share of the composite. 100 = every
+ * input live; 0 = nothing live. Canary count deliberately plays NO part — the
+ * old formula RAISED certainty as more warning canaries fired.
+ *
+ * The `0.5 × aiMax` term is gone with P6-34. Half-crediting an LLM's guess at
+ * a published figure was the same claim as scoring it, made quieter: certainty
+ * is meant to answer "how much of this is measured?", and the answer for an
+ * estimate is none of it.
  */
 export function computeCertainty(results: PillarResults): number {
-  const dataQuality = (r: PillarResult) => (r.liveMax + 0.5 * r.aiMax) / 100
+  const dataQuality = (r: PillarResult) => r.liveMax / 100
   return Math.round(
     100 *
       (dataQuality(results.momentum) * PILLAR_WEIGHTS.momentum +

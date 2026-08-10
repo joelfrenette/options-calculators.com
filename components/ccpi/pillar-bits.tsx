@@ -13,14 +13,19 @@ import type { CCPIPillarProvenance } from "@/lib/ccpi/types"
 
 /**
  * Compact per-pillar data-provenance summary (added by the P3 scoring rework).
- * Shows how much of the pillar's 100-point weight actually scored, how much of
- * that was live vs AI-estimated, and which indicators were excluded.
+ *
+ * Since P6-34 only LIVE weight scores, so `scoredMax` and `liveMax` are the
+ * same number and printing both said nothing. `aiMax` changed meaning with the
+ * same decision: it is now weight that was DROPPED for being an LLM estimate of
+ * a published figure, not weight that counted at half credit. The wording has
+ * to follow the arithmetic, or the line quietly keeps making the old claim.
  */
 export function PillarProvenanceLine({ prov }: { prov?: CCPIPillarProvenance }) {
   if (!prov) return null
   return (
     <p className="text-xs text-muted-foreground border-l-2 border-blue-200 pl-2">
-      Scored {prov.scoredMax}/100 weight · {prov.liveMax} live · {prov.aiMax} AI-est
+      Scored {prov.scoredMax}/100 weight, all live
+      {prov.aiMax > 0 ? ` · ${prov.aiMax} dropped as AI-estimated` : ""}
       {prov.excluded.length > 0 ? ` · excluded: ${prov.excluded.join(", ")}` : ""}
     </p>
   )

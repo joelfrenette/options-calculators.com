@@ -238,10 +238,18 @@ export function ApiDataSourceStatus() {
                         {p.score === null ? "—" : `${p.score}/100`}
                       </span>
                     </div>
+                    {/* P6-34: only live weight scores. `aiMax` is now weight
+                        DROPPED for being an LLM estimate, not weight counted at
+                        half credit — so it reads as a deduction, not a source. */}
                     <p className="text-xs text-slate-600">
-                      Scored weight: <span className="font-mono">{dash(p.scoredMax)}</span>/100 (live{" "}
-                      <span className="font-mono">{dash(p.liveMax)}</span>, AI{" "}
-                      <span className="font-mono">{dash(p.aiMax)}</span>) across {p.indicatorCount} indicators
+                      Scored weight: <span className="font-mono">{dash(p.scoredMax)}</span>/100, all live
+                      {typeof p.aiMax === "number" && p.aiMax > 0 && (
+                        <>
+                          {" "}
+                          · <span className="font-mono">{p.aiMax}</span> dropped as AI-estimated
+                        </>
+                      )}{" "}
+                      across {p.indicatorCount} indicators
                     </p>
                     {p.score === null && (
                       <p className="text-xs text-orange-700 mt-1">
