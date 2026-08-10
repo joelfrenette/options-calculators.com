@@ -178,11 +178,26 @@ Every ID above was fetched from FRED and its actual history depth recorded. This
    backtested against 2008 or 2020 at all. That leaves the backtestable core as **NFCI/ANFCI
    (1971), T10Y3M (1982) and ICSA (1967)** — still enough to cover all four reference drawdowns,
    but a materially thinner Gauge B than §5 assumed.
-   **Next step before any of this is designed around:** check whether the keyed FRED API returns
-   full history for the ICE series where the public CSV does not. If it does, nothing changes.
-   If it does not, the credit-spread signals become present-day display indicators with no
-   measurable lead time, and Gauge B is built on financial-conditions and labour-market series
-   instead.
+   **Attempted the keyed check and could not run it locally:** `FRED_API_KEY` is present in
+   `.env.local` but **empty** (declared, zero length), so the API returns 400 from this machine.
+   The key lives in Vercel — production serves real FRED data — which means this question can
+   only be settled from an environment that holds it. **This is an owner action of about thirty
+   seconds**, and it decides whether credit spreads can carry any weight at all:
+
+   ```
+   https://api.stlouisfed.org/fred/series/observations?series_id=BAMLH0A0HYM2&api_key=YOUR_KEY&file_type=json&observation_start=1990-01-01&limit=1&sort_order=asc
+   ```
+
+   Read the `date` on the single observation returned. **1996-12-31 → the ICE series have full
+   history through the keyed API, the public CSV was the only thing truncating them, and §5
+   stands unchanged. 2023-08-08 → the licence caps them everywhere**, credit-spread signals
+   become present-day display indicators with no measurable lead time, and Gauge B is built on
+   financial-conditions and labour-market series instead.
+
+   *(Worth noting separately: an empty `FRED_API_KEY` locally means no FRED-dependent code path
+   can be exercised on this machine — every local test of those routes has been running against
+   a 400. Not a production defect, but it explains why FRED behaviour has only ever been
+   verifiable on staging.)*
 2. **NFCI/ANFCI reach 1971 and cover all four reference drawdowns**, which makes them the
    strongest free candidates by history alone. `T10Y3M` from 1982 covers 2000, 2008, 2020, 2022.
    `ICSA` from 1967 covers everything.
