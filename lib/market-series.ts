@@ -49,8 +49,24 @@ export async function getSeriesHistory(series: string, limit = 400): Promise<{ d
   if (!cfg) return null
   try {
     const res = await fetch(
-      `${cfg.url}/rest/v1/market_series?series=eq.${encodeURIComponent(series)}&select=day,value&order=day.desc&limit=${Math.min(800, Math.max(1, limit))}`,
-      { headers: { apikey: cfg.key, Authorization: `Bearer ${cfg.key}` }, signal: AbortSignal.timeout(6000), cache: "no-store" },
+      // Cap raised 800 -> 20000 for the CCPI lead-time backtest. 800 rows is
+      // ~3 years of a daily series, so the backtest could not see past 2023
+      // however deep the store went — and it would have reported
+      // insufficient-history for the wrong reason, sending someone hunting a
+      // backfill that had already worked.
+      //
+      // If a deep read comes back short of what `getSeriesCoverage` says is
+      // stored, suspect PostgREST's own `db-max-rows` rather than this line.
+      `${cfg.url}/rest/v1/market_series?series=eq.${encodeURIComponent(series)}&select=day,value&order=day.desc&limit=${Math.min(20000, Math.max(1, limit))}`,
+      {
+        headers: { apikey: cfg.key, Authorization: `Bearer ${cfg.key}` },
+        // 6s was sized for a few hundred rows. A 9,000-row read needs longer,
+        // and a timeout here returns null — which every caller correctly treats
+        // as "no data", so a too-short timeout would look exactly like an
+        // empty store.
+        signal: AbortSignal.timeout(limit > 2000 ? 25000 : 6000),
+        cache: "no-store",
+      },
     )
     if (!res.ok) return null
     const rows = (await res.json()) as { day: string; value: string | number }[]

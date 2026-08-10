@@ -31,12 +31,10 @@ export async function GET() {
 
   const seriesNeeded = [...new Set(SIGNALS.flatMap((s) => s.requires))]
 
-  // Pull each series once. getSeriesHistory caps at 800 rows per call, which is
-  // itself a limit on how deep this can look — reported below rather than
-  // hidden, because a backtest silently truncated to 800 days would report
-  // insufficient-history for the wrong reason and send someone hunting the
-  // backfill instead of the reader.
-  const HISTORY_CAP = 800
+  // Pull each series once, as deep as the store allows. Still reported in the
+  // response: if this ever becomes the binding constraint again, the reader
+  // should be able to see that from the output rather than deduce it.
+  const HISTORY_CAP = 20000
   const loaded: Record<string, readonly SeriesPoint[]> = {}
   const available: string[] = []
   for (const id of seriesNeeded) {
