@@ -28,9 +28,24 @@ const CANDIDATES: { key: string; label: string; url: string }[] = [
   { key: "sec13fchanges", label: "13F position changes (E-8f)", url: "https://api.quiverquant.com/beta/live/sec13fchanges" },
   { key: "govcontracts", label: "Government contracts (E-8g)", url: "https://api.quiverquant.com/beta/live/govcontractsall" },
   { key: "lobbying", label: "Lobbying (E-8g)", url: "https://api.quiverquant.com/beta/live/lobbying" },
+  // ---- E-8h, endpoint name still unresolved --------------------------------
+  // Both of these answered 404 on the PAID plan (2026-08-10). On this API a
+  // 404 means the route does not exist, not that the dataset is unlicensed —
+  // 403 is what "not in plan" looks like, and the four datasets we do hold
+  // return 200. So the name is wrong rather than the entitlement, and it is
+  // worth exhausting the plausible spellings before writing E-8h off.
   { key: "wikipedia", label: "Wikipedia page views (E-8h)", url: "https://api.quiverquant.com/beta/live/wikipedia" },
-  // Wikipedia may only exist per-ticker under /historical — probe one ticker.
   { key: "wikipedia-historical", label: "Wikipedia page views, historical per-ticker (E-8h)", url: "https://api.quiverquant.com/beta/historical/wikipedia/AAPL" },
+  { key: "wikipediapageviews", label: "E-8h variant: wikipediapageviews", url: "https://api.quiverquant.com/beta/live/wikipediapageviews" },
+  { key: "wikipedia-views", label: "E-8h variant: wikipedia_page_views", url: "https://api.quiverquant.com/beta/live/wikipedia_page_views" },
+  { key: "pageviews", label: "E-8h variant: pageviews", url: "https://api.quiverquant.com/beta/live/pageviews" },
+
+  // ---- Off-exchange carries a column we do not read yet ---------------------
+  // The offexchange rows include a `DPI` field (Quiver's Dark Pool Index)
+  // alongside OTC_Short/OTC_Total, which is what E-8a scores. Probing the
+  // per-ticker route tells us whether DPI has usable history before anyone
+  // designs an indicator around it.
+  { key: "offexchange-historical", label: "Off-exchange per-ticker history (DPI depth check)", url: "https://api.quiverquant.com/beta/historical/offexchange/AAPL" },
 ]
 
 function authorized(request: Request): boolean {
