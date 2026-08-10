@@ -90,18 +90,29 @@ export async function GET() {
       // where the only two positives appeared. `fit-only` is the overfit
       // verdict and the one to watch for.
       walkForward: (() => {
-        // Split at the window where this signal looked BEST in-sample, not a
-        // fixed 90. Walking forward at a window the signal never favoured
-        // tests the window rather than the signal — and with 30 and 60 now in
-        // the sweep, the best window is no longer the same for every row.
-        const best = sweepLeadWindows(observations, events)
+        // The window is chosen using the FIT PERIOD ONLY.
+        //
+        // The first version picked it from the full-sample sweep and then
+        // tested at that window — choosing a hyperparameter with data the test
+        // is meant to be blind to. `claims-rising` exposed it: its best lift
+        // across every window in sample was 0.28, never once beating chance,
+        // and it still produced a test lift of 2.41. That is not a discovery,
+        // it is the window being selected because it happened to work later.
+        //
+        // Selecting on the fit half and testing on the other is the whole
+        // point of a walk-forward, and getting it wrong turns the gate into
+        // another way of fitting.
+        const SPLIT = "2010-01-01"
+        const fitObs = observations.filter((o) => o.day < SPLIT)
+        const fitEvents = events.filter((e) => e.peak < SPLIT)
+        const best = sweepLeadWindows(fitObs, fitEvents)
           .filter((x) => x.result.verdict === "scored")
           .sort((a, b) => (b.result.lift ?? 0) - (a.result.lift ?? 0))[0]
-        const w = walkForward(observations, events, "2010-01-01", { maxLeadDays: best?.maxLeadDays ?? 90 })
+        const w = walkForward(observations, events, SPLIT, { maxLeadDays: best?.maxLeadDays ?? 90 })
         return {
           splitDay: w.splitDay,
           atWindow: best?.maxLeadDays ?? 90,
-          bestInSampleLift: best?.result.lift ?? null,
+          bestFitLift: best?.result.lift ?? null,
           verdict: w.verdict,
           fitLift: w.fit.lift,
           testLift: w.test.lift,
