@@ -87,7 +87,14 @@ function safeEqual(a: string, b: string): boolean {
  * must read as "wrong password", never as a 500 that reveals the format.
  */
 function verifyScrypt(password: string, stored: string): boolean {
-  const parts = stored.split(":")
+  // Trim, and strip any whitespace INSIDE the value. A hash pasted into a
+  // dashboard textarea routinely picks up a trailing newline, and long values
+  // are sometimes soft-wrapped into a real line break on save. Either one
+  // corrupts the hex segment, the buffers decode to different bytes, and the
+  // result is indistinguishable from a wrong password — no error, no log, just
+  // a locked-out owner. Whitespace is never meaningful in `scrypt:hex:hex`, so
+  // removing it cannot mask a genuine mismatch.
+  const parts = stored.replace(/\s+/g, "").split(":")
   if (parts.length !== 3 || parts[0] !== "scrypt") return false
   try {
     const salt = Buffer.from(parts[1], "hex")
