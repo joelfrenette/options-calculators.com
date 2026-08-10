@@ -35,7 +35,19 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url)
-  const backfill = Math.min(800, Math.max(0, Number.parseInt(url.searchParams.get("backfill") || "0", 10) || 0))
+  // Cap raised 800 -> 20000 for the CCPI lead-time backtest (CCPI_DESIGN.md
+  // Phase 1). 800 observations is ~3 years of a daily series; scoring against
+  // 2008 needs ~6,300 trading days, and NFCI has 2,900 weekly points back to
+  // 1971. The old cap silently truncated any attempt at a deep load.
+  const backfill = Math.min(20000, Math.max(0, Number.parseInt(url.searchParams.get("backfill") || "0", 10) || 0))
 
-  return NextResponse.json(await runFredSnapshot(fredKey, backfill))
+  // `?series=NFCI,T10Y3M` restricts the run. A deep backfill across all series
+  // in one call will not finish inside maxDuration, and a backfill that times
+  // out half way leaves a partial history that looks complete.
+  const only = (url.searchParams.get("series") || "")
+    .split(",")
+    .map((s) => s.trim().toUpperCase())
+    .filter(Boolean)
+
+  return NextResponse.json(await runFredSnapshot(fredKey, backfill, only))
 }

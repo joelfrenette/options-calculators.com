@@ -266,9 +266,18 @@ export interface FredResult {
   results: { series: string; fetched: number; stored: number; httpStatus: number }[]
 }
 
-export async function runFredSnapshot(fredKey: string, backfill = 0): Promise<FredResult> {
+/**
+ * `only` restricts the run to named series (CCPI redesign Phase 1). A 25-year
+ * backfill across all 30 series is ~150k rows in one request, which will not
+ * finish inside the function budget — and a backfill that times out half way
+ * leaves a partial history that looks complete. Seeding the new series one or
+ * two at a time is the difference between a load you can verify and one you
+ * have to trust.
+ */
+export async function runFredSnapshot(fredKey: string, backfill = 0, only?: readonly string[]): Promise<FredResult> {
   const results: FredResult["results"] = []
-  for (const s of FRED_SERIES) {
+  const wanted = only && only.length > 0 ? FRED_SERIES.filter((f) => only.includes(f.id)) : FRED_SERIES
+  for (const s of wanted) {
     const limit = backfill > 0 ? backfill : s.dailyLimit
     try {
       const r = await meteredFetch(
@@ -294,7 +303,7 @@ export async function runFredSnapshot(fredKey: string, backfill = 0): Promise<Fr
 
   const failed = results.filter((r) => r.httpStatus !== 200).map((r) => r.series)
   return {
-    ok: failed.length < FRED_SERIES.length / 2,
+    ok: wanted.length > 0 && failed.length < wanted.length / 2,
     mode: backfill > 0 ? `backfill(${backfill})` : "daily",
     totalStored: results.reduce((a, r) => a + r.stored, 0),
     failedSeries: failed,
