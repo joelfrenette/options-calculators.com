@@ -315,3 +315,55 @@ export function sweepLeadWindows(
     result: scoreLeadTime(observations, events, { ...options, maxLeadDays }),
   }))
 }
+
+/**
+ * Score a signal separately on a fit period and a test period.
+ *
+ * CCPI_DESIGN.md §6 step 6, and the single gate between the 2026-08-10
+ * measurement and a scored gauge. Twenty tests — five signals across four
+ * windows — produced two positives, which is exactly the yield noise gives.
+ * A signal that beats chance on the same history that suggested it is not
+ * evidence of anything; a signal that beats chance on history it was never
+ * shown is.
+ *
+ * `verdict` is deliberately blunt, because this is the decision the whole
+ * redesign turns on and it should not need interpreting:
+ *   confirmed        — cleared the bar in BOTH periods
+ *   fit-only         — worked in-sample and failed out. THE OVERFIT CASE.
+ *   test-only        — failed in-sample and worked out. Luck, not a discovery.
+ *   failed           — cleared the bar in neither
+ *   insufficient     — one or both periods could not be scored at all
+ */
+export interface WalkForwardResult {
+  splitDay: string
+  verdict: "confirmed" | "fit-only" | "test-only" | "failed" | "insufficient"
+  minLift: number
+  fit: LeadTimeResult
+  test: LeadTimeResult
+}
+
+export function walkForward(
+  observations: readonly SignalObservation[],
+  events: readonly ReferenceEvent[],
+  splitDay: string,
+  options: LeadTimeOptions = {},
+  minLift = 1.2,
+): WalkForwardResult {
+  const fitObs = observations.filter((o) => o.day < splitDay)
+  const testObs = observations.filter((o) => o.day >= splitDay)
+  // Events are split on the same boundary. An event in the fit period must not
+  // be scored against test-period observations, or the split measures nothing.
+  const fitEvents = events.filter((e) => e.peak < splitDay)
+  const testEvents = events.filter((e) => e.peak >= splitDay)
+
+  const fit = scoreLeadTime(fitObs, fitEvents, options)
+  const test = scoreLeadTime(testObs, testEvents, options)
+
+  if (fit.verdict !== "scored" || test.verdict !== "scored") {
+    return { splitDay, verdict: "insufficient", minLift, fit, test }
+  }
+  const fitOk = (fit.lift ?? 0) >= minLift
+  const testOk = (test.lift ?? 0) >= minLift
+  const verdict = fitOk && testOk ? "confirmed" : fitOk ? "fit-only" : testOk ? "test-only" : "failed"
+  return { splitDay, verdict, minLift, fit, test }
+}

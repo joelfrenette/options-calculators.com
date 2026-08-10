@@ -12,7 +12,7 @@
  * that fires constantly is punished rather than rewarded.
  */
 
-import { scoreLeadTime, proposedWeight, sweepLeadWindows, type SignalObservation } from "../lib/ccpi/lead-time.ts"
+import { scoreLeadTime, proposedWeight, sweepLeadWindows, walkForward, type SignalObservation } from "../lib/ccpi/lead-time.ts"
 
 let failures = 0
 function check(name: string, passed: boolean, detail = "") {
@@ -210,6 +210,44 @@ check(
   "...which is the whole argument for sweeping rather than picking one window",
   (at540.hitRate ?? 0) > (at180.hitRate ?? 1),
 )
+
+// ---------------------------------------------------------------------------
+// 9. WALK-FORWARD — the gate between a measurement and a scored gauge.
+// ---------------------------------------------------------------------------
+const WF_EVENTS = [
+  { id: "f1", peak: "2004-01-01" }, { id: "f2", peak: "2006-01-01" }, { id: "f3", peak: "2008-01-01" },
+  { id: "t1", peak: "2012-01-01" }, { id: "t2", peak: "2014-01-01" }, { id: "t3", peak: "2016-01-01" },
+]
+const wfSeries = (spans) => series("2002-01-01", 5700, spans)
+
+// Works in both halves: the only verdict that earns weight.
+const both = walkForward(
+  wfSeries([
+    ["2003-11-01", "2003-11-20"], ["2005-11-01", "2005-11-20"], ["2007-11-01", "2007-11-20"],
+    ["2011-11-01", "2011-11-20"], ["2013-11-01", "2013-11-20"], ["2015-11-01", "2015-11-20"],
+  ]),
+  WF_EVENTS, "2010-01-01", { maxLeadDays: 90 },
+)
+check("a signal that works in both halves is confirmed", both.verdict === "confirmed", `${both.verdict} fit=${both.fit.lift} test=${both.test.lift}`)
+
+// THE OVERFIT CASE: fires only in the fit period. Must NOT read as confirmed.
+const overfit = walkForward(
+  wfSeries([["2003-11-01", "2003-11-20"], ["2005-11-01", "2005-11-20"], ["2007-11-01", "2007-11-20"]]),
+  WF_EVENTS, "2010-01-01", { maxLeadDays: 90 },
+)
+check("a signal that only works in-sample is 'fit-only', never confirmed", overfit.verdict === "fit-only", overfit.verdict)
+// null, not 0: the signal produced no episodes out of sample, so there is no
+// precision to compute. "It never fired" and "it fired and was wrong" are
+// different facts and the result keeps them apart.
+check("...and its test-period lift is null — it never fired out of sample", overfit.test.lift === null, String(overfit.test.lift))
+
+// Events must be split too, or the halves are not independent.
+check("fit-period events stay in the fit half", both.fit.coveredEventIds.every((id) => id.startsWith("f")))
+check("test-period events stay in the test half", both.test.coveredEventIds.every((id) => id.startsWith("t")))
+
+// A half that cannot be scored is never silently treated as a pass.
+const tooShort = walkForward(series("2009-06-01", 400, []), WF_EVENTS, "2010-01-01", { maxLeadDays: 90 })
+check("an unscoreable half returns 'insufficient', not 'failed'", tooShort.verdict === "insufficient", tooShort.verdict)
 
 console.log(failures === 0 ? "\nAll lead-time checks passed." : `\n${failures} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)

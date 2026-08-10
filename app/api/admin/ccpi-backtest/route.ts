@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { isAuthenticated } from "@/lib/auth"
 import { getSeriesHistory } from "@/lib/market-series"
 import { SIGNALS, evaluableSignals, type SeriesPoint } from "@/lib/ccpi/signals"
-import { scoreLeadTime, proposedWeight, sweepLeadWindows } from "@/lib/ccpi/lead-time"
+import { scoreLeadTime, proposedWeight, sweepLeadWindows, walkForward } from "@/lib/ccpi/lead-time"
 import { REFERENCE_DRAWDOWNS } from "@/lib/ccpi/drawdowns"
 
 export const dynamic = "force-dynamic"
@@ -86,6 +86,20 @@ export async function GET() {
         medianLeadDays: w.result.medianLeadDays,
         falsePositivesPerDecade: w.result.falsePositivesPerDecade,
       })),
+      // The gate. Fit on 1990-2010, score on 2010-2026, at the 90-day window
+      // where the only two positives appeared. `fit-only` is the overfit
+      // verdict and the one to watch for.
+      walkForward: (() => {
+        const w = walkForward(observations, events, "2010-01-01", { maxLeadDays: 90 })
+        return {
+          splitDay: w.splitDay,
+          verdict: w.verdict,
+          fitLift: w.fit.lift,
+          testLift: w.test.lift,
+          fitEvents: w.fit.coveredEventIds.length,
+          testEvents: w.test.coveredEventIds.length,
+        }
+      })(),
     }
   })
 
