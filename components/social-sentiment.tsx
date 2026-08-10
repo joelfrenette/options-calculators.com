@@ -225,7 +225,6 @@ export function SocialSentiment() {
       "Fetching Finnhub news...",
       "Fetching Polygon news...",
       "Calculating News Fear & Greed...",
-      "Fetching AAII survey...",
       "Generating AI summary...",
       "Finalizing data...",
     ]

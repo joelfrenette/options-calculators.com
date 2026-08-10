@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 import { resolveApiKey } from "@/lib/api-keys"
 import { generateWithFallback } from "@/lib/ai-providers"
-import { parseAAII } from "@/lib/aaii-sentiment"
 import {
   getGoogleNewsSentiment,
   getCNNFearGreedSentiment,
@@ -21,11 +20,11 @@ const API_VERSION = "7.0.0"
  * Higher score = MORE BULLISH (green/left). Lower score = MORE BEARISH (red/right).
  *
  * SOCIAL sources:  StockTwits (bull/bear tags), Google News pulse (Serper).
- * MACRO sources:   CNN Fear & Greed, AAII survey, Finnhub news, Polygon news,
+ * MACRO sources:   CNN Fear & Greed, Finnhub news, Polygon news,
  *                  News Fear/Greed.
  *
  * Combination:     Reliability-weighted average across only the LIVE sources.
- *                  Hard data feeds (CNN F&G, AAII, news APIs) carry more weight
+ *                  Hard data feeds (CNN F&G, news APIs) carry more weight
  *                  than social scrapes. Any "No data" source is excluded.
  */
 
@@ -165,65 +164,15 @@ async function getNewsFearGreed(): Promise<{ score: number; source: string }> {
   }
 }
 
-// ========== AAII INVESTOR SURVEY ==========
-// Free-first: fetch aaii.com directly. The public page is a chart script with
-// ~121 undated historical tooltips, so the parser usually declines it (see
-// lib/aaii-sentiment.ts) and this pillar reports UNAVAILABLE rather than
-// publishing a week it cannot identify.
-// Only fall back to ScrapingBee if its key is still enabled. -1 if all fail —
-// never a fabricated/historical value.
-// Parsing lives in lib/aaii-sentiment.ts so scripts/check-aaii-sentiment.ts can
-// exercise it against real page fixtures. See that module for why a reading is
-// only accepted as a co-located bullish/neutral/bearish triple summing to 100.
-
-async function getAAIISentiment(): Promise<{ score: number; source: string; bullish: number }> {
-  // 1) Direct free fetch (no scraper) — browser-like UA, weekly data so cacheable.
-  for (const url of ["https://www.aaii.com/sentimentsurvey", "https://www.aaii.com/sentimentsurvey/sent_results"]) {
-    try {
-      const res = await fetch(url, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-          Accept: "text/html,application/xhtml+xml",
-        },
-        signal: AbortSignal.timeout(12000),
-        next: { revalidate: 3600 },
-      })
-      if (res.ok) {
-        const parsed = parseAAII(await res.text())
-        if (parsed) {
-          console.log(`[v0] ✓ AAII (direct free): ${parsed.score}/100 (${parsed.bullish}% bullish)`)
-          return parsed
-        }
-      }
-    } catch {
-      /* try next url / fall through */
-    }
-  }
-
-  // 2) Optional ScrapingBee fallback (only if key still enabled).
-  try {
-    const key = resolveApiKey("SCRAPINGBEE_API_KEY") // respects DISABLED_APIS kill switch
-    if (key) {
-      const target = encodeURIComponent("https://www.aaii.com/sentimentsurvey")
-      const res = await fetch(`https://app.scrapingbee.com/api/v1/?api_key=${key}&url=${target}&render_js=true`, {
-        signal: AbortSignal.timeout(15000),
-      })
-      if (res.ok) {
-        const parsed = parseAAII(await res.text())
-        if (parsed) {
-          console.log(`[v0] ✓ AAII (scrapingbee): ${parsed.score}/100`)
-          return parsed
-        }
-      }
-    }
-  } catch (err) {
-    console.log("[v0] AAII scrape error:", err instanceof Error ? err.message : "Unknown")
-  }
-
-  console.log("[v0] AAII: unavailable")
-  return { score: -1, source: "unavailable", bullish: 0 }
-}
+// ========== AAII INVESTOR SURVEY — REMOVED (S-11, owner decision 2026-08-10) ==========
+// The free path read the public aaii.com page, which is a chart script holding
+// ~121 undated weekly records. There is no way to tell from it which record is
+// current, so the parser could only ever decline, and a pillar that can only
+// decline is not a pillar. The alternative was a dated feed (Nasdaq Data Link);
+// the owner chose to drop the indicator instead. Six sources remain.
+//
+// The weighted average divides by the weight of the LIVE sources, so removing
+// AAII's 0.12 renormalises the rest on its own — no other weight changes.
 
 // ========== AI EXECUTIVE SUMMARY (analysis of the REAL scores above) ==========
 async function generateExecutiveSummary(
@@ -308,7 +257,6 @@ export async function GET() {
       finnhub,
       polygon,
       newsFearGreed,
-      aaii,
       // per-symbol StockTwits (real, symbol-specific)
       stQQQ,
       stIWM,
@@ -320,18 +268,16 @@ export async function GET() {
       getFinnhubSentiment(),
       getPolygonNewsSentiment(),
       getNewsFearGreed(),
-      getAAIISentiment(),
       getStockTwitsSentiment("QQQ"),
       getStockTwitsSentiment("IWM"),
       getStockTwitsSentiment("DIA"),
     ])
 
     // Build indicator list (name, score, weight, group). score -1 => not live.
-    // Reliability weighting: hard data feeds (CNN F&G, AAII, news APIs) > social scrapes.
+    // Reliability weighting: hard data feeds (CNN F&G, news APIs) > social scrapes.
     const indicators = [
       // --- Hard data / aggregated indices (highest reliability) ---
       { name: "CNN Fear & Greed", score: cnnFearGreed.score, source: cnnFearGreed.source, weight: 0.16, group: "macro", description: cnnFearGreed.score >= 0 ? `CNN multi-factor index${cnnFearGreed.detail ? ` (${cnnFearGreed.detail})` : ""}` : "CNN multi-factor index (no live reading)" },
-      { name: "AAII Survey", score: aaii.score, source: aaii.source, weight: 0.12, group: "macro", description: aaii.score >= 0 ? `Weekly investor survey (${aaii.bullish}% bullish)` : "Weekly individual-investor survey (no live reading)" },
       { name: "Finnhub News", score: finnhub.score, source: finnhub.source, weight: 0.11, group: "macro", description: `Financial news headline sentiment (${finnhub.articles} articles)` },
       { name: "Polygon News", score: polygon.score, source: polygon.source, weight: 0.1, group: "macro", description: `Polygon.io news sentiment (${polygon.articles} articles)` },
       { name: "News Fear & Greed", score: newsFearGreed.score, source: newsFearGreed.source, weight: 0.08, group: "macro", description: "Greed vs fear language across general market news" },

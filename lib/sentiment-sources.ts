@@ -290,34 +290,11 @@ async function scrapeBeeHtml(targetUrl: string, renderJs = true): Promise<string
 }
 
 // ============================================================================
-// AAII INVESTOR SURVEY — bullish vs bearish % scraped via ScrapingBee.
-// Score = bullish / (bullish + bearish) * 100.
+// AAII INVESTOR SURVEY — REMOVED with the Social Sentiment pillar (S-11).
+// This was a second, unimported copy of the scrape, and it carried the same
+// defect: two independent regexes over the page, pairing a "Bullish" and a
+// "Bearish" that need not come from the same week. Nothing consumed it.
 // ============================================================================
-export async function getAAIISentiment(): Promise<{
-  score: number
-  source: string
-  detail: string
-}> {
-  const html = await scrapeBeeHtml("https://www.aaii.com/sentimentsurvey", true)
-  if (!html) return { score: -1, source: "unavailable", detail: "no_html" }
-  try {
-    const bull = html.match(/Bullish[:\s]+(\d+\.?\d*)%/i)
-    const bear = html.match(/Bearish[:\s]+(\d+\.?\d*)%/i)
-    if (!bull || !bear) {
-      console.log("[v0] Source (AAII): could not parse percentages")
-      return { score: -1, source: "parse_failed", detail: "no_match" }
-    }
-    const bullish = Number.parseFloat(bull[1])
-    const bearish = Number.parseFloat(bear[1])
-    if (bullish + bearish <= 0) return { score: -1, source: "no_signal", detail: "zero" }
-    const score = Math.round((bullish / (bullish + bearish)) * 100)
-    console.log(`[v0] ✓ Source (AAII): ${score}/100 (bull ${bullish}% / bear ${bearish}%)`)
-    return { score, source: "aaii_survey", detail: `bull ${bullish}% / bear ${bearish}%` }
-  } catch (err) {
-    console.log("[v0] Source (AAII) error:", err instanceof Error ? err.message : "Unknown")
-    return { score: -1, source: "error", detail: "exception" }
-  }
-}
 
 // ============================================================================
 // CNN FEAR & GREED INDEX — 0-100 where higher = greed/bullish (already aligned).
