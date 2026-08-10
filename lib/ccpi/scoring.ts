@@ -240,7 +240,7 @@ function scorePillar<K extends string>(
 
 export interface MomentumInputs {
   nvidiaMomentum: number // 0-100 (50 = neutral; low = NVDA falling)
-  soxIndex: number
+  soxIndex: number | null // null when no source produced a reading (P6-34)
   qqqDailyReturn: number // percent
   qqqConsecDown: number
   qqqBelowSMA20: boolean
@@ -251,7 +251,7 @@ export interface MomentumInputs {
   qqqSMA200Proximity: number
   qqqBelowBollinger: boolean
   qqqBollingerProximity: number
-  vix: number
+  vix: number | null // null when no source produced a reading (P6-34)
   /** RATIO convention: VIX3M / spot VIX. <1 = backwardation. */
   vixTermStructure: number
 }
@@ -275,6 +275,7 @@ export function computeMomentumPillar(d: MomentumInputs, tiers: MomentumTiers): 
       return 0
     })(),
     soxIndex: (() => {
+      if (d.soxIndex === null) return null // P6-34: no reading, no points
       const dev = ((d.soxIndex - 5000) / 5000) * 100
       if (dev < -15) return 9 // Chip sector collapse
       if (dev < -10) return 6
@@ -299,6 +300,7 @@ export function computeMomentumPillar(d: MomentumInputs, tiers: MomentumTiers): 
     qqqSMA200: smaPoints(d.qqqBelowSMA200, d.qqqSMA200Proximity, 15, 10, 5),
     qqqBollinger: smaPoints(d.qqqBelowBollinger, d.qqqBollingerProximity, 9, 6, 3),
     vix: (() => {
+      if (d.vix === null) return null // P6-34: no reading, no points
       if (d.vix > 35) return 13
       if (d.vix > 25) return 9
       if (d.vix > 20) return 6
@@ -322,11 +324,11 @@ export function computeMomentumPillar(d: MomentumInputs, tiers: MomentumTiers): 
 // ---------------------------------------------------------------------------
 
 export interface RiskAppetiteInputs {
-  putCallRatio: number
+  putCallRatio: number | null // null when no source produced a reading (P6-34)
   /** CNN equity Fear & Greed 0-100; null when the source is unavailable */
   fearGreedIndex: number | null
-  aaiiBullish: number
-  shortInterest: number
+  aaiiBullish: number | null // null when no source produced a reading (P6-34)
+  shortInterest: number | null // null when no source produced a reading (P6-34)
 }
 
 export type RiskAppetiteTiers = Record<RiskAppetiteKey, Tier>
@@ -334,6 +336,7 @@ export type RiskAppetiteTiers = Record<RiskAppetiteKey, Tier>
 export function computeRiskAppetitePillar(d: RiskAppetiteInputs, tiers: RiskAppetiteTiers): PillarResult {
   const points: Record<RiskAppetiteKey, number | null> = {
     putCallRatio: (() => {
+      if (d.putCallRatio === null) return null // P6-34: no reading, no points
       if (d.putCallRatio < 0.6) return 29 // Extreme complacency
       if (d.putCallRatio < 0.7) return 22
       if (d.putCallRatio < 0.9) return 16
@@ -356,6 +359,7 @@ export function computeRiskAppetitePillar(d: RiskAppetiteInputs, tiers: RiskAppe
             return 0
           })(),
     aaiiBullish: (() => {
+      if (d.aaiiBullish === null) return null // P6-34: no reading, no points
       if (d.aaiiBullish > 55) return 26 // Retail euphoria
       if (d.aaiiBullish > 50) return 19
       if (d.aaiiBullish > 45) return 13
@@ -364,6 +368,7 @@ export function computeRiskAppetitePillar(d: RiskAppetiteInputs, tiers: RiskAppe
       return 0
     })(),
     shortInterest: (() => {
+      if (d.shortInterest === null) return null // P6-34: no reading, no points
       if (d.shortInterest < 1.5) return 21 // Extreme complacency
       if (d.shortInterest < 2.0) return 16
       if (d.shortInterest < 3.0) return 10
@@ -382,10 +387,10 @@ export function computeRiskAppetitePillar(d: RiskAppetiteInputs, tiers: RiskAppe
 export interface ValuationInputs {
   spxPE: number
   spxPS: number
-  buffettIndicator: number
-  qqqPE: number
-  mag7Concentration: number
-  shillerCAPE: number
+  buffettIndicator: number | null // null when no source produced a reading (P6-34)
+  qqqPE: number | null // null when no source produced a reading (P6-34)
+  mag7Concentration: number | null // null when no source produced a reading (P6-34)
+  shillerCAPE: number | null // null when no source produced a reading (P6-34)
   equityRiskPremium: number
 }
 
@@ -408,6 +413,7 @@ export function computeValuationPillar(d: ValuationInputs, tiers: ValuationTiers
       return 0
     })(),
     buffettIndicator: (() => {
+      if (d.buffettIndicator === null) return null // P6-34: no reading, no points
       if (d.buffettIndicator > 200) return 16 // Danger: >200%
       if (d.buffettIndicator > 180) return 13
       if (d.buffettIndicator > 150) return 9
@@ -415,6 +421,7 @@ export function computeValuationPillar(d: ValuationInputs, tiers: ValuationTiers
       return 0
     })(),
     qqqPE: (() => {
+      if (d.qqqPE === null) return null // P6-34: no reading, no points
       if (d.qqqPE > 40) return 16 // Bubble territory
       if (d.qqqPE > 35) return 13
       if (d.qqqPE > 30) return 10
@@ -422,6 +429,7 @@ export function computeValuationPillar(d: ValuationInputs, tiers: ValuationTiers
       return 2
     })(),
     mag7Concentration: (() => {
+      if (d.mag7Concentration === null) return null // P6-34: no reading, no points
       if (d.mag7Concentration > 65) return 15 // Extreme concentration
       if (d.mag7Concentration > 60) return 12
       if (d.mag7Concentration > 55) return 9
@@ -430,6 +438,7 @@ export function computeValuationPillar(d: ValuationInputs, tiers: ValuationTiers
       return 0
     })(),
     shillerCAPE: (() => {
+      if (d.shillerCAPE === null) return null // P6-34: no reading, no points
       if (d.shillerCAPE > 35) return 13 // Historic overvaluation
       if (d.shillerCAPE > 30) return 10
       if (d.shillerCAPE > 25) return 7
@@ -454,7 +463,7 @@ export function computeValuationPillar(d: ValuationInputs, tiers: ValuationTiers
 export interface MacroInputs {
   tedSpread: number
   dxyIndex: number
-  ismPMI: number
+  ismPMI: number | null // null when no source produced a reading (P6-34)
   fedFundsRate: number
   fedReverseRepo: number
   junkSpread: number
@@ -482,6 +491,7 @@ export function computeMacroPillar(d: MacroInputs, tiers: MacroTiers): PillarRes
       return 0
     })(),
     ismPMI: (() => {
+      if (d.ismPMI === null) return null // P6-34: no reading, no points
       if (d.ismPMI < 42) return 15 // Deep contraction
       if (d.ismPMI < 46) return 12
       if (d.ismPMI < 50) return 8

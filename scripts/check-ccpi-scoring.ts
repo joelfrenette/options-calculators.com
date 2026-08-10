@@ -287,5 +287,37 @@ check(
 check("Crash Watch deployed allocation is reduced", crashPlaybook.allocation.deployed !== calmPlaybook.allocation.deployed)
 check("Crash Watch cash allocation is raised", crashPlaybook.allocation.cash !== calmPlaybook.allocation.cash)
 
+// ---------------------------------------------------------------------------
+// P6-34: a null input earns no points, independently of its tier.
+//
+// The tier map already excludes non-live inputs, so these assertions are belt
+// and braces — deliberately. The tier and the value come from two different
+// places in the assembly layer, and the whole P6-31/32 class of defect was one
+// of them being right while the other was not. The scoring core should refuse
+// a missing value even if a caller mislabels it "live".
+// ---------------------------------------------------------------------------
+const nullRisk: RiskAppetiteInputs = {
+  putCallRatio: null,
+  fearGreedIndex: null,
+  aaiiBullish: null,
+  shortInterest: null,
+}
+const nullRiskLive = computeRiskAppetitePillar(nullRisk, allTiers(RISK_APPETITE_WEIGHTS, "live") as RiskAppetiteTiers)
+check("all-null inputs score nothing even when tiered live", nullRiskLive.rawPoints === 0, `${nullRiskLive.rawPoints}`)
+check("all-null inputs earn no scored weight", nullRiskLive.scoredMax === 0, `${nullRiskLive.scoredMax}`)
+check("all-null inputs report null score, not 0/100", nullRiskLive.score === null, String(nullRiskLive.score))
+check("all four indicators are listed as excluded", nullRiskLive.excluded.length === 4, `${nullRiskLive.excluded.length}`)
+
+const oneRealRisk = computeRiskAppetitePillar(
+  { putCallRatio: 0.5, fearGreedIndex: null, aaiiBullish: null, shortInterest: null },
+  allTiers(RISK_APPETITE_WEIGHTS, "live") as RiskAppetiteTiers,
+)
+check("a single live input scores its own weight", oneRealRisk.scoredMax === 29, `${oneRealRisk.scoredMax}`)
+check(
+  "...but 29 is below MIN_SCORED_MAX, so the pillar still refuses a number",
+  oneRealRisk.score === null,
+  String(oneRealRisk.score),
+)
+
 console.log(failures === 0 ? "\nAll CCPI scoring checks passed." : `\n${failures} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)

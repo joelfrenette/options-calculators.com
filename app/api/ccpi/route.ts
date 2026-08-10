@@ -352,9 +352,16 @@ function notBaseline<T>(value: T, tier: Tier): T | null {
   return tier === "baseline" ? null : value
 }
 
-/** AI-fallback source string → provenance tier. */
-function aiTier(source: "grok" | "groq" | "anthropic" | "openai" | "baseline"): Tier {
-  return source === "baseline" ? "baseline" : "ai-estimate"
+/**
+ * AI-fallback source string → provenance tier.
+ *
+ * "unavailable" replaced "baseline" when fetchWithAIFallback stopped inventing
+ * a constant (P6-34); both tier as `baseline`, which is excluded from scoring
+ * and suppressed from the canaries. The difference is that "unavailable" now
+ * carries a null value, so there is nothing left to accidentally read.
+ */
+function aiTier(source: "grok" | "groq" | "anthropic" | "openai" | "unavailable"): Tier {
+  return source === "unavailable" ? "baseline" : "ai-estimate"
 }
 
 /** The weaker of two tiers, for derived indicators (live > ai-estimate > baseline). */

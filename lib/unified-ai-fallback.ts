@@ -84,6 +84,18 @@ const AI_ESTIMATE_TTL_HOURS = (() => {
 
 type AiSource = "grok" | "groq" | "anthropic" | "openai"
 
+/**
+ * The chain's result. `value` is null when no provider produced a plausible
+ * reading — there is no baseline constant any more (P6-34). Callers must tier
+ * `"unavailable"` as `baseline`, which excludes it from scoring and suppresses
+ * it from the canaries; the alternative, substituting a number, is the defect
+ * this audit spent a fortnight removing from everywhere else.
+ */
+export interface AIFallbackResult {
+  value: number | null
+  source: AiSource | "unavailable"
+}
+
 async function readCachedEstimate(
   key: string,
   range: PlausibleRange,
@@ -138,8 +150,7 @@ export async function fetchWithAIFallback(
   anthropicFunc: () => Promise<number | null>,
   openaiFunc: () => Promise<number | null>,
   range: PlausibleRange,
-  baselineValue: number,
-): Promise<{ value: number; source: "grok" | "groq" | "anthropic" | "openai" | "baseline" }> {
+): Promise<AIFallbackResult> {
   // Cache first (E-7a): a fresh-enough live estimate serves every request in
   // the TTL window instead of re-running the LLM chain per view.
   const cached = await readCachedEstimate(indicatorName, range)
@@ -196,15 +207,16 @@ export async function fetchWithAIFallback(
     console.warn(`[v0] All AI providers failed for ${indicatorName}`)
   }
 
-  // Last resort: baseline value
-  console.warn(`[v0] ❌ ${indicatorName}: Using baseline value (${baselineValue})`)
-  return { value: baselineValue, source: "baseline" }
+  // Last resort used to be a hardcoded baseline. It is now nothing (P6-34).
+  // A constant standing in for a market reading is the defect this whole audit
+  // has been chasing: it scored, it fired canaries, and it was indistinguishable
+  // from data downstream. `null` with source "unavailable" tiers as baseline,
+  // which is excluded from scoring and suppressed from canaries.
+  console.warn(`[v0] ❌ ${indicatorName}: no source produced a value — reporting unavailable`)
+  return { value: null, source: "unavailable" }
 }
 
-export async function getShillerCAPE(): Promise<{
-  value: number
-  source: "grok" | "groq" | "anthropic" | "openai" | "baseline"
-}> {
+export async function getShillerCAPE(): Promise<AIFallbackResult> {
   return fetchWithAIFallback(
     "Shiller CAPE",
     async () => await fetchMarketDataWithGrok("Shiller CAPE", "Current CAPE ratio"),
@@ -212,14 +224,10 @@ export async function getShillerCAPE(): Promise<{
     fetchShillerCAPEWithAnthropic,
     fetchShillerCAPEWithOpenAI,
     { min: 5, max: 60 },
-    30,
   )
 }
 
-export async function getShortInterest(): Promise<{
-  value: number
-  source: "grok" | "groq" | "anthropic" | "openai" | "baseline"
-}> {
+export async function getShortInterest(): Promise<AIFallbackResult> {
   return fetchWithAIFallback(
     "Short Interest",
     async () => await fetchMarketDataWithGrok("Short Interest", "Current short interest level"),
@@ -227,14 +235,10 @@ export async function getShortInterest(): Promise<{
     fetchShortInterestWithAnthropic,
     fetchShortInterestWithOpenAI,
     { min: 0.2, max: 20 },
-    1.8,
   )
 }
 
-export async function getMag7Concentration(): Promise<{
-  value: number
-  source: "grok" | "groq" | "anthropic" | "openai" | "baseline"
-}> {
+export async function getMag7Concentration(): Promise<AIFallbackResult> {
   return fetchWithAIFallback(
     "Mag7 Concentration",
     async () => await fetchMarketDataWithGrok("Mag7 Concentration", "Current concentration level"),
@@ -242,14 +246,10 @@ export async function getMag7Concentration(): Promise<{
     fetchMag7ConcentrationWithAnthropic,
     fetchMag7ConcentrationWithOpenAI,
     { min: 20, max: 80 },
-    55,
   )
 }
 
-export async function getQQQPE(): Promise<{
-  value: number
-  source: "grok" | "groq" | "anthropic" | "openai" | "baseline"
-}> {
+export async function getQQQPE(): Promise<AIFallbackResult> {
   return fetchWithAIFallback(
     "QQQ P/E",
     async () => await fetchMarketDataWithGrok("QQQ P/E", "Current QQQ P/E ratio"),
@@ -257,14 +257,10 @@ export async function getQQQPE(): Promise<{
     fetchQQQPEWithAnthropic,
     fetchQQQPEWithOpenAI,
     { min: 10, max: 60 },
-    32,
   )
 }
 
-export async function getBuffettIndicator(): Promise<{
-  value: number
-  source: "grok" | "groq" | "anthropic" | "openai" | "baseline"
-}> {
+export async function getBuffettIndicator(): Promise<AIFallbackResult> {
   return fetchWithAIFallback(
     "Buffett Indicator",
     async () => await fetchMarketDataWithGrok("Buffett Indicator (Market Cap to GDP ratio)", "Current percentage"),
@@ -272,14 +268,10 @@ export async function getBuffettIndicator(): Promise<{
     fetchBuffettIndicatorWithAnthropic,
     fetchBuffettIndicatorWithOpenAI,
     { min: 50, max: 300 },
-    180,
   )
 }
 
-export async function getPutCallRatio(): Promise<{
-  value: number
-  source: "grok" | "groq" | "anthropic" | "openai" | "baseline"
-}> {
+export async function getPutCallRatio(): Promise<AIFallbackResult> {
   return fetchWithAIFallback(
     "Put/Call Ratio",
     async () => await fetchMarketDataWithGrok("CBOE Put/Call Ratio", "Current equity put/call ratio"),
@@ -287,14 +279,10 @@ export async function getPutCallRatio(): Promise<{
     fetchPutCallRatioWithAnthropic,
     fetchPutCallRatioWithOpenAI,
     { min: 0.3, max: 2.5 },
-    0.95,
   )
 }
 
-export async function getAAIIBullish(): Promise<{
-  value: number
-  source: "grok" | "groq" | "anthropic" | "openai" | "baseline"
-}> {
+export async function getAAIIBullish(): Promise<AIFallbackResult> {
   return fetchWithAIFallback(
     "AAII Bullish %",
     async () =>
@@ -303,14 +291,10 @@ export async function getAAIIBullish(): Promise<{
     fetchAAIIBullishWithAnthropic,
     fetchAAIIBullishWithOpenAI,
     { min: 5, max: 80 },
-    35,
   )
 }
 
-export async function getVIX(): Promise<{
-  value: number
-  source: "grok" | "groq" | "anthropic" | "openai" | "baseline"
-}> {
+export async function getVIX(): Promise<AIFallbackResult> {
   return fetchWithAIFallback(
     "VIX",
     async () => await fetchMarketDataWithGrok("CBOE Volatility Index (VIX)", "Current VIX level"),
@@ -318,14 +302,10 @@ export async function getVIX(): Promise<{
     fetchVIXWithAnthropic,
     fetchVIXWithOpenAI,
     { min: 5, max: 100 },
-    18,
   )
 }
 
-export async function getNVIDIAPrice(): Promise<{
-  value: number
-  source: "grok" | "groq" | "anthropic" | "openai" | "baseline"
-}> {
+export async function getNVIDIAPrice(): Promise<AIFallbackResult> {
   return fetchWithAIFallback(
     "NVIDIA Price",
     async () => await fetchMarketDataWithGrok("NVIDIA (NVDA) stock price", "Current NVDA price in USD"),
@@ -333,14 +313,10 @@ export async function getNVIDIAPrice(): Promise<{
     fetchNVIDIAPriceWithAnthropic,
     fetchNVIDIAPriceWithOpenAI,
     { min: 10, max: 5000 },
-    800,
   )
 }
 
-export async function getSOXIndex(): Promise<{
-  value: number
-  source: "grok" | "groq" | "anthropic" | "openai" | "baseline"
-}> {
+export async function getSOXIndex(): Promise<AIFallbackResult> {
   return fetchWithAIFallback(
     "SOX Index",
     async () => await fetchMarketDataWithGrok("PHLX Semiconductor Index (SOX)", "Current SOX index level"),
@@ -348,14 +324,10 @@ export async function getSOXIndex(): Promise<{
     fetchSOXIndexWithAnthropic,
     fetchSOXIndexWithOpenAI,
     { min: 1000, max: 20000 },
-    5000,
   )
 }
 
-export async function getISMPMI(): Promise<{
-  value: number
-  source: "grok" | "groq" | "anthropic" | "openai" | "baseline"
-}> {
+export async function getISMPMI(): Promise<AIFallbackResult> {
   return fetchWithAIFallback(
     "ISM PMI",
     async () => await fetchMarketDataWithGrok("ISM Manufacturing PMI", "Current ISM PMI value"),
@@ -363,7 +335,6 @@ export async function getISMPMI(): Promise<{
     fetchISMPMIWithAnthropic,
     fetchISMPMIWithOpenAI,
     { min: 30, max: 70 },
-    48,
   )
 }
 
