@@ -106,8 +106,19 @@ export interface CanaryInputs {
   fedReverseRepo: number | null
 }
 
-/** SOX has no absolute threshold; the canary measures deviation from this level. */
-const SOX_REFERENCE_LEVEL = 5000
+/**
+ * The SOX canary has no trailing baseline to compare against — the semiconductor
+ * index is not in FRED and Polygon's grouped bars carry no indices, so nothing
+ * the site stores can supply a moving reference (P6-33).
+ *
+ * It therefore compares against a fixed level, and the copy has to say so. The
+ * old wording, "SOX down 12% - Chip sector crash", read as a market move; it
+ * actually meant "12% below 5,000", which drifts from meaningless to permanent
+ * as the index re-rates. Naming the constant was not enough — the SENTENCE was
+ * the false claim. Until a real reference series exists, the canary states the
+ * level it is measuring against.
+ */
+export const SOX_REFERENCE_LEVEL = 5000
 
 export function generateCanarySignals(inputs: CanaryInputs, PILLAR_PCT: PillarPercentages): CanaryResult {
   const canaries: CanarySignal[] = []
@@ -230,10 +241,23 @@ export function generateCanarySignals(inputs: CanaryInputs, PILLAR_PCT: PillarPe
 
   when("SOX Index", [inputs.soxIndex], () => {
     const deviation = (((inputs.soxIndex as number) - SOX_REFERENCE_LEVEL) / SOX_REFERENCE_LEVEL) * 100
+    const level = inputs.soxIndex as number
     if (deviation < -15) {
-      push(`SOX down ${Math.abs(deviation).toFixed(1)}% - Chip sector crash`, MOMENTUM, "high", 9, PILLAR_PCT.momentum)
+      push(
+        `SOX at ${level.toFixed(0)}, ${Math.abs(deviation).toFixed(1)}% below the ${SOX_REFERENCE_LEVEL} reference - Chip sector weakness`,
+        MOMENTUM,
+        "high",
+        9,
+        PILLAR_PCT.momentum,
+      )
     } else if (deviation < -10) {
-      push(`SOX down ${Math.abs(deviation).toFixed(1)}% - Semiconductor weakness`, MOMENTUM, "medium", 9, PILLAR_PCT.momentum)
+      push(
+        `SOX at ${level.toFixed(0)}, ${Math.abs(deviation).toFixed(1)}% below the ${SOX_REFERENCE_LEVEL} reference`,
+        MOMENTUM,
+        "medium",
+        9,
+        PILLAR_PCT.momentum,
+      )
     }
   })
 

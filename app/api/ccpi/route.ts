@@ -116,13 +116,13 @@ export async function GET() {
     // the assembly layer's baseline constants as real market data: with QQQ
     // unavailable, `qqqDailyReturn` arrived as 0 and `qqqBelowSMA50` as false —
     // two assertions the data never made. Baseline-tier inputs are passed as
-    // null and simply do not fire their bonus. `notBaseline` is module-scope
+    // null and simply do not fire their bonus. `measured` is module-scope
     // now — the canary signals need the same guard (P6-31).
     const crashAmplifiers = calculateCrashAmplifiers({
-      qqqDailyReturn: notBaseline(data.qqqDailyReturn, data.tiers.momentum.qqqDailyReturn),
-      qqqBelowSMA50: notBaseline(data.qqqBelowSMA50, data.tiers.momentum.qqqSMA50),
-      vix: notBaseline(data.vix, data.tiers.momentum.vix),
-      putCallRatio: notBaseline(data.putCallRatio, data.tiers.riskAppetite.putCallRatio),
+      qqqDailyReturn: measured(data.qqqDailyReturn, data.tiers.momentum.qqqDailyReturn),
+      qqqBelowSMA50: measured(data.qqqBelowSMA50, data.tiers.momentum.qqqSMA50),
+      vix: measured(data.vix, data.tiers.momentum.vix),
+      putCallRatio: measured(data.putCallRatio, data.tiers.riskAppetite.putCallRatio),
     })
     const finalCCPI = Math.min(100, baseCCPI + crashAmplifiers.totalBonus)
 
@@ -143,42 +143,42 @@ export async function GET() {
     const vt = data.tiers.valuation
     const kt = data.tiers.macro
     const { canaries, suppressed: suppressedCanaries } = generateCanarySignals({
-      qqqDailyReturn: notBaseline(data.qqqDailyReturn, mt.qqqDailyReturn),
-      qqqConsecDown: notBaseline(data.qqqConsecDown, mt.qqqConsecDown),
-      qqqBelowSMA20: notBaseline(data.qqqBelowSMA20, mt.qqqSMA20),
-      qqqSMA20Proximity: notBaseline(data.qqqSMA20Proximity, mt.qqqSMA20),
-      qqqBelowSMA50: notBaseline(data.qqqBelowSMA50, mt.qqqSMA50),
-      qqqSMA50Proximity: notBaseline(data.qqqSMA50Proximity, mt.qqqSMA50),
-      qqqBelowSMA200: notBaseline(data.qqqBelowSMA200, mt.qqqSMA200),
-      qqqSMA200Proximity: notBaseline(data.qqqSMA200Proximity, mt.qqqSMA200),
-      qqqBelowBollinger: notBaseline(data.qqqBelowBollinger, mt.qqqBollinger),
-      qqqBollingerProximity: notBaseline(data.qqqBollingerProximity, mt.qqqBollinger),
-      vix: notBaseline(data.vix, mt.vix),
-      vixTermStructure: notBaseline(data.vixTermStructure, mt.vixTermStructure),
-      nvidiaMomentum: notBaseline(data.nvidiaMomentum, mt.nvidiaMomentum),
-      soxIndex: notBaseline(data.soxIndex, mt.soxIndex),
-      putCallRatio: notBaseline(data.putCallRatio, rt.putCallRatio),
+      qqqDailyReturn: measured(data.qqqDailyReturn, mt.qqqDailyReturn),
+      qqqConsecDown: measured(data.qqqConsecDown, mt.qqqConsecDown),
+      qqqBelowSMA20: measured(data.qqqBelowSMA20, mt.qqqSMA20),
+      qqqSMA20Proximity: measured(data.qqqSMA20Proximity, mt.qqqSMA20),
+      qqqBelowSMA50: measured(data.qqqBelowSMA50, mt.qqqSMA50),
+      qqqSMA50Proximity: measured(data.qqqSMA50Proximity, mt.qqqSMA50),
+      qqqBelowSMA200: measured(data.qqqBelowSMA200, mt.qqqSMA200),
+      qqqSMA200Proximity: measured(data.qqqSMA200Proximity, mt.qqqSMA200),
+      qqqBelowBollinger: measured(data.qqqBelowBollinger, mt.qqqBollinger),
+      qqqBollingerProximity: measured(data.qqqBollingerProximity, mt.qqqBollinger),
+      vix: measured(data.vix, mt.vix),
+      vixTermStructure: measured(data.vixTermStructure, mt.vixTermStructure),
+      nvidiaMomentum: measured(data.nvidiaMomentum, mt.nvidiaMomentum),
+      soxIndex: measured(data.soxIndex, mt.soxIndex),
+      putCallRatio: measured(data.putCallRatio, rt.putCallRatio),
       // Already nullable at source (P6-18) — no tier gate needed.
       fearGreedIndex: data.fearGreedIndex,
-      aaiiBullish: notBaseline(data.aaiiBullish, rt.aaiiBullish),
-      shortInterest: notBaseline(data.shortInterest, rt.shortInterest),
+      aaiiBullish: measured(data.aaiiBullish, rt.aaiiBullish),
+      shortInterest: measured(data.shortInterest, rt.shortInterest),
       // Informational, outside the tier system; undefined means not fetched.
       etfFlows: data.etfFlows ?? null,
-      spxPE: notBaseline(data.spxPE, vt.spxPE),
-      spxPS: notBaseline(data.spxPS, vt.spxPS),
-      buffettIndicator: notBaseline(data.buffettIndicator, vt.buffettIndicator),
-      qqqPE: notBaseline(data.qqqPE, vt.qqqPE),
-      mag7Concentration: notBaseline(data.mag7Concentration, vt.mag7Concentration),
-      shillerCAPE: notBaseline(data.shillerCAPE, vt.shillerCAPE),
-      equityRiskPremium: notBaseline(data.equityRiskPremium, vt.equityRiskPremium),
-      fedFundsRate: notBaseline(data.fedFundsRate, kt.fedFundsRate),
-      junkSpread: notBaseline(data.junkSpread, kt.junkSpread),
-      debtToGDP: notBaseline(data.debtToGDP, kt.debtToGDP),
-      yieldCurve: notBaseline(data.yieldCurve, kt.yieldCurve),
-      tedSpread: notBaseline(data.tedSpread, kt.tedSpread),
-      dxyIndex: notBaseline(data.dxyIndex, kt.dxyIndex),
-      ismPMI: notBaseline(data.ismPMI, kt.ismPMI),
-      fedReverseRepo: notBaseline(data.fedReverseRepo, kt.fedReverseRepo),
+      spxPE: measured(data.spxPE, vt.spxPE),
+      spxPS: measured(data.spxPS, vt.spxPS),
+      buffettIndicator: measured(data.buffettIndicator, vt.buffettIndicator),
+      qqqPE: measured(data.qqqPE, vt.qqqPE),
+      mag7Concentration: measured(data.mag7Concentration, vt.mag7Concentration),
+      shillerCAPE: measured(data.shillerCAPE, vt.shillerCAPE),
+      equityRiskPremium: measured(data.equityRiskPremium, vt.equityRiskPremium),
+      fedFundsRate: measured(data.fedFundsRate, kt.fedFundsRate),
+      junkSpread: measured(data.junkSpread, kt.junkSpread),
+      debtToGDP: measured(data.debtToGDP, kt.debtToGDP),
+      yieldCurve: measured(data.yieldCurve, kt.yieldCurve),
+      tedSpread: measured(data.tedSpread, kt.tedSpread),
+      dxyIndex: measured(data.dxyIndex, kt.dxyIndex),
+      ismPMI: measured(data.ismPMI, kt.ismPMI),
+      fedReverseRepo: measured(data.fedReverseRepo, kt.fedReverseRepo),
     }, PILLAR_PCT)
     console.log(
       `[v0] CCPI GET: ${canaries.length} canary signals; ${suppressedCanaries.length} indicator(s) could not be evaluated`,
@@ -342,14 +342,21 @@ function buildProvenance(
 }
 
 /**
- * A baseline-tier value is the assembly layer's own fallback constant, not a
- * measurement. Reading one as fact is the P6-20 defect; this returns null so
- * the caller has to decide what to do about missing data rather than
- * evaluating a constant. Module-scope because both the crash amplifiers and
- * the canary signals need it.
+ * Passes a value through only when it was MEASURED.
+ *
+ * A baseline-tier value is the assembly layer's own fallback constant, and
+ * since P6-34 an ai-estimate is an LLM's guess at a published figure — neither
+ * is a market observation. Reading either as fact is the P6-20 defect, so both
+ * come back null and the caller has to decide what to do about missing data.
+ *
+ * Originally this dropped `baseline` only. That left an inconsistency the
+ * moment P6-34 landed: the pillars stopped scoring AI estimates while the crash
+ * amplifiers and the headline canaries went on evaluating them, so a warning
+ * could still fire off a number the index itself refused to count. Found while
+ * fixing P6-33, one file over.
  */
-function notBaseline<T>(value: T, tier: Tier): T | null {
-  return tier === "baseline" ? null : value
+function measured<T>(value: T, tier: Tier): T | null {
+  return tier === "baseline" || tier === "ai-estimate" ? null : value
 }
 
 /**

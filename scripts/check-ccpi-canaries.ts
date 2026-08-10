@@ -17,8 +17,8 @@
  * zero warnings and names every indicator it could not check.
  */
 
-import { generateCanarySignals, type CanaryInputs } from "../lib/ccpi/canaries.ts"
-import { PILLAR_WEIGHTS } from "../lib/ccpi/scoring.ts"
+import { generateCanarySignals, SOX_REFERENCE_LEVEL, type CanaryInputs } from "../lib/ccpi/canaries.ts"
+import { PILLAR_WEIGHTS, SOX_REFERENCE_LEVEL as SCORING_SOX_REF } from "../lib/ccpi/scoring.ts"
 
 const PILLAR_PCT = {
   momentum: PILLAR_WEIGHTS.momentum * 100,
@@ -198,6 +198,28 @@ const etf = generateCanarySignals({ ...ALL_NULL, etfFlows: -4 }, PILLAR_PCT)
 check("ETF outflows fire a canary", etf.canaries.length === 1)
 check("...with zero indicator weight", etf.canaries[0].indicatorWeight === 0)
 check("...and therefore zero impact score", etf.canaries[0].impactScore === 0)
+
+// ---------------------------------------------------------------------------
+// 7. SOX: the canary must state the level it measures against (P6-33).
+// ---------------------------------------------------------------------------
+check(
+  "the two SOX reference constants cannot drift apart",
+  SOX_REFERENCE_LEVEL === SCORING_SOX_REF,
+  `${SOX_REFERENCE_LEVEL} vs ${SCORING_SOX_REF}`,
+)
+const sox = generateCanarySignals({ ...ALL_NULL, soxIndex: 4200 }, PILLAR_PCT)
+check("a 16% shortfall fires high", sox.canaries[0]?.severity === "high", sox.canaries[0]?.signal ?? "none")
+check(
+  "...and the wording names the reference rather than implying a market move",
+  sox.canaries[0]?.signal.includes(String(SOX_REFERENCE_LEVEL)) === true,
+  sox.canaries[0]?.signal ?? "none",
+)
+check(
+  "...and does not claim the index 'fell', which it never measured",
+  /down \d/.test(sox.canaries[0]?.signal ?? "") === false,
+  sox.canaries[0]?.signal ?? "none",
+)
+check("SOX at the reference level fires nothing", generateCanarySignals({ ...ALL_NULL, soxIndex: 5000 }, PILLAR_PCT).canaries.length === 0)
 
 console.log(failures === 0 ? "\nAll CCPI canary checks passed." : `\n${failures} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)

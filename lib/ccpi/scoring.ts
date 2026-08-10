@@ -70,6 +70,15 @@ export interface PillarResult {
   excluded: string[]
 }
 
+/**
+ * The level the SOX indicator scores deviation from. A literal, because the
+ * semiconductor index is in neither FRED nor Polygon's grouped bars, so no
+ * stored series can supply a trailing reference (P6-33). Duplicated
+ * deliberately in lib/ccpi/canaries.ts, which must stay import-free; the two
+ * are asserted equal by scripts/check-ccpi-canaries.ts.
+ */
+export const SOX_REFERENCE_LEVEL = 5000
+
 /** Below this scored weight, a pillar refuses to report a number. */
 export const MIN_SCORED_MAX = 40
 
@@ -276,7 +285,10 @@ export function computeMomentumPillar(d: MomentumInputs, tiers: MomentumTiers): 
     })(),
     soxIndex: (() => {
       if (d.soxIndex === null) return null // P6-34: no reading, no points
-      const dev = ((d.soxIndex - 5000) / 5000) * 100
+      // Fixed reference, not a trailing average — nothing the site stores
+      // carries the semiconductor index, so there is no moving baseline to
+      // compare against (P6-33). Kept in step with lib/ccpi/canaries.ts.
+      const dev = ((d.soxIndex - SOX_REFERENCE_LEVEL) / SOX_REFERENCE_LEVEL) * 100
       if (dev < -15) return 9 // Chip sector collapse
       if (dev < -10) return 6
       if (dev < -5) return 3
