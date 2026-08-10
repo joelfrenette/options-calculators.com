@@ -34,6 +34,16 @@ const STALENESS_DAYS: Record<string, number> = {
   // Discontinued Jan 2022 — FRED's own latest observation is that old, and the
   // live path serves it too. No staleness gate, else the store could never win.
   TEDRATE: Number.POSITIVE_INFINITY,
+  // CCPI redesign Phase 1. Weekly series post with a lag, so the gate has to
+  // clear a full publication cycle plus slack — 7 days would mark a perfectly
+  // current NFCI stale every week and push every read back onto live FRED,
+  // the exact per-view traffic the store exists to remove (the CPI lesson).
+  T10Y3M: 7,
+  NFCI: 21,
+  ANFCI: 21,
+  STLFSI4: 21,
+  ICSA: 21,
+  PERMIT: 100, // monthly, published ~5 weeks in arrears
   GASREGW: 21,
   WRMFSL: 21,
   BOGZ1FL663067003Q: 200,

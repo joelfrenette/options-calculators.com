@@ -55,6 +55,27 @@ export const FRED_SERIES: { id: string; cadence: "daily" | "weekly" | "monthly" 
     // computed once a day and the tab stops depending on FRED being up.
     { id: "VIXCLS", cadence: "daily", dailyLimit: 8 },
     { id: "VXVCLS", cadence: "daily", dailyLimit: 8 },
+    // CCPI redesign Phase 1 (CCPI_DESIGN.md §5/§6). Candidates for the
+    // Trigger gauge, added ONLY after each ID was fetched and its real history
+    // depth recorded — not from recollection. None of them scores anything yet;
+    // they are stored so the lead-time backtest has something to measure.
+    //
+    // The deep-history ones are the point. NFCI and ANFCI reach 1971 and cover
+    // all four reference drawdowns; T10Y3M reaches 1982 and is the
+    // Estrella-Mishkin recession predictor, with a better record than the
+    // T10Y2Y already above; ICSA reaches 1967.
+    //
+    // Deliberately NOT added: the ICE BofA investment-grade series for a HY-IG
+    // differential. Every ICE series probes back only to 2023-08-08 on the
+    // public endpoint, including the BAMLH0A0HYM2 already stored above, which
+    // looks like a licence cap rather than four coincidences. Until the keyed
+    // API settles it, storing them would imply a history that may not exist.
+    { id: "T10Y3M", cadence: "daily", dailyLimit: 8 }, // 10Y-3M: the stronger recession predictor
+    { id: "NFCI", cadence: "weekly", dailyLimit: 4 }, // Chicago Fed financial conditions, 1971-
+    { id: "ANFCI", cadence: "weekly", dailyLimit: 4 }, // adjusted for the business cycle
+    { id: "STLFSI4", cadence: "weekly", dailyLimit: 4 }, // St. Louis Fed financial stress, 1993-
+    { id: "ICSA", cadence: "weekly", dailyLimit: 4 }, // initial jobless claims, 1967-
+    { id: "PERMIT", cadence: "monthly", dailyLimit: 3 }, // building permits, 1960-
     { id: "GASREGW", cadence: "weekly", dailyLimit: 4 },
     { id: "WRMFSL", cadence: "weekly", dailyLimit: 4 }, // retail MMF (panic-euphoria)
     { id: "BOGZ1FL663067003Q", cadence: "quarterly", dailyLimit: 2 }, // Z.1 margin debt (panic-euphoria)
