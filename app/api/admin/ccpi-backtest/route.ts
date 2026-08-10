@@ -90,9 +90,18 @@ export async function GET() {
       // where the only two positives appeared. `fit-only` is the overfit
       // verdict and the one to watch for.
       walkForward: (() => {
-        const w = walkForward(observations, events, "2010-01-01", { maxLeadDays: 90 })
+        // Split at the window where this signal looked BEST in-sample, not a
+        // fixed 90. Walking forward at a window the signal never favoured
+        // tests the window rather than the signal — and with 30 and 60 now in
+        // the sweep, the best window is no longer the same for every row.
+        const best = sweepLeadWindows(observations, events)
+          .filter((x) => x.result.verdict === "scored")
+          .sort((a, b) => (b.result.lift ?? 0) - (a.result.lift ?? 0))[0]
+        const w = walkForward(observations, events, "2010-01-01", { maxLeadDays: best?.maxLeadDays ?? 90 })
         return {
           splitDay: w.splitDay,
+          atWindow: best?.maxLeadDays ?? 90,
+          bestInSampleLift: best?.result.lift ?? null,
           verdict: w.verdict,
           fitLift: w.fit.lift,
           testLift: w.test.lift,

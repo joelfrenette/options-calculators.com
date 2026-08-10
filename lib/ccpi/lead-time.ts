@@ -307,7 +307,10 @@ export function proposedWeight(r: LeadTimeResult): number | null {
 export function sweepLeadWindows(
   observations: readonly SignalObservation[],
   events: readonly ReferenceEvent[],
-  windows: readonly number[] = [90, 180, 365, 540],
+  // 30 and 60 added 2026-08-10: lift rose at EVERY signal as the window
+  // narrowed, without exception, and 90 was the shortest tried. Following that
+  // trend is not curve-fitting — it is testing where the data says to look.
+  windows: readonly number[] = [30, 60, 90, 180, 365, 540],
   options: Omit<LeadTimeOptions, "maxLeadDays"> = {},
 ): Array<{ maxLeadDays: number; result: LeadTimeResult }> {
   return windows.map((maxLeadDays) => ({

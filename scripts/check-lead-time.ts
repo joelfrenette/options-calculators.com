@@ -200,6 +200,9 @@ const longLead = series("2010-01-01", 2800, [
   ["2015-11-01", "2015-11-20"],
 ])
 const sweep = sweepLeadWindows(longLead, EVENTS, [90, 180, 365, 540])
+const defaultSweep = sweepLeadWindows(longLead, EVENTS)
+check("the default sweep now starts at 30 days", defaultSweep[0].maxLeadDays === 30, String(defaultSweep[0].maxLeadDays))
+check("...and covers six windows", defaultSweep.length === 6, String(defaultSweep.length))
 check("the sweep returns one result per window", sweep.length === 4)
 check("windows are reported alongside their results", sweep.map((x) => x.maxLeadDays).join(",") === "90,180,365,540")
 const at180 = sweep.find((x) => x.maxLeadDays === 180)!.result
