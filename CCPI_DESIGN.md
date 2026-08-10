@@ -216,7 +216,15 @@ P6-31/32/34 the backtest would have been measuring LLM guesses and fallback cons
 
 ## 8. Decisions needed from the owner
 
-1. **Two gauges, or keep one number?** Two is the honest structure; one is what exists.
+1. ~~**Two gauges, or keep one number?**~~ **DECIDED 2026-08-10: two gauges (Layout A).** Chosen
+   after a side-by-side mockup fed five live FRED readings —
+   https://claude.ai/code/artifact/b96605b8-15b1-4d0f-9225-dc4a9cd18cdc . Today's data made the
+   case on its own: every leading signal was quiet (10Y-2Y +0.46, 10Y-3M +0.78, HY OAS 2.71%,
+   NFCI −0.529, VIX 15.15), and the two-gauge layout reads `QUIET — 0 of 5 firing` while the
+   single composite reads `—`, because two of its four pillars are null. **The deciding
+   argument was degradation, not aesthetics:** a gauge consulted before moving to cash has to
+   stay readable on the day it matters. Layout A degrades to "3 of 5 firing"; Layout B degrades
+   to a dash, and it does so precisely when data is thin — which is when drawdowns happen.
 2. **Retention:** confirm raising `prune_market_closes` to ~9,000 days. Storage cost is small
    (a few series × 9,000 rows) but it is a database change.
 3. **Walk-forward discipline:** accept that some indicators will fail their own test and be
