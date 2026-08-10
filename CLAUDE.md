@@ -57,6 +57,13 @@ options come from his standard set:
 The user can always type free-form instead ("Other" is built in). Never ask
 permission-style questions this way — it is a navigation menu, not a gate.
 
+**The failure mode is long working turns.** On 2026-08-10 the menu was dropped
+for roughly fifteen consecutive replies once a multi-tool-call task got
+absorbing, and Joel had to ask for it a second time. It is never omitted because
+a reply "only answers a question" — an answer-only reply still ends with the
+menu. Treat "I am about to write the final response" as the checkpoint: status
+block present, menu present, first options specific to this turn.
+
 ## Deployment rule (mandatory)
 **Never push directly to `main`.** `main` = production (www.options-calculators.com).
 1. All work deploys first to the staging branch (currently `audit-preview`) →
