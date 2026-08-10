@@ -165,17 +165,31 @@ Every ID above was fetched from FRED and its actual history depth recorded. This
 
 **Two things this probe changed:**
 
-1. **`BAMLC0A0CM` returns only three years, not the ~1996 start the HY−IG differential needs.**
-   Either the public CSV endpoint truncates this one or the ID is subtly wrong. **Re-probe
-   through the keyed FRED API before building anything on it** — and if three years is genuinely
-   all there is, the HY−IG differential cannot be backtested and drops out of Gauge B. Do not
-   assume; this is exactly the kind of thing that becomes an invented number later.
+1. **RE-PROBED, and it is worse than one bad ID: the whole ICE BofA family is capped at three
+   years on this endpoint.** `BAMLC0A0CM`, `BAMLC0A0CMEY`, `BAMLC0A4CBBB` **and
+   `BAMLH0A0HYM2`** — the high-yield spread the site *already* stores and uses — all return
+   exactly 796 rows starting 2023-08-08, even with an explicit `cosd=1990-01-01`. Identical row
+   counts and identical start dates across four unrelated series is a family-level restriction,
+   almost certainly ICE's redistribution licence, not four coincidences.
+   **This corrects a claim made earlier in this document's own drafting:** the HY credit spread
+   was described as testable back to 1996. On this access path it is not.
+   **Consequence for the design — do not skip this.** Credit spreads are one of the two
+   best-documented leading signals and, if three years is all that is obtainable, they cannot be
+   backtested against 2008 or 2020 at all. That leaves the backtestable core as **NFCI/ANFCI
+   (1971), T10Y3M (1982) and ICSA (1967)** — still enough to cover all four reference drawdowns,
+   but a materially thinner Gauge B than §5 assumed.
+   **Next step before any of this is designed around:** check whether the keyed FRED API returns
+   full history for the ICE series where the public CSV does not. If it does, nothing changes.
+   If it does not, the credit-spread signals become present-day display indicators with no
+   measurable lead time, and Gauge B is built on financial-conditions and labour-market series
+   instead.
 2. **NFCI/ANFCI reach 1971 and cover all four reference drawdowns**, which makes them the
    strongest free candidates by history alone. `T10Y3M` from 1982 covers 2000, 2008, 2020, 2022.
    `ICSA` from 1967 covers everything.
 
-So the macro/credit case can be tested against all four reference drawdowns on free data —
-now verified rather than asserted, with the single exception flagged above.
+So the macro case can be tested against all four reference drawdowns on free data. **The
+credit case cannot, on this access path** — see item 1 above. That distinction was invisible
+until the series were actually fetched, which is the argument for probing before designing.
 
 **All free, all through the FRED key already in place, most with 25+ years of history.**
 This is the finding that matters commercially: **the macro/credit case can be backtested
