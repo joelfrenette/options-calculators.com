@@ -508,6 +508,45 @@ which signals are measured, which are untested, and which have no data at all.
 
 ---
 
+## 8a. Polygon history depth — what each year buys
+
+Computed 2026-08-10 from `REFERENCE_DRAWDOWNS`, a 90-day runway requirement and
+breadth's ~280-day warm-up. **The decision this replaces is a hunch about
+"more history would help".**
+
+| Closes from | Breadth from | Testable events |
+|---|---|---|
+| **5y — current plan** | 2022-05 | **1 of 11** |
+| 6y | 2021-05 | 2 |
+| 7y | 2020-05 | 2 |
+| **8y** | 2019-05 | **3 — the floor** |
+| **10y** | 2017-05 | **5** |
+| 15y | 2012-05 | 6 |
+| 20y | 2007-05 | 9 |
+| 30y | 1997-05 | 11 |
+
+**There is no partial credit.** Three covered events is the minimum the scorer
+accepts, so 6 and 7 years buy nothing usable — the signal still cannot be
+scored. The decision is binary: does the next tier reach **8 years or more**.
+
+**10 years is the value point.** Five events, including COVID-2020 and the two
+2018 corrections, which are genuinely different regimes from 2022-23 rather than
+more of the same. Beyond that the curve flattens hard: 15 years adds one event,
+and reaching 9 needs 20.
+
+**The warm-up is a real cost and easy to forget.** Breadth spends ~280 calendar
+days of closes computing its first 200-day average, which is why five years of
+closes yields only four years of breadth. Any depth purchased loses a year off
+the front before it counts.
+
+**Not priced here.** The tier names, costs and history depths must be read off
+Polygon's current pricing against the live subscription — asserting them from
+memory is the mistake §5 already made with the ICE series. The question to take
+to that page is narrow: *what does the next tier up cost, and does it reach
+eight years?*
+
+---
+
 ## 9. What this document deliberately does not do
 
 It does not re-weight anything, and it does not assert that any indicator works. Every lead
