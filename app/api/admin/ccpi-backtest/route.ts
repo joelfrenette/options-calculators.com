@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { isAuthenticated } from "@/lib/auth"
-import { getSeriesHistory } from "@/lib/market-series"
-import { SIGNALS, evaluableSignals, type SeriesPoint } from "@/lib/ccpi/signals"
+import { getSeriesHistory, getBreadthHistory, getCloseHistory } from "@/lib/market-series"
+import { SIGNALS, evaluableSignals, breadthDivergence, type SeriesPoint } from "@/lib/ccpi/signals"
 import { scoreLeadTime, proposedWeight, sweepLeadWindows, walkForward } from "@/lib/ccpi/lead-time"
 import { REFERENCE_DRAWDOWNS } from "@/lib/ccpi/drawdowns"
 
@@ -122,6 +122,45 @@ export async function GET() {
       })(),
     }
   })
+
+  // Breadth divergence is not a FRED signal — the index comes from stored
+  // closes and breadth from breadth_daily — so it is scored separately rather
+  // than forced into the registry's shape. It is expected to report
+  // insufficient-history until roughly two years of breadth has accumulated;
+  // wiring it now starts that clock.
+  const [spy, breadth] = await Promise.all([getCloseHistory("SPY"), getBreadthHistory()])
+  const breadthRow = (() => {
+    if (!spy || !breadth || spy.length === 0 || breadth.length === 0) {
+      return {
+        id: "breadth-divergence",
+        label: "Breadth divergence",
+        meaning: "The index is near its high while fewer members hold above their 200-day average.",
+        verdict: "insufficient-history" as const,
+        reason: `needs both SPY closes and breadth history; have ${spy?.length ?? 0} and ${breadth?.length ?? 0}`,
+        observedDays: 0,
+        proposedWeight: null,
+      }
+    }
+    const asc = [...spy].sort((a, b) => (a.day < b.day ? -1 : 1))
+    const obs = breadthDivergence(asc, breadth)
+    const r = scoreLeadTime(obs, events)
+    return {
+      id: "breadth-divergence",
+      label: "Breadth divergence",
+      meaning: "The index is near its high while fewer members hold above their 200-day average.",
+      verdict: r.verdict,
+      reason: r.reason,
+      observedDays: r.observedDays,
+      hitRate: r.hitRate,
+      precision: r.precision,
+      baseRate: r.baseRate,
+      lift: r.lift,
+      medianLeadDays: r.medianLeadDays,
+      falsePositivesPerDecade: r.falsePositivesPerDecade,
+      proposedWeight: proposedWeight(r),
+    }
+  })()
+  rows.push(breadthRow as (typeof rows)[number])
 
   const scored = rows.filter((r) => r.verdict === "scored")
 

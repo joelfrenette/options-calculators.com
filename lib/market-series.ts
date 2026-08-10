@@ -183,3 +183,73 @@ export async function getSeriesCoverage(
     return null
   }
 }
+
+/**
+ * Breadth history from `breadth_daily`, as points the signal layer can read.
+ *
+ * Breadth does not live in `market_series` — it is computed daily into its own
+ * table — so `breadthDivergence` needs this path rather than the FRED one.
+ * Paginated for the same reason getSeriesHistory is: PostgREST caps a single
+ * request at 1000 rows and says nothing about it.
+ */
+export async function getBreadthHistory(limit = 20000): Promise<{ day: string; value: number }[] | null> {
+  const cfg = getMeteringSupabaseConfig()
+  if (!cfg) return null
+  const headers = { apikey: cfg.key, Authorization: `Bearer ${cfg.key}` }
+  const out: { day: string; value: number }[] = []
+  try {
+    for (let offset = 0; offset < limit; offset += 1000) {
+      const size = Math.min(1000, limit - offset)
+      const res = await fetch(
+        `${cfg.url}/rest/v1/breadth_daily?select=day,pct&order=day.desc&limit=${size}&offset=${offset}`,
+        { headers, signal: AbortSignal.timeout(15000), cache: "no-store" },
+      )
+      if (!res.ok) return out.length > 0 ? out : null
+      const rows = (await res.json()) as { day: string; pct: string | number }[]
+      if (!Array.isArray(rows) || rows.length === 0) break
+      for (const r of rows) {
+        const value = Number(r.pct)
+        if (Number.isFinite(value)) out.push({ day: r.day, value })
+      }
+      if (rows.length < size) break
+    }
+    return out
+  } catch {
+    return out.length > 0 ? out : null
+  }
+}
+
+/**
+ * One ticker's close history from `market_closes`.
+ *
+ * SPY stands in for the index in `breadthDivergence`. `^SPX` is deliberately
+ * not stored — Polygon's grouped endpoint carries no indices (E-7c) — and SPY
+ * tracks it closely enough for a "near its high" test, which is a relative
+ * comparison rather than a level.
+ */
+export async function getCloseHistory(ticker: string, limit = 20000): Promise<{ day: string; value: number }[] | null> {
+  const cfg = getMeteringSupabaseConfig()
+  if (!cfg) return null
+  const headers = { apikey: cfg.key, Authorization: `Bearer ${cfg.key}` }
+  const out: { day: string; value: number }[] = []
+  try {
+    for (let offset = 0; offset < limit; offset += 1000) {
+      const size = Math.min(1000, limit - offset)
+      const res = await fetch(
+        `${cfg.url}/rest/v1/market_closes?ticker=eq.${encodeURIComponent(ticker)}&select=day,close&order=day.desc&limit=${size}&offset=${offset}`,
+        { headers, signal: AbortSignal.timeout(15000), cache: "no-store" },
+      )
+      if (!res.ok) return out.length > 0 ? out : null
+      const rows = (await res.json()) as { day: string; close: string | number }[]
+      if (!Array.isArray(rows) || rows.length === 0) break
+      for (const r of rows) {
+        const value = Number(r.close)
+        if (Number.isFinite(value)) out.push({ day: r.day, value })
+      }
+      if (rows.length < size) break
+    }
+    return out
+  } catch {
+    return out.length > 0 ? out : null
+  }
+}
