@@ -111,3 +111,50 @@ export async function latestWithPercentile(
     return null
   }
 }
+
+/**
+ * Per-series coverage: how many points are stored and the span they cover.
+ *
+ * Written for CCPI Phase 1. A backfill reports `totalStored`, which counts rows
+ * WRITTEN, not rows that survived — an upsert overwriting the same 800 days
+ * reports the same healthy number as one loading 25 years. The only way to know
+ * a deep load landed is to ask the store what it now holds, and the earliest
+ * day it holds is the number that decides which reference drawdowns are
+ * testable at all.
+ *
+ * Uses PostgREST aggregates rather than pulling rows: counting 9,000 points by
+ * fetching them would be a slow way to answer a cheap question.
+ */
+export async function getSeriesCoverage(
+  series: string,
+): Promise<{ series: string; points: number; earliest: string | null; latest: string | null } | null> {
+  const cfg = getMeteringSupabaseConfig()
+  if (!cfg) return null
+  const base = `${cfg.url}/rest/v1/market_series?series=eq.${encodeURIComponent(series)}`
+  const headers = { apikey: cfg.key, Authorization: `Bearer ${cfg.key}` }
+  try {
+    const [countRes, firstRes, lastRes] = await Promise.all([
+      fetch(`${base}&select=day`, {
+        headers: { ...headers, Prefer: "count=exact", Range: "0-0" },
+        signal: AbortSignal.timeout(6000),
+        cache: "no-store",
+      }),
+      fetch(`${base}&select=day&order=day.asc&limit=1`, { headers, signal: AbortSignal.timeout(6000), cache: "no-store" }),
+      fetch(`${base}&select=day&order=day.desc&limit=1`, { headers, signal: AbortSignal.timeout(6000), cache: "no-store" }),
+    ])
+    if (!countRes.ok || !firstRes.ok || !lastRes.ok) return null
+    // content-range comes back as "0-0/1234"; the total is what matters.
+    const range = countRes.headers.get("content-range") || ""
+    const total = Number.parseInt(range.split("/")[1] ?? "", 10)
+    const first = (await firstRes.json()) as { day: string }[]
+    const last = (await lastRes.json()) as { day: string }[]
+    return {
+      series,
+      points: Number.isFinite(total) ? total : 0,
+      earliest: first?.[0]?.day ?? null,
+      latest: last?.[0]?.day ?? null,
+    }
+  } catch {
+    return null
+  }
+}

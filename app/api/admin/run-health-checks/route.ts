@@ -3,6 +3,9 @@ import { z } from "zod"
 import { isAuthenticated } from "@/lib/auth"
 import { API_KEY_ALIASES, getDisabledServices, hasRawKey, resolveApiKey } from "@/lib/api-keys"
 import { ROUTE_CONTRACTS, type RouteContract, errorShape, routesByRequiredKey } from "@/lib/api-contracts"
+import { getSeriesCoverage } from "@/lib/market-series"
+import { FRED_SERIES } from "@/lib/market-snapshot"
+import { REFERENCE_DRAWDOWNS } from "@/lib/ccpi/drawdowns"
 
 /**
  * Probes every route in lib/api-contracts.ts against its declared contract and
@@ -233,6 +236,26 @@ async function runAll(
   return results.sort((a, b) => a.path.localeCompare(b.path))
 }
 
+/**
+ * Per-series store coverage, with the consequence spelled out rather than left
+ * for the reader to work out: how many reference drawdowns each series can
+ * actually be scored against. A series with 800 points covers nothing, and
+ * "800 points stored" on its own reads like success.
+ */
+async function seriesCoverageReport() {
+  const rows = await Promise.all(FRED_SERIES.map((s) => getSeriesCoverage(`fred:${s.id}`)))
+  return rows.filter(Boolean).map((r) => {
+    const cov = r!.earliest ? REFERENCE_DRAWDOWNS.filter((d) => d.peak >= r!.earliest!).length : 0
+    return {
+      series: r!.series,
+      points: r!.points,
+      earliest: r!.earliest,
+      latest: r!.latest,
+      drawdownsTestable: `${cov} of ${REFERENCE_DRAWDOWNS.length}`,
+    }
+  })
+}
+
 export async function GET(request: NextRequest) {
   if (!(await isAuthenticated())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -292,6 +315,12 @@ export async function GET(request: NextRequest) {
     keys,
     coverage: contractCoverage(),
     security: securityPosture(),
+    // What the store actually HOLDS, per series (CCPI Phase 1). A backfill
+    // reports rows written, which an upsert over the same 800 days inflates to
+    // look identical to a 25-year load. `earliest` is the number that decides
+    // which reference drawdowns are testable, so it is reported beside a count
+    // of exactly that.
+    seriesCoverage: await seriesCoverageReport(),
   })
 }
 
