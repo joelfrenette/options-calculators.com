@@ -27,6 +27,10 @@ const STALENESS_DAYS: Record<string, number> = {
   BAMLH0A0HYM2: 7,
   DTWEXBGS: 7,
   RRPONTSYD: 7,
+  // Daily, and the market-snapshot cron writes both. A stale VIX is worse than
+  // no VIX, so keep the gate tight (P6-31b).
+  VIXCLS: 7,
+  VXVCLS: 7,
   // Discontinued Jan 2022 — FRED's own latest observation is that old, and the
   // live path serves it too. No staleness gate, else the store could never win.
   TEDRATE: Number.POSITIVE_INFINITY,

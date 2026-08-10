@@ -386,7 +386,7 @@ async function fetchMarketData() {
     buffettResult,
     putCallResult,
     aaiiBullishResult,
-    vixResult,
+    vixAiResult,
     nvidiaPriceResult,
     soxIndexResult,
     ismPMIResult,
@@ -403,6 +403,18 @@ async function fetchMarketData() {
     getSOXIndex(),
     getISMPMI(),
   ])
+
+  // Spot VIX is a PUBLISHED NUMBER, and the site already stores it: the
+  // market-snapshot cron writes FRED VIXCLS daily. Asking an LLM to recall
+  // today's VIX — which is what the fallback chain did whenever the term
+  // structure fetch failed — is guessing at a fact, and `isPlausible` waves
+  // through anything between 5 and 100 (P6-31b). Read the store first; the AI
+  // chain is now the third choice, behind two real sources.
+  const vixFromStore = await fredLatestFromStore("VIXCLS")
+  const vixResult = vixFromStore ? { value: vixFromStore.value, source: "fred-store" as const } : vixAiResult
+  if (vixFromStore) {
+    console.log(`[v0] ✓ VIX from FRED store: ${vixFromStore.value} (${vixFromStore.day})`)
+  }
 
   console.log("[v0] AI Fallback Summary:")
   console.log(`  Shiller CAPE: ${shillerCAPEResult.value} (${shillerCAPEResult.source})`)
@@ -520,7 +532,8 @@ async function fetchMarketData() {
       qqqBollinger: qqqLive ? "live" : "baseline",
       // Spot VIX: real FRED value when the term-structure fetch is live,
       // else the AI-fallback estimate.
-      vix: vixTermLive ? "live" : aiTier(vixResult.source),
+      // Store-sourced VIX is a real FRED observation, not an estimate.
+      vix: vixTermLive || vixResult.source === "fred-store" ? "live" : aiTier(vixResult.source),
       vixTermStructure: vixTermLive ? "live" : "baseline",
     },
     riskAppetite: {
