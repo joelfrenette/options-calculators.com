@@ -29,6 +29,13 @@ presentation only. These are the exact units the CCPI_DESIGN Phase 2 restructure
 reassigns (Momentum → Coincident, Valuation → Vulnerability), which is why they were
 extracted ahead of it.
 
+### `trigger-section.tsx`
+The Phase 2 TRIGGER section (CCPI_DESIGN.md §7a): one row per signal from
+`/api/ccpi-signals` — state, reading and date, meaning, and record ("lead: untested"
+until the backtest confirms one). The header is a count, never a composite; NO DATA is
+never rendered as QUIET; row order is the API's (grouped by data source), never
+"importance".
+
 ### `tooltip-copy.ts`
 `getSignalTooltip` and `getCrashAmplifierTooltip` — the long-form explanatory strings for
 warning signals and crash amplifiers, kept out of the component files so the dashboard

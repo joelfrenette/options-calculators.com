@@ -20,6 +20,7 @@ import { RefreshButton } from "./ui/refresh-button" // Assuming RefreshButton is
 import { DataLoadGate } from "@/components/data-load-gate"
 
 import { getSignalTooltip, getCrashAmplifierTooltip } from "@/components/ccpi/tooltip-copy"
+import { TriggerSection } from "@/components/ccpi/trigger-section"
 import { PillarMomentum } from "@/components/ccpi/pillar-momentum"
 import { PillarRiskAppetite } from "@/components/ccpi/pillar-risk-appetite"
 import { PillarValuation } from "@/components/ccpi/pillar-valuation"
@@ -292,6 +293,41 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
             </div>
             <RefreshButton onClick={fetchCCPIData} isLoading={isRefreshing} />
           </div>
+        </div>
+
+        {/* Phase 2 (CCPI_DESIGN §7a): Trigger / Vulnerability / Coincident, in this order. */}
+        <TriggerSection />
+
+        {/* VULNERABILITY — context, visually quieter, explicitly not a timing signal. */}
+        <div className="space-y-2">
+          <h3 className="text-lg font-semibold text-gray-700">Vulnerability — context, not a timing signal</h3>
+          <p className="text-xs text-gray-500 italic">
+            This has been elevated since 2017. It describes how far a fall could go, not when.
+          </p>
+          <Accordion type="multiple" defaultValue={["pillar3"]} className="space-y-4">
+            <PillarValuation
+              score={pillarScores.valuation}
+              prov={data.provenance?.valuation}
+              indicators={indicators}
+              tooltipsEnabled={tooltipsEnabled}
+            />
+          </Accordion>
+        </div>
+
+        {/* COINCIDENT — collapsed by default, clearly labelled non-predictive. */}
+        <div className="space-y-2">
+          <h3 className="text-lg font-semibold text-gray-500">Coincident indicators</h3>
+          <p className="text-xs text-gray-500 italic">
+            These confirm a decline that has started. They do not predict one.
+          </p>
+          <Accordion type="multiple" className="space-y-4">
+            <PillarMomentum
+              score={pillarScores.momentum}
+              prov={data.provenance?.momentum}
+              indicators={indicators}
+              tooltipsEnabled={tooltipsEnabled}
+            />
+          </Accordion>
         </div>
 
         {/* Main CCPI Score Card */}
@@ -728,24 +764,10 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
           </CardContent>
         </Card>
 
-        <Accordion type="multiple" defaultValue={["pillar1", "pillar2", "pillar3", "pillar4"]} className="space-y-4">
-          <PillarMomentum
-            score={pillarScores.momentum}
-            prov={data.provenance?.momentum}
-            indicators={indicators}
-            tooltipsEnabled={tooltipsEnabled}
-          />
-
+        <Accordion type="multiple" defaultValue={["pillar2", "pillar4"]} className="space-y-4">
           <PillarRiskAppetite
             score={pillarScores.riskAppetite}
             prov={data.provenance?.riskAppetite}
-            indicators={indicators}
-            tooltipsEnabled={tooltipsEnabled}
-          />
-
-          <PillarValuation
-            score={pillarScores.valuation}
-            prov={data.provenance?.valuation}
             indicators={indicators}
             tooltipsEnabled={tooltipsEnabled}
           />
