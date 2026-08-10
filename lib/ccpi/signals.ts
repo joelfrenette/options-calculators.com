@@ -111,6 +111,48 @@ function ratioSignal(numerator: string, denominator: string, threshold: number, 
   }
 }
 
+/**
+ * Fires when a rising index is being carried by fewer and fewer names.
+ *
+ * The classic topping tell, and the one candidate with prior support that the
+ * 2026-08-10 run could not test: an index at or near its highs while the share
+ * of members above their 200-day average falls. Both halves are required —
+ * breadth falling in a falling market is not divergence, it is just a decline.
+ *
+ * NOT a FRED series. `index` comes from stored closes (SPY) and `breadthPct`
+ * from `breadth_daily`, so wiring it needs a data path the other signals do
+ * not use. Until that exists and ~2 years of breadth has accumulated, this
+ * reports nothing — which the lead-time scorer will state as
+ * `insufficient-history` rather than a quiet zero.
+ */
+export function breadthDivergence(
+  index: readonly SeriesPoint[],
+  breadthPct: readonly SeriesPoint[],
+  opts: { lookbackDays?: number; nearHighPct?: number; breadthDropPts?: number } = {},
+): SignalObservationOut[] {
+  const lookback = opts.lookbackDays ?? 60
+  const nearHigh = opts.nearHighPct ?? 2 // within 2% of the lookback high
+  const drop = opts.breadthDropPts ?? 5 // breadth down 5 percentage points
+
+  const breadthByDay = new Map(breadthPct.map((p) => [p.day, p.value]))
+  return index.map((p, i) => {
+    const b = breadthByDay.get(p.day)
+    // Same day only. A ratio or comparison across two dates is not a reading
+    // (S-11, and the CPI gap month before it).
+    if (b === undefined || !Number.isFinite(p.value) || !Number.isFinite(b)) return { day: p.day, firing: null }
+
+    const window = index.slice(Math.max(0, i - lookback), i + 1)
+    if (window.length < lookback) return { day: p.day, firing: null }
+    const priorBreadth = breadthByDay.get(window[0].day)
+    if (priorBreadth === undefined || !Number.isFinite(priorBreadth)) return { day: p.day, firing: null }
+
+    const high = Math.max(...window.map((w) => w.value))
+    const indexNearHigh = high > 0 && ((high - p.value) / high) * 100 <= nearHigh
+    const breadthFalling = priorBreadth - b >= drop
+    return { day: p.day, firing: indexNearHigh && breadthFalling }
+  })
+}
+
 // ---------------------------------------------------------------------------
 // The registry
 // ---------------------------------------------------------------------------

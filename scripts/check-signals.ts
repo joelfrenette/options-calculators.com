@@ -12,7 +12,7 @@
  * is satisfied rather than quietly reporting "no".
  */
 
-import { SIGNALS, evaluableSignals, type SeriesPoint } from "../lib/ccpi/signals.ts"
+import { SIGNALS, evaluableSignals, breadthDivergence, type SeriesPoint } from "../lib/ccpi/signals.ts"
 
 let failures = 0
 function check(name: string, passed: boolean, detail = "") {
@@ -104,6 +104,33 @@ check(
 check(
   "contango does not fire",
   vix.evaluate({ VXVCLS: [{ day: "2026-08-06", value: 18 }], VIXCLS: [{ day: "2026-08-06", value: 15.15 }] })[0].firing === false,
+)
+
+// ---------------------------------------------------------------------------
+// 6. Breadth divergence — both halves required, never one.
+// ---------------------------------------------------------------------------
+const mk = (n, f) => Array.from({ length: n }, (_, i) => ({
+  day: new Date(Date.parse("2020-01-01T00:00:00Z") + i * 86400000).toISOString().slice(0, 10),
+  value: f(i),
+}))
+// Index grinding to new highs while breadth falls 80 -> 50: the topping tell.
+const divergent = breadthDivergence(mk(80, (i) => 100 + i), mk(80, (i) => 80 - i * 0.5))
+check("a rising index on falling breadth fires", divergent[79].firing === true)
+// Both rising: healthy, must not fire.
+check(
+  "a rising index on RISING breadth does not fire",
+  breadthDivergence(mk(80, (i) => 100 + i), mk(80, (i) => 50 + i * 0.3))[79].firing === false,
+)
+// Both falling: a decline, not a divergence. This is the one a naive
+// implementation gets wrong — breadth is falling, but the index is not at a high.
+check(
+  "a FALLING index on falling breadth does not fire — that is a decline, not a warning",
+  breadthDivergence(mk(80, (i) => 200 - i), mk(80, (i) => 80 - i * 0.5))[79].firing === false,
+)
+check("days before the lookback is satisfied are null", divergent[10].firing === null)
+check(
+  "a missing breadth reading is null, never false",
+  breadthDivergence(mk(80, (i) => 100 + i), mk(80, (i) => 80 - i * 0.5).filter((_, i) => i !== 79))[79].firing === null,
 )
 
 console.log(failures === 0 ? "\nAll signal checks passed." : `\n${failures} CHECK(S) FAILED`)
