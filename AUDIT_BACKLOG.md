@@ -276,7 +276,7 @@ Volume, Price Stability, IV Skew, conviction badges) now render `—` because
 nothing sources them. **This needs a preview-deploy check before it reaches
 users** — see P2 verification note.
 
-_Not yet fixed:_ S-2 … S-20 except S-1, and P0-1 … P0-7, P1-11, P1-13, P1-14.
+_Not yet fixed (CORRECTED 2026-08-10 — the previous wording was materially wrong and is what a planning session would have read):_ **still real:** S-11, S-14, and P0-1 … P0-7, P1-11, P1-13, P1-14. **Already done:** S-2, S-6, S-12, S-13, S-15, S-19, S-20. **Partial:** S-5 (21 → 10 TypeScript errors). **Unverifiable as written:** S-7, S-8, S-9, S-10, S-16, S-17, S-18 — every one cites `components/wheel-scanner.tsx` line numbers the Wave-2 split invalidated; re-locate them in `components/scanner/*` before calling any of them open or closed.
 
 Fixed in the Phase 3 commit (`audit Phase 3: …`):
 
@@ -405,3 +405,25 @@ Size-budget pass, 2026-08-09:
 |---|---|---|---|
 | S-6 (ccpi-dashboard) | P3 | **components/ccpi-dashboard.tsx 3,196 → 2,877 lines.** Three purely mechanical extractions, no behaviour touched: `components/ccpi/indicator-primitives.tsx` (tooltip, gradient bar, both indicator rows), `components/ccpi/tooltip-copy.ts` (the canary and crash-amplifier copy — 110 lines of string maps, no JSX, no imports) and `components/ccpi/pillar-bits.tsx` (provenance line + the null-safe pillar score). **Still 2,277 over budget**; the remaining bulk is the component's JSX body, which needs the state graph traced before it can be cut safely and is not something to do without a browser to verify in. | Verbatim audit: each extracted block diffed against the original at HEAD and is **byte-identical apart from the added `export ` keyword**. typecheck 10 (unchanged), formulas 159/159, contracts 59/59. |
 | NEW P6-29 | P2 | **An entire directory of duplicate CCPI components that nothing imports.** `components/ccpi/` already held `ccpi-indicator.tsx`, `ccpi-boolean-indicator.tsx`, `ccpi-gradient-bar.tsx`, `ccpi-indicator-tooltip.tsx`, `ccpi-canary-card.tsx`, `ccpi-pillar-section.tsx`, `ccpi-status-badge.tsx` and an `index.ts` barrel — an earlier extraction that was **never wired up**, while `ccpi-dashboard.tsx` went on using its own private copies of the same components. Nothing outside the directory imports the barrel; the only external referrer is `components/ccpi-indicator.tsx`, which is itself a re-export shim that nothing imports either. So it is dead code that has been quietly diverging from the live copies — and the gradient bar in particular already differs (the unused copy carries a "No data" guard the live one did not). **Found while doing the S-6 split**, which is the only reason it surfaced: I nearly added a third copy. **NOT deleted this turn** — removing eight files deserves its own pass with a real consumer check rather than being tacked onto a line-count exercise. | `grep` for the barrel and for each module across the tree, excluding the directory itself. |
+
+---
+
+## Session close — 2026-08-10
+
+**PRODUCTION = STAGING = `2ee5a46`.** 15 commits fast-forwarded to `main` and verified
+live: the FOMC tab reports `predictionReliability: full` with an empty `unavailable[]`,
+the yield curve reads Normal (10Y 4.69 / 2Y 4.25, spread +0.44), and CPI serves
+3.46 / 2.57 — the figures that were 2.9 / 3.2 from a hardcoded constant two days ago.
+
+Supabase migrations **0001–0010** applied. Checks: typecheck **10** (baseline was 13),
+formulas **159/159**, contracts **59/59**, remediation **31/31** — run individually,
+because `pnpm check` chains on typecheck and short-circuits before the other three.
+
+**Dormant until the owner runs `/api/cron/market-snapshot` once:** stored OHLCV bars,
+SPY/QQQ capture, and the store-first VIX term structure. All three are deployed and
+inert; nothing on the site changes until that job runs.
+
+**Open, in priority order:** P6-29 (delete the eight dead CCPI duplicate components
+nothing imports), S-11 and S-14, re-locating the seven stale wheel-scanner references,
+and the 16 modules still over the 600-line budget. Ledger stands at 98/336 cells with
+`fb` and `size` at 0/42 and `mob` needing a real device.
