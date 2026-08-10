@@ -83,6 +83,17 @@ export interface LeadTimeResult {
   hitEventIds: string[]
   missedEventIds: string[]
   hitRate: number | null
+  /**
+   * Of every episode this signal produced, the share that preceded an event.
+   *
+   * THE NUMBER THAT MATTERS, and the one the first backtest was missing. Hit
+   * rate answers "how many drawdowns did it catch"; precision answers "when it
+   * fired, was it right". A signal firing twice a year will precede most things
+   * by coincidence inside a six-month window and post a flattering hit rate on
+   * no information at all — which is exactly what vix-backwardation did on the
+   * 2026-08-10 run: 3 of 8 events caught, 43 false alarms, 6.5% precision.
+   */
+  precision: number | null
   medianLeadDays: number | null
   falsePositives: number
   falsePositivesPerDecade: number | null
@@ -121,6 +132,7 @@ export function scoreLeadTime(
     hitEventIds: [],
     missedEventIds: [],
     hitRate: null,
+    precision: null,
     medianLeadDays: null,
     falsePositives: 0,
     falsePositivesPerDecade: null,
@@ -201,6 +213,7 @@ export function scoreLeadTime(
     hitEventIds: hits.map((h) => h.id),
     missedEventIds: covered.filter((e) => !hits.some((h) => h.id === e.id)).map((e) => e.id),
     hitRate: hits.length / covered.length,
+    precision: episodes.length > 0 ? hits.length / episodes.length : null,
     medianLeadDays: median(hits.map((h) => h.leadDays)),
     falsePositives,
     falsePositivesPerDecade: decades > 0 ? Math.round((falsePositives / decades) * 10) / 10 : null,
@@ -220,6 +233,32 @@ export function scoreLeadTime(
  */
 export function proposedWeight(r: LeadTimeResult): number | null {
   if (r.verdict !== "scored" || r.hitRate === null) return null
-  const falseRate = (r.falsePositivesPerDecade ?? 0) + 1 // +1 so a perfect record is finite
-  return Math.round((r.hitRate / falseRate) * 1000) / 1000
+  // Hit rate ALONE ranked a signal that fires twice a year above one that fires
+  // twice a decade, because firing constantly catches things by coincidence.
+  // Multiplying by precision prices that in: a signal is worth its coverage
+  // times its reliability, and a noisy one collapses however much it "caught".
+  const precision = r.precision ?? 0
+  return Math.round(r.hitRate * precision * 1000) / 1000
+}
+
+/**
+ * Score the same signal across several lead windows.
+ *
+ * A window is not a neutral parameter — it encodes what counts as a usable
+ * warning, and a signal documented to lead by 12-18 months CANNOT hit inside a
+ * 180-day window however well it works. Testing one window and concluding is
+ * the mistake; testing several and reading how precision moves is the
+ * measurement. Curve inversion is the case in point: its own hypothesis claims
+ * 12-18 months and the first run only ever asked it about six.
+ */
+export function sweepLeadWindows(
+  observations: readonly SignalObservation[],
+  events: readonly ReferenceEvent[],
+  windows: readonly number[] = [90, 180, 365, 540],
+  options: Omit<LeadTimeOptions, "maxLeadDays"> = {},
+): Array<{ maxLeadDays: number; result: LeadTimeResult }> {
+  return windows.map((maxLeadDays) => ({
+    maxLeadDays,
+    result: scoreLeadTime(observations, events, { ...options, maxLeadDays }),
+  }))
 }

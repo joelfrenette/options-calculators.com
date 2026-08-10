@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { isAuthenticated } from "@/lib/auth"
 import { getSeriesHistory } from "@/lib/market-series"
 import { SIGNALS, evaluableSignals, type SeriesPoint } from "@/lib/ccpi/signals"
-import { scoreLeadTime, proposedWeight } from "@/lib/ccpi/lead-time"
+import { scoreLeadTime, proposedWeight, sweepLeadWindows } from "@/lib/ccpi/lead-time"
 import { REFERENCE_DRAWDOWNS } from "@/lib/ccpi/drawdowns"
 
 export const dynamic = "force-dynamic"
@@ -65,7 +65,22 @@ export async function GET() {
       falsePositives: result.falsePositives,
       falsePositivesPerDecade: result.falsePositivesPerDecade,
       medianEpisodeDays: result.medianEpisodeDays,
+      // When it fired, was it right. Hit rate without this ranked a signal
+      // firing twice a year above one firing twice a decade.
+      precision: result.precision,
       proposedWeight: proposedWeight(result),
+      // The same signal at four windows. A signal documented to lead by 12-18
+      // months cannot hit inside 180 days however well it works, so one window
+      // is a measurement of the window as much as of the signal.
+      sweep: sweepLeadWindows(observations, events).map((w) => ({
+        maxLeadDays: w.maxLeadDays,
+        verdict: w.result.verdict,
+        coveredEvents: w.result.coveredEventIds.length,
+        hitRate: w.result.hitRate,
+        precision: w.result.precision,
+        medianLeadDays: w.result.medianLeadDays,
+        falsePositivesPerDecade: w.result.falsePositivesPerDecade,
+      })),
     }
   })
 

@@ -12,7 +12,7 @@
  * that fires constantly is punished rather than rewarded.
  */
 
-import { scoreLeadTime, proposedWeight, type SignalObservation } from "../lib/ccpi/lead-time.ts"
+import { scoreLeadTime, proposedWeight, sweepLeadWindows, type SignalObservation } from "../lib/ccpi/lead-time.ts"
 
 let failures = 0
 function check(name: string, passed: boolean, detail = "") {
@@ -139,6 +139,47 @@ const lagging = scoreLeadTime(
 check("a signal that fires only after the peak hits nothing", lagging.hitEventIds.length === 0)
 check("...and every one of those episodes is a false positive", lagging.falsePositives === lagging.episodes.length)
 check("...so its weight collapses", (proposedWeight(lagging) ?? 1) === 0, String(proposedWeight(lagging)))
+
+// ---------------------------------------------------------------------------
+// 7. PRECISION — the number the first real backtest was missing.
+// ---------------------------------------------------------------------------
+check("a clean signal has precision 1", perfect.precision === 1, String(perfect.precision))
+check(
+  "a noisy signal's precision collapses even at a 100% hit rate",
+  noisy.precision !== null && noisy.precision < 0.45,
+  String(noisy.precision),
+)
+check("a lagging signal has precision 0", lagging.precision === 0, String(lagging.precision))
+check("precision is null when nothing scored", shortWindow.precision === null)
+
+// The ranking failure that prompted this: hit rate alone rewarded frequency.
+check(
+  "weight now prices in reliability, not just coverage",
+  (proposedWeight(noisy) ?? 1) < (proposedWeight(perfect) ?? 0),
+  `${proposedWeight(noisy)} vs ${proposedWeight(perfect)}`,
+)
+
+// ---------------------------------------------------------------------------
+// 8. The window sweep — a signal cannot hit inside a window shorter than its
+//    own lead, which is why testing one window and concluding is a mistake.
+// ---------------------------------------------------------------------------
+const longLead = series("2010-01-01", 2800, [
+  ["2009-12-01", "2009-12-20"], // ~400 days before e1 — invisible at 180
+  ["2011-11-01", "2011-11-20"], // ~400 days before e2
+  ["2013-11-01", "2013-11-20"],
+  ["2015-11-01", "2015-11-20"],
+])
+const sweep = sweepLeadWindows(longLead, EVENTS, [90, 180, 365, 540])
+check("the sweep returns one result per window", sweep.length === 4)
+check("windows are reported alongside their results", sweep.map((x) => x.maxLeadDays).join(",") === "90,180,365,540")
+const at180 = sweep.find((x) => x.maxLeadDays === 180)!.result
+const at540 = sweep.find((x) => x.maxLeadDays === 540)!.result
+check("a 400-day-lead signal scores ZERO at a 180-day window", at180.hitRate === 0, String(at180.hitRate))
+check("...and is found at 540", (at540.hitRate ?? 0) > 0, String(at540.hitRate))
+check(
+  "...which is the whole argument for sweeping rather than picking one window",
+  (at540.hitRate ?? 0) > (at180.hitRate ?? 1),
+)
 
 console.log(failures === 0 ? "\nAll lead-time checks passed." : `\n${failures} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)
