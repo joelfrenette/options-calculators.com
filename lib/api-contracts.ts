@@ -405,6 +405,9 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     budgetMs: 300000,
     tabs: [],
   },
+  // Phase 2 Trigger data (CCPI_DESIGN.md §7a). Public and read-only. Reports
+  // signal states only — never a score, because none is earned yet.
+  { path: "/api/ccpi-signals", method: "GET", schema: anyObject, budgetMs: 60000, tabs: ["ccpi"] },
   // CCPI lead-time backtest (CCPI_DESIGN.md §6). Read-only diagnostic: it
   // scores signals against the reference drawdowns and writes nothing. Slow
   // because it pulls every stored series it needs.

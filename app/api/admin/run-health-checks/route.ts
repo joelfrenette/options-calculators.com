@@ -371,7 +371,7 @@ function contractCoverage() {
     "/api/admin/backup", "/api/admin/budget-guard", "/api/admin/ccpi-backtest",
     "/api/admin/run-health-checks",
     "/api/admin/usage",
-    "/api/ai-status", "/api/apify-proxy",
+    "/api/ai-status", "/api/apify-proxy", "/api/ccpi-signals",
     "/api/auth/login", "/api/auth/logout", "/api/auth/reset-password",
     "/api/breadth", "/api/ccpi",
     "/api/ccpi/cache", "/api/ccpi/chat", "/api/ccpi/executive-summary", "/api/ccpi/history",
