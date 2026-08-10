@@ -35,7 +35,13 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url)
-  const backfillDays = Math.min(320, Math.max(0, Number.parseInt(url.searchParams.get("backfill") || "0", 10) || 0))
+  // 320 raised to 9,000 to match retention (migration 0011) and the
+  // market-snapshot route. This is the route that computes breadth BACKWARDS
+  // over stored closes, so a 320-day cap put a hard ceiling on how far the
+  // breadth-divergence signal could ever be backtested — regardless of how
+  // much close history was bought. Fourth silent clamp found today.
+  const requestedBackfill = Math.max(0, Number.parseInt(url.searchParams.get("backfill") || "0", 10) || 0)
+  const backfillDays = Math.min(9000, requestedBackfill)
 
   try {
     const closes = await runClosesSnapshot(polygonKey, backfillDays)
@@ -50,6 +56,12 @@ export async function GET(request: Request) {
       universeAsOf: closes.universeAsOf,
       tickersStored: closes.tickersStored,
       failedTickers: closes.failedTickers,
+      // Report the clamp instead of applying it silently. Four caps found on
+      // 2026-08-10 truncated a request and returned ok:true, which reads as
+      // success and sends the caller debugging the wrong thing.
+      ...(requestedBackfill > backfillDays
+        ? { backfillClamped: { requested: requestedBackfill, applied: backfillDays } }
+        : {}),
       breadth,
     })
   } catch (err) {
