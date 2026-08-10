@@ -178,7 +178,17 @@ Every ID above was fetched from FRED and its actual history depth recorded. This
    backtested against 2008 or 2020 at all. That leaves the backtestable core as **NFCI/ANFCI
    (1971), T10Y3M (1982) and ICSA (1967)** — still enough to cover all four reference drawdowns,
    but a materially thinner Gauge B than §5 assumed.
-   **Attempted the keyed check and could not run it locally:** `FRED_API_KEY` is present in
+   **ANSWERED 2026-08-10, and it is the bad branch.** The keyed API returns
+   `count: 793`, first observation **2023-08-11** — identical to the public CSV. **The three-year
+   cap is the ICE licence, not an endpoint quirk.** Therefore: **credit spreads CANNOT be
+   backtested.** No 2008, no 2020, no 2022 top. `hy-spread-widening` is demoted to display-only
+   — it can show a current reading and can never earn weight, because nothing can measure its
+   lead time. **Gauge B now rests on NFCI/ANFCI (1971), T10Y3M (1982), STLFSI4 (1993) and ICSA
+   (1967)** — still covering all four reference drawdowns, but on financial-conditions and
+   labour-market evidence rather than credit. If credit lead time is ever wanted, it needs a
+   paid source with history, which is a budget question (§8 decision 5: bring the measured case
+   and the cost).
+   *Original note, kept because it explains a real local-environment defect:* `FRED_API_KEY` is present in
    `.env.local` but **empty** (declared, zero length), so the API returns 400 from this machine.
    The key lives in Vercel — production serves real FRED data — which means this question can
    only be settled from an environment that holds it. **This is an owner action of about thirty

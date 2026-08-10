@@ -153,7 +153,8 @@ export const SIGNALS: readonly SignalDefinition[] = [
     label: "Credit spreads widening fast",
     requires: ["BAMLH0A0HYM2"],
     meaning: "High-yield spreads have widened more than 50bp in 20 days.",
-    hypothesis: "Velocity, not level: credit turning is the classic precursor. NOTE the ICE series may be capped at 3 years (CCPI_DESIGN.md §5), which would make this untestable.",
+    hypothesis:
+      "UNTESTABLE — display only. Velocity rather than level is the right shape, and credit turning is the classic precursor, but the ICE licence caps every BofA series at ~3 years (first observation 2023-08-11, confirmed against the KEYED API on 2026-08-10). There is no 2008, 2020 or 2022 to measure a lead time against, so this signal can show a reading and must never earn weight.",
     evaluate: velocitySignal("BAMLH0A0HYM2", 20, 0.5, "rise"),
   },
   {
