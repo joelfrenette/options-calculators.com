@@ -264,12 +264,87 @@ Phased so the site is never in a broken half-state:
   lead-time table for every candidate.
 - **Phase 2 — restructure.** Split the page into Trigger / Vulnerability / Coincident.
   Trigger initially shows the measured signals **unscored**, exactly as E-6a did for breadth.
+  Specified in §7a below.
 - **Phase 3 — score.** Turn on weights derived in step 5, each with its record beside it.
 - **Phase 4 — retire.** Remove the old composite, or keep it clearly labelled as "legacy
   conditions score" if it is still wanted for continuity.
 
 The audit's data-integrity work is a prerequisite for all of this and is already done: without
 P6-31/32/34 the backtest would have been measuring LLM guesses and fallback constants.
+
+### 7a. Phase 2 in detail — the page, before anything scores
+
+Phase 1 is code-complete: retention at 9,000 days, seven signals defined, the lead-time scorer
+and its 25 checks, the reference drawdowns, `/api/admin/ccpi-backtest`, and a per-series
+coverage readout. Phase 2 is the **only** phase that changes what a visitor sees, and it changes
+it before a single weight exists. That ordering is deliberate — see "why unscored first" below.
+
+#### Three sections, in this order
+
+**1. TRIGGER** — the actionable one, at the top.
+
+Each evaluable signal gets one row:
+
+```
+●  Financial conditions tighter than average        QUIET      NFCI −0.529 · 31 Jul
+   Chicago Fed index above zero                                lead: untested
+●  10Y-3M curve inverted                            QUIET      +0.78 · 7 Aug
+●  Credit spreads widening fast                     NO DATA    needs 20-day history
+```
+
+Every row carries four things and never fewer: **state** (firing / quiet / no data), **the
+reading and its date**, **what firing would mean** in one line, and **its record** — which
+during Phase 2 reads `lead: untested` for every signal, because it is. A row missing its record
+is a row asserting something it has not earned.
+
+The section header states the count and nothing more: `TRIGGER — 0 of 7 firing`. **No composite
+number, no gauge, no colour-graded dial.** There is nothing to compute a number from yet, and
+inventing a 0-100 reading from unweighted signals would be precisely the defect this redesign
+exists to remove, reintroduced at the last moment for the sake of a familiar-looking widget.
+
+**2. VULNERABILITY** — context, visually quieter, explicitly not a timing signal.
+
+Valuation, concentration, margin debt. Carries a permanent one-line caveat: *"This has been
+elevated since 2017. It describes how far a fall could go, not when."* Today's inputs are
+largely unsourced (P6-34 removed the LLM guesses), so most of it renders "—" — which is honest
+and, for once, also instructive: it shows the reader how thin this evidence actually is.
+
+**3. COINCIDENT** — collapsed by default, clearly labelled.
+
+QQQ SMA breaches, consecutive down days, spot VIX level, VIX term structure. These tell you a
+decline is **already underway**. Useful for confirmation, worthless for warning, and mixing them
+into the Trigger list is exactly how the current CCPI came to be 35% coincident. The header says
+so in plain words: *"These confirm a decline that has started. They do not predict one."*
+
+#### Why unscored first, and not "just briefly"
+
+E-6a shipped market breadth unscored and it was the right call: the indicator was visible, its
+provenance was legible, and nothing in the headline number depended on a claim nobody had
+tested. Phase 2 repeats that deliberately.
+
+The risk being managed is specific. Once a number exists on screen, it acquires readers and
+screenshots and expectations, and removing it later becomes a negotiation rather than a
+correction. Shipping the sections **without** a score means the walk-forward results in Phase 3
+can freely delete signals — which they will, since the whole point is that some fail — without
+anyone having to defend a number that was never justified.
+
+#### What Phase 2 must NOT do
+
+- **No score, no gauge, no 0-100 anything.** Not even "provisional".
+- **No signal shown without its record.** `lead: untested` is a fact; a blank column is a lie by
+  omission.
+- **No inferring a state from a missing reading.** A signal with no data reads `NO DATA`, never
+  `QUIET`. This is the P6-30 defect (a dead feed rendering as "Neutral") and it would be
+  unforgivable to reproduce it in the component built to replace that thinking.
+- **No reordering rows by "importance".** Until the backtest has spoken there is no importance,
+  and an ordering implies one. Alphabetical, or grouped by data source.
+
+#### Definition of done for Phase 2
+
+The page shows three sections; every Trigger row shows state, reading, date, meaning and record;
+no number anywhere claims to aggregate them; the Coincident section is labelled as
+non-predictive; and a reader who knows nothing about the redesign can tell, from the page alone,
+which signals are measured, which are untested, and which have no data at all.
 
 ---
 
