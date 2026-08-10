@@ -22,6 +22,13 @@ states how much of a pillar's 100-point weight actually scored and how much was 
 versus AI-estimated; `PillarScore` renders an explicit "Insufficient data" when the score
 is `null`, never `0` or `NaN`.
 
+### `pillar-momentum.tsx`, `pillar-risk-appetite.tsx`, `pillar-valuation.tsx`, `pillar-macro.tsx`
+The four pillar accordion sections, lifted verbatim from the dashboard. Each takes
+`{ score, prov, indicators, tooltipsEnabled }` and renders one `AccordionItem` —
+presentation only. These are the exact units the CCPI_DESIGN Phase 2 restructure
+reassigns (Momentum → Coincident, Valuation → Vulnerability), which is why they were
+extracted ahead of it.
+
 ### `tooltip-copy.ts`
 `getSignalTooltip` and `getCrashAmplifierTooltip` — the long-form explanatory strings for
 warning signals and crash amplifiers, kept out of the component files so the dashboard
