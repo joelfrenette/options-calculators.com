@@ -34,8 +34,13 @@ export async function GET(request: Request) {
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
   const url = new URL(request.url)
-  const closesBackfill = Math.min(320, Math.max(0, Number.parseInt(url.searchParams.get("closesBackfill") || "0", 10) || 0))
-  const fredBackfill = Math.min(800, Math.max(0, Number.parseInt(url.searchParams.get("fredBackfill") || "0", 10) || 0))
+  // Caps raised to match retention (migration 0011 keeps 9,000 days) and the
+  // fred-snapshot route (20,000). They were 320 and 800 — set when the deepest
+  // consumer was a 200-day moving average — and both silently truncated a
+  // deeper request instead of refusing it, which is how a backfill "succeeds"
+  // and leaves a partial history that looks complete.
+  const closesBackfill = Math.min(9000, Math.max(0, Number.parseInt(url.searchParams.get("closesBackfill") || "0", 10) || 0))
+  const fredBackfill = Math.min(20000, Math.max(0, Number.parseInt(url.searchParams.get("fredBackfill") || "0", 10) || 0))
 
   const polygonKey = resolveApiKey("POLYGON_API_KEY")
   const fredKey = resolveApiKey("FRED_API_KEY")
