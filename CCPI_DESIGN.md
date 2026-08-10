@@ -303,6 +303,16 @@ the window widens, because the base rate grows faster than precision. A wider
 net catches more events and proportionally more noise. Whatever information
 exists here is at **90 days**, not 12-18 months.
 
+**3. Selecting a parameter on data the test can see is not a test.** The
+walk-forward originally chose each signal's lead window from the *full-sample*
+sweep, then scored it out of sample at that window. `claims-rising` exposed it:
+its best lift across all six windows on fit data was **0.28** — never once
+beating chance — and it still returned a test lift of **2.41**. That is the
+window being picked because it happened to work later, dressed as validation.
+**A leaky gate is worse than no gate, because the output looks confirmed.**
+Window selection now uses the fit period alone. Any future hyperparameter —
+threshold, persistence, split date — must be chosen the same way.
+
 ### Assignment
 
 - **Trigger — two PROVISIONAL candidates, at 90 days only.** `curve-10y3m`
