@@ -8,6 +8,7 @@ import { fetchApifyYahooFinance as fetchApifyYahooFinanceUtil } from "@/lib/apif
 import { fetchFMPValuation } from "@/lib/fmp-valuation"
 
 import { PILLAR_WEIGHTS } from "@/lib/ccpi/constants"
+import { generateCanarySignals } from "@/lib/ccpi/canaries"
 import {
   type Tier,
   type PillarResult,
@@ -131,9 +132,57 @@ export async function GET() {
     console.log("  Total Bonus:", crashAmplifiers.totalBonus)
     console.log("  Final CCPI:", finalCCPI)
 
+    // Canaries live in lib/ccpi/canaries.ts and take nullable inputs only
+    // (P6-32). Resolving the tier here is the whole point: a baseline-tier
+    // value is the assembly layer's own constant, and a warning evaluated
+    // against a constant is not a warning about the market. Paired inputs
+    // (breach flag + proximity) share one tier, because they share one source.
     console.log("[v0] CCPI GET: Generating canary signals...")
-    const canaries = generateCanarySignals(data)
-    console.log("[v0] CCPI GET: Canary signals generated:", canaries.length)
+    const mt = data.tiers.momentum
+    const rt = data.tiers.riskAppetite
+    const vt = data.tiers.valuation
+    const kt = data.tiers.macro
+    const { canaries, suppressed: suppressedCanaries } = generateCanarySignals({
+      qqqDailyReturn: notBaseline(data.qqqDailyReturn, mt.qqqDailyReturn),
+      qqqConsecDown: notBaseline(data.qqqConsecDown, mt.qqqConsecDown),
+      qqqBelowSMA20: notBaseline(data.qqqBelowSMA20, mt.qqqSMA20),
+      qqqSMA20Proximity: notBaseline(data.qqqSMA20Proximity, mt.qqqSMA20),
+      qqqBelowSMA50: notBaseline(data.qqqBelowSMA50, mt.qqqSMA50),
+      qqqSMA50Proximity: notBaseline(data.qqqSMA50Proximity, mt.qqqSMA50),
+      qqqBelowSMA200: notBaseline(data.qqqBelowSMA200, mt.qqqSMA200),
+      qqqSMA200Proximity: notBaseline(data.qqqSMA200Proximity, mt.qqqSMA200),
+      qqqBelowBollinger: notBaseline(data.qqqBelowBollinger, mt.qqqBollinger),
+      qqqBollingerProximity: notBaseline(data.qqqBollingerProximity, mt.qqqBollinger),
+      vix: notBaseline(data.vix, mt.vix),
+      vixTermStructure: notBaseline(data.vixTermStructure, mt.vixTermStructure),
+      nvidiaMomentum: notBaseline(data.nvidiaMomentum, mt.nvidiaMomentum),
+      soxIndex: notBaseline(data.soxIndex, mt.soxIndex),
+      putCallRatio: notBaseline(data.putCallRatio, rt.putCallRatio),
+      // Already nullable at source (P6-18) — no tier gate needed.
+      fearGreedIndex: data.fearGreedIndex,
+      aaiiBullish: notBaseline(data.aaiiBullish, rt.aaiiBullish),
+      shortInterest: notBaseline(data.shortInterest, rt.shortInterest),
+      // Informational, outside the tier system; undefined means not fetched.
+      etfFlows: data.etfFlows ?? null,
+      spxPE: notBaseline(data.spxPE, vt.spxPE),
+      spxPS: notBaseline(data.spxPS, vt.spxPS),
+      buffettIndicator: notBaseline(data.buffettIndicator, vt.buffettIndicator),
+      qqqPE: notBaseline(data.qqqPE, vt.qqqPE),
+      mag7Concentration: notBaseline(data.mag7Concentration, vt.mag7Concentration),
+      shillerCAPE: notBaseline(data.shillerCAPE, vt.shillerCAPE),
+      equityRiskPremium: notBaseline(data.equityRiskPremium, vt.equityRiskPremium),
+      fedFundsRate: notBaseline(data.fedFundsRate, kt.fedFundsRate),
+      junkSpread: notBaseline(data.junkSpread, kt.junkSpread),
+      debtToGDP: notBaseline(data.debtToGDP, kt.debtToGDP),
+      yieldCurve: notBaseline(data.yieldCurve, kt.yieldCurve),
+      tedSpread: notBaseline(data.tedSpread, kt.tedSpread),
+      dxyIndex: notBaseline(data.dxyIndex, kt.dxyIndex),
+      ismPMI: notBaseline(data.ismPMI, kt.ismPMI),
+      fedReverseRepo: notBaseline(data.fedReverseRepo, kt.fedReverseRepo),
+    }, PILLAR_PCT)
+    console.log(
+      `[v0] CCPI GET: ${canaries.length} canary signals; ${suppressedCanaries.length} indicator(s) could not be evaluated`,
+    )
 
     // Certainty is strictly a data-quality number (live vs AI vs baseline
     // weight); the canary count no longer inflates it.
@@ -232,6 +281,10 @@ export async function GET() {
       },
       canaries,
       activeCanaries: canaries.filter((c) => c.severity === "high" || c.severity === "medium").length,
+      // Indicators whose input was baseline-tier, so no warning could be
+      // evaluated either way. A short canary list and a short canary list with
+      // eleven suppressed inputs are very different states (P6-32).
+      suppressedCanaries,
       totalIndicators: TOTAL_SCORED_INDICATORS,
       apiStatus: data.apiStatus,
       timestamp: new Date().toISOString(),
@@ -865,287 +918,3 @@ function generateWeeklySummary(
   }
 }
 
-function generateCanarySignals(data: Awaited<ReturnType<typeof fetchMarketData>>) {
-  const canaries: Array<{
-    signal: string
-    pillar: string
-    severity: "high" | "medium" | "low"
-    indicatorWeight: number
-    pillarWeight: number
-    impactScore: number
-  }> = []
-
-  const MOMENTUM = "Momentum & Technical"
-  const RISK = "Risk Appetite & Volatility"
-  const VALUATION = "Valuation & Market Structure"
-  const MACRO = "Macro"
-
-  const push = (
-    signal: string,
-    pillar: string,
-    severity: "high" | "medium",
-    indicatorWeight: number,
-    pillarPct: number,
-  ) => {
-    canaries.push({
-      signal,
-      pillar,
-      severity,
-      indicatorWeight,
-      pillarWeight: pillarPct,
-      impactScore: indicatorWeight * (pillarPct / 100),
-    })
-  }
-
-  // --- Pillar 1: Momentum & Technical (weights from MOMENTUM_WEIGHTS) ---
-
-  // QQQ Daily Return (12)
-  if (data.qqqDailyReturn <= -6) {
-    push(`QQQ crashed ${Math.abs(data.qqqDailyReturn).toFixed(1)}% - Momentum loss`, MOMENTUM, "high", 12, PILLAR_PCT.momentum)
-  } else if (data.qqqDailyReturn <= -3) {
-    push(`QQQ dropped ${Math.abs(data.qqqDailyReturn).toFixed(1)}% - Sharp decline`, MOMENTUM, "medium", 12, PILLAR_PCT.momentum)
-  }
-
-  // QQQ Consecutive Down Days (7)
-  if (data.qqqConsecDown >= 5) {
-    push(`${data.qqqConsecDown} consecutive down days - Trend break`, MOMENTUM, "high", 7, PILLAR_PCT.momentum)
-  } else if (data.qqqConsecDown >= 3) {
-    push(`${data.qqqConsecDown} consecutive down days`, MOMENTUM, "medium", 7, PILLAR_PCT.momentum)
-  }
-
-  // QQQ Below 20-Day SMA (7)
-  if (data.qqqBelowSMA20 && data.qqqSMA20Proximity >= 100) {
-    push("QQQ breached 20-day SMA - Short-term support lost", MOMENTUM, "high", 7, PILLAR_PCT.momentum)
-  } else if (data.qqqSMA20Proximity >= 50) {
-    push(`QQQ approaching 20-day SMA (${data.qqqSMA20Proximity.toFixed(0)}% proximity)`, MOMENTUM, "medium", 7, PILLAR_PCT.momentum)
-  }
-
-  // QQQ Below 50-Day SMA (10)
-  if (data.qqqBelowSMA50 && data.qqqSMA50Proximity >= 100) {
-    push("QQQ breached 50-day SMA - Medium-term trend broken", MOMENTUM, "high", 10, PILLAR_PCT.momentum)
-  } else if (data.qqqSMA50Proximity >= 50) {
-    push(`QQQ approaching 50-day SMA (${data.qqqSMA50Proximity.toFixed(0)}% proximity)`, MOMENTUM, "medium", 10, PILLAR_PCT.momentum)
-  }
-
-  // QQQ Below 200-Day SMA (15)
-  if (data.qqqBelowSMA200 && data.qqqSMA200Proximity >= 100) {
-    push("QQQ breached 200-day SMA - Long-term bull market in question", MOMENTUM, "high", 15, PILLAR_PCT.momentum)
-  } else if (data.qqqSMA200Proximity >= 50) {
-    push(`QQQ approaching 200-day SMA (${data.qqqSMA200Proximity.toFixed(0)}% proximity)`, MOMENTUM, "medium", 15, PILLAR_PCT.momentum)
-  }
-
-  // QQQ Below Bollinger Band (9)
-  if (data.qqqBelowBollinger && data.qqqBollingerProximity >= 100) {
-    push("QQQ breached lower Bollinger Band - Oversold territory", MOMENTUM, "high", 9, PILLAR_PCT.momentum)
-  } else if (data.qqqBollingerProximity >= 50) {
-    push(`QQQ approaching Bollinger Band (${data.qqqBollingerProximity.toFixed(0)}% proximity)`, MOMENTUM, "medium", 9, PILLAR_PCT.momentum)
-  }
-
-  // VIX (13)
-  if (data.vix > 35) {
-    push(`VIX at ${data.vix.toFixed(1)} - Extreme fear`, MOMENTUM, "high", 13, PILLAR_PCT.momentum)
-  } else if (data.vix > 25) {
-    push(`VIX at ${data.vix.toFixed(1)} - Elevated fear`, MOMENTUM, "medium", 13, PILLAR_PCT.momentum)
-  }
-
-  // VIX Term Structure (9) — RATIO convention: VIX3M / spot; < 1 = backwardation.
-  if (data.vixTermStructure < 0.95) {
-    push(`VIX term structure in backwardation (${data.vixTermStructure.toFixed(2)}) - Immediate fear`, MOMENTUM, "high", 9, PILLAR_PCT.momentum)
-  } else if (data.vixTermStructure < 1.0) {
-    push(`VIX term structure flattening (${data.vixTermStructure.toFixed(2)})`, MOMENTUM, "medium", 9, PILLAR_PCT.momentum)
-  }
-
-  // NVIDIA Momentum (9)
-  if (data.nvidiaMomentum < 20) {
-    push(`NVIDIA momentum at ${data.nvidiaMomentum} - AI sector weakness`, MOMENTUM, "high", 9, PILLAR_PCT.momentum)
-  } else if (data.nvidiaMomentum < 40) {
-    push(`NVIDIA momentum at ${data.nvidiaMomentum} - Tech leadership fading`, MOMENTUM, "medium", 9, PILLAR_PCT.momentum)
-  }
-
-  // SOX Index (9)
-  const soxDeviation = ((data.soxIndex - 5000) / 5000) * 100
-  if (soxDeviation < -15) {
-    push(`SOX down ${Math.abs(soxDeviation).toFixed(1)}% - Chip sector crash`, MOMENTUM, "high", 9, PILLAR_PCT.momentum)
-  } else if (soxDeviation < -10) {
-    push(`SOX down ${Math.abs(soxDeviation).toFixed(1)}% - Semiconductor weakness`, MOMENTUM, "medium", 9, PILLAR_PCT.momentum)
-  }
-
-  // --- Pillar 2: Risk Appetite & Sentiment (weights from RISK_APPETITE_WEIGHTS) ---
-
-  // Put/Call Ratio (29)
-  if (data.putCallRatio < 0.6) {
-    push(`Put/Call at ${data.putCallRatio.toFixed(2)} - Extreme complacency`, RISK, "high", 29, PILLAR_PCT.riskAppetite)
-  } else if (data.putCallRatio < 0.85) {
-    push(`Put/Call at ${data.putCallRatio.toFixed(2)} - Low hedging activity`, RISK, "medium", 29, PILLAR_PCT.riskAppetite)
-  }
-
-  // Fear & Greed (24) — CNN equity index; skipped entirely when unavailable
-  if (data.fearGreedIndex !== null) {
-    if (data.fearGreedIndex > 80) {
-      push(`Fear & Greed at ${data.fearGreedIndex} - Extreme greed`, RISK, "high", 24, PILLAR_PCT.riskAppetite)
-    } else if (data.fearGreedIndex > 70) {
-      push(`Fear & Greed at ${data.fearGreedIndex} - Elevated greed`, RISK, "medium", 24, PILLAR_PCT.riskAppetite)
-    }
-  }
-
-  // AAII Bullish (26) — skipped entirely when the input is baseline-tier.
-  //
-  // `|| 35` was reading the assembly layer's own fallback as fact (P6-31). It
-  // was the SECOND copy of that constant: getAAIIBullish() already returns 35
-  // with source "baseline" when the whole AI chain fails, so a total outage
-  // produced a confident "35% bullish, no signal" rather than silence. 35 sits
-  // just under the 45 threshold, which is why it never fired and never looked
-  // wrong — a constant that happens to be quiet is still a constant.
-  const aaiiBullish = notBaseline(data.aaiiBullish, data.tiers.riskAppetite.aaiiBullish)
-  if (aaiiBullish !== null) {
-    if (aaiiBullish > 55) {
-      push(`AAII Bullish at ${aaiiBullish}% - Retail euphoria`, RISK, "high", 26, PILLAR_PCT.riskAppetite)
-    } else if (aaiiBullish > 45) {
-      push(`AAII Bullish at ${aaiiBullish}% - Elevated retail optimism`, RISK, "medium", 26, PILLAR_PCT.riskAppetite)
-    }
-  }
-
-  // Short Interest (21) — same treatment. Here the constant was NOT quiet:
-  // `|| 2.5` fed a `< 2.5` test, so a missing reading landed exactly on the
-  // boundary and the canary's behaviour depended on a floating-point tie.
-  const shortInterest = notBaseline(data.shortInterest, data.tiers.riskAppetite.shortInterest)
-  if (shortInterest !== null) {
-    if (shortInterest < 1.5) {
-      push(`Short Interest at ${shortInterest.toFixed(1)}% - Extreme complacency`, RISK, "high", 21, PILLAR_PCT.riskAppetite)
-    } else if (shortInterest < 2.5) {
-      push(`Short Interest at ${shortInterest.toFixed(1)}% - Low positioning`, RISK, "medium", 21, PILLAR_PCT.riskAppetite)
-    }
-  }
-
-  // ETF Flows — informational only; not part of any pillar's WEIGHTS (weight 0)
-  if (data.etfFlows !== undefined) {
-    if (data.etfFlows < -3.0) {
-      push(`ETF outflows at $${Math.abs(data.etfFlows).toFixed(1)}B - Capital flight`, RISK, "high", 0, PILLAR_PCT.riskAppetite)
-    } else if (data.etfFlows < -1.5) {
-      push(`ETF outflows at $${Math.abs(data.etfFlows).toFixed(1)}B - Selling pressure`, RISK, "medium", 0, PILLAR_PCT.riskAppetite)
-    }
-  }
-
-  // --- Pillar 3: Valuation & Market Structure (weights from VALUATION_WEIGHTS) ---
-
-  // S&P 500 P/E (18)
-  if (data.spxPE > 30) {
-    push(`S&P 500 P/E at ${data.spxPE.toFixed(1)} - Extreme overvaluation`, VALUATION, "high", 18, PILLAR_PCT.valuation)
-  } else if (data.spxPE > 22) {
-    push(`S&P 500 P/E at ${data.spxPE.toFixed(1)} - Above historical average`, VALUATION, "medium", 18, PILLAR_PCT.valuation)
-  }
-
-  // S&P 500 P/S (12)
-  if (data.spxPS > 3.5) {
-    push(`S&P 500 P/S at ${data.spxPS.toFixed(1)} - Extremely expensive`, VALUATION, "high", 12, PILLAR_PCT.valuation)
-  } else if (data.spxPS > 2.5) {
-    push(`S&P 500 P/S at ${data.spxPS.toFixed(1)} - Elevated valuation`, VALUATION, "medium", 12, PILLAR_PCT.valuation)
-  }
-
-  // Buffett Indicator (16) — the loudest of the three. `|| 180` sat ABOVE the
-  // 150 threshold, so a missing reading did not merely fail to fire: it fired
-  // "Above fair value" as a medium warning, every load, on no data at all.
-  const buffett = notBaseline(data.buffettIndicator, data.tiers.valuation.buffettIndicator)
-  if (buffett !== null) {
-    if (buffett > 200) {
-      push(`Buffett Indicator at ${buffett.toFixed(0)}% - Significantly overvalued`, VALUATION, "high", 16, PILLAR_PCT.valuation)
-    } else if (buffett > 150) {
-      push(`Buffett Indicator at ${buffett.toFixed(0)}% - Above fair value`, VALUATION, "medium", 16, PILLAR_PCT.valuation)
-    }
-  }
-
-  // QQQ P/E (16)
-  if (data.qqqPE > 40) {
-    push(`QQQ P/E at ${data.qqqPE.toFixed(1)} - AI bubble territory`, VALUATION, "high", 16, PILLAR_PCT.valuation)
-  } else if (data.qqqPE > 30) {
-    push(`QQQ P/E at ${data.qqqPE.toFixed(1)} - Tech overvaluation`, VALUATION, "medium", 16, PILLAR_PCT.valuation)
-  }
-
-  // Mag7 Concentration (15)
-  if (data.mag7Concentration > 65) {
-    push(`Mag7 at ${data.mag7Concentration.toFixed(1)}% of QQQ - Extreme concentration risk`, VALUATION, "high", 15, PILLAR_PCT.valuation)
-  } else if (data.mag7Concentration > 55) {
-    push(`Mag7 at ${data.mag7Concentration.toFixed(1)}% of QQQ - High concentration`, VALUATION, "medium", 15, PILLAR_PCT.valuation)
-  }
-
-  // Shiller CAPE (13)
-  if (data.shillerCAPE > 35) {
-    push(`Shiller CAPE at ${data.shillerCAPE.toFixed(1)} - Historic overvaluation`, VALUATION, "high", 13, PILLAR_PCT.valuation)
-  } else if (data.shillerCAPE > 28) {
-    push(`Shiller CAPE at ${data.shillerCAPE.toFixed(1)} - Elevated cyclical valuation`, VALUATION, "medium", 13, PILLAR_PCT.valuation)
-  }
-
-  // Equity Risk Premium (10)
-  if (data.equityRiskPremium < 1.5) {
-    push(`Equity Risk Premium at ${data.equityRiskPremium.toFixed(2)}% - Stocks vs bonds severely overpriced`, VALUATION, "high", 10, PILLAR_PCT.valuation)
-  } else if (data.equityRiskPremium < 3.0) {
-    push(`Equity Risk Premium at ${data.equityRiskPremium.toFixed(2)}% - Low compensation for equity risk`, VALUATION, "medium", 10, PILLAR_PCT.valuation)
-  }
-
-  // --- Pillar 4: Macro (weights from MACRO_WEIGHTS) ---
-
-  // Fed Funds Rate (15)
-  if (data.fedFundsRate > 6.0) {
-    push(`Fed Funds at ${data.fedFundsRate.toFixed(2)}% - Extremely restrictive`, MACRO, "high", 15, PILLAR_PCT.macro)
-  } else if (data.fedFundsRate > 5.0) {
-    push(`Fed Funds at ${data.fedFundsRate.toFixed(2)}% - Restrictive policy`, MACRO, "medium", 15, PILLAR_PCT.macro)
-  }
-
-  // Junk Spread (10)
-  if (data.junkSpread > 8) {
-    push(`Junk Bond Spread at ${data.junkSpread.toFixed(2)}% - Severe credit stress`, MACRO, "high", 10, PILLAR_PCT.macro)
-  } else if (data.junkSpread > 5) {
-    push(`Junk Bond Spread at ${data.junkSpread.toFixed(2)}% - Credit tightening`, MACRO, "medium", 10, PILLAR_PCT.macro)
-  }
-
-  // Debt-to-GDP (10)
-  if (data.debtToGDP > 130) {
-    push(`US Debt-to-GDP at ${data.debtToGDP.toFixed(0)}% - Fiscal crisis risk`, MACRO, "high", 10, PILLAR_PCT.macro)
-  } else if (data.debtToGDP > 110) {
-    push(`US Debt-to-GDP at ${data.debtToGDP.toFixed(0)}% - Elevated fiscal burden`, MACRO, "medium", 10, PILLAR_PCT.macro)
-  }
-
-  // Yield Curve (14) — scored once, in Macro (P3-13)
-  if (data.yieldCurve < -1.0) {
-    push(`Yield curve inverted ${Math.abs(data.yieldCurve).toFixed(2)}% - Deep inversion`, MACRO, "high", 14, PILLAR_PCT.macro)
-  } else if (data.yieldCurve < -0.2) {
-    push(`Yield curve inverted ${Math.abs(data.yieldCurve).toFixed(2)}%`, MACRO, "medium", 14, PILLAR_PCT.macro)
-  }
-
-  // TED Spread (13)
-  if (data.tedSpread > 1.0) {
-    push(`TED Spread at ${data.tedSpread.toFixed(2)}% - Banking system stress`, MACRO, "high", 13, PILLAR_PCT.macro)
-  } else if (data.tedSpread > 0.5) {
-    push(`TED Spread at ${data.tedSpread.toFixed(2)}% - Credit market tension`, MACRO, "medium", 13, PILLAR_PCT.macro)
-  }
-
-  // DXY Dollar Index (12)
-  if (data.dxyIndex > 115) {
-    push(`Dollar Index at ${data.dxyIndex.toFixed(1)} - Extreme dollar strength hurts tech`, MACRO, "high", 12, PILLAR_PCT.macro)
-  } else if (data.dxyIndex > 105) {
-    push(`Dollar Index at ${data.dxyIndex.toFixed(1)} - Strong dollar headwind`, MACRO, "medium", 12, PILLAR_PCT.macro)
-  }
-
-  // ISM PMI (15)
-  if (data.ismPMI < 46) {
-    push(`ISM PMI at ${data.ismPMI.toFixed(1)} - Manufacturing contraction`, MACRO, "high", 15, PILLAR_PCT.macro)
-  } else if (data.ismPMI < 50) {
-    push(`ISM PMI at ${data.ismPMI.toFixed(1)} - Weak manufacturing`, MACRO, "medium", 15, PILLAR_PCT.macro)
-  }
-
-  // Fed Reverse Repo (11)
-  if (data.fedReverseRepo > 2000) {
-    push(`Fed RRP at $${data.fedReverseRepo.toFixed(0)}B - Severe liquidity drain`, MACRO, "high", 11, PILLAR_PCT.macro)
-  } else if (data.fedReverseRepo > 1000) {
-    push(`Fed RRP at $${data.fedReverseRepo.toFixed(0)}B - Tight liquidity conditions`, MACRO, "medium", 11, PILLAR_PCT.macro)
-  }
-
-  return canaries.sort((a, b) => {
-    // First sort by severity: high before medium
-    if (a.severity === "high" && b.severity !== "high") return -1
-    if (a.severity !== "high" && b.severity === "high") return 1
-
-    // Within same severity, sort by impact score descending
-    return b.impactScore - a.impactScore
-  })
-}
