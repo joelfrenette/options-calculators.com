@@ -147,6 +147,36 @@ the indicator. Series IDs must be probed before use (401/404 discrimination, as 
 | Building permits | `PERMIT` | months | Classic leading component; slow. |
 | Consumer sentiment | `UMCSENT` | months | Weak alone; possibly useful in combination. |
 
+### PROBED 2026-08-10 — measured, not assumed
+
+Every ID above was fetched from FRED and its actual history depth recorded. This replaces the
+"25+ years" claim with numbers:
+
+| Series | Resolves | History starts | Observations | Latest reading |
+|---|---|---|---|---|
+| `T10Y3M` | yes | **1982-01-04** | 11,636 daily | +0.78 (2026-08-07) |
+| `NFCI` | yes | **1971-01-08** | 2,901 weekly | −0.529 (2026-07-31) |
+| `ANFCI` | yes | **1971-01-08** | 2,901 weekly | −0.543 (2026-07-31) |
+| `STLFSI4` | yes | **1993-12-31** | 1,702 weekly | −0.5063 (2026-07-31) |
+| `BAMLC0A0CM` | yes | **2023-08-08 ⚠** | 796 daily | 0.78 (2026-08-06) |
+| `ICSA` | yes | **1967-01-07** | 3,110 weekly | 199,000 (2026-08-01) |
+| `PERMIT` | yes | **1960-01-01** | 799 monthly | 1,374 (2026-06-01) |
+| `UMCSENT` | yes | **1952-11-01** | 885 monthly | 49.5 (2026-06-01) |
+
+**Two things this probe changed:**
+
+1. **`BAMLC0A0CM` returns only three years, not the ~1996 start the HY−IG differential needs.**
+   Either the public CSV endpoint truncates this one or the ID is subtly wrong. **Re-probe
+   through the keyed FRED API before building anything on it** — and if three years is genuinely
+   all there is, the HY−IG differential cannot be backtested and drops out of Gauge B. Do not
+   assume; this is exactly the kind of thing that becomes an invented number later.
+2. **NFCI/ANFCI reach 1971 and cover all four reference drawdowns**, which makes them the
+   strongest free candidates by history alone. `T10Y3M` from 1982 covers 2000, 2008, 2020, 2022.
+   `ICSA` from 1967 covers everything.
+
+So the macro/credit case can be tested against all four reference drawdowns on free data —
+now verified rather than asserted, with the single exception flagged above.
+
 **All free, all through the FRED key already in place, most with 25+ years of history.**
 This is the finding that matters commercially: **the macro/credit case can be backtested
 against 2000, 2008, 2020 and 2022 without spending a penny.**
