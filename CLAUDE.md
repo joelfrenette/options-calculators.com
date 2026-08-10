@@ -13,20 +13,37 @@ NEXT      <immediate next action, and whose it is>
 YOURS     <numbered items blocked on Joel — or "nothing blocking">
 STATE     prod <sha> · staging <sha> · checks <pass/fail>
 RTK       <tokens saved, read from `rtk gain` — never estimated>
+CAVEMAN   <net tokens saved, read from the caveman-stats hook — omit the whole
+           line when caveman mode is off>
 ```
 
 Keep it a dashboard, not a recap. Always include the `YOURS` line, saying
 "nothing blocking" when true, so its absence never reads as an oversight.
 
-**The RTK line is measured, never guessed.** Read it from `rtk gain`. RTK
-computes savings as bytes/4, so the figure is approximate by its own admission —
-say so rather than presenting it as an exact count. When there is no tracking
-data, report `0` and why. Inventing a savings number for a tool bought to save
-money is the same failure as inventing market data.
+**Both savings lines are read, never guessed.**
+
+- **RTK** — from `rtk gain`. RTK computes savings as bytes/4, so the figure is
+  approximate by its own admission; say so rather than presenting it as exact.
+- **CAVEMAN** — only when caveman mode is active. `/caveman-stats` is delivered
+  by a hook whose output goes to the user, not into the transcript, so read the
+  number directly:
+  `node ~/.claude/plugins/cache/caveman/caveman/*/src/hooks/caveman-stats.js`
+  **Report `Est. net`, not `Est. tokens saved`.** Gross savings ignore the
+  ~1,250 input tokens per turn the caveman rules themselves cost; net subtracts
+  them and can go negative, in which case say so plainly and suggest turning
+  caveman off for that workload. Quoting the gross number alone is the same
+  flattery-by-omission this audit exists to remove. Label it an estimate — it
+  is benchmark-derived, not a measured counterfactual.
+
+When either tool has no data, report `0` and why. Inventing a savings number
+for a tool bought to save money is the same failure as inventing market data.
 
 ## Interaction rule (mandatory)
 **After the status block, end every reply with a clickable multiple-choice
-question** (AskUserQuestion) offering Joel his next actions. **The FIRST 1-3
+question** (AskUserQuestion) offering Joel his next actions. This is not
+optional and not "when it seems useful" — a reply without the menu is an
+incomplete reply. It has been silently dropped mid-session before; if a long
+turn ends without one, that is a defect, not a style choice. **The FIRST 1-3
 options MUST be dynamic — generated from what just happened in this specific
 response** (e.g. "Build E-8a against the dataset that just probed YES",
 "Retry the failed deploy", "Review the 3 findings above"). The remaining
