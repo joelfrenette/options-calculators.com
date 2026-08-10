@@ -1,6 +1,6 @@
 # CCPI Redesign — a leading indicator, not a dashboard
 
-**Status:** proposal, awaiting owner approval. No code changes until this is signed off.
+**Status:** APPROVED 2026-08-10 — all five decisions in §8 are taken. Phase 1 may begin.
 **Written:** 2026-08-10. Supersedes AUDIT_BACKLOG P6-35 (which proposed re-weighting the
 existing indicator set — the wrong question, answered well).
 
@@ -225,14 +225,25 @@ P6-31/32/34 the backtest would have been measuring LLM guesses and fallback cons
    argument was degradation, not aesthetics:** a gauge consulted before moving to cash has to
    stay readable on the day it matters. Layout A degrades to "3 of 5 firing"; Layout B degrades
    to a dash, and it does so precisely when data is thin — which is when drawdowns happen.
-2. **Retention:** confirm raising `prune_market_closes` to ~9,000 days. Storage cost is small
-   (a few series × 9,000 rows) but it is a database change.
-3. **Walk-forward discipline:** accept that some indicators will fail their own test and be
-   removed, and that the resulting score may fire *less* often than the current one.
-4. **What "move to cash" means numerically** — how many firing signals, sustained how long, is
-   the threshold for the page to say it. This is a risk-tolerance question only Joel can answer.
-5. **Budget:** the free set is expected to carry most of the value. Confirm before any paid
-   source is proposed.
+2. ~~**Retention**~~ **DECIDED: raise `prune_market_closes` to 9,000 days (~25 years).** Covers
+   2000, 2008, 2020 and 2022. This is the blocking change — until it lands the backtest is
+   guaranteed to answer `insufficient-history`. Migration, plus a change to a nightly job that
+   is currently deleting exactly the history the backtest needs.
+3. ~~**Walk-forward discipline**~~ **DECIDED: yes — fewer, better signals.** Fit on 1990-2010,
+   score on 2010-2026. Indicators that fail their own test are removed, and the resulting gauge
+   is expected to fire *less* often than today's. This is the decision that separates an
+   instrument from a dashboard: an indicator tuned on the same crashes it is scored against
+   looks perfect and predicts nothing.
+4. ~~**What "move to cash" means numerically**~~ **DECIDED: the data sets it.** Derive the
+   threshold from the backtest — the firing count and duration with the best hit-rate to
+   false-alarm ratio ahead of the reference drawdowns — and bring the number back with its
+   record for approval. **Do not pick a round number and justify it afterwards.**
+5. ~~**Budget**~~ **DECIDED: free set first.** Build and measure on FRED plus the existing
+   Polygon / Quiver / FMP plans only. A paid source is proposed only if the backtest shows a
+   specific, measured lead-time gain, and then with its cost stated. The $79/mo committed
+   ceiling stands until then.
+
+**All five decisions are now taken. Phase 1 may begin without further sign-off.**
 
 ---
 
