@@ -82,6 +82,13 @@ export interface ClosesResult {
   tickersStored: number
   universeAsOf: string
   failedTickers?: string[]
+  /**
+   * Universe members absent from the grouped response. MMC went dark on
+   * 2026-01-13 and nobody noticed for seven months: breadth divides by the
+   * tickers that qualify, so the number stayed honest while a constituent
+   * quietly stopped existing. Silence is not the same as "nothing to report".
+   */
+  missingTickers?: string[]
   error?: string
 }
 
@@ -195,6 +202,14 @@ export async function runClosesSnapshot(polygonKey: string, backfillDays = 0): P
     }
   }
 
+  const returned = new Set(closes.map((c) => c.ticker))
+  const missingTickers = STORED_TICKERS.filter((t) => !returned.has(t))
+  if (missingTickers.length > 0) {
+    console.warn(
+      `[snapshot] ${missingTickers.length} universe ticker(s) absent from the ${day} grouped bars: ${missingTickers.join(", ")}`,
+    )
+  }
+
   const upserted = await upsertCloses(closes)
 
   // Opportunistic retention.
@@ -214,6 +229,7 @@ export async function runClosesSnapshot(polygonKey: string, backfillDays = 0): P
     day,
     tickersStored: closes.length,
     universeAsOf: BREADTH_UNIVERSE_AS_OF,
+    missingTickers,
   }
 }
 

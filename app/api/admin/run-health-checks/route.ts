@@ -291,7 +291,40 @@ export async function GET(request: NextRequest) {
     results: visible,
     keys,
     coverage: contractCoverage(),
+    security: securityPosture(),
   })
+}
+
+/**
+ * Which credential source the deployment is actually running on.
+ *
+ * Nothing in the app reported this. The only signal that admin auth was still
+ * on the plaintext ADMIN_PASSWORD was a server-side console warning nobody
+ * reads, so "did the hash migration land?" could not be answered from outside
+ * the box — it had to be taken on trust. Names and booleans only; no value,
+ * no prefix, no length.
+ */
+function securityPosture() {
+  const hasHash = Boolean(process.env.ADMIN_PASSWORD_HASH)
+  const hasPlaintext = Boolean(process.env.ADMIN_PASSWORD)
+  return {
+    adminPasswordSource: hasHash ? "hash" : hasPlaintext ? "plaintext" : "unset",
+    /** Both set means the migration is half-done: delete ADMIN_PASSWORD. */
+    adminPasswordPlaintextStillPresent: hasHash && hasPlaintext,
+    /** A cron route answers 503 rather than 401 when this is missing. */
+    cronSecretConfigured: Boolean(process.env.CRON_SECRET),
+    encryptionKeyConfigured: Boolean(process.env.ENCRYPTION_KEY),
+    notes: [
+      !hasHash && hasPlaintext
+        ? "Admin auth is on the PLAINTEXT ADMIN_PASSWORD. Generate a hash with `node scripts/hash-admin-password.ts` and set ADMIN_PASSWORD_HASH."
+        : null,
+      hasHash && hasPlaintext
+        ? "ADMIN_PASSWORD_HASH is in use, but the plaintext ADMIN_PASSWORD is still set. Delete it — it is a second, weaker key to the same door."
+        : null,
+      !hasHash && !hasPlaintext ? "No admin credential configured at all: login cannot succeed." : null,
+      !process.env.CRON_SECRET ? "CRON_SECRET is unset — every cron route returns 503 and no snapshot will run." : null,
+    ].filter(Boolean),
+  }
 }
 
 /**
