@@ -75,7 +75,7 @@ check("a perfect signal scores", perfect.verdict === "scored", perfect.reason ??
 check("...hit rate 100%", perfect.hitRate === 1, String(perfect.hitRate))
 check("...with a ~61 day median lead", perfect.medianLeadDays === 61, String(perfect.medianLeadDays))
 check("...and no false positives", perfect.falsePositives === 0, String(perfect.falsePositives))
-check("...earning the maximum weight", proposedWeight(perfect) === 1, String(proposedWeight(perfect)))
+check("...earning real weight", (proposedWeight(perfect) ?? 0) > 1, String(proposedWeight(perfect)))
 
 // ---------------------------------------------------------------------------
 // 4. THE POINT OF THE WHOLE MODULE: a noisy signal must be punished.
@@ -141,23 +141,53 @@ check("...and every one of those episodes is a false positive", lagging.falsePos
 check("...so its weight collapses", (proposedWeight(lagging) ?? 1) === 0, String(proposedWeight(lagging)))
 
 // ---------------------------------------------------------------------------
-// 7. PRECISION — the number the first real backtest was missing.
+// 7. PRECISION, BASE RATE AND LIFT — measured against chance, not in a vacuum.
 // ---------------------------------------------------------------------------
 check("a clean signal has precision 1", perfect.precision === 1, String(perfect.precision))
-check(
-  "a noisy signal's precision collapses even at a 100% hit rate",
-  noisy.precision !== null && noisy.precision < 0.45,
-  String(noisy.precision),
-)
+check("...and a lift above 1, so it beats chance", (perfect.lift ?? 0) > 1, String(perfect.lift))
 check("a lagging signal has precision 0", lagging.precision === 0, String(lagging.precision))
+check("...and therefore zero lift", lagging.lift === 0, String(lagging.lift))
 check("precision is null when nothing scored", shortWindow.precision === null)
-
-// The ranking failure that prompted this: hit rate alone rewarded frequency.
+check("base rate is reported so precision is never read alone", perfect.baseRate !== null)
 check(
-  "weight now prices in reliability, not just coverage",
-  (proposedWeight(noisy) ?? 1) < (proposedWeight(perfect) ?? 0),
-  `${proposedWeight(noisy)} vs ${proposedWeight(perfect)}`,
+  "base rate is a real fraction of observed days",
+  (perfect.baseRate ?? -1) > 0 && (perfect.baseRate ?? 2) < 1,
+  String(perfect.baseRate),
 )
+
+// THE FIX. Precision now counts EPISODES in-window, not events, so it is no
+// longer capped at events/episodes and is comparable between signals that fire
+// at very different rates.
+// Two episodes before ONE event: the old hits/episodes formula capped this at
+// 1/2 = 0.5 because an event can only be hit once. Counting episodes gives 1.0,
+// which is the honest answer — both fired into a window that mattered.
+const twoBeforeOne = scoreLeadTime(
+  series("2010-01-01", 2800, [
+    ["2010-09-01", "2010-09-20"], ["2010-11-01", "2010-11-20"],
+    ["2012-11-01", "2012-11-20"], ["2014-11-01", "2014-11-20"], ["2016-11-01", "2016-11-20"],
+  ]),
+  EVENTS,
+)
+check(
+  "precision is no longer capped by the event count",
+  twoBeforeOne.precision === 1,
+  `${twoBeforeOne.precision} across ${twoBeforeOne.episodes.length} episodes, ${twoBeforeOne.hitEventIds.length} events hit`,
+)
+
+// A signal at chance must earn nothing, however good its hit rate looks.
+const alwaysFiring = scoreLeadTime(
+  series("2010-01-01", 2800, Array.from({ length: 60 }, (_, i) => {
+    const start = day("2010-01-05", i * 45)
+    return [start, day(start, 5)]
+  })),
+  EVENTS,
+)
+check(
+  "a signal firing constantly earns ZERO weight despite a perfect hit rate",
+  proposedWeight(alwaysFiring) === 0,
+  `hit ${alwaysFiring.hitRate}, lift ${alwaysFiring.lift}, weight ${proposedWeight(alwaysFiring)}`,
+)
+check("...because its lift is indistinguishable from chance", (alwaysFiring.lift ?? 9) < 1.2, String(alwaysFiring.lift))
 
 // ---------------------------------------------------------------------------
 // 8. The window sweep — a signal cannot hit inside a window shorter than its

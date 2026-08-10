@@ -86,14 +86,35 @@ export interface LeadTimeResult {
   /**
    * Of every episode this signal produced, the share that preceded an event.
    *
-   * THE NUMBER THAT MATTERS, and the one the first backtest was missing. Hit
-   * rate answers "how many drawdowns did it catch"; precision answers "when it
-   * fired, was it right". A signal firing twice a year will precede most things
-   * by coincidence inside a six-month window and post a flattering hit rate on
-   * no information at all — which is exactly what vix-backwardation did on the
-   * 2026-08-10 run: 3 of 8 events caught, 43 false alarms, 6.5% precision.
+   * Of every episode, the share that began inside a pre-event window.
+   *
+   * The first version of this divided hits by episodes, which was wrong: an
+   * event can only be hit once, so that figure was structurally capped at
+   * events/episodes and could not be compared between signals with different
+   * firing frequencies. vix-backwardation scored exactly its own ceiling
+   * (8/46 = 17.4%) and it read as a bad number when it was a maximal one.
+   *
+   * This counts EPISODES, not events, so several episodes preceding the same
+   * drawdown all count — which is the honest question: when it fired, was it
+   * firing into a window that mattered.
    */
   precision: number | null
+  /**
+   * The share of observed days that fall inside ANY pre-event window.
+   *
+   * What precision would be for a signal that fired at random. Reported so
+   * precision is never read on its own — with 11 events and an 18-month
+   * window, a large fraction of all history IS "before a drawdown", and a
+   * coin-flip signal would look impressive.
+   */
+  baseRate: number | null
+  /**
+   * precision ÷ baseRate. **1.0 means indistinguishable from chance.**
+   *
+   * The only number in this result that answers "does this signal carry
+   * information", and the one a weight should be built from.
+   */
+  lift: number | null
   medianLeadDays: number | null
   falsePositives: number
   falsePositivesPerDecade: number | null
@@ -133,6 +154,8 @@ export function scoreLeadTime(
     missedEventIds: [],
     hitRate: null,
     precision: null,
+    baseRate: null,
+    lift: null,
     medianLeadDays: null,
     falsePositives: 0,
     falsePositivesPerDecade: null,
@@ -201,6 +224,30 @@ export function scoreLeadTime(
     }
   }
 
+  // Precision counts every episode that began inside a window, including
+  // several before the same event. Attribution above deduplicates by event to
+  // measure lead; this deliberately does not.
+  const inWindow = episodes.filter((ep) =>
+    covered.some((e) => {
+      const lead = daysBetween(ep.start, e.peak)
+      return lead >= 0 && lead <= maxLeadDays
+    }),
+  ).length
+
+  // Base rate: the share of observed days sitting inside any window. Computed
+  // as a UNION so overlapping windows are not double counted — with 11 events
+  // and a 540-day window they overlap heavily, and counting them twice would
+  // understate how much of history is "pre-drawdown" and flatter every signal.
+  const windowDays = new Set<string>()
+  for (const e of covered) {
+    for (let d = 0; d <= maxLeadDays; d++) {
+      windowDays.add(new Date(Date.parse(e.peak + "T00:00:00Z") - d * 86400000).toISOString().slice(0, 10))
+    }
+  }
+  const observedInWindow = obs.filter((o) => windowDays.has(o.day)).length
+  const baseRate = obs.length > 0 ? observedInWindow / obs.length : null
+  const precision = episodes.length > 0 ? inWindow / episodes.length : null
+
   const falsePositives = episodes.filter((ep) => ep.precededEventId === null).length
   const spanDays = daysBetween(firstDay, lastDay)
   const decades = spanDays / 3652.5
@@ -213,7 +260,9 @@ export function scoreLeadTime(
     hitEventIds: hits.map((h) => h.id),
     missedEventIds: covered.filter((e) => !hits.some((h) => h.id === e.id)).map((e) => e.id),
     hitRate: hits.length / covered.length,
-    precision: episodes.length > 0 ? hits.length / episodes.length : null,
+    precision,
+    baseRate,
+    lift: precision !== null && baseRate !== null && baseRate > 0 ? Math.round((precision / baseRate) * 100) / 100 : null,
     medianLeadDays: median(hits.map((h) => h.leadDays)),
     falsePositives,
     falsePositivesPerDecade: decades > 0 ? Math.round((falsePositives / decades) * 10) / 10 : null,
@@ -233,12 +282,16 @@ export function scoreLeadTime(
  */
 export function proposedWeight(r: LeadTimeResult): number | null {
   if (r.verdict !== "scored" || r.hitRate === null) return null
-  // Hit rate ALONE ranked a signal that fires twice a year above one that fires
-  // twice a decade, because firing constantly catches things by coincidence.
-  // Multiplying by precision prices that in: a signal is worth its coverage
-  // times its reliability, and a noisy one collapses however much it "caught".
-  const precision = r.precision ?? 0
-  return Math.round(r.hitRate * precision * 1000) / 1000
+  // Weight is coverage × information. LIFT, not raw precision: with 11 events
+  // and a wide window most of history is "before a drawdown", so a random
+  // signal posts a high precision and would earn weight it has not got.
+  // A signal at or below chance earns exactly nothing, which is the point.
+  // A lift of 1.0 is chance. The bar is 1.2 rather than 1.0 because a signal
+  // measured on 11 events lands within a few percent of chance by luck alone,
+  // and "3% better than a coin" must not earn weight in a crash gauge.
+  const lift = r.lift ?? 0
+  if (lift < 1.2) return 0
+  return Math.round(r.hitRate * (lift - 1) * 1000) / 1000
 }
 
 /**

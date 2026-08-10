@@ -68,6 +68,9 @@ export async function GET() {
       // When it fired, was it right. Hit rate without this ranked a signal
       // firing twice a year above one firing twice a decade.
       precision: result.precision,
+      baseRate: result.baseRate,
+      // The only figure that answers "does this carry information". 1.0 = chance.
+      lift: result.lift,
       proposedWeight: proposedWeight(result),
       // The same signal at four windows. A signal documented to lead by 12-18
       // months cannot hit inside 180 days however well it works, so one window
@@ -78,6 +81,8 @@ export async function GET() {
         coveredEvents: w.result.coveredEventIds.length,
         hitRate: w.result.hitRate,
         precision: w.result.precision,
+        baseRate: w.result.baseRate,
+        lift: w.result.lift,
         medianLeadDays: w.result.medianLeadDays,
         falsePositivesPerDecade: w.result.falsePositivesPerDecade,
       })),
