@@ -132,17 +132,7 @@ export async function fetchISMPMIWithOpenAI(): Promise<number | null> {
   return fetchMarketDataWithOpenAI("ISM Manufacturing PMI", "Current ISM PMI value")
 }
 
-export async function fetchSPXPEWithOpenAI(): Promise<number | null> {
-  console.log(`[v0] OpenAI: Fetching S&P 500 Forward P/E...`)
-  return fetchMarketDataWithOpenAI("S&P 500 Forward P/E", "Current S&P 500 forward P/E ratio")
-}
-
-export async function fetchFearGreedWithOpenAI(): Promise<number | null> {
-  console.log(`[v0] OpenAI: Fetching CNN Fear & Greed Index...`)
-  return fetchMarketDataWithOpenAI("CNN Fear & Greed Index", "Current index value (0-100)")
-}
-
-export async function fetchYieldCurveWithOpenAI(): Promise<number | null> {
-  console.log(`[v0] OpenAI: Fetching 10-Year minus 2-Year Treasury Spread...`)
-  return fetchMarketDataWithOpenAI("10-Year minus 2-Year Treasury Spread", "Current spread in percentage")
-}
+// Removed 2026-08-10 (P6-34): the S&P P/E, Fear & Greed and yield-curve
+// fetchers. Their only caller was lib/unified-ai-fallback.ts, whose three
+// getters were themselves never called, and all three figures have a real
+// source in the app.

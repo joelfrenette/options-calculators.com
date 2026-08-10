@@ -142,17 +142,7 @@ export async function fetchISMPMIWithGroqLLM(): Promise<number | null> {
   return fetchMarketDataWithGroqLLM("ISM Manufacturing PMI", "Current ISM PMI value")
 }
 
-export async function fetchSPXPEWithGroqLLM(): Promise<number | null> {
-  console.log(`[v0] Groq LLM: Fetching S&P 500 P/E...`)
-  return fetchMarketDataWithGroqLLM("S&P 500 Forward P/E", "Current S&P 500 forward P/E ratio")
-}
-
-export async function fetchFearGreedWithGroqLLM(): Promise<number | null> {
-  console.log(`[v0] Groq LLM: Fetching Fear & Greed...`)
-  return fetchMarketDataWithGroqLLM("CNN Fear & Greed Index", "Current index value (0-100)")
-}
-
-export async function fetchYieldCurveWithGroqLLM(): Promise<number | null> {
-  console.log(`[v0] Groq LLM: Fetching Yield Curve...`)
-  return fetchMarketDataWithGroqLLM("10-Year minus 2-Year Treasury Spread", "Current spread in percentage")
-}
+// Removed 2026-08-10 (P6-34): the S&P P/E, Fear & Greed and yield-curve
+// fetchers. Their only caller was lib/unified-ai-fallback.ts, whose three
+// getters were themselves never called, and all three figures have a real
+// source in the app.

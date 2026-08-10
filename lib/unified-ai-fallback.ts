@@ -10,9 +10,6 @@ import {
   fetchNVIDIAPriceWithOpenAI,
   fetchSOXIndexWithOpenAI,
   fetchISMPMIWithOpenAI,
-  fetchSPXPEWithOpenAI,
-  fetchFearGreedWithOpenAI,
-  fetchYieldCurveWithOpenAI,
 } from "./openai-market-data"
 
 import {
@@ -27,9 +24,6 @@ import {
   fetchNVIDIAPriceWithAnthropic,
   fetchSOXIndexWithAnthropic,
   fetchISMPMIWithAnthropic,
-  fetchSPXPEWithAnthropic,
-  fetchFearGreedWithAnthropic,
-  fetchYieldCurveWithAnthropic,
 } from "./anthropic-market-data"
 
 import {
@@ -44,9 +38,6 @@ import {
   fetchNVIDIAPriceWithGroqLLM,
   fetchSOXIndexWithGroqLLM,
   fetchISMPMIWithGroqLLM,
-  fetchSPXPEWithGroqLLM,
-  fetchFearGreedWithGroqLLM,
-  fetchYieldCurveWithGroqLLM,
 } from "./groq-llm-market-data"
 
 import { fetchMarketDataWithGrok } from "./grok-market-data"
@@ -376,47 +367,14 @@ export async function getISMPMI(): Promise<{
   )
 }
 
-export async function getSPXPE(): Promise<{
-  value: number
-  source: "grok" | "groq" | "anthropic" | "openai" | "baseline"
-}> {
-  return fetchWithAIFallback(
-    "S&P 500 P/E",
-    async () => await fetchMarketDataWithGrok("S&P 500 Forward P/E", "Current S&P 500 forward P/E ratio"),
-    fetchSPXPEWithGroqLLM,
-    fetchSPXPEWithAnthropic,
-    fetchSPXPEWithOpenAI,
-    { min: 5, max: 50 },
-    22.5,
-  )
-}
-
-export async function getFearGreed(): Promise<{
-  value: number
-  source: "grok" | "groq" | "anthropic" | "openai" | "baseline"
-}> {
-  return fetchWithAIFallback(
-    "Fear & Greed Index",
-    async () => await fetchMarketDataWithGrok("CNN Fear & Greed Index", "Current index value (0-100)"),
-    fetchFearGreedWithGroqLLM,
-    fetchFearGreedWithAnthropic,
-    fetchFearGreedWithOpenAI,
-    { min: 0, max: 100 },
-    50,
-  )
-}
-
-export async function getYieldCurve(): Promise<{
-  value: number
-  source: "grok" | "groq" | "anthropic" | "openai" | "baseline"
-}> {
-  return fetchWithAIFallback(
-    "Yield Curve (10Y-2Y)",
-    async () => await fetchMarketDataWithGrok("10-Year minus 2-Year Treasury Spread", "Current spread in percentage"),
-    fetchYieldCurveWithGroqLLM,
-    fetchYieldCurveWithAnthropic,
-    fetchYieldCurveWithOpenAI,
-    { min: -3, max: 3 },
-    0.25,
-  )
-}
+/**
+ * REMOVED 2026-08-10 (P6-34): getSPXPE, getFearGreed and getYieldCurve.
+ *
+ * All three were exported and never called, and all three asked an LLM for a
+ * figure the site already sources properly — S&P forward P/E from FMP/Apify,
+ * the Fear & Greed index from CNN, and the 10Y-2Y spread from FRED DGS10/DGS2
+ * through lib/yield-curve.ts, which owns that sign convention (P6-21). Their
+ * baselines were 22.5, 50 and 0.25: on the Fear & Greed scale 50 is a real
+ * NEUTRAL reading, which is the P6-18 defect sitting in a function nobody ran.
+ * Dead code that would have been wrong the moment someone called it.
+ */
