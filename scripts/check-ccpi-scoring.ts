@@ -199,6 +199,42 @@ const fgNull = computeRiskAppetitePillar({ ...maxRiskRisk, fearGreedIndex: null 
 check("null F&G excluded and renormalized (still 100 at max risk)", fgNull.score === 100, `got ${fgNull.score}`)
 check("null F&G reduces scoredMax to 76", fgNull.scoredMax === 76, `got ${fgNull.scoredMax}`)
 
+// P7-10: the same contract for nvidiaMomentum, which was `number` until Alpha
+// Vantage's failure path was found to be handing over a defaulted 50.
+//
+// The tier gate ALREADY excluded it when Alpha Vantage was down, so this is not
+// re-testing the gate — it asserts the value path independently. A null must be
+// excluded even when the tier says "live", because those are two different
+// claims: the tier says where a reading came from, the value says whether there
+// is one. P6-34's soxIndex and P6-18's Fear & Greed established the rule; this
+// input was written before it and missed by P6-4, which fixed the identical
+// idiom for AAII in the same route.
+const nvNull = computeMomentumPillar({ ...maxRiskMomentum, nvidiaMomentum: null }, liveMomentum)
+check(
+  "null NVDA momentum excluded and renormalized (still 100 at max risk)",
+  nvNull.score === 100,
+  `got ${nvNull.score}`,
+)
+check(
+  `null NVDA momentum reduces scoredMax by its weight (9)`,
+  nvNull.scoredMax === 100 - 9,
+  `got ${nvNull.scoredMax}`,
+)
+check(
+  "null NVDA momentum is named in the excluded list",
+  nvNull.excluded.includes("nvidiaMomentum"),
+  nvNull.excluded.join(", ") || "(none)",
+)
+// A null must NOT read as a calm reading: 50 scores 0 points, so a fallback to
+// 50 and a genuine absence would both leave the pillar at the same score while
+// meaning opposite things. Only the scoredMax distinguishes them.
+const nvFifty = computeMomentumPillar({ ...maxRiskMomentum, nvidiaMomentum: 50 }, liveMomentum)
+check(
+  "a 50 reading and a null are told apart by scoredMax, not by score",
+  nvFifty.scoredMax === 100 && nvNull.scoredMax === 91,
+  `50 ⇒ ${nvFifty.scoredMax}, null ⇒ ${nvNull.scoredMax}`,
+)
+
 // ---------------------------------------------------------------------------
 // 5. Certainty decreases live → ai-estimate → baseline, canaries play no part
 // ---------------------------------------------------------------------------

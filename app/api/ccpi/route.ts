@@ -657,7 +657,18 @@ async function fetchMarketData() {
     // Was read from fredData, which never carries this field — the momentum
     // actually computed from the Alpha Vantage NVDA quote was discarded and the
     // indicator was permanently 50 (neutral).
-    nvidiaMomentum: alphaVantageData?.nvidiaMomentum ?? 50,
+    //
+    // P7-10: `?? 50` became `?? null`. On a 0-100 momentum scale **50 is a real
+    // neutral reading**, and the tab's own axis labels it "Neutral: 40-60" — so
+    // the default was indistinguishable from a measurement saying NVDA is flat.
+    // The scoring side was already safe (the tier below is `baseline` when Alpha
+    // Vantage is down, and baseline inputs are excluded and renormalized), but
+    // the DISPLAY side read this value raw: `nvidiaPrice` comes from an
+    // independent AI-fallback chain, so it stays defined when Alpha Vantage
+    // fails, and the momentum card rendered "$X | 50/100" as though both halves
+    // were measured. P6-4 fixed exactly this idiom for AAII eight lines above
+    // and left this one.
+    nvidiaMomentum: alphaVantageData?.nvidiaMomentum ?? null,
     soxIndex: soxIndexResult.value,
     tedSpread: fredData?.tedSpread ?? 0.25,
     dxyIndex: fredData?.dxyIndex ?? 103,
@@ -816,11 +827,24 @@ async function fetchFREDIndicators() {
 async function fetchAlphaVantageIndicators() {
   const ALPHA_VANTAGE_API_KEY = resolveApiKey("ALPHA_VANTAGE_API_KEY")
 
+  // P7-10. **This is where the fabricated 50 actually came from.** The caller
+  // reads `alphaVantageData?.nvidiaMomentum ?? null`, and that `??` never fired:
+  // this function returns `baselineValues` — not null — whenever the key is
+  // missing or the fetch throws, so a full set of invented numbers arrived
+  // looking exactly like measurements. A default written at the source outlives
+  // every null-guard written at the call site.
+  //
+  // Only `nvidiaMomentum` and `source` are read from this object at all
+  // (`nvidiaPrice` and `soxIndex` are taken from their own AI-fallback results,
+  // and `mag7Concentration` has no reader), so the other three were invented
+  // constants sitting where a future caller would have found them and believed
+  // them. All four are null; `source: "baseline"` is what the tier map reads to
+  // exclude the input from scoring.
   const baselineValues = {
-    nvidiaPrice: 800,
-    nvidiaMomentum: 50,
-    soxIndex: 5000,
-    mag7Concentration: 55,
+    nvidiaPrice: null,
+    nvidiaMomentum: null,
+    soxIndex: null,
+    mag7Concentration: null,
     source: "baseline" as const,
   }
 

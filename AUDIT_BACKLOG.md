@@ -384,7 +384,7 @@ recomputes it.
 | P7-7 | P2 | open | **`next build` does not run on this machine, by either bundler — a second blocker on Phase 7.0.** Needs a Vercel preview deploy or a local Node downgrade. |
 | P7-8 | P2 | fixed | The dead-code lens is now a rule (`check-dead-exports.ts`, ratcheted at 51). Its first run cleared itself because the allowlist named its own findings. |
 | P7-9 | P3 | fixed | **17 → 0, decided one at a time.** Fourteen deleted, two wired to the caller that had reimplemented them, one un-exported. `KNOWN_DEAD` is now empty, so any new unreferenced export in `lib/` fails. |
-| P7-10 | P2 | open | `nvidiaMomentum ?? 50` — a neutral-50 on a scored 0-100 momentum input. Excluded from scoring by its baseline tier; the display side is unverified. |
+| P7-10 | P2 | fixed | The 50 came from `fetchAlphaVantageIndicators`'s baseline object, not the `??` the row named, so the call-site guard never fired. Display rendered "$X \| 50/100" with Alpha Vantage down. |
 | P7-11 | P2 | fixed | `check-dead-exports.ts` counted a same-named local declaration as a reference, so a lib export with a diverged twin — the dangerous case — read as live. |
 | P7-12 | P2 | fixed | The Greeks calculator's own Black-Scholes is gone; gamma/theta/rho added to `lib/black-scholes.ts` with 19 new tests. The real bug was a missing `else` leaving stale Greeks on screen, not the NaN first recorded. |
 | P7-13 | P3 | fixed | `expectedMove` recomputed inline in `/api/strategy-scanner` now calls `lib/black-scholes.ts` and skips the row when it returns null. |
@@ -394,7 +394,7 @@ recomputes it.
 
 ### The open list, by severity
 
-219 findings recorded · **172 fixed · 8 wontfix · 0 verified-ok · 39 open.**
+219 findings recorded · **173 fixed · 8 wontfix · 0 verified-ok · 38 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -1891,3 +1891,76 @@ snapshot older than five minutes — want UAT on staging.**
 | ID | Sev | Tab / area | Finding |
 |---|---|---|---|
 | P7-16 | P2 | ANALYZE → CCPI | **FIXED.** The header dates every reading, says when one is cached, and flags it stale past `CACHE_FRESH_MINUTES` using the `hasFreshCache` P7-14 kept for it. Two further defects surfaced in the same lines: the existing date line read `data?.lastUpdated`, which `/api/ccpi` never returns, so no date had been rendering on any path; and the subtitle claimed "Real-time" on a tab whose most common path restores a cache without refetching. |
+
+---
+
+## Phase 7.4 (thirteenth pass) — P7-10: the default was not where the finding said it was (2026-08-11)
+
+P7-10 was recorded as `nvidiaMomentum: alphaVantageData?.nvidiaMomentum ?? 50` in
+`/api/ccpi`. That line was real, but **it was not the source of the 50, and changing it
+alone would have fixed nothing while looking like a fix.**
+
+`fetchAlphaVantageIndicators()` does not return null when it fails. It returns a
+`baselineValues` object — and that object carried `nvidiaMomentum: 50`. So on the failure
+path `alphaVantageData` is truthy, `alphaVantageData?.nvidiaMomentum` is `50`, and the
+`??` never fires. **A default written at the source outlives every null-guard written at
+the call site**, and the guard reads as protection while protecting nothing.
+
+The same object also carried `nvidiaPrice: 800`, `soxIndex: 5000` and
+`mag7Concentration: 55`. None of those three is read anywhere — `nvidiaPrice` and
+`soxIndex` come from their own AI-fallback results, and `mag7Concentration` has no reader
+at all — so they were invented constants sitting exactly where a future caller would find
+them and believe them. All four are now null.
+
+### Why the display side was the live half
+
+The row said scoring was safe and the display was unverified. Both hold, and the display
+side is a real defect that fires whenever Alpha Vantage is unavailable:
+
+- **Scoring** was already protected. `tiers.momentum.nvidiaMomentum` is
+  `alphaVantageLive ? "live" : "baseline"`, and baseline inputs are excluded from the
+  pillar and renormalized (P3-12). The canary path is protected too, via
+  `measured(value, tier)` returning null on a baseline tier.
+- **Display** read the value raw: the response's `indicators.nvidiaMomentum` is
+  `data.nvidiaMomentum` with no tier gate, and `components/ccpi/pillar-momentum.tsx`
+  rendered `` `$${nvidiaPrice} | ${nvidiaMomentum}/100` ``.
+
+The reason it reaches the screen rather than being hidden is worth naming: **`nvidiaPrice`
+comes from an independent AI-fallback chain**, not from Alpha Vantage. So when Alpha
+Vantage is down the price is still defined, the card's `!== undefined` guards both pass,
+and the row renders a real price beside a fabricated momentum — looking complete. The
+card's own axis labels 40-60 as "Neutral", so a 50 reads as the measurement "NVDA is
+flat" rather than "we could not measure NVDA".
+
+### The guard change is not cosmetic
+
+`indicators.nvidiaMomentum !== undefined` had to become `!= null`. **`null !== undefined`
+is true**, so with the value now nullable the old guard would have passed and rendered the
+string `"null/100"`. A nullable value and a `!== undefined` check are not the same test —
+switching a field from a default to null without revisiting its guards moves a fabricated
+number to a broken one.
+
+### Scoring contract, asserted
+
+`MomentumInputs.nvidiaMomentum` is now `number | null`, matching `soxIndex` (P6-34) and
+`fearGreedIndex` (P6-18), with `null` points for a null reading. Four checks added
+(formulas 533 → 537), including one that exists because the two states are otherwise
+indistinguishable:
+
+> **a 50 reading and a null are told apart by `scoredMax`, not by `score`.**
+
+A momentum of 50 scores 0 points, and an excluded input also contributes 0. So the pillar
+`score` is identical either way — only `scoredMax` (100 vs 91) records that one of them
+was never measured. A test asserting `score` alone would have passed against the defect.
+
+The null test also runs with the tier set to `live`, deliberately: the tier says where a
+reading came from, the value says whether there is one, and a rule that only tests the
+tier gate cannot see a null arriving on a live-tier input.
+
+**P6-4 fixed this exact idiom for AAII eight lines above this one** and left NVDA — the
+"a decision enforced in one module is not enforced" pattern, for the fifth time in this
+phase.
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| P7-10 | P2 | ANALYZE → CCPI | **FIXED, and the finding's own diagnosis corrected.** The `?? 50` named in the row was never reached: `fetchAlphaVantageIndicators` returns a `baselineValues` object rather than null on failure, and *that* object held the 50 — along with three more invented constants (`nvidiaPrice: 800`, `soxIndex: 5000`, `mag7Concentration: 55`) that no code reads. All null now. Scoring was already gated by the baseline tier; the **display** rendered "$X \| 50/100" whenever Alpha Vantage was down, because `nvidiaPrice` comes from a separate AI chain and stays defined. `MomentumInputs.nvidiaMomentum` is `number \| null` with four new checks, one asserting that a real 50 and an absence are distinguished by `scoredMax` rather than by `score` — they are identical in `score`. |

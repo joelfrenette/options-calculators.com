@@ -64,8 +64,17 @@ export function PillarMomentum({
               remaining pillars.
             </p>
           )}
-          {/* NVIDIA Momentum Score */}
-          {indicators.nvidiaPrice !== undefined && indicators.nvidiaMomentum !== undefined && (
+          {/* NVIDIA Momentum Score.
+              P7-10: the guard was `!== undefined` on both halves, and the
+              momentum half is now null rather than a defaulted 50 when Alpha
+              Vantage is down. `null !== undefined` is TRUE, so the old guard
+              would have rendered the string "null/100" — a nullable value and a
+              `!== undefined` check are not the same test. `!= null` covers both,
+              and the card is withheld rather than showing half a reading:
+              `nvidiaPrice` comes from an independent AI-fallback chain and stays
+              defined, so without this the row would pair a real price with a
+              missing momentum and look complete. */}
+          {indicators.nvidiaPrice != null && indicators.nvidiaMomentum != null && (
             <CCPIIndicator
               label="NVIDIA Price Momentum (Tech Bellwether)"
               value={`$${indicators.nvidiaPrice.toFixed(0)} | ${indicators.nvidiaMomentum}/100`}

@@ -227,7 +227,7 @@ _None._
 | `components/trade-walkthrough-modal.tsx` | 866 | 266 |
 | `components/insider-trading-dashboard.tsx` | 859 | 259 |
 | `components/risk-calculator.tsx` | 845 | 245 |
-| `lib/ccpi/scoring.ts` | 805 | 205 |
+| `lib/ccpi/scoring.ts` | 812 | 212 |
 | `components/social-sentiment.tsx` | 758 | 158 |
 | `lib/remediation.ts` | 756 | 156 |
 | `components/jobs-report-dashboard.tsx` | 751 | 151 |

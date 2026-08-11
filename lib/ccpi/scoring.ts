@@ -248,7 +248,13 @@ function scorePillar<K extends string>(
 // ---------------------------------------------------------------------------
 
 export interface MomentumInputs {
-  nvidiaMomentum: number // 0-100 (50 = neutral; low = NVDA falling)
+  /**
+   * 0-100. **50 is a real neutral reading on this scale, not an absence** —
+   * which is why the field is nullable (P7-10). The route used to default it to
+   * `?? 50` when Alpha Vantage was down, so "we could not measure NVDA" and
+   * "NVDA is exactly neutral" arrived here as the same number.
+   */
+  nvidiaMomentum: number | null
   soxIndex: number | null // null when no source produced a reading (P6-34)
   qqqDailyReturn: number // percent
   qqqConsecDown: number
@@ -277,6 +283,7 @@ function smaPoints(below: boolean, proximity: number, breach: number, near: numb
 export function computeMomentumPillar(d: MomentumInputs, tiers: MomentumTiers): PillarResult {
   const points: Record<MomentumKey, number | null> = {
     nvidiaMomentum: (() => {
+      if (d.nvidiaMomentum === null) return null // P7-10: no reading, no points
       if (d.nvidiaMomentum < 20) return 9 // Severe weakness = max danger
       if (d.nvidiaMomentum < 40) return 6
       if (d.nvidiaMomentum > 80) return 4 // Overheating = moderate danger
