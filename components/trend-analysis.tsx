@@ -584,18 +584,30 @@ export function TrendAnalysis() {
                   formatter={(value: any) => (value ? `$${value.toFixed(2)}` : "N/A")}
                 />
                 <Legend />
-                <ReferenceLine
-                  y={selectedItem.support ?? 0}
-                  stroke="#ef4444"
-                  strokeDasharray="3 3"
-                  label={{ value: "Support", position: "right", fill: "#ef4444", fontSize: 11 }}
-                />
-                <ReferenceLine
-                  y={selectedItem.resistance ?? 0}
-                  stroke="#10b981"
-                  strokeDasharray="3 3"
-                  label={{ value: "Resistance", position: "right", fill: "#10b981", fontSize: 11 }}
-                />
+                {/* P7-6. These read `?? 0`, so an unknown support or resistance
+                    drew a dashed line labelled "Support" across y=0 — a price
+                    level of zero asserted on the chart, and with
+                    `domain={["auto","auto"]}` the axis then stretched to include
+                    it and flattened the whole series against the bottom. P6-68
+                    fixed `priceTarget1Week ?? 0` printing "$0.00" in this same
+                    component and did not reach the chart. An unknown level draws
+                    no line. */}
+                {Number.isFinite(selectedItem.support) && (
+                  <ReferenceLine
+                    y={selectedItem.support as number}
+                    stroke="#ef4444"
+                    strokeDasharray="3 3"
+                    label={{ value: "Support", position: "right", fill: "#ef4444", fontSize: 11 }}
+                  />
+                )}
+                {Number.isFinite(selectedItem.resistance) && (
+                  <ReferenceLine
+                    y={selectedItem.resistance as number}
+                    stroke="#10b981"
+                    strokeDasharray="3 3"
+                    label={{ value: "Resistance", position: "right", fill: "#10b981", fontSize: 11 }}
+                  />
+                )}
                 <Line
                   type="monotone"
                   dataKey="bollingerUpper"

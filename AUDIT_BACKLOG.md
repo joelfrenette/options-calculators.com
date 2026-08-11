@@ -375,10 +375,18 @@ recomputes it.
 | P6-87 | P3 | open | `lib/budget-guard.ts` is unassertable for the same reason. Needs `readBudget` extracted into an import-free module. **This is Phase 7.0.** |
 | P6-88 | P1 | fixed | Default encryption key deleted from `lib/api-keys.ts`. |
 | P6-89 | P1 | fixed | A commit broke `check:formulas` on staging and the suite went on looking green. Pure maths moved to the import-free `lib/vix-term.ts`. Numbered during 7.1 — it had been recorded as an unnumbered row. |
+| P7-1 | P2 | fixed | The Costs tab's budget verdict excluded pay-per-use spend and called one of two budgets "the budget". |
+| P7-2 | P2 | fixed | `totalIndicators \|\| 29` ×5 in the CCPI dashboard, plus a `?? 0` that defeated two routes' derived fallbacks. |
+| P7-3 | P2 | fixed | Rule 12 could not see an integer default. Widened; it found eleven sites (P7-6). |
+| P7-4 | P2 | fixed | Dead `validateCCPICalculation` returned "valid" for a composite it could not compute. Deleted. |
+| P7-5 | P2 | fixed | `check-provenance.ts` printed the wrong line number for any file with a block comment above the hit. |
+| P7-6 | P1 | fixed | Eleven defaulted-number sites across six public tabs, including a "Support" reference line drawn at y = 0 on a price chart. |
+| P7-7 | P2 | open | **`next build` does not run on this machine, by either bundler — a second blocker on Phase 7.0.** Needs a Vercel preview deploy or a local Node downgrade. |
 
 ### The open list, by severity
 
-203 findings recorded · **148 fixed · 7 wontfix · 0 verified-ok · 48 open.**
+210 findings recorded · **154 fixed · 7 wontfix · 0 verified-ok · 49 open.**
+_(Updated 2026-08-11 by Phase 7.2, which added P7-1…P7-7: six fixed, one open.)_
 
 `verified-ok` is empty on purpose. The vocabulary allows it and nothing currently
 qualifies: every investigated-and-clean result on this project was recorded inside
@@ -393,11 +401,12 @@ work on them; three of the four are probably already done.**
 `P6-8` · `P6-11` — both need an owner rebuild-or-retire decision, not code.
 `P6-27` — needs one live grouped Polygon call.
 
-**P2 — 10.**
+**P2 — 11.**
 `S-8` · `S-9` · `S-10` · `S-18` (the scanner's hidden gates, estimate badges, expected
 move and step-number drift) · `P0-4` (timeout coverage, never re-measured) ·
 `P2-2` (the CCPI cache that does not cache) · `P2-4` (16 routes with no automated
-verification) · `P6-31` · `P6-65` **— Joel's weight decision** · `P6-85` **— Phase 7.0**.
+verification) · `P6-31` · `P6-65` **— Joel's weight decision** · `P6-85` **— Phase 7.0** ·
+`P7-7` **— `next build` runs on neither bundler here; the second blocker on Phase 7.0**.
 
 **P3 — 14.**
 `S-5` · `S-7` · `S-13` **— Joel's Vercel action** · `S-16` · `S-17` · `P0-1` · `P0-6` ·
@@ -410,8 +419,8 @@ verification) · `P6-31` · `P6-65` **— Joel's weight decision** · `P6-85` **
 **Closed on rationale rather than a change — 7.**
 `S-4` · `P0-7` · `P2-6` · `E-8b` · `E-8e` · `E-8f` · `P6-35`.
 
-**What this changes about "work the backlog by severity".** The real defect list is 32
-items, not the 203 the file's length suggests — and half the P1s on it are bookkeeping,
+**What this changes about "work the backlog by severity".** The real defect list is 33
+items, not the 210 the file's length suggests — and half the P1s on it are bookkeeping,
 not work. Nobody could see that before, which is the point of this section: closure was
 recorded in fourteen vocabularies, and the file's own summary line was still calling
 three items "remaining" (P6-29, S-11, S-14) that had each been fixed the day before.
@@ -1165,3 +1174,45 @@ across 42 tabs, and clearing any blank `DAILY_HARD_STOP` / `MONTHLY_HARD_STOP` /
 starts at **7.0 — make the unverifiable verifiable**, which needs a `next build` and
 therefore a clean branch; if the merge has not happened, **7.1 (reconcile this file's
 inconsistent closure markers) needs no build and can start immediately.**
+
+---
+
+## Phase 7.2 — the admin surfaces, and what following them out found (2026-08-11)
+
+The two lenses Phase 6 built — **provenance** ("does the label match the code behind
+it") and **composite independence** ("can input A ever disagree with input B") — had
+swept the public tabs, `lib/` and the API routes and had never touched `/admin`, the
+health panel or the costs tab. This is that sweep: ~5,350 lines across
+`app/admin/page.tsx`, the three `components/admin/*`, `ai-status-admin`,
+`ccpi-audit-admin`, `costs-usage-admin`, and the eight `app/api/admin/*` routes.
+
+**The admin came out better than the public tabs, and the negatives are worth recording
+so nobody re-runs this.** All ten admin controls have real handlers (shape 5: clean).
+No admin component contains a numeric default in any idiom (shape 3: clean). One
+provenance-claiming noun exists in admin copy — `ccpi-audit-admin`'s "Implied
+Volatility = S&P 500 30-day expected volatility from options pricing" — and it is an
+accurate definition of the VIX it labels. The Budget Guard route and panel, the
+`api-status` route's coverage note and the health check's own note each state their
+scope correctly and are the standard the rest of the site should be measured against.
+**The Phase 5b rebuild holds.**
+
+**What the sweep found instead is that the admin is where you can SEE the public tabs'
+defects.** Three of the findings below are in public components, and each was reached
+by reading an admin file that had already fixed the same thing.
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| P7-1 | P2 | ADMIN → Costs | **The Costs tab's budget verdict excludes the only spend that can run away.** "Estimated spend now" sums flat subscription fees; "Budget target" is `MONTHLY_BUDGET_TARGET`; `overBudget` compares the two. Pay-per-use LLM spend — the category E-5a exists because the ledger was blind to it — is in neither number, and nothing said so, so "estimate is $X under budget" read as a verdict on total spend. There are **two budgets on this site governed by three env vars**, and the Costs tab called one of them "the budget". The Budget Guard panel states its own scope correctly ("Cuts off pay-per-use API keys… Flat-rate and free providers are left running"); nothing stated the reverse. **FIXED (staging):** the card says flat plan fees only, names `DAILY_BUDGET_HARD_STOP` / `MONTHLY_BUDGET_HARD_STOP` as the other half, and states that neither figure includes the other. |
+| P7-2 | P2 | ANALYZE → CCPI | **`data.totalIndicators \|\| 29` in five places in the flagship dashboard — the exact idiom the admin panel's own comment records as removed.** `ccpi-audit-admin.tsx:145` reads "The old `ccpi.totalIndicators \|\| 29` invented 29 for any falsy value" and takes the real count; `ccpi-dashboard.tsx` never got that fix and prints "3 of 29 warning signals active". The count is derived route-side from the weight tables (`TOTAL_SCORED_INDICATORS`), so the literal is right only by coincidence — change a weight table and five render sites keep printing 29. **The same component answered the same missing field three ways:** `\|\| 29` at five render sites and `?? 0` at two prompt-payload sites. **And the pair was wrong although each half was right:** `/api/ccpi/chat` falls back to `?? TOTAL_SCORED_INDICATORS` and `/api/ccpi/executive-summary` had a fallback of its own — both unreachable, because the client always sent a number, so a missing count would have put **"Active Warning Signals: 3 of 0"** into an LLM prompt. **FIXED (staging):** one `indicatorCount` memo rendering "—", nulls sent to both routes so their derived fallbacks can fire, `CCPIChatModal`'s prop type widened. The executive-summary route's own fallback was the canary-array length — the "3 of 12 against a 29-indicator index" substitution P6-19 named — and is now `TOTAL_SCORED_INDICATORS`. **A decision enforced in one module is not enforced.** |
+| P7-3 | P2 | tooling | **Rule 12 could not see an integer default, and its scope was narrower than its name.** `check-provenance.ts` matched a numeric default only when `.toFixed(` followed it — that is, a formatted **decimal**. A count rendered straight into JSX has no decimal places, so `{data.totalIndicators \|\| 29}` walked through, **and P6-71 swept all 95 components under this rule with all five instances present.** A denominator is as much a measurement as a price is. **FIXED:** the rule now also matches `{ … \|\| <int>}` / `{ … ?? <int>}` closing a JSX expression container. Layout arithmetic never appears in that position, so the two patterns stay disjoint and neither needs an exception list. **It found eleven more sites on the run that introduced it** — see P7-6. |
+| P7-4 | P2 | ANALYZE → CCPI | **A function named `validate` answered "valid" for a composite it could not compute, and nothing called it.** `lib/ccpi/calculations.ts` held `validateCCPICalculation`, opening `if (calculated === null) return true`. A null composite means no pillar had enough live or AI weight to score — the state most in need of flagging — and it reported clean. A repo-wide symbol search across `app/`, `lib/`, `components/` and `scripts/` returned only its own definition. **Dead code holding a reassuring default, sitting in one of the two modules no check script can load (P6-85), so nothing would have caught it if someone wired it up** — P6-81's shape exactly. Found by asking which of the admin's numbers are recomputed rather than echoed. **FIXED (staging): deleted.** The live implementation of the same decision, `validateCCPI` in `ccpi-audit-admin.tsx`, is correct — an unscoreable composite returns `ok: null`, "NOT VERIFIABLE", not a pass. Two implementations of one decision; the dead one was the wrong one. |
+| P7-5 | P2 | tooling | **`check-provenance.ts` printed the wrong line for any file with a block comment above the hit.** `stripComments` replaced a block comment with a single space, collapsing it to one line and shifting every line after it. Four of P7-6's eleven hits pointed at `</CardHeader>` and a chart axis. On a project whose stated highest-yield method is "follow a label to the code behind it", **a check that points at the wrong line is worse than one that prints no line at all: the reader looks, sees nothing wrong, and concludes the finding is stale.** Every `file:line` this script has emitted for such a file was wrong. **FIXED:** a block comment is now replaced by its own newlines, so offsets are exact. Applies to all nineteen rules, not only rule 12. |
+| P7-6 | **P1** | six public tabs | **The widened rule 12 found eleven sites, and the sharpest one draws a line on a chart.** `trend-analysis.tsx` rendered `<ReferenceLine y={selectedItem.support ?? 0} label="Support">`, and the same for resistance — an unknown level drew a dashed line labelled **"Support" across y = 0** on a price chart, and because the axis is `domain={["auto","auto"]}` it then stretched to include zero and flattened the whole price series against the bottom. **P6-68 fixed `priceTarget1Week ?? 0` printing "$0.00" in this same component and never reached the chart.** Also fixed: `ccpi-dashboard` rendering "CRASH AMPLIFIERS ACTIVE **+0 BONUS POINTS**" — a contradiction whose reassuring half is the default, the same rule as P6-20(a), where a +0 bonus must not read as "no acute event" when it means "could not check"; `insider-clusters` saying "0 clusters found" while `data` was still null; `insider-trading-dashboard` rendering "(0 trades)" beside "Live SEC Form 4 data via Finnhub"; `politician-spotlight` asserting a 180-day window the response never reported; and `social-sentiment` putting "0/0 sources responded" both on screen and into the AI prompt, at the exact point the prompt is explaining that no reading exists. **Every rule on this project has found a live defect on the run that introduced it. This one found eleven.** |
+| P7-7 | P2 | tooling / ops | **`next build` does not run on this machine, which is a second blocker on Phase 7.0 and was not known.** 7.0 was deferred because it "needs a `next build` to confirm the bundler accepts `.ts` import specifiers". `pnpm build` fails at `WasmHash._updateWithBuffer` inside webpack's bundled WASM hasher — `TypeError: Cannot read properties of undefined (reading 'length')` — on Node **v24.16.0** with Next **15.5.9**. **Verified pre-existing:** the working tree was stashed and the identical failure reproduced at a clean `HEAD`, so nothing in this session caused it. `next build --turbopack` bypasses webpack and resolves every module, then fails fetching Geist from `fonts.googleapis.com` — the same blocked outbound HTTPS recorded as P2-6. **So the build gate 7.0 needs is not obtainable locally by either bundler.** **OPEN.** The realistic answers are a Vercel preview deploy — which the staging branch already provides once the merge happens — or a local Node downgrade. Recorded so 7.0 is not attempted a third time on the assumption that only the merge is in the way. |
+
+**The rule 7.2 earned: a fix is not finished until the same question has been asked of
+every module that renders the same field.** P7-2 and P7-6 are both one module getting a
+fix its sibling did not, and in both cases the fixed module carried a comment
+explaining the defect while the unfixed one carried the defect. The synthesis already
+named this cause; what is new is that **the comment recording a fix is a reliable place
+to look for the instance that was missed.**

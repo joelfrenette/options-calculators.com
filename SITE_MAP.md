@@ -11,13 +11,13 @@
 
 | Tab id | Label | Component | File | Lines | Internal APIs |
 |---|---|---|---|---|---|
-| `ccpi` ★ | Crash & Corrections Prediction Index | `CcpiDashboard` | `components/ccpi-dashboard.tsx` | 921 | `/api/ccpi/executive-summary`<br>`/api/ccpi`<br>`/api/ccpi/cache`<br>`/api/ccpi/history` |
+| `ccpi` ★ | Crash & Corrections Prediction Index | `CcpiDashboard` | `components/ccpi-dashboard.tsx` | 942 | `/api/ccpi/executive-summary`<br>`/api/ccpi`<br>`/api/ccpi/cache`<br>`/api/ccpi/history` |
 | `earnings-calendar` | Earnings & Economic Calendar | `EarningsEconomicCalendar` | `components/earnings-economic-calendar.tsx` | 603 | `/api/earnings-calendar/insights`<br>`/api/earnings-calendar` |
-| `trend-analysis` | Index Trend Analysis | `TrendAnalysis` | `components/trend-analysis.tsx` | 1157 | `/api/trend-analysis` |
+| `trend-analysis` | Index Trend Analysis | `TrendAnalysis` | `components/trend-analysis.tsx` | 1169 | `/api/trend-analysis` |
 | `risk-management` | CBOE VIX Volatility Index | `RiskCalculator` | `components/risk-calculator.tsx` | 845 | `/api/vix`<br>`/api/vix-history` |
 | `market-sentiment` | CNN's Fear & Greed | `MarketSentiment` | `components/market-sentiment.tsx` | 1585 | `/api/market-sentiment`<br>`/api/sentiment-heatmap` |
 | `panic-euphoria` | Citibank's Panic & Euphoria Index | `PanicEuphoria` | `components/panic-euphoria.tsx` | 1150 | `/api/panic-euphoria` |
-| `social-sentiment` | Social Sentiment Index | `SocialSentiment` | `components/social-sentiment.tsx` | 745 | `/api/social-sentiment` |
+| `social-sentiment` | Social Sentiment Index | `SocialSentiment` | `components/social-sentiment.tsx` | 758 | `/api/social-sentiment` |
 | `fomc-predictions` | FOMC Fed Rate Forecaster | `FomcPredictions` | `components/fomc-predictions.tsx` | 1461 | `/api/fomc-predictions` |
 | `cpi-inflation` | BLS CPI Inflation Forecaster | `CpiInflationAnalysis` | `components/cpi-inflation-analysis.tsx` | 669 | `/api/cpi-inflation` |
 | `jobs` | BLS Jobs Rate Forecaster | `JobsReportDashboard` | `components/jobs-report-dashboard.tsx` | 751 | `/api/jobs-report` |
@@ -38,11 +38,11 @@
 
 | Tab id | Label | Component | File | Lines | Internal APIs |
 |---|---|---|---|---|---|
-| `insiders` | Insider Activity | `InsiderTradingDashboard` | `components/insider-trading-dashboard.tsx` | 851 | `/api/insider-trading`<br>`/api/insider-trading/ai-insights` |
-| `insider-clusters` | Cluster Buys | `InsiderClusters` | `components/insider-clusters.tsx` | 243 | `/api/insider-clusters` |
+| `insiders` | Insider Activity | `InsiderTradingDashboard` | `components/insider-trading-dashboard.tsx` | 859 | `/api/insider-trading`<br>`/api/insider-trading/ai-insights` |
+| `insider-clusters` | Cluster Buys | `InsiderClusters` | `components/insider-clusters.tsx` | 249 | `/api/insider-clusters` |
 | `form-144` | Form 144 Watch | `Form144Watch` | `components/form-144-watch.tsx` | 187 | `/api/form-144` |
 | `congress-feed` | Congress Trade Feed | `CongressTradeFeed` | `components/congress-trade-feed.tsx` | 456 | `/api/congress-trades` |
-| `politician-spotlight` | Politician Spotlight | `PoliticianSpotlight` | `components/politician-spotlight.tsx` | 271 | `/api/politician-spotlight` |
+| `politician-spotlight` | Politician Spotlight | `PoliticianSpotlight` | `components/politician-spotlight.tsx` | 276 | `/api/politician-spotlight` |
 | `top-performers` | Top Performers | `TopPerformers` | `components/top-performers.tsx` | 285 | `/api/top-performers` |
 | `hedge-fund-13f` | Hedge Fund 13F | `HedgeFund13F` | `components/hedge-fund-13f.tsx` | 188 | `/api/hedge-fund-13f` |
 | `smart-money-etfs` | Smart-Money ETFs | `SmartMoneyEtfs` | `components/smart-money-etfs.tsx` | 195 | `/api/smart-money-etfs` |
@@ -221,17 +221,17 @@ _None._
 | `components/ccpi-audit-admin.tsx` | 1637 | 1037 |
 | `components/market-sentiment.tsx` | 1585 | 985 |
 | `components/fomc-predictions.tsx` | 1461 | 861 |
-| `components/trend-analysis.tsx` | 1157 | 557 |
+| `components/trend-analysis.tsx` | 1169 | 569 |
 | `components/panic-euphoria.tsx` | 1150 | 550 |
 | `components/options-strategy-toolbox.tsx` | 1027 | 427 |
-| `components/ccpi-dashboard.tsx` | 921 | 321 |
+| `components/ccpi-dashboard.tsx` | 942 | 342 |
 | `components/trade-walkthrough-modal.tsx` | 866 | 266 |
-| `components/insider-trading-dashboard.tsx` | 851 | 251 |
+| `components/insider-trading-dashboard.tsx` | 859 | 259 |
 | `components/risk-calculator.tsx` | 845 | 245 |
 | `lib/ccpi/scoring.ts` | 805 | 205 |
+| `components/social-sentiment.tsx` | 758 | 158 |
 | `components/jobs-report-dashboard.tsx` | 751 | 151 |
 | `lib/remediation.ts` | 748 | 148 |
-| `components/social-sentiment.tsx` | 745 | 145 |
 | `app/page.tsx` | 697 | 97 |
 | `components/cpi-inflation-analysis.tsx` | 669 | 69 |
 | `components/admin/health-check-panel.tsx` | 622 | 22 |

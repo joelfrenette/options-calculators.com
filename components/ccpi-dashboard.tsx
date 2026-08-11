@@ -49,6 +49,21 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
   const regimeColor = useMemo(() => getReadableColor(zone.color), [zone.color])
   const sortedCanaries = useMemo(() => (data ? sortCanaries(data.canaries) : []), [data])
   const activeCanariesCount = useMemo(() => (data ? countActiveWarnings(data.canaries) : 0), [data])
+  /**
+   * The scored-indicator count the payload reported, or null.
+   *
+   * P7-2. This component carried `data.totalIndicators || 29` in five places —
+   * the exact idiom `ccpi-audit-admin.tsx` records as removed ("invented 29 for
+   * any falsy value") while the flagship dashboard kept it. `totalIndicators` is
+   * optional on `CCPIData` and derived route-side from the weight tables
+   * (`TOTAL_SCORED_INDICATORS`, currently 29), so the literal is right only by
+   * coincidence: change a weight table and five render sites keep printing 29.
+   * A denominator is a measurement; a missing one renders "—".
+   */
+  const indicatorCount = useMemo(
+    () => (typeof data?.totalIndicators === "number" ? data.totalIndicators : null),
+    [data],
+  )
 
   const fetchExecutiveSummary = useCallback(async (ccpiData: CCPIData) => {
     try {
@@ -60,7 +75,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
         activeCanaries: ccpiData.canaries ? countActiveWarnings(ccpiData.canaries) : 0,
         // The payload's scored-indicator count, not the canary-array length —
         // "3 of 12" was being narrated against a 29-indicator index.
-        totalIndicators: ccpiData.totalIndicators ?? 0,
+        totalIndicators: ccpiData.totalIndicators ?? null,
         regime: ccpiData.regime || { name: "Unknown", description: "Unknown" },
         pillars: ccpiData.pillars ?? { momentum: null, riskAppetite: null, valuation: null, macro: null },
       }
@@ -493,20 +508,20 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                   {data.ccpi <= 39 ? (
                     <p>
                       <span className="font-semibold text-green-700">Regime: {data.regime.name}</span> - With{" "}
-                      {countActiveWarnings(data.canaries)} of {data.totalIndicators || 29} warning signals active and{" "}
+                      {countActiveWarnings(data.canaries)} of {indicatorCount ?? "—"} warning signals active and{" "}
                       {data.certainty}% data quality, the market is in a {data.ccpi <= 19 ? "low-risk" : "normal"}{" "}
                       state.
                     </p>
                   ) : data.ccpi <= 59 ? (
                     <p>
                       <span className="font-semibold text-yellow-700">Regime: {data.regime.name}</span> - With{" "}
-                      {countActiveWarnings(data.canaries)} of {data.totalIndicators || 29} warning signals active,
+                      {countActiveWarnings(data.canaries)} of {indicatorCount ?? "—"} warning signals active,
                       elevated caution is warranted. Monitor for regime shift.
                     </p>
                   ) : (
                     <p>
                       <span className="font-semibold text-red-700">Regime: {data.regime.name}</span> - With{" "}
-                      {countActiveWarnings(data.canaries)} of {data.totalIndicators || 29} warning signals active and
+                      {countActiveWarnings(data.canaries)} of {indicatorCount ?? "—"} warning signals active and
                       CCPI at {data.ccpi}, extreme caution required.
                     </p>
                   )}
@@ -529,7 +544,13 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span className="cursor-help border-b border-dashed border-red-400">
-                      CRASH AMPLIFIERS ACTIVE +{data.totalBonus || 0} BONUS POINTS
+                      {/* P7-6. `|| 0` read "+0 BONUS POINTS" under a heading
+                          saying amplifiers are ACTIVE — a contradiction, and the
+                          reassuring half of it. Same rule as P6-20(a): a +0
+                          bonus must not be read as "no acute event" when it
+                          means "could not check". */}
+                      CRASH AMPLIFIERS ACTIVE +{typeof data.totalBonus === "number" ? data.totalBonus : "—"} BONUS
+                      POINTS
                     </span>
                   </TooltipTrigger>
                   <TooltipContent
@@ -611,7 +632,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className="text-3xl font-bold text-orange-600 cursor-help">
-                    {activeCanariesCount}/{data.totalIndicators || 29}
+                    {activeCanariesCount}/{indicatorCount ?? "—"}
                   </div>
                 </TooltipTrigger>
                 <TooltipContent
@@ -620,7 +641,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 >
                   <p className="text-sm">
                     <strong>
-                      {activeCanariesCount} out of {data.totalIndicators || 29}
+                      {activeCanariesCount} out of {indicatorCount ?? "—"}
                     </strong>{" "}
                     warning signals are currently active.
                     <br />
@@ -907,7 +928,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
           activeWarnings: data ? countActiveWarnings(data.canaries) : 0,
           // The payload's own scored-indicator count. This was the canary-array
           // length, so the prompt read "3 of 12" against a 29-indicator index.
-          totalIndicators: data?.totalIndicators ?? 0,
+          totalIndicators: data?.totalIndicators ?? null,
           crashAmplifiers: data?.crashAmplifiers?.map((ca) => ca.reason) || [],
           activeSignals:
             data?.canaries

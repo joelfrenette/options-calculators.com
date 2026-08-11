@@ -71,7 +71,13 @@ export async function POST(request: Request) {
     const certainty = body.certainty ?? body.confidence ?? 0
     const activeCanaries =
       body.activeCanaries ?? (body.canaries ? body.canaries.filter((c: any) => c.active).length : 0)
-    const totalIndicators = body.totalIndicators ?? (body.canaries ? body.canaries.length : 0)
+    // The canary-array length is NOT the indicator count — that substitution is
+    // what narrated "3 of 12" against a 29-indicator index (P6-19), and it was
+    // still sitting here as the fallback. The count is derived from the weight
+    // tables, so fall back to that; the client sends null when the payload
+    // carried no count (P7-2), which is what makes this reachable at all.
+    const totalIndicators =
+      typeof body.totalIndicators === "number" ? body.totalIndicators : TOTAL_SCORED_INDICATORS
     const regime = body.regime ?? { name: "Unknown", description: "Unknown" }
     // Pillars arrive null when too little of their weight was live/AI-sourced.
     // `?? { …: 0 }` and a bare `${pillars.momentum}/100` both told the model a

@@ -82,9 +82,22 @@ function walk(dir: string, match: (p: string) => boolean): string[] {
  * preceded by `:`, so a `https://` inside a string does not swallow the rest of
  * the line — the one case that would cause a silent MISS rather than a false
  * alarm, which is the direction that matters here.
+ *
+ * LINE-PRESERVING (P7-5). This used to collapse a block comment to a single
+ * space, which shifted every line after it. Every `file:line` this script has
+ * ever printed for a file with a block comment above the hit named the wrong
+ * line — and on a project whose stated method is "follow a label to the code
+ * behind it", a check that points at the wrong line is worse than one that
+ * prints no line at all: the reader looks, sees nothing wrong, and concludes
+ * the finding is stale. Found while widening rule 12 (P7-3), when four of the
+ * eleven new hits pointed at `</CardHeader>` and a chart axis.
+ *
+ * A block comment is now replaced by its own newlines, so offsets are exact.
  */
 function stripComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1")
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => " " + "\n".repeat((m.match(/\n/g) || []).length))
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1")
 }
 
 const read = (p: string) => readFileSync(p, "utf8")
@@ -652,11 +665,29 @@ check(
 // exactly how P6-68 became live — `?? 50` was harmless when written and became
 // a defect the moment the route learned to return null.
 
+// SCOPE WIDENED (P7-3). The original rule required `.toFixed(` immediately
+// after the default, which means it only ever saw a formatted DECIMAL. An
+// integer rendered straight into JSX slipped past it, and one had:
+// `{data.totalIndicators || 29}` in `ccpi-dashboard.tsx`, five times, printing
+// "3 of 29 warning signals active" whenever the payload omitted the count —
+// while `ccpi-audit-admin.tsx` carried a comment recording that exact idiom as
+// removed. **P6-71 swept all 95 components under this rule and every one of the
+// five survived**, because a count has no decimal places.
+//
+// A denominator is as much a measurement as a price is. The second pattern
+// catches `{expr || <int>}` and `{expr ?? <int>}` closing a JSX expression
+// container. Layout arithmetic never appears in that position — a width or an
+// array index is not a thing you render on its own — so the two patterns stay
+// disjoint and neither needs an exception list.
+
 const numericDefaults: string[] = []
 for (const f of UI_FILES) {
   const src = code(f)
   src.split("\n").forEach((line, i) => {
-    if (/(?:\?\?|\|\|)\s*-?\d+(?:\.\d+)?\s*\)\s*\.toFixed\(/.test(line)) {
+    const formattedDecimal = /(?:\?\?|\|\|)\s*-?\d+(?:\.\d+)?\s*\)\s*\.toFixed\(/.test(line)
+    // `{ … || 29}` / `{ … ?? 0}` — a defaulted number rendered as itself.
+    const renderedInteger = /\{[^{}]*(?:\?\?|\|\|)\s*-?\d+(?:\.\d+)?\s*\}/.test(line)
+    if (formattedDecimal || renderedInteger) {
       numericDefaults.push(`${rel(f)}:${i + 1}`)
     }
   })
@@ -666,7 +697,7 @@ check(
   numericDefaults.length === 0,
   numericDefaults.length
     ? numericDefaults.join(", ")
-    : `${UI_FILES.length} components checked — missing values render "—", not 0`,
+    : `${UI_FILES.length} components checked, both idioms (formatted decimal and rendered integer) — missing values render "—", not a constant`,
 )
 
 // ---------------------------------------------------------------------------

@@ -445,13 +445,21 @@ const InsiderTradingDashboard = () => {
                     className={`w-2 h-2 rounded-full ${data.dataSources.corporate?.isLive ? "bg-green-500" : "bg-yellow-500"}`}
                   />
                   <span className="font-medium">Corporate:</span>{" "}
+                  {/* P7-6. `|| 0` rendered "(0 trades)" beside "Live SEC Form 4
+                      data via Finnhub" when the feed reported live but sent no
+                      count — a live source that returned nothing and a source
+                      that never reported a count read identically. */}
                   {data.dataSources.corporate?.isLive ? "Live SEC Form 4 data via Finnhub" : "Data unavailable"} (
-                  {data.dataSources.corporate?.count || 0} trades)
+                  {typeof data.dataSources.corporate?.count === "number" ? data.dataSources.corporate.count : "—"}{" "}
+                  trades)
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-blue-500" />
                   <span className="font-medium">Congressional:</span> Public STOCK Act disclosures (
-                  {data.dataSources.congressional?.count || 0} trades)
+                  {typeof data.dataSources.congressional?.count === "number"
+                    ? data.dataSources.congressional.count
+                    : "—"}{" "}
+                  trades)
                   <InfoTooltip content="Congressional trades are disclosed with up to 45-day delay per STOCK Act. Value ranges (not exact amounts) are reported. Prices shown are approximate market prices at disclosure." />
                 </span>
               </div>

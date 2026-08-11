@@ -42,18 +42,18 @@ const BACKLOG = "AUDIT_BACKLOG.md"
  * findings set that quietly shrinks, fails loudly instead of passing quietly.
  * Update them deliberately in the same commit that changes the counts.
  */
-const EXPECTED_LEDGER_ROWS = 203
-const EXPECTED_OPEN = 48
-const EXPECTED_FIXED = 148
+const EXPECTED_LEDGER_ROWS = 210
+const EXPECTED_OPEN = 49
+const EXPECTED_FIXED = 154
 const EXPECTED_WONTFIX = 7
 const EXPECTED_VERIFIED_OK = 0
 
 /**
- * IDs reachable from a table's first cell. The remainder of the ledger (203 - 193)
+ * IDs reachable from a table's first cell. The remainder of the ledger (210 - 200)
  * is sub-items that exist only inside a parent row's prose — E-6a..E-6d, E-7a/b/d,
  * E-8a/c/d. Asserted so that findings cannot quietly stop being table rows.
  */
-const EXPECTED_TABLE_IDS = 193
+const EXPECTED_TABLE_IDS = 200
 
 /**
  * Table rows whose first cell is deliberately not a finding ID: they record a piece
@@ -97,10 +97,10 @@ for (let i = ledgerStart + 1; i < lines.length; i++) {
 
 // ---------------------------------------------------------------------------
 // Parse. A finding ID is <prefix>-<number><optional letter suffix>, where the
-// prefix names a phase: S (seeded), P0..P6 (phases), A (admin audit), E (enhancement).
+// prefix names a phase: S (seeded), P0..P9 (phases), A (admin audit), E (enhancement).
 // ---------------------------------------------------------------------------
 
-const ID = /\b(?:S|P[0-6]|A|E)-\d+[a-z]?\b/g
+const ID = /\b(?:S|P[0-9]|A|E)-\d+[a-z]?\b/g
 
 /** The first cell of a markdown table row, or null if the line is not one. */
 function firstCell(line: string): string | null {

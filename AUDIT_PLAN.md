@@ -215,7 +215,22 @@ Do not skip to burn-down on the assumption the list is obvious: P6-66 shipped tw
 contradicting rows for one finding, and P6-79 found a planning document 40% wrong about
 its own inventory.
 
-**7.2 — Point the two new lenses at what they have never touched.**
+**7.2 — Point the two new lenses at what they have never touched. DONE 2026-08-11.**
+The admin surfaces were swept (~5,350 lines) and **came out better than the public tabs**:
+every control has a handler, no admin component holds a numeric default in any idiom, and
+the one provenance-claiming noun in admin copy is accurate. The Phase 5b rebuild holds.
+Seven findings (P7-1…P7-7), six fixed. **Three of them are in PUBLIC components, each
+reached by reading an admin file that had already fixed the same thing** — including
+`totalIndicators || 29` five times in the flagship CCPI dashboard beside an admin comment
+recording that idiom as removed. Widening rule 12 to see integer defaults (it only ever
+matched formatted decimals) found eleven more sites across six tabs, the sharpest being a
+"Support" reference line drawn at y = 0 on a price chart. **P7-7 is open and changes this
+plan: `next build` runs on neither bundler on this machine**, so 7.0's build gate needs a
+Vercel preview deploy or a local Node downgrade — the merge was never the only blocker.
+Still not swept: anything rendered from data rather than written in source, and the
+email/metadata layer.
+
+_Original statement of the step:_
 Provenance ("does the label match the code behind it") and composite independence ("can
 input A ever disagree with input B") were applied for the first time on 2026-08-11 and
 **fourteen already-ticked tabs failed one or both**. They have now swept the public tabs,

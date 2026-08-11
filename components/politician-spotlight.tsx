@@ -122,7 +122,12 @@ export function PoliticianSpotlight() {
             <InfoTooltip content="Curated cards for the most-watched senators and representatives. Each shows their trade activity, top tickers, and average performance vs the S&P 500. Use these as one signal among many — disclosures lag up to 45 days." />
           </h2>
           <p className="text-sm text-slate-600 mt-1">
-            Last {data?.windowDays ?? 180} days of trades by the most-watched members of Congress.
+            {/* P7-6. `?? 180` asserted a 180-day window whether or not the
+                route reported one — a claim about the scope of the data below,
+                defaulted. The window is either known or it is not stated. */}
+            {typeof data?.windowDays === "number"
+              ? `Last ${data.windowDays} days of trades by the most-watched members of Congress.`
+              : "Recent trades by the most-watched members of Congress. The window is not reported by this response."}
           </p>
         </div>
         <div className="flex items-center gap-3">

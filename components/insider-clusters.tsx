@@ -147,7 +147,13 @@ export function InsiderClusters() {
       <Card className="bg-white">
         <CardHeader className="pb-2">
           <CardTitle className="text-base">
-            {data?.clusters?.length ?? 0} cluster{data?.clusters?.length === 1 ? "" : "s"} found
+            {/* P7-6. `?? 0` said "0 clusters found" whether the scan returned
+                nothing or never ran — and this card renders while `data` is
+                still null. A count is a result; absence of a result is not
+                zero. */}
+            {data && Array.isArray(data.clusters)
+              ? `${data.clusters.length} cluster${data.clusters.length === 1 ? "" : "s"} found`
+              : "No cluster scan loaded"}
           </CardTitle>
           {data?.totalCompaniesScanned != null && (
             <CardDescription className="text-xs">

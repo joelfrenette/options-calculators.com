@@ -266,6 +266,18 @@ export function CostsUsageAdmin() {
               {controls.overBudget
                 ? ` — estimate exceeds budget by $${controls.effectiveMonthly - controls.budgetTarget}/mo`
                 : ` — estimate is $${controls.budgetTarget - controls.effectiveMonthly}/mo under budget`}
+              {/* P7-1. This compares FLAT SUBSCRIPTION FEES against
+                  MONTHLY_BUDGET_TARGET and says nothing about pay-per-use spend
+                  — which is the only spend that can run away, and the reason
+                  E-5a exists. The Budget Guard panel states its own scope
+                  correctly ("Cuts off pay-per-use API keys… Flat-rate and free
+                  providers are left running"); nothing here stated the reverse,
+                  so "under budget" read as a verdict on total spend. */}
+              <span className="block mt-1 text-slate-500">
+                Flat plan fees only. Pay-per-use AI spend is not in this number and is not governed by this variable —
+                it runs against <code>DAILY_BUDGET_HARD_STOP</code> / <code>MONTHLY_BUDGET_HARD_STOP</code> on the
+                Budget Guard panel. Neither figure includes the other.
+              </span>
             </CardDescription>
           </CardHeader>
         </Card>
@@ -315,7 +327,8 @@ export function CostsUsageAdmin() {
           </div>
           <p className="text-xs text-muted-foreground">
             Vercel → Project → Settings → Environment Variables → set <code>DISABLED_APIS</code> to the value above →
-            Redeploy. Set <code>MONTHLY_BUDGET_TARGET</code> to change the budget.
+            Redeploy. Set <code>MONTHLY_BUDGET_TARGET</code> to change the flat-fee budget on this tab — it is not the
+            automatic shutoff, which uses <code>DAILY_BUDGET_HARD_STOP</code> / <code>MONTHLY_BUDGET_HARD_STOP</code>.
           </p>
         </CardContent>
       </Card>

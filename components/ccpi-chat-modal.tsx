@@ -26,7 +26,11 @@ interface CCPIChatModalProps {
       macro: number | null
     }
     activeWarnings: number
-    totalIndicators: number
+    // Null when the payload did not report a scored-indicator count. The chat
+    // route falls back to `TOTAL_SCORED_INDICATORS`, derived from the weight
+    // tables — but only if this arrives nullish. Sending 0 defeated that
+    // fallback and put "3 of 0" in the prompt (P7-2).
+    totalIndicators: number | null
     crashAmplifiers?: string[]
     activeSignals?: Array<{ name: string; severity: string }>
   }

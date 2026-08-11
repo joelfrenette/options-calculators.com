@@ -102,16 +102,23 @@ export function calculateCCPI(pillars: CCPIData["pillars"]): number | null {
   return totalWeight > 0 ? weighted / totalWeight : null
 }
 
-/**
- * Validates that CCPI calculation matches expected value.
- * Null pillars make an exact cross-check impossible when amplifiers are in
- * play, so a null composite never reports a discrepancy.
- */
-export function validateCCPICalculation(pillars: CCPIData["pillars"], expectedCCPI: number, tolerance = 0.5): boolean {
-  const calculated = calculateCCPI(pillars)
-  if (calculated === null) return true
-  return Math.abs(calculated - expectedCCPI) <= tolerance
-}
+// `validateCCPICalculation` was deleted here (P7-4). It was a function named
+// "validate" that answered `true` — valid — for a composite it could not
+// compute: `if (calculated === null) return true`. On this index a null
+// composite means no pillar had enough live or AI weight to score, which is the
+// state most in need of being flagged, and it reported clean.
+//
+// Nothing called it. A repo-wide search for the symbol across app/, lib/,
+// components/ and scripts/ returned only its own definition — so it was dead
+// code holding a reassuring default, the exact shape of P6-81's second Fear &
+// Greed implementation, sitting in one of the two modules no check script can
+// load (P6-85). Nothing would have caught it if someone had wired it up.
+//
+// The live implementation of this decision is `validateCCPI` in
+// `components/ccpi-audit-admin.tsx`, and it is correct: an unscoreable
+// composite returns `ok: null` with "NOT VERIFIABLE", not a pass. Two
+// implementations of one decision, one right and one wrong — keep the one the
+// admin panel actually renders.
 
 /**
  * Formats pillar contribution for logging. Null pillars print "n/a (excluded)".

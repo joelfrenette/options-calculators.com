@@ -87,6 +87,19 @@ function fmtScore(score: number | null | undefined): string {
   return score == null || Number.isNaN(score) ? "no data" : `${Math.round(score)}/100`
 }
 
+/**
+ * A source count the response actually reported, or an em dash.
+ *
+ * P7-6. `sources_available ?? 0` / `sources_total ?? 0` rendered "0/0 sources
+ * responded" — and put the same string into the AI prompt at the point where
+ * the prompt is explaining that no reading exists. A denominator of zero is not
+ * a measurement of anything; "how many sources are there" and "how many
+ * answered" are different unknowns and neither is 0.
+ */
+function srcCount(n: number | null | undefined): string {
+  return typeof n === "number" && Number.isFinite(n) ? String(n) : "—"
+}
+
 // NOTE: safeNumber is for RAW COUNTS only (StockTwits bullish/bearish tags,
 // where the row already declares "No live data" beside them). It used to back
 // the gauge needles at a fallback of 50, which drew an unmeasured "Neutral" —
@@ -664,8 +677,8 @@ export function SocialSentiment() {
                   // it — the P6-19 defect, one tab over.
                   details:
                     data?.global_social_sentiment == null
-                      ? `No live sentiment reading is available (${data?.sources_available ?? 0}/${data?.sources_total ?? 0} sources responded, data quality ${data?.data_quality || "NONE"}). Do not infer a neutral market from the absence of a score, and do not recommend a strategy from it.`
-                      : `Current global sentiment score: ${data.global_social_sentiment}/100 (${getSentimentLabel(data.global_social_sentiment)}). Macro sentiment: ${fmtScore(data.macro_sentiment)}. Social sentiment: ${fmtScore(data.social_sentiment)}. Headline mood: ${fmtScore(data.headline_market_mood)}. Data quality: ${data.data_quality || "N/A"} with ${data.sources_available ?? 0}/${data.sources_total ?? 0} sources available. ${data.global_social_sentiment >= 70 ? "Bullish conditions - consider selling puts or buying calls." : data.global_social_sentiment <= 30 ? "Bearish conditions - consider defensive strategies or puts." : "Neutral conditions - consider iron condors or strangles."}`,
+                      ? `No live sentiment reading is available (${srcCount(data?.sources_available)}/${srcCount(data?.sources_total)} sources responded, data quality ${data?.data_quality || "NONE"}). Do not infer a neutral market from the absence of a score, and do not recommend a strategy from it.`
+                      : `Current global sentiment score: ${data.global_social_sentiment}/100 (${getSentimentLabel(data.global_social_sentiment)}). Macro sentiment: ${fmtScore(data.macro_sentiment)}. Social sentiment: ${fmtScore(data.social_sentiment)}. Headline mood: ${fmtScore(data.headline_market_mood)}. Data quality: ${data.data_quality || "N/A"} with ${srcCount(data.sources_available)}/${srcCount(data.sources_total)} sources available. ${data.global_social_sentiment >= 70 ? "Bullish conditions - consider selling puts or buying calls." : data.global_social_sentiment <= 30 ? "Bearish conditions - consider defensive strategies or puts." : "Neutral conditions - consider iron condors or strangles."}`,
                 }}
               />
             </div>
@@ -731,8 +744,8 @@ export function SocialSentiment() {
 
             <div className="flex items-center justify-between pt-4 border-t border-teal-100 text-xs text-gray-500">
               <span>
-                Data Quality: {data?.data_quality || "NONE"} ({data?.sources_available ?? 0}/
-                {data?.sources_total ?? 0} sources)
+                Data Quality: {data?.data_quality || "NONE"} ({srcCount(data?.sources_available)}/
+                {srcCount(data?.sources_total)} sources)
               </span>
               {lastUpdated && <span>Last updated: {lastUpdated.toLocaleTimeString()}</span>}
             </div>
