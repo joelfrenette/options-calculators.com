@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "@/lib/fetch-timeout"
 // E-7d: daily VIX closes do not move intraday-fast enough to justify a
 // fresh Yahoo history pull per page view; 15-min edge cache.
 export const revalidate = 900
@@ -11,7 +12,7 @@ export async function GET() {
     // Fetch historical VIX data from Yahoo Finance
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?period1=${startDate}&period2=${endDate}&interval=1d`
 
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
       },

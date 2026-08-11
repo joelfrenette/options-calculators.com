@@ -23,6 +23,7 @@
 
 import { NextResponse } from "next/server"
 import { isAuthenticated } from "@/lib/auth"
+import { fetchWithTimeout } from "@/lib/fetch-timeout"
 
 export const dynamic = "force-dynamic"
 
@@ -261,7 +262,7 @@ interface CcpiPayload {
 /** Try the in-process CCPI cache first (cheap), then the live route. */
 async function loadCcpi(origin: string): Promise<{ payload: CcpiPayload; from: string } | null> {
   try {
-    const cached = await fetch(new URL("/api/ccpi/cache", origin), { cache: "no-store" })
+    const cached = await fetchWithTimeout(new URL("/api/ccpi/cache", origin), { cache: "no-store" })
     if (cached.ok) {
       const json = (await cached.json()) as CcpiPayload & { cached?: boolean }
       if (json?.provenance) return { payload: json, from: "/api/ccpi/cache" }
@@ -271,7 +272,7 @@ async function loadCcpi(origin: string): Promise<{ payload: CcpiPayload; from: s
   }
 
   try {
-    const res = await fetch(new URL("/api/ccpi", origin), { cache: "no-store" })
+    const res = await fetchWithTimeout(new URL("/api/ccpi", origin), { cache: "no-store" })
     // /api/ccpi answers 503 with a provenance block when every pillar is
     // unscorable — that is still real provenance, so use it.
     const json = (await res.json()) as CcpiPayload

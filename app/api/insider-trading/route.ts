@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { resolveApiKey } from "@/lib/api-keys"
+import { fetchWithTimeout } from "@/lib/fetch-timeout"
 
 export const dynamic = "force-dynamic"
 
@@ -151,7 +152,7 @@ async function fetchFinnhubInsiderTransactions(days = 30, ticker = "") {
   // Always do the market-wide scan
   try {
     const url = `https://finnhub.io/api/v1/stock/insider-transactions?from=${fromStr}&to=${toStr}&token=${apiKey}`
-    const res = await fetch(url, { next: { revalidate: 3600 } })
+    const res = await fetchWithTimeout(url, { next: { revalidate: 3600 } })
     if (res.ok) {
       const data = await res.json()
       const txns = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : []
@@ -172,7 +173,7 @@ async function fetchFinnhubInsiderTransactions(days = 30, ticker = "") {
     const upperTicker = ticker.toUpperCase()
     try {
       const url = `https://finnhub.io/api/v1/stock/insider-transactions?symbol=${upperTicker}&token=${apiKey}`
-      const res = await fetch(url, { cache: "no-store" })
+      const res = await fetchWithTimeout(url, { cache: "no-store" })
       if (res.ok) {
         const data = await res.json()
         const txns = Array.isArray(data.data) ? data.data : []
@@ -208,7 +209,7 @@ async function fetchFinnhubInsiderTransactions(days = 30, ticker = "") {
 // ---------------------------------------------------------------------------
 async function fetchSecEdgarForm4() {
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=4&company=&dateb=&owner=include&count=40&output=atom",
       {
         headers: { "User-Agent": SEC_USER_AGENT, Accept: "application/atom+xml" },
@@ -254,7 +255,7 @@ async function fetchCongressionalTrades(days = 30) {
   // ---- Quiver Quant (most reliable, no key needed) ----
   try {
     // Quiver provides the last 6 months of congressional trades as a public feed
-    const res = await fetch("https://api.quiverquant.com/beta/live/congresstrading", {
+    const res = await fetchWithTimeout("https://api.quiverquant.com/beta/live/congresstrading", {
       headers: {
         Accept: "application/json",
         "User-Agent": "options-calculators.com contact@options-calculators.com",
@@ -309,7 +310,7 @@ async function fetchCongressionalTrades(days = 30) {
   if (all.length < 5) {
     try {
       const year = new Date().getFullYear()
-      const senateRes = await fetch(
+      const senateRes = await fetchWithTimeout(
         `https://efts.senate.gov/LATEST/search-index?q=%22%22&dateRange=custom&startDate=${cutoffDate.toISOString().split("T")[0]}&endDate=${new Date().toISOString().split("T")[0]}&type=annual-report,ptr`,
         {
           headers: { "User-Agent": SEC_USER_AGENT, Accept: "application/json" },

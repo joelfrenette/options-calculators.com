@@ -195,7 +195,7 @@ recomputes it.
 | P0-1 | P3 | open | 15 orphan routes → **6 remain**: `yahoo-proxy`, `apify-proxy`, `google-trends`, `serper-finance`, `macro-indicators`, `scraping-bee/diagnostics` (verified 2026-08-11). Each still needs a keep-or-delete verdict. |
 | P0-2 | P1 | fixed | Breadth route and lib deleted. |
 | P0-3 | P3 | fixed | `/api/qqq-technicals` route gone, `lib/qqq-technicals.ts` kept (verified 2026-08-11). |
-| P0-4 | P2 | open | Timeout/abort coverage across the route set has never been re-measured since 40-of-61. |
+| P0-4 | P2 | fixed | **Re-measured 2026-08-11 and the row was wrong: 9 of 35 outbound routes unwired, not 40 of 61.** `lib/fetch-timeout.ts` built, all 9 wired, `check-route-timeouts.ts` keeps it at zero. |
 | P0-5 | P2 | fixed | Alias resolution through `resolveApiKey`; last holdouts closed by P6-12. |
 | P0-6 | P3 | open | Payoff math per strategy for the 8 shared LEARN tabs — partly covered by P3-25/26/27, never signed off as a set. |
 | P0-7 | P3 | wontfix | The inventory is regex-based by design. Recorded as a limitation rather than trusted as exhaustive. |
@@ -211,7 +211,7 @@ recomputes it.
 | P1-10 | P1 | fixed | `components/pricing-provenance.tsx` replaces the tab-level badge. |
 | P1-11 | P1 | fixed | Route and lib deleted. |
 | P1-12 | P2 | fixed | Keys resolve through `resolveApiKey`. |
-| P1-13 | P3 | open | The row's own exit condition — "verify the dashboard surfaces the baseline flag, then mark verified-ok" — was never carried out. The CCPI provenance rework almost certainly satisfies it; confirm and re-mark. |
+| P1-13 | P3 | fixed | **Verified 2026-08-11**, which is what the row asked for. Two of the four constants were deleted by P3-19; the survivors are per-series tiered (P6-6), baseline-excluded (P3-12), and the dashboard renders per-pillar provenance. Surfaced P7-10 on the way. |
 | P1-14 | P3 | fixed | **Closed 2026-08-11.** The ~40 commented-out `Math.random()` lines and the header claiming "we generate realistic mock historical data" are gone; the file now says why the history is empty. A comment is a claim about the code, and that one described an honest empty response as a mock generator waiting to be switched on. |
 | P2-1 | P1 | fixed | The three routes return 502 on upstream failure. |
 | P2-2 | P2 | open | `/api/ccpi/cache` is still a module-level mutable variable. |
@@ -384,10 +384,11 @@ recomputes it.
 | P7-7 | P2 | open | **`next build` does not run on this machine, by either bundler — a second blocker on Phase 7.0.** Needs a Vercel preview deploy or a local Node downgrade. |
 | P7-8 | P2 | fixed | The dead-code lens is now a rule (`check-dead-exports.ts`, ratcheted at 51). Its first run cleared itself because the allowlist named its own findings. |
 | P7-9 | P3 | open | 51 of `lib/`'s 282 exported values are referenced only by their own file. Measured and ratcheted; deleted module by module, not in one sweep. |
+| P7-10 | P2 | open | `nvidiaMomentum ?? 50` — a neutral-50 on a scored 0-100 momentum input. Excluded from scoring by its baseline tier; the display side is unverified. |
 
 ### The open list, by severity
 
-212 findings recorded · **160 fixed · 7 wontfix · 0 verified-ok · 45 open.**
+213 findings recorded · **162 fixed · 7 wontfix · 0 verified-ok · 44 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14.)_
 
@@ -405,16 +406,16 @@ _(`P3-15`, `P3-17` and `P3-18` were confirmed and closed on 2026-08-11 — see b
 `P5-1` closed with Phase 7.2. The prediction that "three of the four are probably
 already done" was **wrong on two of them**, which is the point of confirming.)_
 
-**P2 — 9.**
+**P2 — 10.**
 `S-9` · `S-10` · `S-18` (the scanner's hidden gates, estimate badges, expected
-move and step-number drift) · `P0-4` (timeout coverage, never re-measured) ·
-`P2-2` (the CCPI cache that does not cache) · `P2-4` (16 routes with no automated
+move and step-number drift) · `P2-2` (the CCPI cache that does not cache) · `P2-4` (16 routes with no automated
 verification) · `P6-31` · `P6-65` **— Joel's weight decision** · `P6-85` **— Phase 7.0** ·
-`P7-7` **— `next build` runs on neither bundler here; the second blocker on Phase 7.0**.
+`P7-7` **— `next build` runs on neither bundler here; the second blocker on Phase 7.0** ·
+`P7-10`.
 
-**P3 — 13.**
+**P3 — 11.**
 `S-5` · `S-7` · `S-13` **— Joel's Vercel action** · `S-16` · `S-17` · `P0-1` · `P0-6` ·
-`P1-13` · `P2-3` · `P4-1` · `P6-13` · `P6-87` **— Phase 7.0** · `E-8i` · `P7-9`.
+`P2-3` · `P4-1` · `P6-13` · `P6-87` **— Phase 7.0** · `E-8i` · `P7-9`.
 
 **Enhancements and unbuilt features — 16.**
 `E-1` · `E-2` · `E-3` · `E-4` · `P4-4` · `E-6` (+ `E-6b`, `E-6c`, `E-6d`) ·
@@ -423,8 +424,8 @@ verification) · `P6-31` · `P6-65` **— Joel's weight decision** · `P6-85` **
 **Closed on rationale rather than a change — 7.**
 `S-4` · `P0-7` · `P2-6` · `E-8b` · `E-8e` · `E-8f` · `P6-35`.
 
-**What this changes about "work the backlog by severity".** The real defect list is 29
-items, not the 212 the file's length suggests — and half the P1s on it are bookkeeping,
+**What this changes about "work the backlog by severity".** The real defect list is 28
+items, not the 213 the file's length suggests — and half the P1s on it are bookkeeping,
 not work. Nobody could see that before, which is the point of this section: closure was
 recorded in fourteen vocabularies, and the file's own summary line was still calling
 three items "remaining" (P6-29, S-11, S-14) that had each been fixed the day before.
@@ -1343,3 +1344,18 @@ widening the rule until it produces noise nobody reads.
 |---|---|---|---|
 | P7-8 | P2 | tooling | **The dead-code lens is now a rule, and it caught itself on the first run.** `scripts/check-dead-exports.ts` (4 assertions, `check:formulas` 507 → 511) walks `lib/` structurally, counts 282 exported values across 53 modules, and fails on any that no other file references. Ships as a ratchet against a named baseline of 51 rather than a zero, for the reason given above. **Its first run reported `lib/` clean because the allowlist names all 51 symbols and the scan walks `scripts/`** — the check referenced its own findings and cleared them. Excluded itself; verified by adding a deliberately dead export and watching it fail, then restoring from a scratchpad copy rather than `git checkout --` (P6-64). |
 | P7-9 | P3 | ops / lib | **51 of `lib/`'s 282 exported values are referenced only by their own file, and some are whole modules.** All four exports of `lib/ccpi/logger.ts`, both of `lib/ccpi/progress.ts`, five of six in `lib/ccpi/cache.ts`, three of `lib/serper-finance.ts` and two of `lib/sentiment-sources.ts` — the last being the module S-11 already deleted one dead scraper from. Measured, named and ratcheted by P7-8; **not deleted, deliberately.** Several sit on the auth (`getSession`, `isPasswordHashed`) and spend-control (`getDailyHardStop`, `getMonthlyHardStop`, `isBudgetGuardTrippedSync`) paths, where "nothing references it" and "nothing references it yet" need to be told apart one at a time before anything is removed. **OPEN**, to be burned down module by module as each is next touched. |
+
+---
+
+## Phase 7.4 (second pass) — P0-4 and P1-13, and the row figures were wrong again (2026-08-11)
+
+Two rows open since Phase 0 and Phase 1. Both asked for a measurement nobody had
+repeated, and **both row figures turned out to be wrong** — this time in the safe
+direction, which is its own kind of expensive: P0-4 has read as a 40-route project for
+four phases and was therefore never started.
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| P0-4 | P2 | site-wide | **"40 of 61 routes have no timeout/abort wiring" was wrong: 35 routes make outbound calls, 26 were already wired, 9 were not.** The row's proposed fix — "a shared `fetchWithTimeout` helper; enforce presence via the contract tests" — had never been built, so every route wanting a deadline hand-rolled an `AbortController` and the rest had none. A hung upstream ties the function up until the platform kills it: the caller waits, the budget is spent, and nothing in the response names the upstream that stalled. **FIXED (staging):** new `lib/fetch-timeout.ts` — deliberately import-free, so it does not inherit the untestability of `lib/budget-guard.ts` (P6-87) — with a 10s default chosen to fail *before* Vercel's own limit so the route can still return a real status. **The dead-export rule written an hour earlier failed on this very module** — `DEFAULT_TIMEOUT_MS` and an `isTimeoutError` helper were exported and imported by nobody. They were removed rather than allowlisted: an unused export is speculative API, which is the thing that rule exists to stop accumulating. (The work `isTimeoutError` was for is real and open: no route yet distinguishes a deadline from a refusal, so a stalled upstream reports 502 where it should report 504.) All 9 routes wired (17 call sites). New `scripts/check-route-timeouts.ts`, 3 assertions in `check:formulas`, deriving its scope from file layout and asserting both counts (P6-75, P6-77) — because "0 routes without timeouts" is also what you get when you find 0 routes. **A number nobody recomputes is a number that drifts**, and that is precisely what cost this row four phases. |
+| P1-13 | P3 | ANALYZE → CCPI | **Closed by verification, which is what the row asked for and nobody had done.** It required checking that the dashboard surfaces the baseline flag for four literal constants before it could be marked clean. Two of the four (`ltv`, `spotVol`) were deleted outright by P3-19. The survivors are correctly tiered per-series since P6-6 — `tedSpread: fredData?.tedSpread != null ? "live" : "baseline"` — a `baseline` tier is excluded from scoring and renormalized away (P3-12), and the dashboard renders a per-pillar provenance line off `data.provenance`. The mechanism is real and in place. **FIXED.** |
+| P7-10 | P2 | ANALYZE → CCPI | **`nvidiaMomentum: alphaVantageData?.nvidiaMomentum ?? 50` — a neutral-50 default on a 0-100 momentum scale, found while verifying P1-13.** It is scored at `max: 9` in the momentum pillar, and on this scale **50 is a real neutral reading, not an absence** — the exact P6-18 / P6-30 shape. It is not currently a scoring defect: the tier is `alphaVantageLive ? "live" : "baseline"`, so when Alpha Vantage is down the value carries `baseline` and is excluded from the composite. **What is unverified is the display side.** The raw value reaches the dashboard's momentum pillar, and whether it renders "50" beside a baseline label or is withheld was not established. **OPEN**, and deliberately not changed at the end of a long session on scoring-adjacent code: the honest fix is `?? null` with the pillar's null path exercised, and that needs a run against a live CCPI payload. Note the pattern — **P6-4 fixed this exact idiom for AAII in this same route and left the NVDA one**, which is the "a decision enforced in one module is not enforced" cause for the fourth time this phase. |

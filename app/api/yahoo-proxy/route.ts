@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { fetchWithTimeout } from "@/lib/fetch-timeout"
 
 let cachedCrumb: string | null = null
 let cachedCookies: string | null = null
@@ -12,7 +13,7 @@ async function getYahooCrumbAndCookies() {
 
   try {
     // Step 1: Get initial cookies from Yahoo Finance homepage
-    const initResponse = await fetch("https://finance.yahoo.com", {
+    const initResponse = await fetchWithTimeout("https://finance.yahoo.com", {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -36,7 +37,7 @@ async function getYahooCrumbAndCookies() {
     }
 
     // Step 2: Get crumb token using the cookies
-    const crumbResponse = await fetch("https://query2.finance.yahoo.com/v1/test/getcrumb", {
+    const crumbResponse = await fetchWithTimeout("https://query2.finance.yahoo.com/v1/test/getcrumb", {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -122,7 +123,7 @@ export async function GET(request: NextRequest) {
       url += `${url.includes("?") ? "&" : "?"}crumb=${encodeURIComponent(auth.crumb)}`
     }
 
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       headers,
       next: { revalidate: 60 },
     })

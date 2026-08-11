@@ -6,6 +6,7 @@ import {
   generateWeeklyInsights as aiWeeklyInsights,
 } from "@/lib/earnings-calendar-ai"
 import { generateCuratedEconomicEvents } from "@/lib/economic-events"
+import { fetchWithTimeout } from "@/lib/fetch-timeout"
 
 export const maxDuration = 90
 
@@ -50,7 +51,7 @@ async function fetchFinnhubEarnings(startDate: string, endDate: string) {
   if (!apiKey) return null
 
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `https://finnhub.io/api/v1/calendar/earnings?from=${startDate}&to=${endDate}&token=${apiKey}`,
       { next: { revalidate: 1800 } },
     )
@@ -72,7 +73,7 @@ async function fetchPolygonEarnings(startDate: string, endDate: string) {
 
   try {
     // Polygon uses a different endpoint structure
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `https://api.polygon.io/vX/reference/financials?filing_date.gte=${startDate}&filing_date.lte=${endDate}&limit=50&apiKey=${apiKey}`,
       { next: { revalidate: 1800 } },
     )

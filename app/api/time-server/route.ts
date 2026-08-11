@@ -1,7 +1,8 @@
+import { fetchWithTimeout } from "@/lib/fetch-timeout"
 export async function GET() {
   try {
     // Fetch from WorldTimeAPI for accurate current time
-    const response = await fetch("http://worldtimeapi.org/api/timezone/America/New_York", {
+    const response = await fetchWithTimeout("http://worldtimeapi.org/api/timezone/America/New_York", {
       cache: "no-store",
     })
 

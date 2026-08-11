@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { resolveApiKey } from "@/lib/api-keys"
+import { fetchWithTimeout } from "@/lib/fetch-timeout"
 
 export async function POST(request: Request) {
   try {
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
 
     const scrapingBeeUrl = `https://app.scrapingbee.com/api/v1/?${params.toString()}`
 
-    const response = await fetch(scrapingBeeUrl, {
+    const response = await fetchWithTimeout(scrapingBeeUrl, {
       method: "GET",
       headers: {
         Accept: "application/json, text/html, */*",

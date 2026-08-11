@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getApiKey } from "@/lib/api-keys"
 import { fredHistoryFromStore } from "@/lib/fred-store"
+import { fetchWithTimeout } from "@/lib/fetch-timeout"
 
 // E-7d: BLS/FRED series update monthly-to-daily, never intraday. ISR caches
 // the whole response at the edge for 15 min instead of re-pulling full
@@ -20,7 +21,7 @@ export async function GET() {
       }
       if (!fredApiKey) return []
       try {
-        const response = await fetch(
+        const response = await fetchWithTimeout(
           `https://api.stlouisfed.org/fred/series/observations?series_id=CPIAUCSL&api_key=${fredApiKey}&file_type=json&sort_order=desc&limit=36`,
         )
         if (!response.ok) return []

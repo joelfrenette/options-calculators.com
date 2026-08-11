@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server"
+import { fetchWithTimeout } from "@/lib/fetch-timeout"
 
 export async function GET() {
   try {
     // Fetch VIX data from Yahoo Finance API
-    const response = await fetch("https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1d&range=1d", {
+    const response = await fetchWithTimeout("https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1d&range=1d", {
       headers: {
         "User-Agent": "Mozilla/5.0",
       },
