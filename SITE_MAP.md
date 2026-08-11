@@ -11,11 +11,11 @@
 
 | Tab id | Label | Component | File | Lines | Internal APIs |
 |---|---|---|---|---|---|
-| `ccpi` ★ | Crash & Corrections Prediction Index | `CcpiDashboard` | `components/ccpi-dashboard.tsx` | 1142 | `/api/ccpi/executive-summary`<br>`/api/ccpi`<br>`/api/ccpi/cache`<br>`/api/ccpi/history` |
+| `ccpi` ★ | Crash & Corrections Prediction Index | `CcpiDashboard` | `components/ccpi-dashboard.tsx` | 927 | `/api/ccpi/executive-summary`<br>`/api/ccpi`<br>`/api/ccpi/cache`<br>`/api/ccpi/history` |
 | `earnings-calendar` | Earnings & Economic Calendar | `EarningsEconomicCalendar` | `components/earnings-economic-calendar.tsx` | 585 | `/api/earnings-calendar/insights`<br>`/api/earnings-calendar` |
 | `trend-analysis` | Index Trend Analysis | `TrendAnalysis` | `components/trend-analysis.tsx` | 1173 | `/api/trend-analysis` |
 | `risk-management` | CBOE VIX Volatility Index | `RiskCalculator` | `components/risk-calculator.tsx` | 845 | `/api/vix`<br>`/api/vix-history` |
-| `market-sentiment` | CNN's Fear & Greed | `MarketSentiment` | `components/market-sentiment.tsx` | 1543 | `/api/market-sentiment`<br>`/api/sentiment-heatmap` |
+| `market-sentiment` | CNN's Fear & Greed | `MarketSentiment` | `components/market-sentiment.tsx` | 1548 | `/api/market-sentiment`<br>`/api/sentiment-heatmap` |
 | `panic-euphoria` | Citibank's Panic & Euphoria Index | `PanicEuphoria` | `components/panic-euphoria.tsx` | 1125 | `/api/panic-euphoria` |
 | `social-sentiment` | Social Sentiment Index | `SocialSentiment` | `components/social-sentiment.tsx` | 745 | `/api/social-sentiment` |
 | `fomc-predictions` | FOMC Fed Rate Forecaster | `FomcPredictions` | `components/fomc-predictions.tsx` | 1439 | `/api/fomc-predictions` |
@@ -221,13 +221,13 @@ _None._
 | File | Lines | Over by |
 |---|---|---|
 | `components/ccpi-audit-admin.tsx` | 1637 | 1037 |
-| `components/market-sentiment.tsx` | 1543 | 943 |
+| `components/market-sentiment.tsx` | 1548 | 948 |
 | `components/fomc-predictions.tsx` | 1439 | 839 |
 | `components/trend-analysis.tsx` | 1173 | 573 |
-| `components/ccpi-dashboard.tsx` | 1142 | 542 |
 | `components/panic-euphoria.tsx` | 1125 | 525 |
 | `components/options-strategy-toolbox.tsx` | 1040 | 440 |
 | `components/insider-trading-dashboard.tsx` | 961 | 361 |
+| `components/ccpi-dashboard.tsx` | 927 | 327 |
 | `components/trade-walkthrough-modal.tsx` | 866 | 266 |
 | `components/risk-calculator.tsx` | 845 | 245 |
 | `lib/ccpi/scoring.ts` | 805 | 205 |

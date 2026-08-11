@@ -174,16 +174,16 @@ export function PanicEuphoria() {
   }
 
   const getScoreColor = (score: number) => {
-    if (score <= -0.45) return "text-green-700" // Extreme Panic (GOOD - buy signal)
-    if (score <= -0.17) return "text-green-600" // Panic (good)
+    if (score < -0.45) return "text-green-700" // Extreme Panic (GOOD - buy signal)
+    if (score < -0.17) return "text-green-600" // Panic (good)
     if (score < 0.41) return "text-yellow-600" // Neutral/Complacent
     if (score < 0.7) return "text-red-500" // Euphoria (bad)
     return "text-red-700" // Extreme Euphoria (BAD - sell signal)
   }
 
   const getScoreBackground = (score: number) => {
-    if (score <= -0.45) return "bg-green-100 border-green-400"
-    if (score <= -0.17) return "bg-green-50 border-green-300"
+    if (score < -0.45) return "bg-green-100 border-green-400"
+    if (score < -0.17) return "bg-green-50 border-green-300"
     if (score < 0.41) return "bg-yellow-50 border-yellow-200"
     if (score < 0.7) return "bg-red-50 border-red-300"
     return "bg-red-100 border-red-400"
@@ -191,16 +191,16 @@ export function PanicEuphoria() {
 
   // Added getScoreLabel for the updated contrarian scale
   const getScoreLabel = (score: number) => {
-    if (score <= -0.45) return "EXTREME PANIC (Buy Signal)"
-    if (score <= -0.17) return "PANIC (Contrarian Bullish)"
+    if (score < -0.45) return "EXTREME PANIC (Buy Signal)"
+    if (score < -0.17) return "PANIC (Contrarian Bullish)"
     if (score < 0.41) return "NEUTRAL/COMPLACENT"
     if (score < 0.7) return "EUPHORIA (Contrarian Bearish)"
     return "EXTREME EUPHORIA (Sell Signal)"
   }
 
   const getTradeRecommendations = (score: number, aboveMA: boolean) => {
-    // Extreme Panic: score <= -0.45
-    if (score <= -0.45) {
+    // Extreme Panic: score < -0.45
+    if (score < -0.45) {
       return {
         level: "Extreme Panic",
         signal: "STRONG BUY",
@@ -222,8 +222,8 @@ export function PanicEuphoria() {
       }
     }
 
-    // Panic (Contrarian Bullish): -0.45 < score <= -0.17
-    if (score <= -0.17 && score > -0.45) {
+    // Panic (Contrarian Bullish): -0.45 < score < -0.17
+    if (score < -0.17 && score >= -0.45) {
       return {
         level: "Panic",
         signal: "BUY",
@@ -246,7 +246,7 @@ export function PanicEuphoria() {
     }
 
     // Neutral/Complacent: -0.17 < score < 0.41
-    if (score < 0.41 && score > -0.17) {
+    if (score < 0.41 && score >= -0.17) {
       return {
         level: "Neutral/Complacent",
         signal: "HOLD",

@@ -877,7 +877,12 @@ export function MarketSentiment() {
   // }
 
   const getTradeRecommendations = (score: number) => {
-    if (score <= 24) {
+    // Boundaries are lower-edge (< 25, < 45, < 56, < 75) to match getScoreColor
+    // above and SENTIMENT_ALLOCATION in lib/allocation.ts. They used to read
+    // <= 24 / 44 / 55 / 74, which is equivalent ONLY for whole numbers — and
+    // the API rounds to one decimal (Math.round(x * 10) / 10), so a score of
+    // 24.5 was coloured Extreme Fear while this chain called it Fear.
+    if (score < 25) {
       return {
         level: "Extreme Fear",
         positionSize: "Larger positions (3-5% per trade)",
@@ -896,7 +901,7 @@ export function MarketSentiment() {
         coachTips:
           "Top coaches recommend being greedy when others are fearful. This is prime time for put selling on quality stocks.",
       }
-    } else if (score <= 44) {
+    } else if (score < 45) {
       return {
         level: "Fear",
         positionSize: "Standard positions (2-3% per trade)",
@@ -915,7 +920,7 @@ export function MarketSentiment() {
         coachTips:
           "Market showing some fear - favorable for options sellers. Focus on quality underlyings and maintain discipline.",
       }
-    } else if (score <= 55) {
+    } else if (score < 56) {
       return {
         level: "Neutral",
         positionSize: "Conservative positions (1-2% per trade)",
@@ -933,7 +938,7 @@ export function MarketSentiment() {
         ],
         coachTips: "Neutral market conditions - maintain discipline and don't force trades. Wait for better setups.",
       }
-    } else if (score <= 74) {
+    } else if (score < 75) {
       return {
         level: "Greed",
         positionSize: "Small positions (0.5-1% per trade)",
