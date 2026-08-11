@@ -39,8 +39,13 @@ export async function GET(request: Request) {
   // consumer was a 200-day moving average — and both silently truncated a
   // deeper request instead of refusing it, which is how a backfill "succeeds"
   // and leaves a partial history that looks complete.
-  const closesBackfill = Math.min(9000, Math.max(0, Number.parseInt(url.searchParams.get("closesBackfill") || "0", 10) || 0))
-  const fredBackfill = Math.min(20000, Math.max(0, Number.parseInt(url.searchParams.get("fredBackfill") || "0", 10) || 0))
+  // P6-37 raised both caps but left them clamping silently — only
+  // /api/cron/breadth got the reporting half. A ceiling the caller cannot see
+  // is the same defect at a higher number.
+  const requestedCloses = Math.max(0, Number.parseInt(url.searchParams.get("closesBackfill") || "0", 10) || 0)
+  const requestedFred = Math.max(0, Number.parseInt(url.searchParams.get("fredBackfill") || "0", 10) || 0)
+  const closesBackfill = Math.min(9000, requestedCloses)
+  const fredBackfill = Math.min(20000, requestedFred)
 
   const polygonKey = resolveApiKey("POLYGON_API_KEY")
   const fredKey = resolveApiKey("FRED_API_KEY")
@@ -92,6 +97,18 @@ export async function GET(request: Request) {
     ok: allOk,
     mode: closesBackfill > 0 || fredBackfill > 0 ? "backfill" : "daily",
     steps,
+    ...(requestedCloses > closesBackfill || requestedFred > fredBackfill
+      ? {
+          backfillClamped: {
+            ...(requestedCloses > closesBackfill
+              ? { closes: { requested: requestedCloses, applied: closesBackfill } }
+              : {}),
+            ...(requestedFred > fredBackfill
+              ? { fred: { requested: requestedFred, applied: fredBackfill } }
+              : {}),
+          },
+        }
+      : {}),
     ranAt: new Date().toISOString(),
   })
 }

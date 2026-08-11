@@ -568,5 +568,39 @@ for (const p of PINNED) {
   check(`${p.finding}: "${p.claim}" still holds`, p.dependsOn.test(depSrc), p.why)
 }
 
+// ---------------------------------------------------------------------------
+// 11. A cron backfill that clamps must say what it applied.
+// ---------------------------------------------------------------------------
+//
+// P6-37 found four silent truncation caps in one day, each returning ok:true
+// after quietly applying a limit. The worst cost an hour: `getSeriesHistory`
+// asked for 20,000 rows, PostgREST returned 1,000, and the first lead-time
+// backtest scored a 44-year series using four years and reported confident hit
+// rates from it.
+//
+// The row records the fix as "caps raised to match retention, and
+// /api/cron/breadth now returns backfillClamped {requested, applied} rather
+// than clamping in silence". Only breadth got the second half. `fred-snapshot`
+// and `market-snapshot` had their ceilings raised and went on clamping without
+// a word — the same defect at a higher number, since asking for 30,000 and
+// receiving 20,000 with ok:true still reads as "that is all there was".
+//
+// The rule: in `app/api/cron/**`, a `Math.min` on a caller-supplied backfill
+// must be accompanied by a `backfillClamped` report in the same file.
+
+const CRON_FILES = walk(join(ROOT, "app", "api", "cron"), (p) => p.endsWith(".ts"))
+const silentClamps: string[] = []
+for (const f of CRON_FILES) {
+  const src = code(f)
+  const clamps = /Math\.min\(\s*\d+\s*,[^)]*[Bb]ackfill/.test(src) || /[Bb]ackfill\s*=\s*Math\.min/.test(src)
+  if (!clamps) continue
+  if (!/backfillClamped/.test(src)) silentClamps.push(rel(f))
+}
+check(
+  "every cron backfill clamp reports what it applied",
+  silentClamps.length === 0,
+  silentClamps.length ? silentClamps.join(", ") : `${CRON_FILES.length} cron route(s) checked`,
+)
+
 console.log(failures === 0 ? "\nAll provenance checks passed." : `\n${failures} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)

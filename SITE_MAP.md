@@ -225,7 +225,7 @@ _None._
 | `components/trend-analysis.tsx` | 1151 | 551 |
 | `components/panic-euphoria.tsx` | 1139 | 539 |
 | `components/options-strategy-toolbox.tsx` | 1027 | 427 |
-| `components/ccpi-dashboard.tsx` | 919 | 319 |
+| `components/ccpi-dashboard.tsx` | 921 | 321 |
 | `components/trade-walkthrough-modal.tsx` | 866 | 266 |
 | `components/insider-trading-dashboard.tsx` | 851 | 251 |
 | `components/risk-calculator.tsx` | 845 | 245 |

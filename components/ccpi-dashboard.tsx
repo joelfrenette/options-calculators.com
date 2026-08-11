@@ -815,9 +815,11 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                   <CardTitle className="text-lg font-bold text-gray-900 text-left">
                     Cash vs Stocks by CCPI Crash Risk Level
                   </CardTitle>
-                  <p className="text-sm text-gray-600 mt-1 text-left">
-                    One ratio per regime. "Stocks" is everything deployed — shares, ETFs, LEAPS and options
-                  </p>
+                  {/* The "stocks is everything deployed" half of this sentence moved
+                      into AllocationBar, which draws the split on all three tabs. Two
+                      copies of one definition is the shape this module was built to
+                      remove; the bar states it wherever it renders. */}
+                  <p className="text-sm text-gray-600 mt-1 text-left">One ratio per regime.</p>
                 </CardHeader>
               </AccordionTrigger>
               <AccordionContent>

@@ -39,7 +39,12 @@ export async function GET(request: Request) {
   // Phase 1). 800 observations is ~3 years of a daily series; scoring against
   // 2008 needs ~6,300 trading days, and NFCI has 2,900 weekly points back to
   // 1971. The old cap silently truncated any attempt at a deep load.
-  const backfill = Math.min(20000, Math.max(0, Number.parseInt(url.searchParams.get("backfill") || "0", 10) || 0))
+  // P6-37 raised this cap from 800 but left it clamping silently — only
+  // /api/cron/breadth was given the reporting half of that fix. A ceiling the
+  // caller cannot see is the same defect at a higher number: ask for 30,000
+  // and you get 20,000 with ok:true, which reads as "that is all there was".
+  const requestedBackfill = Math.max(0, Number.parseInt(url.searchParams.get("backfill") || "0", 10) || 0)
+  const backfill = Math.min(20000, requestedBackfill)
 
   // `?series=NFCI,T10Y3M` restricts the run. A deep backfill across all series
   // in one call will not finish inside maxDuration, and a backfill that times
@@ -49,5 +54,13 @@ export async function GET(request: Request) {
     .map((s) => s.trim().toUpperCase())
     .filter(Boolean)
 
-  return NextResponse.json(await runFredSnapshot(fredKey, backfill, only))
+  const result = await runFredSnapshot(fredKey, backfill, only)
+  return NextResponse.json({
+    ...result,
+    // Report the clamp rather than applying it silently — same treatment
+    // /api/cron/breadth already had.
+    ...(requestedBackfill > backfill
+      ? { backfillClamped: { requested: requestedBackfill, applied: backfill } }
+      : {}),
+  })
 }
