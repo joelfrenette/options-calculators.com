@@ -7,6 +7,7 @@ import { resolveApiKey } from "@/lib/api-keys"
 import { recordAiCall } from "@/lib/metered-fetch"
 import { ensureBudgetGuardFresh } from "@/lib/budget-guard"
 import { TOTAL_SCORED_INDICATORS } from "@/lib/ccpi/scoring"
+import { isDryRun, dryRunPayload } from "@/lib/dry-run"
 
 const OPENROUTER_FREE_MODEL = process.env.OPENROUTER_FREE_MODEL || "openrouter/free"
 
@@ -137,6 +138,15 @@ Make it professional, data-driven, and immediately actionable for sophisticated 
     // Budget guard (E-5): refresh before spending, so `config.key()` below
     // resolves to "" for guarded providers once the kill switch has tripped.
     await ensureBudgetGuardFresh()
+
+    // P2-4. The dry run stops HERE — after body parsing, the null-aware pillar
+    // rendering and the budget-guard refresh, and before any provider is
+    // touched. It deliberately sits AFTER `ensureBudgetGuardFresh()`, because a
+    // guard that fails to refresh is exactly the kind of silent spend-control
+    // break this route had no test for at all.
+    if (isDryRun(request, body)) {
+      return NextResponse.json(dryRunPayload("/api/ccpi/executive-summary", "providerConfigs chain", prompt.length))
+    }
 
     let lastError: Error | null = null
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { generateWithFallback } from "@/lib/ai-providers"
+import { isDryRun, dryRunPayload } from "@/lib/dry-run"
 
 export async function POST(request: Request) {
   try {
@@ -28,6 +29,17 @@ Please provide:
 3. **Probability Assessment**: Your estimated probability and confidence level
 4. **Risk Considerations**: Key risks to monitor
 5. **Actionable Recommendations**: Specific steps or strategies to consider`
+
+    // P2-4. The dry run stops HERE — after routing, body parsing and the
+    // `question` validation above, and before any provider is touched. That is
+    // the whole point: the contract test now covers everything this route can
+    // break at without spending a model call, and the health check no longer
+    // has to mark it `skip` and verify nothing.
+    if (isDryRun(request, { question, context })) {
+      return NextResponse.json(
+        dryRunPayload("/api/scenario-analysis", "generateWithFallback", systemPrompt.length + userPrompt.length),
+      )
+    }
 
     const result = await generateWithFallback({
       system: systemPrompt,

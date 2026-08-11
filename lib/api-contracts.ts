@@ -89,8 +89,15 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
   {
     path: "/api/ccpi/executive-summary",
     method: "POST",
-    skip: "Spends an LLM call on every probe. Covered by /api/ai-status instead.",
-    budgetMs: 30000,
+    // P2-4. Was skipped — "spends an LLM call on every probe" — so the route had
+    // NO automated verification of any kind. `dryRun` exercises routing, body
+    // parsing, the null-aware pillar rendering and the budget-guard refresh, and
+    // returns before any provider is touched. What it does not cover is whether
+    // a model answers; /api/ai-status covers that, and P6-34 is the standing
+    // decision on what a model answer is worth.
+    canary: { body: { dryRun: true, ccpi: 42, certainty: 60, pillars: { momentum: 50, riskAppetite: null, valuation: 50, macro: 50 } } },
+    schema: z.object({ dryRun: z.literal(true), route: z.string(), wouldCall: z.string(), promptChars: z.number() }),
+    budgetMs: 5000,
     tabs: ["ccpi"],
   },
   {
@@ -359,8 +366,12 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
   {
     path: "/api/scenario-analysis",
     method: "POST",
-    skip: "Spends an LLM call on every probe.",
-    budgetMs: 30000,
+    // P2-4. Was skipped. The dry run stops after the `question` validation and
+    // before the provider chain, so the probe covers the 400 path and the
+    // success envelope without spending anything.
+    canary: { body: { dryRun: true, question: "contract probe", context: "none" } },
+    schema: z.object({ dryRun: z.literal(true), route: z.string(), wouldCall: z.string(), promptChars: z.number() }),
+    budgetMs: 5000,
     tabs: [],
   },
 

@@ -216,7 +216,7 @@ recomputes it.
 | P2-1 | P1 | fixed | The three routes return 502 on upstream failure. |
 | P2-2 | P2 | fixed | **Route deleted 2026-08-11**, with three writers and one reader. It cost a self-fetch per request to write a module-level variable the next isolate could not read. Routes 61 → 60. |
 | P2-3 | P3 | open | Triage done, verdicts partly executed — see P0-1 for what survives. |
-| P2-4 | P2 | open | 16 routes still have no automated verification; the `?dryRun=1` the row proposes was never built. |
+| P2-4 | P2 | open | **Partial 2026-08-11.** `lib/dry-run.ts` built; `/api/ccpi/executive-summary` and `/api/scenario-analysis` converted from `skip` to real contract probes. Three LLM routes and eleven others remain. |
 | P2-5 | P3 | fixed | `scripts/check-contract-coverage.ts` fails the build on drift and runs in `check:contracts`. |
 | P2-6 | P3 | wontfix | Local TLS interception, not a repo defect. Recorded so it is not re-diagnosed. |
 | P3-1 | P0 | fixed | CCPI reads real FRED spot VIX. |
@@ -1422,3 +1422,25 @@ to reopen.
 It asserts the route count, so 61 → 60 broke it exactly as intended. That is the
 P6-77 rule earning itself: had it merely *printed* the count, the suite would have gone
 green over a route set that had silently changed size.
+
+---
+
+## Phase 7.4 (sixth pass) — P2-4, the first two of sixteen unverified routes (2026-08-11)
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| P2-4 | P2 | site-wide | **Sixteen routes are marked `skip` and therefore have no automated verification of any kind; two of them now do.** The contract file has carried the fix since Phase 2 — "give the LLM routes a `?dryRun=1` that exercises the request path without calling a model" — and nobody built it, so the routes most likely to break quietly were the ones nothing watched. **New `lib/dry-run.ts`** (import-free, P6-85) with `isDryRun(request, body)` and `dryRunPayload(route, wouldCall, promptChars)`. **Converted: `/api/ccpi/executive-summary` and `/api/scenario-analysis`** — both now contract-tested at a 5s budget instead of skipped at 30s. **The placement matters and is deliberate:** the executive-summary dry run returns *after* `ensureBudgetGuardFresh()`, because a guard that fails to refresh is exactly the silent spend-control break this route had no test for. **STILL OPEN:** three LLM routes remain (`/api/ccpi/chat`, which streams and needs a different response shape; `/api/insider-trading/ai-insights`; `/api/earnings-calendar/insights`), plus the eleven skipped for reasons a dry run does not address — cron pipelines that write to stores, auth routes with rate-limit side effects, and fan-out audit endpoints that would double every provider's call volume. |
+
+**The rule the helper is written around, because this project has shipped the mistake
+twice.** A dry run **must not return content shaped like an answer**. P6-53 was a route
+returning three invented trade setups under a comment admitting they were defaults;
+P6-52 was seven invented Form 4 filings at HTTP 200. A route that replies with plausible
+prose when asked not to think is a synthetic-data generator with a flag on it. The
+payload carries `dryRun: true` and facts about the request — the route name, the
+provider chain it *would* have used, the prompt length — and never a summary, an
+analysis or a number that could be read as a reading.
+
+**And what it does not verify, recorded so the coverage claim cannot grow past it:**
+routing, auth, body parsing, input validation, the budget guard, key resolution and the
+response envelope are covered. **Whether a provider answers is not.** `/api/ai-status`
+covers reachability; P6-34 is the standing decision on what a model's answer is worth.
