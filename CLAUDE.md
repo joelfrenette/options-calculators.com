@@ -75,7 +75,8 @@ block present, menu present, first options specific to this turn.
 ## Verification before any commit
 Run `pnpm check:formulas && pnpm check:contracts` (typecheck via `pnpm typecheck`;
 10 known errors remain, do not add new ones). Regenerate SITE_MAP.md with
-`pnpm inventory` when routes/components change.
+`pnpm inventory` when routes/components change — `check:formulas` now enforces this via
+`site-inventory.ts --check`, so a stale SITE_MAP fails the suite rather than going unnoticed.
 
 **Any check that derives a file set must assert that set's size (P6-75, P6-77).**
 A check that stops COVERING is as invisible as one that stops running: the PASS count is
