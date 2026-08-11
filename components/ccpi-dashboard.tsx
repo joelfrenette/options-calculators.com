@@ -484,12 +484,18 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                         state.
                       </p>
                       <div className="bg-green-50 p-3 rounded border border-green-200">
-                        <p className="font-semibold text-green-800">Recommended Strategies This Week:</p>
+                        {/* "This Week" claimed a weekly refresh of a fixed list,
+                            and the list named AAPL, MSFT and GOOGL as put
+                            candidates. The CCPI is a market-wide index — it reads
+                            nothing about any individual ticker, so naming three was
+                            invented specificity. "target 70% POP" was the same:
+                            a precise figure nothing computes. */}
+                        <p className="font-semibold text-green-800">What this regime generally favours:</p>
                         <ul className="list-disc list-inside mt-1 text-green-700 space-y-1">
-                          <li>Sell cash-secured puts on quality stocks (AAPL, MSFT, GOOGL)</li>
-                          <li>Iron condors on SPY/QQQ with 30-45 DTE, target 70% POP</li>
+                          <li>Premium selling is more forgiving here than in a stressed regime</li>
+                          <li>Defined-risk range trades suit a market that is not trending hard</li>
                           <li>Covered calls if holding long equity positions</li>
-                          <li>Consider wheel strategy entries on pullbacks</li>
+                          <li>Pullbacks are entries rather than warnings in this state</li>
                         </ul>
                       </div>
                     </>
@@ -501,7 +507,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                         elevated caution is warranted. Monitor for regime shift.
                       </p>
                       <div className="bg-yellow-50 p-3 rounded border border-yellow-200">
-                        <p className="font-semibold text-yellow-800">Recommended Strategies This Week:</p>
+                        <p className="font-semibold text-yellow-800">What this regime generally favours:</p>
                         <ul className="list-disc list-inside mt-1 text-yellow-700 space-y-1">
                           <li>Reduce position sizes by 25-50%</li>
                           <li>Use defined-risk spreads only - no naked options</li>
@@ -518,7 +524,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                         CCPI at {data.ccpi}, extreme caution required.
                       </p>
                       <div className="bg-red-50 p-3 rounded border border-red-200">
-                        <p className="font-semibold text-red-800">Recommended Strategies This Week:</p>
+                        <p className="font-semibold text-red-800">What this regime generally favours:</p>
                         <ul className="list-disc list-inside mt-1 text-red-700 space-y-1">
                           <li>Close or hedge existing short premium positions</li>
                           <li>Consider long puts or put debit spreads for protection</li>

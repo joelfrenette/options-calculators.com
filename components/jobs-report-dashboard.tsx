@@ -233,9 +233,15 @@ function JobsReportDashboard() {
             <div>
               <h1 className="text-2xl font-bold text-[#1E3A8A] mb-2 flex items-center gap-2">
                 BLS Jobs Rate Forecaster
-                <InfoTooltip content="AI-powered analysis of live employment data to forecast future unemployment trends. Uses official BLS data via FRED (UNRATE/U-3 and U-6) combined with payroll and wage indicators to project upcoming releases." />
+                <InfoTooltip content="Forecasts computed from official BLS data via FRED (UNRATE/U-3 and U-6) plus payroll and wage indicators. The projection is a trend read over recent months with a three-month payrolls average as the central estimate — deterministic arithmetic on published series, not a model's opinion. Missing inputs are excluded rather than filled in." />
               </h1>
-              <p className="text-[#0D9488] text-lg font-medium">AI-Powered Employment Forecasts &amp; Analysis</p>
+              {/* Was "AI-Powered Employment Forecasts & Analysis". /api/jobs-report
+                  imports NextResponse, getApiKey and fred-store — no model, no LLM
+                  provider, nothing to be powered by. The forecast is a trend read
+                  plus a 3-month payrolls average. The label was false in the
+                  direction that flatters least: it claimed a guess where the code
+                  does deterministic, sourced arithmetic. */}
+              <p className="text-[#0D9488] text-lg font-medium">Employment Forecasts &amp; Analysis from BLS Data</p>
             </div>
             <div className="flex items-center gap-3">
               <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />

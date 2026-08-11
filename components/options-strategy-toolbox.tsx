@@ -956,9 +956,18 @@ export function OptionsStrategyToolbox({ strategy = "credit-spreads" }: OptionsS
               <div className="h-1 w-8 bg-teal-500 rounded" />
               <h2 className="text-xl font-bold" style={{ color: "#1E3A8A" }}>
                 <BarChart2 className="h-5 w-5 inline mr-2 text-teal-600" />
-                AI Trade Ideas & Adjustments This Week
+                How This Strategy Works & When to Adjust
               </h2>
-              <InfoTooltip content="Our AI analyzes current market conditions and provides context for why these setups make sense now. Use these insights to understand the 'why' behind each trade idea." />
+              {/* Was "AI Trade Ideas & Adjustments This Week", with a tooltip
+                  claiming "Our AI analyzes current market conditions ... why
+                  these setups make sense now". Everything below renders
+                  `config.insights`, a static object literal in this file — no
+                  model runs, no market data is read, and the text is byte-for-byte
+                  identical on every load and every week. Three false claims in one
+                  heading (AI, current conditions, this week), and because this
+                  component serves nine LEARN tabs it made all three on nine of
+                  them. */}
+              <InfoTooltip content="Written reference for this strategy: what it is, the entry criteria worth insisting on, and what to do when a position moves against you. This is fixed educational material — it does not read live market data and does not change week to week." />
             </div>
             <div className="space-y-3">
               <div className="border rounded-lg shadow-sm bg-white">

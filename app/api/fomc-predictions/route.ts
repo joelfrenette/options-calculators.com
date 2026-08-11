@@ -535,26 +535,40 @@ export async function GET() {
         predictionReliability,
         scoring: { predictionScore, scoredInputs, excludedFromScore },
       },
+      // This block described a method the route does not implement. It claimed,
+      // four times over, that the prediction comes from CME FedWatch methodology
+      // and Fed Funds futures pricing. There is no futures data anywhere in this
+      // file: FRED DFF is the REALIZED effective overnight rate, not a futures
+      // curve, and the probabilities come from `predictionScore` — a rule-based
+      // integer tally (+2 hawkish if CPI > 3.5, -2 dovish if unemployment > 5.0,
+      // and so on). The `weights` object was the same shape of claim: 40/30/15/15
+      // percentages over a score that applies no weights at all, one of them
+      // assigned to a "market pricing" input that does not exist.
+      //
+      // The heuristic is defensible and its inputs are real and sourced. What was
+      // not defensible was borrowing CME's name for it and inviting a
+      // side-by-side comparison, which reads as "same method, second opinion".
       predictionMethodology: {
         description:
-          "Our prediction uses the CME FedWatch methodology, analyzing Fed Funds futures, Treasury yields, and economic indicators to calculate market-implied probabilities",
+          "A rule-based score over published economic series — not a market-implied probability. Inflation, unemployment, growth and the yield curve each nudge a single hawkish/dovish tally, which maps to the probabilities shown. No Fed Funds futures are read.",
         formula:
-          "Implied Rate = Current Rate + Expected Rate Changes | Probabilities based on basis point differential",
+          "predictionScore = sum of per-indicator hawkish(+)/dovish(-) adjustments; the resulting tally maps to rate-decision probabilities",
         factors: [
           "Inflation Trend: Cooling inflation (CPI < 3.5% and declining) signals dovish Fed = rate cuts expected",
           "Treasury Yields: 10Y Treasury below Fed Funds rate signals market expects cuts",
           "Employment: Healthy unemployment (3.5-5%) supports gradual policy normalization",
           "Yield Curve: Inverted curve (2Y > 10Y) historically precedes rate cuts",
-          "Market Pricing: Implied rates from Fed Funds futures and Treasury markets",
         ],
-        weights: {
-          inflation: "40% (Primary mandate - price stability)",
-          employment: "30% (Dual mandate - maximum employment)",
-          growth: "15% (Economic conditions)",
-          marketPricing: "15% (Forward-looking market expectations)",
+        scoreContributions: {
+          inflation: "CPI level ±2, CPI trend ±1",
+          employment: "unemployment level +1/-2, trend -1/+0.5",
+          growth: "GDP ±1",
+          note: "Flat integer nudges, not weighted percentages. An indicator whose input is missing contributes nothing — see provenance.scoring.excludedFromScore.",
         },
-        methodology: "Similar to CME FedWatch Tool - calculates probabilities from market pricing of Fed Funds futures",
-        comparison: "Compare with CME FedWatch Tool at cmegroup.com/markets/interest-rates/cme-fedwatch-tool.html",
+        methodology:
+          "Rule-based scoring of FRED series. This is NOT the CME FedWatch method, which derives probabilities from 30-Day Fed Funds futures prices; this route reads no futures data and the two numbers are not computed the same way.",
+        comparison:
+          "For genuine market-implied probabilities see the CME FedWatch Tool at cmegroup.com/markets/interest-rates/cme-fedwatch-tool.html — a different method, and the one to trust when they disagree.",
         // Missing inputs are excluded from the model rather than substituted;
         // a signal whose input is unavailable simply never fires.
         missingDataPolicy:

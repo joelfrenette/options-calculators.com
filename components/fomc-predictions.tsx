@@ -117,12 +117,16 @@ interface PredictionMethodology {
   description: string
   formula: string
   factors: string[]
-  weights: {
+  // Renamed from `weights`, which named four percentages the score never
+  // applied — including one for a "market pricing" input the route does not read.
+  scoreContributions: {
     inflation: string
     employment: string
     growth: string
-    marketPricing: string
+    note: string
   }
+  methodology?: string
+  comparison?: string
 }
 
 interface OptionsStrategy {
@@ -661,8 +665,12 @@ export function FomcPredictions() {
                   Fed Rate Decision Predictor
                   <InfoTooltip content="The Federal Reserve sets interest rates to control inflation and employment. Rate hikes slow the economy (bearish for stocks), while rate cuts stimulate growth (bullish). Options traders can profit from rate decisions by trading rate-sensitive sectors and index options." />
                 </CardTitle>
+                {/* Was "AI-powered predictions using Fed Funds futures and
+                    economic data". Both halves were false: the route imports no
+                    model, and it reads no futures — see the comment on
+                    predictionMethodology in app/api/fomc-predictions/route.ts. */}
                 <CardDescription className="mt-1">
-                  AI-powered predictions using Fed Funds futures and economic data
+                  Rule-based rate forecasts scored from FRED economic series — not market-implied
                   {lastUpdated && <span className="ml-2 text-xs">(Updated: {lastUpdated.toLocaleTimeString()})</span>}
                 </CardDescription>
               </div>
@@ -792,8 +800,9 @@ export function FomcPredictions() {
               <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-xs text-blue-800">
                   <span className="font-semibold">Chart Methodology:</span> Historical rates from FRED (2 years of daily
-                  data, sampled monthly). Market consensus forecast calculated from Fed Funds futures and Treasury
-                  yields for FOMC meetings, with trend extrapolation to 2 years forward. Values represent monthly
+                  data, sampled monthly) — those are measured. The forward line is this site&apos;s own projection, not
+                  a market consensus: each FOMC meeting is stepped by the hawkish/dovish score, then extrapolated two
+                  years forward. No Fed Funds futures are read anywhere in this chart. Values represent monthly
                   averages.
                 </p>
               </div>
@@ -884,9 +893,16 @@ export function FomcPredictions() {
                     </div>
                     <div className="h-px bg-gray-200" />
                     <div>
+                      {/* Called "Implied Rate", described as what futures markets
+                          imply and what traders expect. In rates, "implied" means
+                          market-implied specifically — and this number is
+                          `currentRate + adjustedChange`, where the change comes
+                          from this site's own hawkish/dovish tally. No market
+                          priced it. Renamed, because the tooltip alone could not
+                          undo what the word claims. */}
                       <p className="text-sm text-gray-600 mb-1">
-                        Implied Rate
-                        <InfoTooltip content="The rate implied by Fed Funds futures markets. Represents what traders expect the rate to be after the meeting. Compare to current rate to see expected change." />
+                        Projected Rate
+                        <InfoTooltip content="This site's projection: the current Fed Funds rate plus the change suggested by its hawkish/dovish score over FRED series. It is NOT a market-implied rate — no futures are priced here — so it will not match the CME FedWatch Tool, and where they disagree the market is the one quoting real money." />
                       </p>
                       <p className="text-2xl font-bold text-primary">{nextMeeting.impliedRate.toFixed(2)}%</p>
                     </div>
@@ -902,7 +918,9 @@ export function FomcPredictions() {
           <Card className="shadow-sm border-gray-200">
             <CardHeader className="bg-gray-50 border-b border-gray-200">
               <CardTitle className="text-lg font-bold text-gray-900">Meeting Probabilities</CardTitle>
-              <CardDescription>Next FOMC Meeting - Calculated using CME FedWatch methodology</CardDescription>
+              {/* Not CME FedWatch, which prices 30-Day Fed Funds futures. This
+                  is a rule-based score over FRED series — see the route. */}
+              <CardDescription>Next FOMC Meeting - scored from FRED economic series</CardDescription>
             </CardHeader>
             <CardContent className="pt-4">
               <div className="overflow-x-auto">
@@ -1258,26 +1276,30 @@ export function FomcPredictions() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-semibold text-gray-900 mb-2">Factor Weights:</p>
+                  <p className="text-sm font-semibold text-gray-900 mb-2">Score Contributions:</p>
                   <div className="grid md:grid-cols-2 gap-2">
                     <div className="text-sm bg-white p-2 rounded border border-blue-200">
                       <span className="font-semibold text-gray-900">Inflation:</span>{" "}
-                      {predictionMethodology.weights.inflation}
+                      {predictionMethodology.scoreContributions.inflation}
                     </div>
                     <div className="text-sm bg-white p-2 rounded border border-blue-200">
                       <span className="font-semibold text-gray-900">Employment:</span>{" "}
-                      {predictionMethodology.weights.employment}
+                      {predictionMethodology.scoreContributions.employment}
                     </div>
                     <div className="text-sm bg-white p-2 rounded border border-blue-200">
                       <span className="font-semibold text-gray-900">Growth:</span>{" "}
-                      {predictionMethodology.weights.growth}
-                    </div>
-                    <div className="text-sm bg-white p-2 rounded border border-blue-200">
-                      <span className="font-semibold text-gray-900">Market Pricing:</span>{" "}
-                      {predictionMethodology.weights.marketPricing}
+                      {predictionMethodology.scoreContributions.growth}
                     </div>
                   </div>
+                  <p className="text-xs text-gray-600 mt-2">{predictionMethodology.scoreContributions.note}</p>
                 </div>
+
+                {predictionMethodology.methodology && (
+                  <div className="rounded border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+                    <p>{predictionMethodology.methodology}</p>
+                    {predictionMethodology.comparison && <p className="mt-2">{predictionMethodology.comparison}</p>}
+                  </div>
+                )}
 
                 <div>
                   <p className="text-sm font-semibold text-gray-900 mb-2">Scoring Factors:</p>
