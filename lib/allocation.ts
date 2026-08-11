@@ -1,29 +1,39 @@
 /**
  * Cash vs stocks, for every gauge on the site that recommends a split.
  *
- * ## Why this is one file and not one per component
+ * ## One number per level, not a range
  *
- * Before this existed the site carried four allocation tables:
+ * These were ranges ("cash 5-10%") until the 2026-08-10 UAT. A range reads as
+ * precision it does not have and cannot be drawn to scale — "90-95% stocks
+ * beside 5-10% cash" has no single proportion to render, so the reader has to
+ * do the arithmetic the page should have done. **Each level now carries one
+ * exact cash figure**, taken as the midpoint of the range it replaced and
+ * rounded to the nearest 5.
+ *
+ * ## Cash is stored, stocks is derived
+ *
+ * Before this file existed the site carried five allocation tables:
  *
  * 1. the CCPI dashboard's five-column split (shares / LEAPS / short options /
  *    hedges / cash) whose columns never summed to 100,
  * 2. the CCPI options-strategy card's "cash 5-10% beside exposure 90-100%",
  *    which sums to 110,
  * 3. market sentiment's `getTradeRecommendations`, the one live table that was
- *    internally consistent, and
- * 4. market sentiment's `getPortfolioAllocation`, a three-way split that summed
- *    to between 85 and 110 **and was never rendered** — dead code carrying
- *    numbers that disagreed with (3) in the same component.
+ *    internally consistent,
+ * 4. market sentiment's `getPortfolioAllocation`, a three-way split summing to
+ *    between 85 and 110 that **was never rendered** — dead code contradicting
+ *    (3) in the same component, and
+ * 5. `components/panic-euphoria.tsx`, still outstanding at the time of writing.
  *
- * The pattern is the same every time: **both halves of a complementary pair were
- * stored, so they were free to drift, and they did.** The fix is structural
- * rather than a one-time correction of the numbers — cash is the only stored
- * figure anywhere in this file, and stocks is always computed from it.
+ * The pattern is the same every time: **both halves of a complementary pair
+ * were stored, so they were free to drift, and they did.** The fix is
+ * structural rather than a one-time correction — cash is the only stored figure
+ * anywhere in this file, and stocks is always computed from it.
  *
- * "Stocks" means everything deployed — shares, ETFs, LEAPS and option positions.
- * That is the house convention: positions are shares/LEAPS/options/cash only,
- * there are no separate asset classes, and diversification is expressed through
- * sectors and indexes such as GDX, XLU and SPY.
+ * "Stocks" means everything deployed — shares, ETFs, LEAPS and option
+ * positions. That is the house convention: positions are shares/LEAPS/options/
+ * cash only, there are no separate asset classes, and diversification is
+ * expressed through sectors and indexes such as GDX, XLU and SPY.
  *
  * ## The two band sets are not interchangeable
  *
@@ -31,10 +41,10 @@
  * reader comparing "cash %" across the two pages is comparing two different
  * questions. Each set states its own, and the UI should print it:
  *
- * - `CCPI_ALLOCATION_BANDS` — keyed to crash risk, 0 calm to 100 crash watch.
- * - `SENTIMENT_ALLOCATION_BANDS` — keyed to fear and greed, 0 extreme fear to
- *   100 extreme greed. Cash rises with *greed* here, which is why its low band
- *   still holds more cash than the CCPI low band does.
+ * - `CCPI_ALLOCATION` — keyed to crash risk, 0 calm to 100 crash watch.
+ * - `SENTIMENT_ALLOCATION` — keyed to fear and greed, 0 extreme fear to 100
+ *   extreme greed. Cash rises with *greed* here, which is why its calmest band
+ *   still holds more cash than the CCPI calmest band does.
  *
  * Dependency-free so check scripts can load it directly.
  */
@@ -45,9 +55,8 @@ export interface AllocationBand {
   min: number
   max: number
   level: string
-  /** The only stored allocation figure. Stocks is derived from it. */
-  cashMin: number
-  cashMax: number
+  /** The only stored allocation figure, as a whole percent. Stocks is derived. */
+  cash: number
   /** One line on what the split is for at this level. */
   stance: string
 }
@@ -65,8 +74,7 @@ export const CCPI_ALLOCATION_BANDS: readonly AllocationBand[] = [
     min: 0,
     max: 19,
     level: "Low Risk",
-    cashMin: 5,
-    cashMax: 10,
+    cash: 10,
     stance: "Fully deployed. Hold only the cash you need to act on a pullback.",
   },
   {
@@ -74,8 +82,7 @@ export const CCPI_ALLOCATION_BANDS: readonly AllocationBand[] = [
     min: 20,
     max: 39,
     level: "Normal",
-    cashMin: 15,
-    cashMax: 25,
+    cash: 20,
     stance: "Standard positioning with a working cash reserve.",
   },
   {
@@ -83,8 +90,7 @@ export const CCPI_ALLOCATION_BANDS: readonly AllocationBand[] = [
     min: 40,
     max: 59,
     level: "Caution",
-    cashMin: 30,
-    cashMax: 40,
+    cash: 35,
     stance: "Trim into strength and let cash build.",
   },
   {
@@ -92,8 +98,7 @@ export const CCPI_ALLOCATION_BANDS: readonly AllocationBand[] = [
     min: 60,
     max: 79,
     level: "High Alert",
-    cashMin: 50,
-    cashMax: 60,
+    cash: 55,
     stance: "Cash is the larger half. Keep only high-conviction and defensive names.",
   },
   {
@@ -101,8 +106,7 @@ export const CCPI_ALLOCATION_BANDS: readonly AllocationBand[] = [
     min: 80,
     max: 100,
     level: "Crash Watch",
-    cashMin: 70,
-    cashMax: 80,
+    cash: 75,
     stance: "Capital preservation. Deploy again only after the regime downgrades.",
   },
 ]
@@ -112,20 +116,14 @@ export const CCPI_ALLOCATION: AllocationScale = {
   bands: CCPI_ALLOCATION_BANDS,
 }
 
-/**
- * Fear and greed: 0 is extreme fear, 100 is extreme greed. Cash rises with greed.
- *
- * Cash figures are the ones the live market-sentiment table already showed. Its
- * pairs were internally consistent; deriving stocks keeps them that way.
- */
+/** Fear and greed: 0 is extreme fear, 100 is extreme greed. Cash rises with greed. */
 export const SENTIMENT_ALLOCATION_BANDS: readonly AllocationBand[] = [
   {
     range: "0-24",
     min: 0,
     max: 24,
     level: "Extreme Fear",
-    cashMin: 10,
-    cashMax: 20,
+    cash: 15,
     stance: "Others are fearful. Deploy into quality and keep a little dry powder.",
   },
   {
@@ -133,8 +131,7 @@ export const SENTIMENT_ALLOCATION_BANDS: readonly AllocationBand[] = [
     min: 25,
     max: 44,
     level: "Fear",
-    cashMin: 20,
-    cashMax: 30,
+    cash: 25,
     stance: "Favourable for premium sellers. Stay selective on the underlying.",
   },
   {
@@ -142,8 +139,7 @@ export const SENTIMENT_ALLOCATION_BANDS: readonly AllocationBand[] = [
     min: 45,
     max: 55,
     level: "Neutral",
-    cashMin: 30,
-    cashMax: 40,
+    cash: 35,
     stance: "Balanced. Do not force trades — wait for better setups.",
   },
   {
@@ -151,8 +147,7 @@ export const SENTIMENT_ALLOCATION_BANDS: readonly AllocationBand[] = [
     min: 56,
     max: 74,
     level: "Greed",
-    cashMin: 40,
-    cashMax: 60,
+    cash: 50,
     stance: "Reduce exposure and take profits early. Build reserves.",
   },
   {
@@ -160,8 +155,7 @@ export const SENTIMENT_ALLOCATION_BANDS: readonly AllocationBand[] = [
     min: 75,
     max: 100,
     level: "Extreme Greed",
-    cashMin: 60,
-    cashMax: 80,
+    cash: 70,
     stance: "Extreme greed often precedes corrections. Maximum cash, minimal new risk.",
   },
 ]
@@ -172,12 +166,12 @@ export const SENTIMENT_ALLOCATION: AllocationScale = {
 }
 
 /** Stocks is always the complement of cash — never stored, so it cannot drift. */
-export function stocksRange(band: AllocationBand): { min: number; max: number } {
-  return { min: 100 - band.cashMax, max: 100 - band.cashMin }
+export function stocksFor(band: AllocationBand): number {
+  return 100 - band.cash
 }
 
-export function formatRange(min: number, max: number): string {
-  return `${min}-${max}%`
+export function formatPct(value: number): string {
+  return `${value}%`
 }
 
 /**

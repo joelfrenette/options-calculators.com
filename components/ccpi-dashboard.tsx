@@ -15,7 +15,8 @@ import type { CCPIData, HistoricalData } from "@/lib/ccpi/types"
 import { getReadableColor, getRegimeZone, sortCanaries, countActiveWarnings } from "@/lib/ccpi/calculations"
 import { saveCCPIToCache, loadCCPIFromCache, saveHistoryToCache } from "@/lib/ccpi/cache"
 import { REFRESH_STATUS_MESSAGES } from "@/lib/ccpi/constants"
-import { CCPI_ALLOCATION, bandForScore, formatRange, stocksRange } from "@/lib/allocation"
+import { CCPI_ALLOCATION, bandForScore, formatPct, stocksFor } from "@/lib/allocation"
+import { AllocationBar } from "@/components/allocation-bar"
 import { CCPIChatModal } from "./ccpi-chat-modal"
 import { RefreshButton } from "./ui/refresh-button" // Assuming RefreshButton is in ui/refresh-button.tsx
 import { DataLoadGate } from "@/components/data-load-gate"
@@ -831,7 +832,6 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 <CardContent className="pt-4 pb-4">
                   <div className="space-y-2">
                     {CCPI_ALLOCATION.bands.map((band) => {
-                      const stocks = stocksRange(band)
                       const isCurrent = currentBand?.range === band.range
 
                       return (
@@ -855,20 +855,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                             )}
                           </div>
 
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="p-3 bg-blue-50 rounded border border-blue-200">
-                              <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Stocks</div>
-                              <div className="text-2xl font-bold text-blue-900">
-                                {formatRange(stocks.min, stocks.max)}
-                              </div>
-                            </div>
-                            <div className="p-3 bg-gray-50 rounded border border-gray-300">
-                              <div className="text-xs font-semibold text-gray-900 uppercase mb-1">Cash</div>
-                              <div className="text-2xl font-bold text-gray-900">
-                                {formatRange(band.cashMin, band.cashMax)}
-                              </div>
-                            </div>
-                          </div>
+                          <AllocationBar band={band} />
 
                           <p className="text-sm text-gray-600 italic mt-3">{band.stance}</p>
                         </div>
@@ -1059,13 +1046,13 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                             <div className="p-3 bg-blue-50 rounded border border-blue-200">
                               <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Stocks</div>
                               <div className="text-lg font-bold text-blue-900">
-                                {band ? formatRange(stocksRange(band).min, stocksRange(band).max) : "—"}
+                                {band ? formatPct(stocksFor(band)) : "—"}
                               </div>
                             </div>
                             <div className="p-3 bg-gray-50 rounded border border-gray-300">
                               <div className="text-xs font-semibold text-gray-900 uppercase mb-1">Cash</div>
                               <div className="text-lg font-bold text-gray-900">
-                                {band ? formatRange(band.cashMin, band.cashMax) : "—"}
+                                {band ? formatPct(band.cash) : "—"}
                               </div>
                             </div>
                             <div className="p-3 bg-purple-50 rounded border border-purple-200">

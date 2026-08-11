@@ -11,7 +11,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Info } from "lucide-react"
-import { SENTIMENT_ALLOCATION, bandForScore, formatRange, stocksRange } from "@/lib/allocation"
+import { SENTIMENT_ALLOCATION, bandForScore } from "@/lib/allocation"
+import { AllocationBar } from "@/components/allocation-bar"
 
 // import {
 //   Activity,
@@ -1303,20 +1304,13 @@ export function MarketSentiment() {
                             what let this card drift from the (now deleted) second table in
                             this same component.
                           */}
-                          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                            <span className="text-sm font-medium text-gray-700">Cash on Hand</span>
-                            <span className="text-sm font-bold text-primary">
-                              {sentimentBand ? formatRange(sentimentBand.cashMin, sentimentBand.cashMax) : "—"}
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                            <span className="text-sm font-medium text-gray-700">Stocks</span>
-                            <span className="text-sm font-bold text-primary">
-                              {sentimentBand
-                                ? formatRange(stocksRange(sentimentBand).min, stocksRange(sentimentBand).max)
-                                : "—"}
-                            </span>
-                          </div>
+                          {sentimentBand ? (
+                            <AllocationBar band={sentimentBand} />
+                          ) : (
+                            <p className="text-sm text-gray-500 italic">
+                              No sentiment reading — allocation not shown.
+                            </p>
+                          )}
                           <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
                             <span className="text-sm font-medium text-gray-700">Position Size</span>
                             <span className="text-sm font-bold text-primary">{recommendations.positionSize}</span>
