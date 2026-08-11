@@ -50,10 +50,13 @@ export type QuiverFailure =
 
 export type QuiverResult<T> = { ok: true; data: T } | ({ ok: false } & QuiverFailure)
 
-/** True when a Quiver credential is available (respects DISABLED_APIS + guard). */
-export function isQuiverConfigured(): boolean {
-  return resolveApiKey("QUIVER_API_KEY").length > 0
-}
+// `isQuiverConfigured` was deleted here (P7-9). It wrapped
+// `resolveApiKey("QUIVER_API_KEY").length > 0` in a boolean, and nothing called
+// it — because none of the three places that ask this question can use a
+// boolean. /api/cron/quiver-probe, /api/panic-euphoria and `fetchQuiverDataset`
+// below all need the key VALUE to send, so each one resolves it and tests the
+// result in a single step. A boolean-only form is a second reading of the same
+// env state that can disagree with the value the caller then uses.
 
 /**
  * Fetch the live congressional-trading feed.

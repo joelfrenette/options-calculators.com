@@ -1,8 +1,8 @@
 // CCPI Calculation & Utility Functions
 // Pure functions for color mapping, scoring, and data transformations
 
-import type { CCPIData, CCPIIndicatorThresholds, CCPIRegimeZone, CCPIIndicatorStatus } from "./types"
-import { COLOR_MAP, GRADIENT_BAR_COLORS, CCPI_THRESHOLDS, REGIME_COLORS, PILLAR_WEIGHTS } from "./constants"
+import type { CCPIData, CCPIRegimeZone } from "./types"
+import { COLOR_MAP, CCPI_THRESHOLDS, PILLAR_WEIGHTS } from "./constants"
 
 /**
  * Converts color name to hex value
@@ -11,25 +11,22 @@ export function getReadableColor(colorName: string): string {
   return COLOR_MAP[colorName as keyof typeof COLOR_MAP] || COLOR_MAP.gray
 }
 
-/**
- * Gets color for gradient bar based on percentage (0-100)
- */
-export function getBarColor(percentage: number): string {
-  if (percentage <= 33) return GRADIENT_BAR_COLORS.low
-  if (percentage <= 66) return GRADIENT_BAR_COLORS.medium
-  return GRADIENT_BAR_COLORS.high
-}
-
-/**
- * Gets Tailwind CSS class for regime color based on CCPI level
- */
-export function getRegimeColor(level: number): string {
-  if (level >= CCPI_THRESHOLDS.CRASH_WATCH) return REGIME_COLORS.CRASH_WATCH
-  if (level >= CCPI_THRESHOLDS.HIGH_ALERT) return REGIME_COLORS.HIGH_ALERT
-  if (level >= CCPI_THRESHOLDS.CAUTION) return REGIME_COLORS.CAUTION
-  if (level >= CCPI_THRESHOLDS.NORMAL) return REGIME_COLORS.NORMAL
-  return REGIME_COLORS.LOW_RISK
-}
+// P7-9. `getBarColor` and `getRegimeColor` were deleted here, with the
+// GRADIENT_BAR_COLORS and REGIME_COLORS constants only they read.
+//
+// `getRegimeColor` is the one that mattered: it classified a CCPI level into
+// five bands off CCPI_THRESHOLDS and returned a Tailwind class, which is the
+// same classification `getRegimeZone` below performs — returning a label and a
+// colour NAME instead. One score, one set of thresholds, classified twice.
+// Only `getRegimeZone` was ever called. Two copies agreeing today is not a
+// property anything enforces; the next threshold change would have had to find
+// both, and the audit has already watched that fail four times (the "comment
+// recording a fix is where the missed instance lives" pattern).
+//
+// `getBarColor` bucketed a 0-100 percentage at 33/66. The live gradient bar is
+// `CCPIGradientBar` in components/ccpi/indicator-primitives.tsx, which renders
+// a continuous CSS gradient and a mask — no buckets, no thresholds, nothing
+// this function could have kept in step with.
 
 /**
  * Gets regime zone information based on CCPI score
@@ -42,23 +39,22 @@ export function getRegimeZone(ccpi: number): CCPIRegimeZone {
   return { color: "green", label: "LOW RISK" }
 }
 
-/**
- * Determines indicator status based on value and thresholds
- */
-export function getIndicatorStatus(value: number, thresholds: CCPIIndicatorThresholds): CCPIIndicatorStatus {
-  // If ideal value provided, calculate deviation
-  if (thresholds.ideal !== undefined) {
-    const deviation = Math.abs(value - thresholds.ideal)
-    if (deviation < 5) return { color: "bg-green-500", status: "Normal" }
-    if (deviation < 15) return { color: "bg-yellow-500", status: "Elevated" }
-    return { color: "bg-red-500", status: "Warning" }
-  }
-
-  // Otherwise use low/high thresholds
-  if (value <= thresholds.low) return { color: "bg-green-500", status: "Low Risk" }
-  if (value <= thresholds.high) return { color: "bg-yellow-500", status: "Moderate" }
-  return { color: "bg-red-500", status: "High Risk" }
-}
+// P7-9. `getIndicatorStatus` was deleted here, together with the
+// `CCPIIndicatorThresholds` and `CCPIIndicatorStatus` types in ./types that
+// only it used.
+//
+// It had no caller, and the reason is that the design it belonged to was
+// replaced: indicators are rendered by `CCPIIndicator` in
+// components/ccpi/indicator-primitives.tsx, which takes a threshold object of
+// an entirely different shape — `{ low: { value, label }, high: { value,
+// label } }` against this one's `{ low: number, high: number, ideal? }` — and
+// shows a gradient bar with band labels rather than a colour/status pair.
+//
+// **The component declares its own interface under the same name**, so the
+// repo held two incompatible `CCPIIndicatorThresholds`, one live and one dead,
+// and an import of the wrong one type-errors in a way that reads as a mistake
+// in the caller. That ambiguity is the whole reason to remove the loser rather
+// than leave it sitting in a module no check script can load (P6-85).
 
 /**
  * Sorts canaries by severity (high > medium > low) then by impact score

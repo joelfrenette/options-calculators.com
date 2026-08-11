@@ -29,9 +29,11 @@ interface ServiceCost {
   disabled: boolean
   active: boolean
   effectiveCost: number
-  // `usageCount` is still emitted by /api/admin/usage but is deliberately not
-  // rendered — nothing in the repo calls `recordApiUsage`, so it is a
-  // never-measured 0, not a measurement of zero (AUDIT A-13).
+  // A-13 / P7-9. `usageCount` and `lastUsedISO` are gone from the payload as
+  // well as from this component. Leaving the fields in the response kept a
+  // never-measured 0 on the wire where any later reader would have taken it
+  // for a measurement of zero. Real per-call counts come from
+  // lib/metered-fetch.ts and are rendered in the "Measured usage" card.
 }
 
 /**

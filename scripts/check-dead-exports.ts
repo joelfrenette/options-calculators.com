@@ -143,16 +143,40 @@ for (const f of ALL_SOURCE) {
   sourceByFile.set(f, stripComments(readFileSync(f, "utf8")))
 }
 
+/**
+ * A file that DECLARES its own function/const of the same name is not a
+ * referrer — it is a second implementation.
+ *
+ * This is a false negative the rule shipped with, and P7-9 found it the only
+ * way it could be found: by hand. `lib/sentiment-sources.ts` exported
+ * `getPolygonNewsSentiment`, and `/api/social-sentiment` declares a LOCAL
+ * `async function getPolygonNewsSentiment()` reading a different corpus and
+ * calls that. The word-match saw the name in another file and scored the lib
+ * export live, so the one case where a dead export is genuinely dangerous —
+ * a diverged twin under the same name — was the case the check was blind to.
+ *
+ * Structural, not textual: it keys off a declaration form, so it cannot be
+ * switched off by rewording a comment the way Rule 13's keyword scope was.
+ */
+const declaresOwn = (src: string, name: string): boolean =>
+  new RegExp(
+    `(?:^|\\n)\\s*(?:export\\s+)?(?:async\\s+)?(?:function|const|let|class)\\s+${name.replace(/\$/g, "\\$")}\\b`,
+  ).test(src)
+
 const dead: { key: string; where: string }[] = []
+const shadowed: string[] = []
 for (const s of symbols) {
   const word = new RegExp(`\\b${s.name.replace(/\$/g, "\\$")}\\b`)
   let referenced = false
   for (const [f, src] of sourceByFile) {
     if (f === s.file) continue
-    if (word.test(src)) {
-      referenced = true
-      break
+    if (!word.test(src)) continue
+    if (declaresOwn(src, s.name)) {
+      shadowed.push(`${rel(s.file)}:${s.name} shadowed by ${rel(f)}`)
+      continue
     }
+    referenced = true
+    break
   }
   if (!referenced) dead.push({ key: `${rel(s.file)}:${s.name}`, where: `${rel(s.file)}:${s.line} ${s.name}` })
 }
@@ -176,27 +200,20 @@ for (const s of symbols) {
 // anything above it is edited, and a guard that fires on unrelated edits gets
 // deleted rather than fixed.
 
-const KNOWN_DEAD: ReadonlySet<string> = new Set([
-  "lib/ai-providers.ts:streamWithFallback",
-  "lib/ai-providers.ts:getProviderStatus",
-  "lib/api-usage.ts:recordApiUsage",
-  "lib/api-usage.ts:getServiceUsage",
-  "lib/auth.ts:isPasswordHashed",
-  "lib/budget-guard.ts:providerToKey",
-  "lib/budget-guard.ts:isBudgetGuardTrippedSync",
-  "lib/ccpi/cache.ts:clearCCPICache",
-  "lib/ccpi/cache.ts:loadHistoryFromCache",
-  "lib/ccpi/cache.ts:saveSummaryToCache",
-  "lib/ccpi/cache.ts:loadSummaryFromCache",
-  "lib/ccpi/calculations.ts:getBarColor",
-  "lib/ccpi/calculations.ts:getRegimeColor",
-  "lib/ccpi/calculations.ts:getIndicatorStatus",
-  "lib/quiver.ts:isQuiverConfigured",
-  "lib/sentiment-sources.ts:getTwitterSentiment",
-  "lib/sentiment-sources.ts:getFinnhubNewsSentiment",
-])
+// P7-9 closed the list. All seventeen entries were decided one at a time:
+// fourteen deleted, two wired to the caller that had reimplemented them
+// (`streamWithFallback` into /api/ccpi/chat, `isPasswordHashed` into the admin
+// health check), and one more — `getPolygonNewsSentiment` — surfaced only after
+// the shadowing false negative above was fixed, then deleted with the rest.
+//
+// **Empty is a stronger claim than a ratchet, so the failure mode changes.**
+// While the list had entries, adding one was the loud event. Now ANY new
+// unreferenced export in lib/ fails the suite. If a genuinely-needed export
+// lands with no caller yet, the honest move is to add it here WITH the reason
+// and raise the baseline in the same commit — not to widen the scope above.
+const KNOWN_DEAD: ReadonlySet<string> = new Set([])
 
-const KNOWN_DEAD_BASELINE = 17
+const KNOWN_DEAD_BASELINE = 0
 
 check(
   `the known-dead list still holds ${KNOWN_DEAD_BASELINE} entries`,
@@ -212,6 +229,16 @@ check(
     ? fresh.map((d) => d.where).join(", ")
     : `${symbols.length} exports across ${LIB_FILES.length} files; ${dead.length} known-dead, 0 new`,
 )
+
+// Report what the shadow rule suppressed. A check that silently stops counting
+// something is the P6-77 failure in miniature: the PASS line looks identical
+// whether the rule found nothing or looked at nothing. Every line here is a
+// lib export sharing a name with a local declaration elsewhere — worth a look
+// even when the export is otherwise live, because that is how a diverged twin
+// starts.
+if (shadowed.length) {
+  console.log(`NOTE  ${shadowed.length} name collision(s) ignored as non-references: ${shadowed.join(", ")}`)
+}
 
 const cleared = [...KNOWN_DEAD].filter((k) => !dead.some((d) => d.key === k))
 if (cleared.length) {

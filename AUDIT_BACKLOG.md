@@ -383,14 +383,19 @@ recomputes it.
 | P7-6 | P1 | fixed | Eleven defaulted-number sites across six public tabs, including a "Support" reference line drawn at y = 0 on a price chart. |
 | P7-7 | P2 | open | **`next build` does not run on this machine, by either bundler — a second blocker on Phase 7.0.** Needs a Vercel preview deploy or a local Node downgrade. |
 | P7-8 | P2 | fixed | The dead-code lens is now a rule (`check-dead-exports.ts`, ratcheted at 51). Its first run cleared itself because the allowlist named its own findings. |
-| P7-9 | P3 | open | **51 → 17.** Nine deleted, 24 un-exported (used internally; typecheck confirms no importer). `lib/` now 251 exports across 52 files. The 17 left need a decision each — three on security or spend-control code. |
+| P7-9 | P3 | fixed | **17 → 0, decided one at a time.** Fourteen deleted, two wired to the caller that had reimplemented them, one un-exported. `KNOWN_DEAD` is now empty, so any new unreferenced export in `lib/` fails. |
 | P7-10 | P2 | open | `nvidiaMomentum ?? 50` — a neutral-50 on a scored 0-100 momentum input. Excluded from scoring by its baseline tier; the display side is unverified. |
+| P7-11 | P2 | fixed | `check-dead-exports.ts` counted a same-named local declaration as a reference, so a lib export with a diverged twin — the dangerous case — read as live. |
+| P7-12 | P2 | open | **`components/greeks-calculator.tsx` computes Black-Scholes itself**, with no degenerate-input guard: T=0 or IV=0 renders NaN where `lib/black-scholes.ts` returns null. |
+| P7-13 | P3 | open | Three more same-name duplicates of live code, surfaced by P7-11's NOTE line: `expectedMove`, `fetchExecutiveSummary`, and `daysBetween` in three modules. |
 
 ### The open list, by severity
 
-213 findings recorded · **166 fixed · 7 wontfix · 0 verified-ok · 40 open.**
+216 findings recorded · **168 fixed · 7 wontfix · 0 verified-ok · 41 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
-pass then closed P3-15, P3-17, P3-18, S-8 and P1-14.)_
+pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
+P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
+that finds nothing new is a rule that stopped looking.)_
 
 `verified-ok` is empty on purpose. The vocabulary allows it and nothing currently
 qualifies: every investigated-and-clean result on this project was recorded inside
@@ -1526,3 +1531,108 @@ P2-4, P3-15, P3-17, P3-18, S-8, S-9 and S-10 closed, dead exports 51 → 17, fou
 scripts. **Routes 61 → 60** (`/api/ccpi/cache` deleted, P2-2).
 
 **Not verified on www yet.** Nothing has been checked against production since it moved.
+
+---
+
+## Phase 7.4 (ninth pass) — P7-9 closed: the last 17 dead exports, one decision each (2026-08-11)
+
+`KNOWN_DEAD` is **empty**. The ratchet that started at 51 is now a zero, so any new
+unreferenced export in `lib/` fails the suite rather than joining a list.
+
+Seventeen decisions, not one sweep. Grouped by what the decision turned out to be:
+
+**Deleted because the behaviour was superseded (11).**
+
+| Export | Why it had no caller |
+|---|---|
+| `lib/api-usage.ts` (whole module: `recordApiUsage`, `getServiceUsage`, `getUsageStats`) | A-13's counter. `recordApiUsage` was called from nowhere, so the reader was structurally incapable of returning anything but 0 — and `/api/admin/usage` still shipped that 0 as `usageCount: … ?? 0`. The component had stopped rendering it; the field stayed on the wire, which moved the trap one layer out instead of removing it. `lib/metered-fetch.ts` measures the calls that actually happen. |
+| `getProviderStatus` | A strict subset of `getProviderChain` — same array, same `config.key()`, minus order/model/tier/endpoint. Two functions deriving one answer from one array is exactly the drift `getProviderChain` exists to prevent. |
+| `providerToKey` (+ `PROVIDER_TO_KEY`) | Mapped a ledger provider tag to a key for per-provider attribution. The guard is all-or-nothing by design — it caps a total and disables every guarded key — so there is no decision to attribute to. It was also a **third** written-down copy of the provider vocabulary, with nothing tying the three together. |
+| `isBudgetGuardTrippedSync` | A second way to ask whether the guard is tripped, carrying its own copy of the fail-open default, on a spend-control path. The one caller that cannot await — `resolveApiKey` — reads the snapshot directly. |
+| `isQuiverConfigured` | A boolean wrapper none of the three Quiver call sites can use: each needs the key VALUE to send, and resolves-and-tests in one step. |
+| `clearCCPICache`, `saveSummaryToCache`, `loadSummaryFromCache` | No control clears the CCPI cache; the executive summary is fetched per use. A matched save/load pair with no caller on either side. |
+| `getBarColor`, `getRegimeColor` | `getRegimeColor` classified a CCPI level into five bands off `CCPI_THRESHOLDS` — the same classification `getRegimeZone` performs, returning a Tailwind class instead of a colour name. One score, two classifiers, one caller. `getBarColor` bucketed at 33/66 for a bar that renders a continuous CSS gradient. |
+| `getIndicatorStatus` | Belonged to a replaced design. **The live component declares its own `CCPIIndicatorThresholds` under the same name and an incompatible shape**, so the repo held two, and importing the wrong one type-errors in a way that reads as the caller's mistake. |
+
+**Deleted including a live caller (1).**
+
+`saveHistoryToCache` / `loadHistoryFromCache` were **a write-only cache**. The dashboard
+called the writer on every history fetch and nothing ever read the key back. Deleting only
+the dead reader would have kept the cost and removed the evidence: localStorage is a
+per-origin quota shared with the CCPI snapshot that *is* read, so the largest unread
+writer is the one most likely to push the quota over and start failing `saveCCPIToCache`.
+`CACHE_KEYS` is down to one entry.
+
+**Deleted after P7-11 exposed them (3).** `getTwitterSentiment`,
+`getFinnhubNewsSentiment` and `getPolygonNewsSentiment` in `lib/sentiment-sources.ts`.
+All three returned `score: -1` as their "no data" sentinel in a field whose live range is
+0-100 — a magic number that survives one arithmetic step and stops being recognisable,
+landing inside the valid range as a real bearish reading. `/api/social-sentiment` imports
+two functions from this module and reads Finnhub and Polygon through its own local
+implementations against **different corpora**.
+
+**Kept and wired to the caller that had reimplemented them (2).**
+
+| Export | What the duplicate was doing |
+|---|---|
+| `streamWithFallback` | `/api/ccpi/chat` carried its own copy of the provider chain, and the copy had **drifted to six providers against the canonical seven — Perplexity was simply absent**, so a chat turn gave up one fallback earlier than every other AI route. Its ledger `provider` tags had drifted too ("OpenRouter (free)", "Groq", "xAI" against "openrouter", "groq", "xai"), splitting one vendor across two rows in the admin Measured-usage card. **The sharp end: `getProviderChain()` is what the admin panel renders as "the live fallback chain, in the exact order the generate/stream loops try it", and it is derived from the canonical array — so the panel was stating something untrue about this route.** That is a provenance defect, not a tidiness one. `streamWithFallback` was dead for exactly as long as the copy existed. |
+| `isPasswordHashed` | Its docstring said "for the admin UI" and the admin UI had reimplemented it: `/api/admin/run-health-checks` computed its own `Boolean(process.env.ADMIN_PASSWORD_HASH)` rather than asking `lib/auth.ts`, the module that decides which credential path actually runs. The reader now asks the verifier. |
+
+**Un-exported (1).** `lib/remediation.ts:routeFile` — used only inside its own module.
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| P7-9 | P3 | ops / lib | **17 → 0. CLOSED.** Fourteen deleted, two wired to callers that had reimplemented them, one un-exported. `KNOWN_DEAD` is empty and `KNOWN_DEAD_BASELINE` is 0, so the rule now claims `lib/` is clean rather than claiming it does not get dirtier. `lib/` is 230 exports across 51 files. The two "keep" decisions each removed a live duplicate, and one of them (`/api/ccpi/chat`) was making the admin panel's provider-chain display false. |
+
+### P7-11 — the check counted a diverged twin as a reference
+
+`check-dead-exports.ts` tested whether a symbol's name appears anywhere else in the repo.
+A file that **declares its own** function of that name therefore scored the lib export
+live — so the one case where a dead export is genuinely dangerous, a second
+implementation under the same name reading different data, was the case the rule was
+blind to. It is the P6-75 shape once more: the check's answer decided by content rather
+than structure.
+
+Found by hand, the only way it could be found: `/api/social-sentiment` declares a local
+`async function getPolygonNewsSentiment()` and calls that, while the lib export of the
+same name sat unreferenced and unreported.
+
+The fix keys off a declaration form (`function|const|let|class <name>`), not a keyword,
+so rewording a comment cannot switch it off. It surfaced one more genuine finding
+immediately — `lib/remediation.ts:routeFile`, "referenced" only by an unrelated local
+`const routeFile` in `check-provenance.ts` — and it **reports what it suppressed** on a
+`NOTE` line, because a rule that silently stops counting something produces the same PASS
+line as one that found nothing (P6-77).
+
+Sixteen collisions are currently reported. Most are benign — `const rsi = calcRSI(prices)`
+is a result variable, not a re-implementation, and `SOX_REFERENCE_LEVEL`'s two copies are
+already asserted equal by `check-ccpi-canaries.ts:207`. **Three are not** (P7-12, P7-13).
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| P7-11 | P2 | tooling | **`check-dead-exports.ts` counted a same-named local declaration as a reference.** The diverged-twin case — the one a dead-export rule most needs to catch — was invisible to it. Fixed structurally; collisions are now reported rather than silently dropped. |
+
+### P7-12 / P7-13 — what the collision NOTE found
+
+**P7-12 is a live defect, not a cleanup.** `components/greeks-calculator.tsx` declares its
+own `normalCDF`, `normalPDF` and `calculateGreeks` while `lib/black-scholes.ts` exports
+all three behaviours. The `normalCDF` bodies are byte-identical, so the duplication is not
+the harm; **the missing guard is.** `lib/black-scholes.ts` runs `isUsable()` and returns
+`null` on non-positive time or volatility, so the UI renders "—". The component has no
+such check: at T=0 or IV=0 it divides by zero and renders NaN/Infinity Greeks on a public
+calculator tab. This violates CLAUDE.md's "option math from `lib/black-scholes.ts` — never
+re-implement locally" and its null rule in one place. **Not fixed here** — it changes
+numbers on a user-facing tab and belongs in its own change with its own UAT.
+
+P7-13 is the rest of the family: `expectedMove` recomputed inline in
+`/api/strategy-scanner` rather than called from `lib/black-scholes.ts`;
+`fetchExecutiveSummary` declared locally in `components/ccpi-dashboard.tsx` alongside the
+`lib/ccpi/api.ts` export of that name; and `daysBetween` written three times
+(`lib/breadth-backtest.ts`, `lib/ccpi/drawdowns.ts` exported, `lib/ccpi/lead-time.ts`
+private). None is known to be wrong today; each is a place where two copies must be found
+to change one behaviour.
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| P7-12 | P2 | LEARN → Greeks | **The Greeks calculator computes Black-Scholes itself and skips the degenerate-input guard.** `lib/black-scholes.ts` returns null for T≤0 or IV≤0 so the UI can render "—"; the local copy divides by zero and renders NaN. **OPEN.** |
+| P7-13 | P3 | site-wide | **Three same-name duplicates of live code**, surfaced by P7-11's NOTE: `expectedMove` inline in `/api/strategy-scanner`, `fetchExecutiveSummary` in `components/ccpi-dashboard.tsx`, and `daysBetween` in three modules. **OPEN.** |

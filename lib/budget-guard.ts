@@ -83,23 +83,22 @@ export function getGuardedKeys(): string[] {
   return getMeteredKeys()
 }
 
-/** Ledger `provider` tag -> canonical key name, for attributing spend. */
-const PROVIDER_TO_KEY: Record<string, string> = {
-  openai: "OPENAI_API_KEY",
-  anthropic: "ANTHROPIC_API_KEY",
-  xai: "XAI_API_KEY",
-  groq: "GROQ_API_KEY",
-  google: "GOOGLE_AI_API_KEY",
-  openrouter: "OPENROUTER_API_KEY",
-  perplexity: "PERPLEXITY_API_KEY",
-  polygon: "POLYGON_API_KEY",
-  fmp: "FMP_API_KEY",
-  finnhub: "FINNHUB_API_KEY",
-}
-
-export function providerToKey(provider: string): string | null {
-  return PROVIDER_TO_KEY[provider.toLowerCase()] ?? null
-}
+// `providerToKey` and its PROVIDER_TO_KEY map were deleted here (P7-9).
+//
+// They mapped a ledger `provider` tag back to a canonical key name so spend
+// could be attributed per provider. Nothing called them, and nothing can:
+// **this guard is all-or-nothing by design.** When it trips it disables every
+// key in `getGuardedKeys()`, not the one that overspent, because the cap it
+// enforces is a total across the account. Per-provider attribution has no
+// decision to feed.
+//
+// The map was also a third place where the provider vocabulary was written
+// down — after `providerConfigs` in lib/ai-providers.ts and the `provider`
+// string each caller passes to `recordAiCall` — with no check tying the three
+// together. That is precisely how /api/ccpi/chat came to write "OpenRouter
+// (free)" into a ledger the rest of the app tags "openrouter" (fixed in the
+// same commit). If per-provider attribution is ever wanted, derive it from
+// `providerConfigs[].keyName`, which cannot drift from the chain.
 
 // ------------------------------------------------------------------- types
 
@@ -412,13 +411,18 @@ export async function ensureBudgetGuardFresh(): Promise<boolean> {
   return getBudgetKillSnapshot()?.tripped ?? false
 }
 
-/**
- * Synchronous best-effort read. Prefer `ensureBudgetGuardFresh()` anywhere you
- * can await. Returns false (fail open) when nothing has been cached yet.
- */
-export function isBudgetGuardTrippedSync(): boolean {
-  return getBudgetKillSnapshot()?.tripped ?? false
-}
+// `isBudgetGuardTrippedSync` was deleted here (P7-9). It was a one-line
+// synchronous read of `getBudgetKillSnapshot()?.tripped ?? false`, offered as
+// a best-effort alternative to `ensureBudgetGuardFresh()`.
+//
+// Nothing called it, and the one caller that needs a synchronous answer —
+// `resolveApiKey` in lib/api-keys.ts, which cannot await — reads the snapshot
+// directly, because this module imports that one and not the reverse. So the
+// export could only ever have been a SECOND way to ask whether the guard is
+// tripped, carrying its own copy of the fail-open default. On a spend-control
+// path two defaults for one question is the thing to avoid: every path that
+// can await now awaits `ensureBudgetGuardFresh()`, and the one that cannot
+// reads the single snapshot.
 
 /** What the admin panel shows: state + freshness, with unknowns as unknowns. */
 export async function getGuardStatus(): Promise<{

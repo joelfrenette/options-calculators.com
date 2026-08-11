@@ -13,7 +13,7 @@ import { Download } from "lucide-react"
 
 import type { CCPIData, HistoricalData } from "@/lib/ccpi/types"
 import { getReadableColor, getRegimeZone, sortCanaries, countActiveWarnings } from "@/lib/ccpi/calculations"
-import { saveCCPIToCache, loadCCPIFromCache, saveHistoryToCache } from "@/lib/ccpi/cache"
+import { saveCCPIToCache, loadCCPIFromCache } from "@/lib/ccpi/cache"
 import { REFRESH_STATUS_MESSAGES } from "@/lib/ccpi/constants"
 import { CCPI_ALLOCATION, bandForScore } from "@/lib/allocation"
 import { AllocationBar } from "@/components/allocation-bar"
@@ -175,7 +175,11 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
       }
       const result = await response.json()
       setHistory(result)
-      saveHistoryToCache(result)
+      // P7-9. `saveHistoryToCache(result)` was here. It wrote the full history
+      // series to localStorage on every fetch and nothing ever read that key
+      // back — a write-only cache, spending the origin's storage quota against
+      // the CCPI snapshot that IS read. History comes from /api/ccpi/history on
+      // each load; the fetch above is the whole path.
     } catch (error) {
       console.error("[v0] Failed to fetch CCPI history:", error)
     }

@@ -198,8 +198,16 @@ const PATH_HINTS: [string, string][] = [
 
 // -------------------------------------------------------------------- helpers
 
-/** "/api/vix" -> "app/api/vix/route.ts" — the file a code fix would touch. */
-export function routeFile(path: string): string {
+/**
+ * "/api/vix" -> "app/api/vix/route.ts" — the file a code fix would touch.
+ *
+ * P7-9: un-exported. It is used only inside this module, and the `export` was
+ * load-bearing in the wrong direction — scripts/check-provenance.ts happens to
+ * declare a local `const routeFile` for an unrelated absolute path, which the
+ * dead-export check counted as a reference until it learned to tell a referrer
+ * from a same-named declaration.
+ */
+function routeFile(path: string): string {
   return `app${path}/route.ts`
 }
 

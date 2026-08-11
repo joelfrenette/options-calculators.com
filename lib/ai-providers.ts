@@ -383,18 +383,10 @@ export async function streamWithFallback(options: AIGenerateOptions) {
   throw lastError || new Error("No AI providers available for streaming")
 }
 
-/**
- * Get list of available providers with their status
- */
-export function getProviderStatus(): Record<ProviderName, { available: boolean; name: string }> {
-  const status: Record<string, { available: boolean; name: string }> = {}
-
-  for (const config of providerConfigs) {
-    status[config.name] = {
-      available: !!config.key(),
-      name: config.displayName,
-    }
-  }
-
-  return status as Record<ProviderName, { available: boolean; name: string }>
-}
+// `getProviderStatus` was deleted here (P7-9). It answered "which providers
+// have a resolvable key", which is a strict subset of what `getProviderChain`
+// above already returns — same source array, same `config.key()` call, minus
+// the order, model, tier and endpoint the admin panel actually renders. Nothing
+// called it. Two functions deriving one answer from one array is how the panel
+// drifts from the chain, which is the defect `getProviderChain` exists to
+// prevent.

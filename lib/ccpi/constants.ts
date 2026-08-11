@@ -23,19 +23,10 @@ export const COLOR_MAP = {
   gray: "#6b7280", // Default fallback
 } as const
 
-export const GRADIENT_BAR_COLORS = {
-  low: "#22c55e", // green-500
-  medium: "#eab308", // yellow-500
-  high: "#ef4444", // red-500
-} as const
-
-export const REGIME_COLORS = {
-  CRASH_WATCH: "bg-red-600",
-  HIGH_ALERT: "bg-orange-500",
-  CAUTION: "bg-yellow-500",
-  NORMAL: "bg-lime-500",
-  LOW_RISK: "bg-green-600",
-} as const
+// GRADIENT_BAR_COLORS and REGIME_COLORS were deleted here (P7-9), with
+// `getBarColor` and `getRegimeColor` in ./calculations — their only readers.
+// REGIME_COLORS was the second of two band tables for one score; COLOR_MAP
+// above, read through `getRegimeZone`, is the one the dashboard renders.
 
 // SEVERITY_CONFIGS was deleted here: a Tailwind class map for canary severity,
 // exported and referenced nowhere. The canary components carry their own
@@ -50,8 +41,14 @@ export const REFRESH_STATUS_MESSAGES = [
   "Calculating CCPI score...",
 ] as const
 
+// P7-9. `CCPI_HISTORY` and `EXECUTIVE_SUMMARY` were removed with the functions
+// that named them (see lib/ccpi/cache.ts). One key, one cache, one reader.
+//
+// Note that `ccpi-history` may still be sitting in the localStorage of anyone
+// who loaded the dashboard before this: the write-only history cache wrote it
+// on every visit. Nothing reads it now, and browsers evict per-origin storage
+// wholesale, so it is left rather than swept — a one-shot cleanup would need
+// code that outlives the reason for it.
 export const CACHE_KEYS = {
   CCPI_DATA: "ccpi-data",
-  CCPI_HISTORY: "ccpi-history",
-  EXECUTIVE_SUMMARY: "ccpi-executive-summary",
 } as const

@@ -1,7 +1,7 @@
 // CCPI Caching Utilities
 // Handles localStorage operations for CCPI data
 
-import type { CCPIData, HistoricalData } from "./types"
+import type { CCPIData } from "./types"
 import { CACHE_KEYS } from "./constants"
 
 /**
@@ -42,68 +42,29 @@ export function loadCCPIFromCache(): CCPIData | null {
 export const getCachedData = loadCCPIFromCache
 export const setCachedData = saveCCPIToCache
 
-/**
- * Clears CCPI data from localStorage
- */
-export function clearCCPICache(): void {
-  try {
-    localStorage.removeItem(CACHE_KEYS.CCPI_DATA)
-    console.log("[v0] CCPI cache cleared")
-  } catch (error) {
-    console.error("[v0] Failed to clear CCPI cache:", error)
-  }
-}
-
-/**
- * Saves historical data to localStorage
- */
-export function saveHistoryToCache(history: HistoricalData): boolean {
-  try {
-    localStorage.setItem(CACHE_KEYS.CCPI_HISTORY, JSON.stringify(history))
-    return true
-  } catch (error) {
-    console.error("[v0] Failed to save history to localStorage:", error)
-    return false
-  }
-}
-
-/**
- * Loads historical data from localStorage
- */
-export function loadHistoryFromCache(): HistoricalData | null {
-  try {
-    const cached = localStorage.getItem(CACHE_KEYS.CCPI_HISTORY)
-    return cached ? JSON.parse(cached) : null
-  } catch (error) {
-    console.error("[v0] Failed to parse cached history:", error)
-    return null
-  }
-}
-
-/**
- * Saves executive summary to localStorage
- */
-export function saveSummaryToCache(summary: string): boolean {
-  try {
-    localStorage.setItem(CACHE_KEYS.EXECUTIVE_SUMMARY, summary)
-    return true
-  } catch (error) {
-    console.error("[v0] Failed to save summary to localStorage:", error)
-    return false
-  }
-}
-
-/**
- * Loads executive summary from localStorage
- */
-export function loadSummaryFromCache(): string | null {
-  try {
-    return localStorage.getItem(CACHE_KEYS.EXECUTIVE_SUMMARY)
-  } catch (error) {
-    console.error("[v0] Failed to load summary from localStorage:", error)
-    return null
-  }
-}
+// P7-9. FIVE FUNCTIONS DELETED HERE, in three separate decisions.
+//
+// `clearCCPICache` — no caller. There is no "clear cache" control anywhere in
+// the dashboard or the admin panel; the CCPI entry is overwritten on every
+// successful fetch and expires by age through `hasFreshCache`.
+//
+// `saveSummaryToCache` / `loadSummaryFromCache` — a matched pair with no caller
+// on either side. The executive summary is fetched from
+// /api/ccpi/executive-summary each time the dashboard needs it.
+//
+// `saveHistoryToCache` / `loadHistoryFromCache` — **a write-only cache, and the
+// reason to delete the WRITE as well as the read.** The dashboard called
+// `saveHistoryToCache(result)` on every history fetch and nothing ever read the
+// key back, so each visit serialised the full history series into localStorage
+// to be read by nobody. That is not merely dead weight: localStorage is a
+// per-origin quota shared with the CCPI snapshot that IS read, and the largest
+// unread writer is the one most likely to push the quota over and make
+// `saveCCPIToCache` start failing. Deleting only the dead reader would have
+// left the cost and removed the evidence.
+//
+// What survives is the one cache with a reader: `saveCCPIToCache` /
+// `loadCCPIFromCache` (plus the `getCachedData` / `setCachedData` aliases
+// hooks/use-ccpi-data.ts imports) and the `hasFreshCache` age check.
 
 /**
  * Checks if cached data is fresh (within specified minutes)

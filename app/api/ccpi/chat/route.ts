@@ -1,68 +1,9 @@
 import { NextResponse } from "next/server"
-import { streamText, convertToModelMessages, type UIMessage } from "ai"
+import { convertToModelMessages, type UIMessage } from "ai"
 import { isDryRun, dryRunPayload } from "@/lib/dry-run"
-import { createOpenAI } from "@ai-sdk/openai"
-import { createAnthropic } from "@ai-sdk/anthropic"
-import { createGoogleGenerativeAI } from "@ai-sdk/google"
-import { resolveApiKey } from "@/lib/api-keys"
-import { recordAiCall } from "@/lib/metered-fetch"
-import { ensureBudgetGuardFresh } from "@/lib/budget-guard"
+import { streamWithFallback } from "@/lib/ai-providers"
 import { TOTAL_SCORED_INDICATORS } from "@/lib/ccpi/scoring"
 
-const OPENROUTER_FREE_MODEL = process.env.OPENROUTER_FREE_MODEL || "openrouter/free"
-
-const providerConfigs = [
-  {
-    // PRIMARY — OpenRouter free model ($0 per token).
-    name: "OpenRouter (free)",
-    key: () => resolveApiKey("OPENROUTER_API_KEY"),
-    create: () =>
-      createOpenAI({
-        apiKey: resolveApiKey("OPENROUTER_API_KEY"),
-        baseURL: "https://openrouter.ai/api/v1",
-      }),
-    model: OPENROUTER_FREE_MODEL,
-  },
-  {
-    name: "Groq",
-    key: () => resolveApiKey("GROQ_API_KEY"),
-    create: () =>
-      createOpenAI({
-        apiKey: resolveApiKey("GROQ_API_KEY"),
-        baseURL: "https://api.groq.com/openai/v1",
-      }),
-    model: "llama-3.3-70b-versatile",
-  },
-  {
-    name: "Google",
-    key: () => resolveApiKey("GOOGLE_AI_API_KEY"),
-    create: () => createGoogleGenerativeAI({ apiKey: resolveApiKey("GOOGLE_AI_API_KEY") }),
-    model: "gemini-2.0-flash",
-  },
-  // --- paid fallbacks; disable via DISABLED_APIS to guarantee $0 ---
-  {
-    name: "OpenAI",
-    key: () => resolveApiKey("OPENAI_API_KEY"),
-    create: () => createOpenAI({ apiKey: resolveApiKey("OPENAI_API_KEY") }),
-    model: "gpt-4o-mini",
-  },
-  {
-    name: "xAI",
-    key: () => resolveApiKey("XAI_API_KEY"),
-    create: () =>
-      createOpenAI({
-        apiKey: resolveApiKey("XAI_API_KEY"),
-        baseURL: "https://api.x.ai/v1",
-      }),
-    model: "grok-2-latest",
-  },
-  {
-    name: "Anthropic",
-    key: () => resolveApiKey("ANTHROPIC_API_KEY"),
-    create: () => createAnthropic({ apiKey: resolveApiKey("ANTHROPIC_API_KEY") }),
-    model: "claude-3-5-sonnet-20241022",
-  },
-]
 
 export const maxDuration = 30
 
@@ -139,9 +80,23 @@ ${
 
     const prompt = convertToModelMessages(messages)
 
-    // Budget guard (E-5): refresh before spending, so `config.key()` below
-    // resolves to "" for guarded providers once the kill switch has tripped.
-    await ensureBudgetGuardFresh()
+    // P7-9. The provider chain, the budget-guard refresh and the spend
+    // accounting used to be re-implemented here, and the copy had drifted:
+    // it listed SIX providers where `lib/ai-providers.ts` lists seven —
+    // Perplexity was simply absent, so a chat turn gave up one fallback
+    // earlier than every other AI route. The `provider` tag it wrote to the
+    // spend ledger had drifted too ("OpenRouter (free)", "Groq", "xAI"
+    // against the canonical "openrouter", "groq", "xai"), which split one
+    // vendor into two rows in the admin Measured-usage card.
+    //
+    // Worse than either: `getProviderChain()` — what the admin panel renders
+    // as "the live fallback chain, in the exact order the generate/stream
+    // loops try it" — is derived from the canonical array, so the panel was
+    // stating something untrue about this route. That is a provenance defect,
+    // not a tidiness one.
+    //
+    // `streamWithFallback` is the shared path this route should always have
+    // used. It was dead code for exactly as long as the copy existed.
 
     // P2-4. The dry run returns plain JSON rather than a stream, and that is
     // the honest shape: there is no stream, because there is no model. A probe
@@ -153,78 +108,25 @@ ${
     // unverified and is recorded as such.
     if (isDryRun(req, { messages, ccpiContext })) {
       return NextResponse.json({
-        ...dryRunPayload("/api/ccpi/chat", "providerConfigs chain (streamText)", systemPrompt.length),
+        ...dryRunPayload("/api/ccpi/chat", "streamWithFallback (lib/ai-providers chain)", systemPrompt.length),
         streams: true,
         note: "Request path exercised; no model was called, so no stream was opened and no content was generated.",
       })
     }
 
-    let lastError: Error | null = null
+    // `streamWithFallback` awaits the budget guard, walks the canonical chain,
+    // and records the spend row itself. It throws when every provider fails,
+    // which the outer catch turns into a 500.
+    const { stream } = await streamWithFallback({
+      messages: prompt,
+      system: systemPrompt,
+      temperature: 0.7,
+      maxTokens: 1000,
+      abortSignal: req.signal,
+      routeTag: "/api/ccpi/chat",
+    })
 
-    for (const config of providerConfigs) {
-      if (!config.key()) continue
-
-      const started = Date.now()
-      try {
-        console.log(`[AI] Trying ${config.name} for CCPI chat...`)
-        const provider = config.create()
-        const model = provider(config.model)
-
-        const result = streamText({
-          model,
-          system: systemPrompt,
-          messages: prompt,
-          temperature: 0.7,
-          // ai v5 renamed this from `maxTokens`. Under the old name the option
-          // was silently dropped, so a chat turn on a paid fallback had no
-          // output ceiling at all — a real spend leak, not just a type error.
-          maxOutputTokens: 1000,
-          abortSignal: req.signal,
-        })
-
-        console.log(`[AI] Success with ${config.name}`)
-
-        // Spend accounting (E-5). `usage` resolves only when the stream ends,
-        // so this is deliberately not awaited — the response must go out now.
-        void Promise.resolve(result.usage)
-          .then((usage) =>
-            recordAiCall({
-              provider: config.name,
-              model: config.model,
-              route: "/api/ccpi/chat",
-              ms: Date.now() - started,
-              ok: true,
-              usage,
-            }),
-          )
-          .catch(() =>
-            recordAiCall({
-              provider: config.name,
-              model: config.model,
-              route: "/api/ccpi/chat",
-              ms: Date.now() - started,
-              ok: false,
-              usage: null,
-            }),
-          )
-
-        return result.toUIMessageStreamResponse()
-      } catch (error) {
-        console.error(`[AI] ${config.name} failed:`, error instanceof Error ? error.message : error)
-        recordAiCall({
-          provider: config.name,
-          model: config.model,
-          route: "/api/ccpi/chat",
-          ms: Date.now() - started,
-          ok: false,
-          usage: null,
-        })
-        lastError = error instanceof Error ? error : new Error(String(error))
-        // Continue to next provider
-      }
-    }
-
-    throw lastError || new Error("No AI providers available")
+    return stream.toUIMessageStreamResponse()
   } catch (error) {
     console.error("[AI] CCPI chat error:", error)
     return new Response(JSON.stringify({ error: "Failed to process chat request" }), {

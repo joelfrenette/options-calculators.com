@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 import { isAuthenticated } from "@/lib/auth"
 import { API_COSTS, getCostSummary } from "@/lib/api-costs"
-import { getUsageStats } from "@/lib/api-usage"
 import { hasRawKey, isServiceDisabled, getDisabledServices, getMonthlyBudgetTarget } from "@/lib/api-keys"
 import {
   getCallStats,
@@ -16,11 +15,20 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const usage = getUsageStats()
   const summary = getCostSummary()
   const budgetTarget = getMonthlyBudgetTarget()
 
-  // Merge cost metadata with live control state and usage counts.
+  // Merge cost metadata with live control state.
+  //
+  // A-13 / P7-9. This used to attach `usageCount` and `lastUsedISO` from
+  // lib/api-usage.ts. That module's writer, `recordApiUsage`, was called from
+  // nowhere in the repo, so the counter was structurally incapable of moving
+  // and every service reported `0` with `?? 0` — a fabricated measurement,
+  // exactly the shape CLAUDE.md's "missing data is null, never 0" rule
+  // forbids. The component had already stopped rendering it; the field stayed
+  // on the wire, which only moved the trap one layer out. The module is
+  // deleted. Measured per-call counts live in `realUsage` below, from
+  // lib/metered-fetch.ts, which is wired to the calls that actually happen.
   const services = API_COSTS.map((cost) => {
     const keyPresent = hasRawKey(cost.key)
     const disabled = isServiceDisabled(cost.key)
@@ -33,8 +41,6 @@ export async function GET() {
       active,
       // Effective spend: a disabled or unconfigured paid API costs nothing.
       effectiveCost: active ? cost.monthlyCost : 0,
-      usageCount: usage[cost.key]?.count ?? 0,
-      lastUsedISO: usage[cost.key]?.lastUsedISO ?? null,
     }
   })
 

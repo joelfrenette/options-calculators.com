@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { isAuthenticated } from "@/lib/auth"
+import { isAuthenticated, isPasswordHashed } from "@/lib/auth"
 import { API_KEY_ALIASES, getDisabledServices, hasRawKey, resolveApiKey } from "@/lib/api-keys"
 import { ROUTE_CONTRACTS, type RouteContract, errorShape, routesByRequiredKey } from "@/lib/api-contracts"
 import { getSeriesCoverage } from "@/lib/market-series"
@@ -334,7 +334,14 @@ export async function GET(request: NextRequest) {
  * no prefix, no length.
  */
 function securityPosture() {
-  const hasHash = Boolean(process.env.ADMIN_PASSWORD_HASH)
+  // P7-9. `hasHash` used to be its own `Boolean(process.env.ADMIN_PASSWORD_HASH)`
+  // here while `lib/auth.ts` exported `isPasswordHashed()` — the same question,
+  // asked twice, and the copy in this file was the one that could drift from
+  // the module that actually decides which credential path runs. (It was also
+  // why `isPasswordHashed` showed up as a dead export whose docstring said "for
+  // the admin UI": the UI had reimplemented it.) The reader now asks the
+  // verifier.
+  const hasHash = isPasswordHashed()
   const hasPlaintext = Boolean(process.env.ADMIN_PASSWORD)
   return {
     adminPasswordSource: hasHash ? "hash" : hasPlaintext ? "plaintext" : "unset",

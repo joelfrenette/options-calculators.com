@@ -80,21 +80,15 @@ export interface HistoricalData {
   regimes: string[]
 }
 
-export interface CCPIIndicatorThresholds {
-  low: number
-  mid?: number
-  high: number
-  ideal?: number
-}
+// `CCPIIndicatorThresholds` and `CCPIIndicatorStatus` were deleted here (P7-9),
+// with `getIndicatorStatus` in ./calculations — the only thing that used
+// either. The live indicator thresholds are declared by `CCPIIndicator` in
+// components/ccpi/indicator-primitives.tsx, under the SAME NAME and an
+// incompatible shape; keeping both invited importing the wrong one.
 
 export interface CCPIRegimeZone {
   color: string
   label: string
-}
-
-export interface CCPIIndicatorStatus {
-  color: string
-  status: string
 }
 
 export type CCPISeverity = "high" | "medium" | "low"
