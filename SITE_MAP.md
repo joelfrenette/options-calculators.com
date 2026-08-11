@@ -236,6 +236,7 @@ _None._
 | `components/cpi-inflation-analysis.tsx` | 669 | 69 |
 | `components/admin/health-check-panel.tsx` | 622 | 22 |
 | `components/earnings-economic-calendar.tsx` | 603 | 3 |
+| `lib/api-contracts.ts` | 601 | 1 |
 
 ## 6. PHASE 6 SIGN-OFF LEDGER
 

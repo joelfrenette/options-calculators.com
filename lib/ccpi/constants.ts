@@ -37,29 +37,9 @@ export const REGIME_COLORS = {
   LOW_RISK: "bg-green-600",
 } as const
 
-export const SEVERITY_CONFIGS = {
-  high: {
-    bgColor: "bg-red-100",
-    textColor: "text-red-900",
-    borderColor: "border-red-400",
-    badgeColor: "bg-red-600 text-white",
-    label: "HIGH RISK",
-  },
-  medium: {
-    bgColor: "bg-yellow-100",
-    textColor: "text-yellow-900",
-    borderColor: "border-yellow-400",
-    badgeColor: "bg-yellow-600 text-white",
-    label: "MEDIUM RISK",
-  },
-  low: {
-    bgColor: "bg-green-100",
-    textColor: "text-green-900",
-    borderColor: "border-green-400",
-    badgeColor: "bg-green-600 text-white",
-    label: "LOW RISK",
-  },
-} as const
+// SEVERITY_CONFIGS was deleted here: a Tailwind class map for canary severity,
+// exported and referenced nowhere. The canary components carry their own
+// styling. Found by the P6-82 dead-code sweep.
 
 export const REFRESH_STATUS_MESSAGES = [
   "Fetching market data...",

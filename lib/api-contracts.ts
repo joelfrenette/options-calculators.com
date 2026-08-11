@@ -593,6 +593,8 @@ export function routesByRequiredKey(): Record<string, string[]> {
   return out
 }
 
-export function getContract(path: string): RouteContract | undefined {
-  return ROUTE_CONTRACTS.find((c) => c.path === path)
-}
+// `getContract(path)` was deleted here — exported, never imported, never called.
+// Consumers iterate ROUTE_CONTRACTS directly. Harmless in itself, but the
+// dead-code sweep that found it (P6-82) was prompted by two dormant functions
+// that were NOT harmless (P6-72, P6-81), and leaving the benign ones in place
+// makes the next sweep noisier for no gain.

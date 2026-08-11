@@ -13,6 +13,7 @@ import {
   expectedMove,
   probabilityBetween,
   probabilityITM,
+  calculateVega,
 } from "../lib/black-scholes.ts"
 
 let failures = 0
@@ -84,6 +85,24 @@ isNull("zero time → null", calculateOptionPrice({ ...hull, timeToExpiry: 0 }, 
 isNull("zero vol → null", calculateCallDelta({ ...hull, volatility: 0 }))
 isNull("negative price → null", calculateOptionPrice({ ...hull, stockPrice: -1 }, true))
 isNull("NaN vol → null", calculatePutDelta({ ...hull, volatility: Number.NaN }))
+
+// --- Vega. Untested until 2026-08-11 despite being LIVE: it drives the Newton
+// step inside estimateImpliedVolatility, so a wrong vega makes implied
+// volatility converge slowly, wrongly, or not at all — and IV is the scanner's
+// premium-richness KPI. Found by a dead-code sweep as an export nothing
+// imported; it turned out not to be dead, just uncovered, in the suite
+// FORMULAS.md calls "the verified in-repo reference".
+const vegaBase = { stockPrice: 100, strikePrice: 100, timeToExpiry: 1, volatility: 0.2, riskFreeRate: 0.05 }
+// Hull, *Options, Futures and Other Derivatives*: vega ≈ 37.52 per unit of vol
+// for this fixture. lib/black-scholes.ts reports per PERCENTAGE POINT, so /100.
+near("vega ATM 1y matches Hull (per pct point)", calculateVega(vegaBase), 0.3752, 1e-4)
+near("vega falls with sqrt(T)", calculateVega({ ...vegaBase, timeToExpiry: 0.25 }), 0.19644, 1e-5)
+// Deep ITM: d1 is far out, the normal pdf collapses, vega goes to ~0. A floor
+// or a constant here would step the IV solver off a cliff.
+near("vega ~0 deep ITM", calculateVega({ ...vegaBase, strikePrice: 50 }), 0.000275, 1e-5)
+near("vega rises with a dividend yield", calculateVega({ ...vegaBase, dividendYield: 0.03 }), 0.37949, 1e-5)
+isNull("vega zero time → null", calculateVega({ ...vegaBase, timeToExpiry: 0 }))
+isNull("vega zero vol → null", calculateVega({ ...vegaBase, volatility: 0 }))
 
 console.log(failures === 0 ? "\nAll black-scholes reference checks passed." : `\n${failures} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)
