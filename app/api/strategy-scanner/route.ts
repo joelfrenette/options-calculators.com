@@ -1436,8 +1436,14 @@ export async function GET(request: NextRequest) {
         zebra: [],
         isLive: false,
       },
-      { status: 200 },
-    ) // Return 200 with empty arrays instead of 500
+      // Was `{ status: 200 } // Return 200 with empty arrays instead of 500`.
+      // The arrays being empty is honest; the 200 is not. Seven scanner tabs
+      // read this route, and each shows "no candidates found" on an empty
+      // array — so a total failure and a genuinely quiet scan were the same
+      // response, and the consuming components all check `res.ok` before they
+      // check anything else. A 502 lets them tell the two apart.
+      { status: 502 },
+    )
   }
 }
 

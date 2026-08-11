@@ -79,7 +79,7 @@ Run `pnpm check:formulas && pnpm check:contracts` (typecheck via `pnpm typecheck
 
 **Count the PASS lines — do not trust the exit code alone.** The suites chain with
 `&&`, so a script that stops *running* is indistinguishable from one that passes, and
-this has cost the project a commit twice. Current baselines: **formulas 440**,
+this has cost the project a commit twice. Current baselines: **formulas 441**,
 contracts 61 routes / 61 contracts, remediation 31.
 
 ## Data-integrity house rules (from the 2026-08 audit — see AUDIT_PLAN.md, AUDIT_BACKLOG.md, FORMULAS.md)
@@ -88,6 +88,11 @@ contracts 61 routes / 61 contracts, remediation 31.
 - Indicators come from `lib/indicators.ts`; option math from `lib/black-scholes.ts` — never re-implement locally.
 - API keys resolve through `lib/api-keys.ts` (`resolveApiKey`) so DISABLED_APIS and aliases apply.
 - Error responses use real HTTP error statuses — never 200 with an `{error}` body.
+  **This was violated nine times while the rule sat in this file** (P6-56), three of them
+  with a comment explaining the downgrade ("to prevent error bubbling"). A 200 makes
+  "we found nothing" and "we never looked" the same response. Forwarding an upstream
+  status (`{ status: response.status }`) is better than picking one. Partial success is
+  a 200 with the failed section named in its own field, the way /api/federal-money does it.
 - Allocation copy: positions are shares/LEAPS/options/cash only; diversification is
   expressed via sectors and indexes (e.g. GDX, XLU, SPY) — never separate asset classes.
 - **A label is a claim, and `scripts/check-provenance.ts` enforces it.** Do not write

@@ -89,12 +89,20 @@ async function fetchPolygonPrev(ticker: string, apiKey: string): Promise<PriceQu
 export async function GET() {
   const apiKey = resolveApiKey("POLYGON_API_KEY")
   if (!apiKey) {
-    return NextResponse.json({
-      success: false,
-      message: "Polygon API key not configured — prices unavailable.",
-      etfs: ETFS.map((e) => ({ ...e, close: null, change: null, changePct: null, asOf: null })),
-      generatedAt: new Date().toISOString(),
-    })
+    // The body was already honest — every price null, a message saying why —
+    // but it went out with no status argument at all, which Next serves as 200.
+    // The ETF list itself is static and worth returning, so this is a partial
+    // answer rather than a total failure; 503 says the prices are missing
+    // because a dependency is not configured, not because the market is quiet.
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Polygon API key not configured — prices unavailable.",
+        etfs: ETFS.map((e) => ({ ...e, close: null, change: null, changePct: null, asOf: null })),
+        generatedAt: new Date().toISOString(),
+      },
+      { status: 503 },
+    )
   }
 
   // Fetch in parallel; Polygon free tier caps at 5 calls/min so this works

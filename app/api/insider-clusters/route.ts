@@ -49,7 +49,11 @@ export async function GET(request: Request) {
         windowDays: days,
         minBuyers,
       },
-      { status: 200 },
+      // All three returns in this file were 200. The bodies were already honest
+      // — success:false with an empty clusters array — but a 200 tells every
+      // caller, cache and monitor that the request worked, so "no clusters
+      // found" and "we never looked" were the same response on the wire.
+      { status: 503 },
     )
   }
 
@@ -70,7 +74,7 @@ export async function GET(request: Request) {
           windowDays: days,
           minBuyers,
         },
-        { status: 200 },
+        { status: 502 },
       )
     }
     const payload = await res.json()
@@ -146,11 +150,15 @@ export async function GET(request: Request) {
       {
         success: false,
         error: err instanceof Error ? err.message : "unknown",
+        // The component renders `message`, not `error`, so this path used to
+        // fail silently — an exception showed the user an empty cluster list
+        // with no banner, identical to a clean scan that found nothing.
+        message: `Cluster scan failed: ${err instanceof Error ? err.message : "unknown error"}`,
         clusters: [],
         windowDays: days,
         minBuyers,
       },
-      { status: 200 },
+      { status: 502 },
     )
   }
 }

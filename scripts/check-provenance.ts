@@ -373,5 +373,68 @@ for (const field of ["priceSource", "deltaSource"]) {
   )
 }
 
+// ---------------------------------------------------------------------------
+// 9. A failure does not return 200.
+// ---------------------------------------------------------------------------
+//
+// P6-56. `CLAUDE.md` has said "never 200 with an `{error}` body" since the start
+// of the audit, and seven routes were doing it anyway — three of them saying so
+// in a comment: "Changed from 500 to 200 to prevent error bubbling", "Return 200
+// with empty arrays instead of 500". The status was downgraded on purpose, each
+// time to stop something downstream from complaining.
+//
+// The cost is that "we found nothing" and "we never looked" become the same
+// response on the wire. Seven scanner tabs render an empty array as "no
+// candidates found", so a total outage read as a quiet market.
+//
+// This walks each `catch` block and flags a JSON response carrying an error
+// marker with no 4xx/5xx status. It deliberately does NOT flag a catch that
+// returns real degraded data with an honest flag — /api/time-server falls back
+// to server time with `fallback: true`, and server time IS a time.
+
+// Scoped to the response call, not the catch block. The rule's first version
+// only walked `catch`, and the very next 200-on-error found in this sweep sat
+// in an ordinary `if (!response.ok)` branch — the shape of the defect has
+// nothing to do with exceptions.
+const badStatus: string[] = []
+for (const f of API_FILES) {
+  const src = code(f)
+  for (const m of src.matchAll(/(?:NextResponse|Response)\.json\(/g)) {
+    let i = m.index! + m[0].length
+    let depth = 1
+    while (i < src.length && depth > 0) {
+      if (src[i] === "(") depth++
+      else if (src[i] === ")") depth--
+      i++
+    }
+    const call = src.slice(m.index!, i)
+    // Only a response that ADMITS failure needs an error status. A degraded
+    // payload that flags itself honestly is a different thing — /api/time-server
+    // falls back to server time with `fallback: true`, and server time IS a time.
+    //
+    // The key must sit at an object-property position — `{` or `,` before it.
+    // A looser `\berror:` matched inside `console.error("… API error:", error)`,
+    // so the first version of this rule failed on a route that was correct,
+    // which is the failure mode that gets a check deleted rather than fixed.
+    const admitsFailure = /[{,]\s*error:\s*["'`]|[{,]\s*success:\s*false/.test(call)
+    if (!admitsFailure) continue
+
+    // Three states, not two. A literal 4xx/5xx is fine. A COMPUTED status is
+    // also fine and is in fact the better pattern — `{ status: response.status }`
+    // and `{ status: contractsResult.httpStatus }` pass the upstream's own
+    // verdict through instead of inventing one, and several routes here do
+    // exactly that. Only a literal 200, or no status at all (which defaults to
+    // 200), is the defect.
+    const statusArg = call.match(/status:\s*([^,}\s]+)/)
+    if (statusArg && statusArg[1] !== "200") continue
+    badStatus.push(`${rel(f)}${statusArg ? "" : " (no status — defaults to 200)"}`)
+  }
+}
+check(
+  "no catch block returns an error body at HTTP 200",
+  badStatus.length === 0,
+  badStatus.length ? [...new Set(badStatus)].join(", ") : "failures carry a failure status",
+)
+
 console.log(failures === 0 ? "\nAll provenance checks passed." : `\n${failures} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)

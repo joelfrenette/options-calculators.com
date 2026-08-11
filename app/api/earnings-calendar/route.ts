@@ -269,13 +269,31 @@ export async function GET(request: Request) {
 
     const { start, end, label } = getCurrentWeekRange()
 
+    // The economic half is still real: lib/economic-events.ts derives events
+    // from publication RULES (jobless claims Thursday, Employment Situation the
+    // first Friday) and reads the committed FOMC schedule, so it does not need
+    // the upstream that just failed. The earnings half genuinely has nothing.
+    //
+    // This used to go out as `success: true` with `earnings: "Static Fallback"`
+    // beside an empty array — claiming the request succeeded and naming a
+    // fallback that does not exist. Partial failure is reported the way
+    // /api/federal-money reports it: the section that worked is returned, the
+    // section that did not says so by name.
+    // `success: true` is correct here and is NOT the old defect. This is a
+    // PARTIAL success and it is reported the way /api/federal-money reports one:
+    // the response did produce real data, and the section that failed is named
+    // in its own field rather than hidden behind a global flag. The defect was
+    // never the boolean — it was `earnings: "Static Fallback"` beside an empty
+    // array, which asserted a fallback that does not exist and left the caller
+    // unable to tell an outage from a quiet week.
     return NextResponse.json({
       success: true,
+      earningsError: "The earnings feed could not be read; no earnings are shown.",
       dateRange: label,
       lastUpdated: new Date().toISOString(),
       dataSources: {
-        earnings: "Static Fallback",
-        economic: "Curated Calendar",
+        earnings: "Unavailable",
+        economic: "Derived from publication schedules",
       },
       earnings: [],
       economic: generateCuratedEconomicEvents(start, end)

@@ -11,7 +11,7 @@
 
 | Tab id | Label | Component | File | Lines | Internal APIs |
 |---|---|---|---|---|---|
-| `earnings-calendar` | Earnings & Economic Calendar | `EarningsEconomicCalendar` | `components/earnings-economic-calendar.tsx` | 585 | `/api/earnings-calendar/insights`<br>`/api/earnings-calendar` |
+| `earnings-calendar` | Earnings & Economic Calendar | `EarningsEconomicCalendar` | `components/earnings-economic-calendar.tsx` | 603 | `/api/earnings-calendar/insights`<br>`/api/earnings-calendar` |
 | `trend-analysis` | Index Trend Analysis | `TrendAnalysis` | `components/trend-analysis.tsx` | 1173 | `/api/trend-analysis` |
 | `risk-management` | CBOE VIX Volatility Index | `RiskCalculator` | `components/risk-calculator.tsx` | 845 | `/api/vix`<br>`/api/vix-history` |
 | `market-sentiment` | CNN's Fear & Greed | `MarketSentiment` | `components/market-sentiment.tsx` | 1571 | `/api/market-sentiment`<br>`/api/sentiment-heatmap` |
@@ -225,7 +225,7 @@ _None._
 | `components/trend-analysis.tsx` | 1173 | 573 |
 | `components/panic-euphoria.tsx` | 1139 | 539 |
 | `components/options-strategy-toolbox.tsx` | 1027 | 427 |
-| `components/ccpi-dashboard.tsx` | 917 | 317 |
+| `components/ccpi-dashboard.tsx` | 919 | 319 |
 | `components/trade-walkthrough-modal.tsx` | 866 | 266 |
 | `components/insider-trading-dashboard.tsx` | 851 | 251 |
 | `components/risk-calculator.tsx` | 845 | 245 |
@@ -236,6 +236,7 @@ _None._
 | `app/page.tsx` | 697 | 97 |
 | `components/cpi-inflation-analysis.tsx` | 669 | 69 |
 | `components/admin/health-check-panel.tsx` | 622 | 22 |
+| `components/earnings-economic-calendar.tsx` | 603 | 3 |
 
 ## 6. PHASE 6 SIGN-OFF LEDGER
 

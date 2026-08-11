@@ -45,7 +45,10 @@ export async function POST(request: Request) {
         console.error("[v0] ScrapingBee API Error:", response.status, errorText)
       }
 
-      // Return 200 with error flag so the calling function can handle fallback
+      // Was 200 "so the calling function can handle fallback". That caller is
+      // gone: lib/scraping-bee.tsx calls ScrapingBee directly and throws on a
+      // non-ok response, so the only consumers left are the health checks —
+      // which is precisely the audience a 200 misleads.
       return NextResponse.json(
         {
           success: false,
@@ -53,8 +56,8 @@ export async function POST(request: Request) {
           status: response.status,
           message: response.status === 503 || response.status === 500 ? "Service temporarily unavailable" : errorText,
         },
-        { status: 200 },
-      ) // Changed from response.status to 200 to prevent error bubbling
+        { status: 502 },
+      )
     }
 
     const contentType = response.headers.get("content-type")
@@ -84,7 +87,12 @@ export async function POST(request: Request) {
         error: "Failed to scrape URL",
         message: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 200 }, // Changed from 500 to 200 to prevent error bubbling
+      // Was `{ status: 200 } // Changed from 500 to 200 to prevent error
+      // bubbling` — a real status downgraded on purpose so callers would stop
+      // noticing. That is the house rule stated backwards: an error is an error
+      // status. Callers that break on a 502 were relying on a scrape that did
+      // not happen.
+      { status: 502 },
     )
   }
 }

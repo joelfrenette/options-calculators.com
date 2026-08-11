@@ -46,6 +46,15 @@ interface AIInsight {
 
 interface CalendarData {
   success: boolean
+  /**
+   * Set when the earnings feed failed but the economic calendar is still real —
+   * that half is derived from publication schedules (jobless claims Thursday,
+   * the committed FOMC dates) and does not need the upstream that broke. The
+   * route used to report this state as `success: true` with the earnings source
+   * named "Static Fallback" beside an empty array, so an outage and a quiet week
+   * rendered identically.
+   */
+  earningsError?: string
   dateRange: string
   lastUpdated: string
   dataSources: {
@@ -370,6 +379,15 @@ export function EarningsEconomicCalendar() {
 
           {/* Earnings Tab */}
           <TabsContent value="earnings" className="p-6 bg-blue-50/50 rounded-lg">
+            {/* An empty earnings list means one of two very different things.
+                Without this banner they render identically, and "no companies
+                report this week" is a fact while "the feed is down" is not. */}
+            {data?.earningsError && (
+              <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                <strong>Earnings feed unavailable.</strong> {data.earningsError} The economic events on the next tab
+                are unaffected — those come from published release schedules, not this feed.
+              </div>
+            )}
             {loading ? (
               <LoadingState />
             ) : sortedEarnings.length > 0 ? (
