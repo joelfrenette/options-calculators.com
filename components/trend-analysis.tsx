@@ -45,7 +45,9 @@ interface TrendData {
   macdHistogram: number
   atr: number
   volumeRatio: number
-  momentumStrength: number
+  // Null when no momentum input was available. The gauge must not fall back to
+  // 50 — on this scale 50 is a real NEUTRAL reading, not an absence.
+  momentumStrength: number | null
   support: number
   resistance: number
   allSupport: number[]
@@ -55,15 +57,17 @@ interface TrendData {
   trendStrength: string
   trendSignals?: { bullish: number; bearish: number; total: number }
   indicatorContributions?: {
-    rsi: { value: number; contribution: number; weight: number }
-    macd: { value: number; contribution: number; weight: number }
-    priceChange: { value: number; contribution: number; weight: number }
-    volumeTrend: { value: number; contribution: number; weight: number }
+    rsi: { value: number | null; contribution: number | null; weight: number }
+    macd: { value: number | null; contribution: number | null; weight: number }
+    priceChange: { value: number | null; contribution: number | null; weight: number }
+    volumeTrend: { value: number | null; contribution: number | null; weight: number }
   }
-  priceTarget1Week: number
+  // The weekly target scales by momentum, so it is withheld when momentum is
+  // unknown rather than computed from a stand-in.
+  priceTarget1Week: number | null
   priceTarget1Month: number
   stopLoss: number
-  targetConfidence: number
+  targetConfidence: number | null
   historicalData: {
     date: string
     price: number | null
@@ -81,6 +85,48 @@ interface TrendData {
 interface TrendAnalysisData {
   indices: TrendData[]
   lastUpdated: string
+}
+
+/**
+ * One momentum contribution, rendered null-aware.
+ *
+ * Replaces four near-identical blocks that each assumed `value` and
+ * `contribution` were numbers. They are nullable now: an indicator with no data
+ * contributes nothing, and "nothing" must not render as `0.0 / +0.0 pts`, which
+ * reads as a measured flat reading rather than an absent one. Same reason the
+ * momentum gauge no longer falls back to 50.
+ */
+function ContributionCard({
+  label,
+  c,
+  digits,
+  suffix = "",
+  verdict,
+}: {
+  label: string
+  c: { value: number | null; contribution: number | null; weight: number }
+  digits: number
+  suffix?: string
+  verdict: (v: number) => string
+}) {
+  const missing = c.value === null || c.contribution === null
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-3">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-semibold text-gray-700">{label}</span>
+        <span className="text-xs text-gray-500">Weight: ±{c.weight} pts</span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-mono">{missing ? "—" : `${c.value!.toFixed(digits)}${suffix}`}</span>
+        <span className={`text-sm font-bold ${missing ? "text-gray-400" : c.contribution! >= 0 ? "text-green-600" : "text-red-600"}`}>
+          {missing ? "no data" : `${c.contribution! >= 0 ? "+" : ""}${c.contribution!.toFixed(1)} pts`}
+        </span>
+      </div>
+      <p className="text-xs text-gray-500 mt-1">
+        {missing ? "Not enough history to compute this input" : verdict(c.value!)}
+      </p>
+    </div>
+  )
 }
 
 export function TrendAnalysis() {
@@ -307,31 +353,42 @@ export function TrendAnalysis() {
                 </div>
               </div>
 
-              <div
-                className="absolute top-0 bottom-0 w-2 bg-black shadow-lg transition-all duration-500"
-                style={{
-                  left: `calc(${Math.max(0, Math.min(100, 100 - (selectedItem.momentumStrength ?? 50)))}% - 4px)`,
-                }}
-              >
-                <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap">
-                  <div className="bg-black text-white px-4 py-2 rounded-lg shadow-xl">
-                    <div className="text-xs font-semibold">TODAY</div>
-                    <div className="text-2xl font-bold">{Math.round(selectedItem.momentumStrength ?? 50)}</div>
-                    <div className="text-xs text-center">
-                      {selectedItem.momentumStrength >= 81
-                        ? "Extreme Bullish"
-                        : selectedItem.momentumStrength >= 61
-                          ? "Bullish"
-                          : selectedItem.momentumStrength >= 41
-                            ? "Neutral"
-                            : selectedItem.momentumStrength >= 21
-                              ? "Bearish"
-                              : "Extreme Bearish"}
-                    </div>
-                  </div>
-                  <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-black mx-auto" />
+              {/* `?? 50` parked the needle dead-centre on "Neutral" whenever
+                  momentum was unknown — the same defect the route was just fixed
+                  for, one layer up. No reading, no needle. */}
+              {selectedItem.momentumStrength === null ? (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/70">
+                  <span className="text-sm font-semibold text-gray-600">
+                    No momentum reading — not enough price history
+                  </span>
                 </div>
-              </div>
+              ) : (
+                <div
+                  className="absolute top-0 bottom-0 w-2 bg-black shadow-lg transition-all duration-500"
+                  style={{
+                    left: `calc(${Math.max(0, Math.min(100, 100 - selectedItem.momentumStrength))}% - 4px)`,
+                  }}
+                >
+                  <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                    <div className="bg-black text-white px-4 py-2 rounded-lg shadow-xl">
+                      <div className="text-xs font-semibold">TODAY</div>
+                      <div className="text-2xl font-bold">{Math.round(selectedItem.momentumStrength)}</div>
+                      <div className="text-xs text-center">
+                        {selectedItem.momentumStrength >= 81
+                          ? "Extreme Bullish"
+                          : selectedItem.momentumStrength >= 61
+                            ? "Bullish"
+                            : selectedItem.momentumStrength >= 41
+                              ? "Neutral"
+                              : selectedItem.momentumStrength >= 21
+                                ? "Bearish"
+                                : "Extreme Bearish"}
+                      </div>
+                    </div>
+                    <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-black mx-auto" />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Context information */}
@@ -368,150 +425,54 @@ export function TrendAnalysis() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* RSI Contribution */}
-                  <div className="bg-white border border-gray-200 rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold text-gray-700">RSI</span>
-                      <span className="text-xs text-gray-500">
-                        Weight: ±{selectedItem.indicatorContributions.rsi.weight} pts
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-mono">
-                        {selectedItem.indicatorContributions.rsi.value.toFixed(1)}
-                      </span>
-                      <span
-                        className={`text-sm font-bold ${selectedItem.indicatorContributions.rsi.contribution >= 0 ? "text-green-600" : "text-red-600"}`}
-                      >
-                        {selectedItem.indicatorContributions.rsi.contribution >= 0 ? "+" : ""}
-                        {selectedItem.indicatorContributions.rsi.contribution.toFixed(1)} pts
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {selectedItem.indicatorContributions.rsi.value > 55
-                        ? "Bullish momentum"
-                        : selectedItem.indicatorContributions.rsi.value < 45
-                          ? "Bearish momentum"
-                          : "Neutral"}
-                    </p>
-                  </div>
-
-                  {/* MACD Contribution */}
-                  <div className="bg-white border border-gray-200 rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold text-gray-700">MACD</span>
-                      <span className="text-xs text-gray-500">
-                        Weight: ±{selectedItem.indicatorContributions.macd.weight} pts
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-mono">
-                        {selectedItem.indicatorContributions.macd.value.toFixed(2)}
-                      </span>
-                      <span
-                        className={`text-sm font-bold ${selectedItem.indicatorContributions.macd.contribution >= 0 ? "text-green-600" : "text-red-600"}`}
-                      >
-                        {selectedItem.indicatorContributions.macd.contribution >= 0 ? "+" : ""}
-                        {selectedItem.indicatorContributions.macd.contribution.toFixed(1)} pts
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {selectedItem.indicatorContributions.macd.value > 0 ? "Bullish trend" : "Bearish trend"}
-                    </p>
-                  </div>
-
-                  {/* Price Change Contribution */}
-                  <div className="bg-white border border-gray-200 rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold text-gray-700">20-Day Price Change</span>
-                      <span className="text-xs text-gray-500">
-                        Weight: ±{selectedItem.indicatorContributions.priceChange.weight} pts
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-mono">
-                        {selectedItem.indicatorContributions.priceChange.value.toFixed(2)}%
-                      </span>
-                      <span
-                        className={`text-sm font-bold ${selectedItem.indicatorContributions.priceChange.contribution >= 0 ? "text-green-600" : "text-red-600"}`}
-                      >
-                        {selectedItem.indicatorContributions.priceChange.contribution >= 0 ? "+" : ""}
-                        {selectedItem.indicatorContributions.priceChange.contribution.toFixed(1)} pts
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {selectedItem.indicatorContributions.priceChange.value > 0
-                        ? "Positive momentum"
-                        : "Negative momentum"}
-                    </p>
-                  </div>
-
-                  {/* Volume Trend Contribution */}
-                  <div className="bg-white border border-gray-200 rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold text-gray-700">Volume Trend</span>
-                      <span className="text-xs text-gray-500">
-                        Weight: ±{selectedItem.indicatorContributions.volumeTrend.weight} pts
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-mono">
-                        {selectedItem.indicatorContributions.volumeTrend.value.toFixed(1)}%
-                      </span>
-                      <span
-                        className={`text-sm font-bold ${selectedItem.indicatorContributions.volumeTrend.contribution >= 0 ? "text-green-600" : "text-red-600"}`}
-                      >
-                        {selectedItem.indicatorContributions.volumeTrend.contribution >= 0 ? "+" : ""}
-                        {selectedItem.indicatorContributions.volumeTrend.contribution.toFixed(1)} pts
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {selectedItem.indicatorContributions.volumeTrend.value > 0 ? "Rising volume" : "Falling volume"}
-                    </p>
-                  </div>
+                  <ContributionCard
+                    label="RSI"
+                    c={selectedItem.indicatorContributions.rsi}
+                    digits={1}
+                    verdict={(v) => (v > 55 ? "Bullish momentum" : v < 45 ? "Bearish momentum" : "Neutral")}
+                  />
+                  <ContributionCard
+                    label="MACD"
+                    c={selectedItem.indicatorContributions.macd}
+                    digits={2}
+                    verdict={(v) => (v > 0 ? "Bullish trend" : "Bearish trend")}
+                  />
+                  <ContributionCard
+                    label="20-Day Price Change"
+                    c={selectedItem.indicatorContributions.priceChange}
+                    digits={2}
+                    suffix="%"
+                    verdict={(v) => (v > 0 ? "Positive momentum" : "Negative momentum")}
+                  />
+                  <ContributionCard
+                    label="Volume Trend"
+                    c={selectedItem.indicatorContributions.volumeTrend}
+                    digits={1}
+                    suffix="%"
+                    verdict={(v) => (v > 0 ? "Rising volume" : "Falling volume")}
+                  />
                 </div>
 
                 {/* Visual Summary */}
                 <div className="mt-4 bg-gray-50 rounded-lg p-3 border border-gray-200">
                   <p className="text-xs font-semibold text-gray-700 mb-2">Calculation Summary</p>
-                  <div className="flex items-center gap-2 text-xs font-mono">
+                  <div className="flex items-center gap-2 text-xs font-mono flex-wrap">
                     <span>Baseline: 50</span>
-                    <span
-                      className={
-                        selectedItem.indicatorContributions.rsi.contribution >= 0 ? "text-green-600" : "text-red-600"
-                      }
-                    >
-                      {selectedItem.indicatorContributions.rsi.contribution >= 0 ? "+" : ""}
-                      {selectedItem.indicatorContributions.rsi.contribution.toFixed(1)}
+                    {(["rsi", "macd", "priceChange", "volumeTrend"] as const).map((k) => {
+                      const c = selectedItem.indicatorContributions![k].contribution
+                      // An indicator with no data contributes nothing and says so.
+                      // It used to print "+0.0", which reads as a measured zero.
+                      if (c === null) return <span key={k} className="text-gray-400">(no {k} data)</span>
+                      return (
+                        <span key={k} className={c >= 0 ? "text-green-600" : "text-red-600"}>
+                          {c >= 0 ? "+" : ""}
+                          {c.toFixed(1)}
+                        </span>
+                      )
+                    })}
+                    <span className="font-bold">
+                      = {selectedItem.momentumStrength === null ? "no reading" : selectedItem.momentumStrength.toFixed(1)}
                     </span>
-                    <span
-                      className={
-                        selectedItem.indicatorContributions.macd.contribution >= 0 ? "text-green-600" : "text-red-600"
-                      }
-                    >
-                      {selectedItem.indicatorContributions.macd.contribution >= 0 ? "+" : ""}
-                      {selectedItem.indicatorContributions.macd.contribution.toFixed(1)}
-                    </span>
-                    <span
-                      className={
-                        selectedItem.indicatorContributions.priceChange.contribution >= 0
-                          ? "text-green-600"
-                          : "text-red-600"
-                      }
-                    >
-                      {selectedItem.indicatorContributions.priceChange.contribution >= 0 ? "+" : ""}
-                      {selectedItem.indicatorContributions.priceChange.contribution.toFixed(1)}
-                    </span>
-                    <span
-                      className={
-                        selectedItem.indicatorContributions.volumeTrend.contribution >= 0
-                          ? "text-green-600"
-                          : "text-red-600"
-                      }
-                    >
-                      {selectedItem.indicatorContributions.volumeTrend.contribution >= 0 ? "+" : ""}
-                      {selectedItem.indicatorContributions.volumeTrend.contribution.toFixed(1)}
-                    </span>
-                    <span className="font-bold">= {selectedItem.momentumStrength.toFixed(1)}</span>
                   </div>
                 </div>
               </div>
@@ -721,23 +682,33 @@ export function TrendAnalysis() {
                     <Target className="h-5 w-5 text-green-600" />
                     <h3 className="font-semibold text-green-900">1-Week Target</h3>
                   </div>
-                  <p className="text-2xl font-bold text-green-700">
-                    ${(selectedItem.priceTarget1Week ?? 0).toFixed(2)}
-                  </p>
-                  <p className="text-sm text-green-600 mt-1">
-                    {(((selectedItem.priceTarget1Week ?? 0) - (selectedItem.currentPrice ?? 0)) /
-                      (selectedItem.currentPrice ?? 1)) *
-                      100 >=
-                    0
-                      ? "+"
-                      : ""}
-                    {(
-                      (((selectedItem.priceTarget1Week ?? 0) - (selectedItem.currentPrice ?? 0)) /
-                        (selectedItem.currentPrice ?? 1)) *
-                      100
-                    ).toFixed(2)}
-                    % from current
-                  </p>
+                  {/* `?? 0` here printed a **$0.00 price target** and a percentage
+                      measured against it — the loudest possible version of the
+                      neutral-default defect, since a price of zero is not a
+                      plausible-looking wrong number, it is nonsense presented in
+                      the same green as a real target. The weekly target scales by
+                      momentum, so it is absent whenever momentum is. */}
+                  {selectedItem.priceTarget1Week === null ? (
+                    <>
+                      <p className="text-2xl font-bold text-gray-400">—</p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        No momentum reading, so no weekly target. The monthly target and stop below are structural
+                        (support, resistance, ATR) and are unaffected.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-2xl font-bold text-green-700">${selectedItem.priceTarget1Week.toFixed(2)}</p>
+                      <p className="text-sm text-green-600 mt-1">
+                        {selectedItem.priceTarget1Week >= selectedItem.currentPrice ? "+" : ""}
+                        {(
+                          ((selectedItem.priceTarget1Week - selectedItem.currentPrice) / selectedItem.currentPrice) *
+                          100
+                        ).toFixed(2)}
+                        % from current
+                      </p>
+                    </>
+                  )}
                 </div>
 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -902,9 +873,16 @@ export function TrendAnalysis() {
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                   <p className="text-sm text-gray-600 mb-1">Momentum Strength</p>
-                  <p className={`text-xl font-bold ${getMomentumColor(selectedItem.momentumStrength)}`}>
-                    {selectedItem.momentumStrength.toFixed(0)}/100
-                  </p>
+                  {/* Grey and em-dash when there is no reading. `getMomentumColor`
+                      would otherwise have to be handed a stand-in number, and any
+                      stand-in on a 0-100 scale is itself a reading. */}
+                  {selectedItem.momentumStrength === null ? (
+                    <p className="text-xl font-bold text-gray-400">—</p>
+                  ) : (
+                    <p className={`text-xl font-bold ${getMomentumColor(selectedItem.momentumStrength)}`}>
+                      {selectedItem.momentumStrength.toFixed(0)}/100
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">

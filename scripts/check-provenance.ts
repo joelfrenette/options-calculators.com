@@ -523,6 +523,14 @@ const PINNED: PinnedClaim[] = [
     why: "the examples are labelled static because the scan route refuses; wiring a real scan would make the label false",
   },
   {
+    finding: "P6-66",
+    claimFile: "components/trend-analysis.tsx",
+    claim: "No momentum reading, so no weekly target",
+    dependsOnFile: "app/api/trend-analysis/route.ts",
+    dependsOn: /if \(!contributed\) return null/,
+    why: "the copy explains an absent target; restoring the 50 baseline would make it unreachable and false",
+  },
+  {
     finding: "P6-61",
     claimFile: "components/panic-euphoria.tsx",
     claim: "DISPLAY ONLY — not scored",

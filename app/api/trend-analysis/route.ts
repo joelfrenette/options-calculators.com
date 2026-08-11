@@ -210,7 +210,7 @@ function calculateMomentumStrength(
   volumes: number[],
   rsi: number | null,
   macd: number | null,
-): number {
+): number | null {
   // Price momentum (rate of change over 20 days) — guard <20 bars (was NaN)
   const priceChange =
     prices.length >= 20
@@ -222,25 +222,50 @@ function calculateMomentumStrength(
   const olderVolume = volumes.slice(-30, -10).reduce((sum, v) => sum + v, 0) / 20
   const volumeTrend = olderVolume > 0 ? ((recentVolume - olderVolume) / olderVolume) * 100 : 0
 
-  // Combine indicators into strength score (0-100, where higher = more bullish)
+  // Combine indicators into strength score (0-100, where higher = more bullish).
+  //
+  // The baseline is 50 and every contribution is additive, so when NONE of the
+  // four inputs is available this function used to return exactly 50 — which on
+  // a 0-100 momentum scale is not "unknown", it is a real NEUTRAL reading. It
+  // was then published as `targetConfidence` and multiplied the one-week price
+  // target (`atr * 2 * (strength / 50)`), so a symbol with no usable history
+  // produced a confident-looking target scaled by a number nothing measured.
+  // Third appearance of this shape after P6-18 and P6-58.
+  //
+  // `contributed` tracks whether anything actually moved the baseline. Nothing
+  // moved it => null, and callers decline rather than default.
   let strength = 50 // neutral baseline
+  let contributed = false
 
   // RSI contribution (±20 points) — null RSI (insufficient history) contributes 0
   if (rsi !== null) {
     if (rsi > 50) strength += ((rsi - 50) / 50) * 20
     else if (rsi < 50) strength -= ((50 - rsi) / 50) * 20
+    contributed = true
   }
 
   // MACD contribution (±15 points), normalized by price — see macdContribution
-  strength += macdContribution(macd, prices[prices.length - 1] ?? 0)
+  if (macd !== null && (prices[prices.length - 1] ?? 0) > 0) {
+    strength += macdContribution(macd, prices[prices.length - 1] ?? 0)
+    contributed = true
+  }
 
   // Price momentum contribution (±10 points)
   // Positive price change is bullish; negative is bearish
-  strength += Math.max(-10, Math.min(10, priceChange))
+  if (prices.length >= 20) {
+    strength += Math.max(-10, Math.min(10, priceChange))
+    contributed = true
+  }
 
   // Volume trend contribution (±5 points)
   // Rising volume is bullish; falling volume is bearish
-  strength += Math.max(-5, Math.min(5, volumeTrend / 10))
+  if (olderVolume > 0) {
+    strength += Math.max(-5, Math.min(5, volumeTrend / 10))
+    contributed = true
+  }
+
+  // No input moved the baseline: the answer is "unknown", not "neutral".
+  if (!contributed) return null
 
   // Return score between 0-100 (higher = more bullish)
   return Math.max(0, Math.min(100, strength))
@@ -253,7 +278,7 @@ function determineTrend(
   ma200: number | null,
   rsi: number | null,
   macd: { macd: number; signal: number; histogram: number } | null,
-  momentumStrength: number,
+  momentumStrength: number | null,
   volumeRatio: number,
 ): {
   trend: string
@@ -291,9 +316,13 @@ function determineTrend(
   }
   totalSignals += 2
 
-  // Momentum strength (2 points) - Fixed: now using corrected scale where higher = more bullish
-  if (momentumStrength > 60) bullishSignals += 2
-  else if (momentumStrength < 40) bearishSignals += 2
+  // Momentum strength (2 points). Null = no vote, matching how RSI and MACD are
+  // handled above: the denominator keeps its 2 points, so an unknown momentum
+  // drags confidence toward Neutral instead of voting from a default.
+  if (momentumStrength !== null) {
+    if (momentumStrength > 60) bullishSignals += 2
+    else if (momentumStrength < 40) bearishSignals += 2
+  }
   totalSignals += 2
 
   // Volume (1 point)
@@ -337,28 +366,32 @@ function calculatePriceTargets(
   atr: number,
   support: number,
   resistance: number,
-  momentumStrength: number,
+  momentumStrength: number | null,
 ) {
   const volatilityMultiplier = atr / currentPrice
 
+  // The weekly target scales by momentum, so with momentum unknown the formula
+  // has no value — it is withheld rather than computed from a stand-in. The
+  // monthly target and the stop are structural (resistance/support/ATR) and
+  // survive.
   if (trend === "Bullish") {
-    const target1Week = currentPrice + atr * 2 * (momentumStrength / 50)
+    const target1Week = momentumStrength === null ? null : currentPrice + atr * 2 * (momentumStrength / 50)
     const target1Month = resistance + (resistance - currentPrice) * 0.5
     const stopLoss = support
 
     return {
-      target1Week: Math.min(target1Week, resistance * 0.98),
+      target1Week: target1Week === null ? null : Math.min(target1Week, resistance * 0.98),
       target1Month: Math.min(target1Month, currentPrice * 1.15),
       stopLoss: Math.max(stopLoss, currentPrice * 0.95),
       confidence: momentumStrength,
     }
   } else if (trend === "Bearish") {
-    const target1Week = currentPrice - atr * 2 * (momentumStrength / 50)
+    const target1Week = momentumStrength === null ? null : currentPrice - atr * 2 * (momentumStrength / 50)
     const target1Month = support - (currentPrice - support) * 0.5
     const stopLoss = resistance
 
     return {
-      target1Week: Math.max(target1Week, support * 1.02),
+      target1Week: target1Week === null ? null : Math.max(target1Week, support * 1.02),
       target1Month: Math.max(target1Month, currentPrice * 0.85),
       stopLoss: Math.min(stopLoss, currentPrice * 1.05),
       confidence: momentumStrength,
@@ -373,7 +406,10 @@ function calculatePriceTargets(
       target1Week: midPoint > currentPrice ? currentPrice + weeklyMove : currentPrice - weeklyMove,
       target1Month: midPoint,
       stopLoss: support * 1.02,
-      confidence: 50,
+      // Was a hardcoded 50. The neutral branch never consulted momentum at all,
+      // so "50% confident" was a constant dressed as a measurement — report the
+      // momentum reading, or nothing when there isn't one.
+      confidence: momentumStrength,
     }
   }
 }
@@ -475,34 +511,38 @@ export async function GET() {
         momentumStrength,
       )
 
+      // These two were `: 0` on the unavailable branch and rendered in the
+      // breakdown as `value: 0` — a 20-day price change of exactly 0.00% and a
+      // flat volume trend, both stated as measurements when the bars to compute
+      // them did not exist. Null so the breakdown shows a gap.
       const priceChange =
         prices.length >= 20
           ? ((prices[prices.length - 1] - prices[prices.length - 20]) / prices[prices.length - 20]) * 100
-          : 0
+          : null
       const recentVolume = volumes.slice(-10).reduce((sum: number, v: number) => sum + v, 0) / 10
       const olderVolume = volumes.slice(-30, -10).reduce((sum: number, v: number) => sum + v, 0) / 20
-      const volumeTrend = olderVolume > 0 ? ((recentVolume - olderVolume) / olderVolume) * 100 : 0
+      const volumeTrend = olderVolume > 0 ? ((recentVolume - olderVolume) / olderVolume) * 100 : null
 
       const indicatorContributions = {
         rsi: {
           value: rsi,
-          contribution: rsi === null ? 0 : rsi > 50 ? ((rsi - 50) / 50) * 20 : -((50 - rsi) / 50) * 20,
+          contribution: rsi === null ? null : rsi > 50 ? ((rsi - 50) / 50) * 20 : -((50 - rsi) / 50) * 20,
           weight: 20,
         },
         macd: {
           value: macd?.macd ?? null,
           // Normalized by price — mirrors calculateMomentumStrength exactly
-          contribution: macdContribution(macd?.macd ?? null, currentPrice),
+          contribution: macd?.macd == null ? null : macdContribution(macd.macd, currentPrice),
           weight: 15,
         },
         priceChange: {
           value: priceChange,
-          contribution: Math.max(-10, Math.min(10, priceChange)),
+          contribution: priceChange === null ? null : Math.max(-10, Math.min(10, priceChange)),
           weight: 10,
         },
         volumeTrend: {
           value: volumeTrend,
-          contribution: Math.max(-5, Math.min(5, volumeTrend / 10)),
+          contribution: volumeTrend === null ? null : Math.max(-5, Math.min(5, volumeTrend / 10)),
           weight: 5,
         },
       }
