@@ -104,6 +104,33 @@ const COMPONENT_FILES = walk(join(ROOT, "components"), (p) => p.endsWith(".tsx")
 const APP_FILES = walk(join(ROOT, "app"), (p) => p.endsWith(".tsx"))
 const UI_FILES = [...COMPONENT_FILES, ...APP_FILES]
 
+// ---------------------------------------------------------------------------
+// 0. The checks below only mean anything over the set they actually cover.
+// ---------------------------------------------------------------------------
+//
+// P6-75: rule 13 silently stopped covering a file and went on reporting PASS,
+// because its scope came from a keyword that a reworded log line removed. The
+// only symptom was a printed count dropping from 12 to 11 — printed, never
+// asserted, and therefore never read.
+//
+// **The PASS-count discipline in CLAUDE.md catches a check that stops RUNNING.
+// It cannot catch one that keeps running over a shrunken set, because the count
+// of PASS lines is identical.** These floors close that gap for this file: they
+// are deliberately loose (a real refactor may move files around) but they make
+// a scope collapse impossible to miss. Raise them when the codebase grows; a
+// floor that has drifted far below reality is only half a guard.
+const FLOORS: ReadonlyArray<[string, number, number]> = [
+  ["components/*.tsx", COMPONENT_FILES.length, 80],
+  ["app/**/*.tsx", APP_FILES.length, 1],
+]
+for (const [label, actual, floor] of FLOORS) {
+  check(
+    `scope: ${label} resolves to a plausible file set`,
+    actual >= floor,
+    `${actual} file(s), floor ${floor}`,
+  )
+}
+
 const deadRefresh: string[] = []
 for (const f of UI_FILES) {
   const src = code(f)
@@ -705,6 +732,13 @@ for (const f of AI_MODULES) {
     if (/status:\s*["']live["']/.test(window)) aiLiveClaims.push(`${rel(f)}:${i + 1}`)
   })
 }
+// The count that P6-75 quietly changed from 12 to 11 is now asserted, not just
+// printed. This is the specific instance the floors above generalise.
+check(
+  "scope: the AI-module set has not collapsed",
+  AI_MODULES.length >= 8,
+  `${AI_MODULES.length} module(s) reach a provider — a sudden drop means the scope rule broke, not that the code got safer`,
+)
 check(
   "no AI helper returns a hardcoded constant when the model fails",
   aiConstants.length === 0,

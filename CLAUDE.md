@@ -77,7 +77,9 @@ Run `pnpm check:formulas && pnpm check:contracts` (typecheck via `pnpm typecheck
 10 known errors remain, do not add new ones). Regenerate SITE_MAP.md with
 `pnpm inventory` when routes/components change.
 
-**A check that stops COVERING is as invisible as one that stops running (P6-75).**
+**Any check that derives a file set must assert that set's size (P6-75, P6-77).**
+A check that stops COVERING is as invisible as one that stops running: the PASS count is
+identical either way.
 Derive a check's scope from structure — imports, call sites — never from incidental
 prose. Rule 13 once scoped itself by keyword, and rewording a `console.log` removed the
 only token putting a file in scope; the suite went on passing with the count silently
