@@ -500,6 +500,39 @@ const PINNED: PinnedClaim[] = [
     dependsOn: /excludedComponents/,
     why: "the banner promises exclusion; a return to neutral-50 defaults would make it false",
   },
+  {
+    finding: "P6-47",
+    claimFile: "components/ccpi-dashboard.tsx",
+    claim: "It does not select trades",
+    dependsOnFile: "components/ccpi-dashboard.tsx",
+    // The owner's decision was that the CCPI band recommends nothing. If a
+    // per-band strategy list returns, this sentence is the first thing it
+    // contradicts.
+    // Negative pin: matches only while the phrase is ABSENT. `[\s\S]` not `.`
+    // — with `.` the lookahead only covers the first line and the rule passes
+    // vacuously, which is a check that exists and verifies nothing.
+    dependsOn: /^(?![\s\S]*Recommended Strategies)[\s\S]*$/,
+    why: "owner decision: the CCPI describes conditions and selects no trades",
+  },
+  {
+    finding: "P6-53",
+    claimFile: "components/options-strategy-toolbox.tsx",
+    claim: "they do not update with the market",
+    dependsOnFile: "app/api/strategy-scanner/route.ts",
+    dependsOn: /status: 501/,
+    why: "the examples are labelled static because the scan route refuses; wiring a real scan would make the label false",
+  },
+  {
+    finding: "P6-61",
+    claimFile: "components/panic-euphoria.tsx",
+    claim: "DISPLAY ONLY — not scored",
+    dependsOnFile: "app/api/panic-euphoria/route.ts",
+    // Negative pin, and it must be one: the explanatory comment is stripped
+    // before matching, so a marker inside `//` cannot be the dependency. This
+    // matches only while `aaiiScore` is absent from the executable source.
+    dependsOn: /^(?![\s\S]*aaiiScore)[\s\S]*$/,
+    why: "the row says it is unscored; putting it back into componentScores would make that false",
+  },
 ]
 
 for (const p of PINNED) {

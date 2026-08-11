@@ -216,8 +216,24 @@ async function calculatePanicEuphoria() {
     const investorIntelligence = Math.max(30, Math.min(70, 100 - ((currentVix - 10) / 40) * 60))
     const iiScore = Math.max(-1, Math.min(1, normalize(investorIntelligence, 30, 70, 50)))
 
+    // `aaiiBullish` is `investorIntelligence * 0.9`, and investorIntelligence is
+    // itself a pure function of VIX. It is therefore a scaled copy of a
+    // component already in the composite — it cannot disagree with it, at any
+    // VIX level, ever. Two names, one number, both entering an equal-weight
+    // mean: VIX level carried 2/9 of the composite through components that
+    // looked independent, and more than that whenever a FRED series dropped out
+    // and the divisor shrank.
+    //
+    // `syntheticComponents` already told the reader both were proxies. That is a
+    // different fact and it did not cover this one — a reader can accept two
+    // labelled proxies as two pieces of evidence, which is exactly what they are
+    // not. Same defect as P6-54 (stability restating beta) and P6-58 (NYSE
+    // highs/lows restating SPY momentum): a derived value is not an input.
+    //
+    // Kept as a DISPLAY field, dropped from the score. The VIX components that
+    // remain are investorIntelligence (level) and putCallRatio (5-day vs 50-day
+    // term structure), which can and do disagree with each other.
     const aaiiBullish = Math.max(25, Math.min(65, investorIntelligence * 0.9))
-    const aaiiScore = Math.max(-1, Math.min(1, normalize(aaiiBullish, 25, 65, 40)))
 
     // FRED helper: latest value + its percentile within ~5y of history. The
     // percentile IS the normalization — the series scores against its own
@@ -317,7 +333,6 @@ async function calculatePanicEuphoria() {
       marginScore,
       volumeScore,
       iiScore,
-      aaiiScore,
       mmfScore,
       pcScore,
       commodityScore,
@@ -332,7 +347,6 @@ async function calculatePanicEuphoria() {
       marginScore,
       volumeScore,
       iiScore,
-      aaiiScore,
       mmfScore,
       pcScore,
       commodityScore,

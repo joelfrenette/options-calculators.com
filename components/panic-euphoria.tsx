@@ -564,7 +564,7 @@ export function PanicEuphoria() {
                   rawValue={`${data.investorIntelligence}% bulls`}
                   tooltip={
                     tooltipsEnabled
-                      ? "Investor Intelligence Survey polls professional newsletter writers for their market outlook. SOURCE: Investor Intelligence weekly survey data. INTERPRETATION: High bullishness (>60%) is a contrarian SELL signal—when experts are too optimistic, markets often decline. Low bullishness (<40%) is a contrarian BUY signal. Current range: 30-70%."
+                      ? "Citi's model uses the Investor Intelligence survey of newsletter writers. This site does not have that survey. SOURCE: derived from VIX — the reading is 100 − ((VIX − 10) / 40) × 60, clamped to 30-70, so it is a volatility measure on a sentiment scale, not a poll of anybody. INTERPRETATION: the contrarian reading still applies (high = complacency, low = fear), but treat it as VIX wearing a survey's name. It IS scored in the composite."
                       : ""
                   }
                 />
@@ -574,7 +574,7 @@ export function PanicEuphoria() {
                   rawValue={`${data.aaiiBullish}%`}
                   tooltip={
                     tooltipsEnabled
-                      ? "AAII (American Association of Individual Investors) Bullish Sentiment measures retail investor optimism. SOURCE: Weekly AAII sentiment survey. INTERPRETATION: High bullishness (>55%) indicates retail euphoria—historically a contrarian SELL signal. Low bullishness (<25%) indicates panic—historically a BUY opportunity. Current range: 25-65%."
+                      ? "DISPLAY ONLY — not scored. SOURCE: this is not the AAII survey. The figure is the Investor Intelligence row above multiplied by 0.9, and that row is itself derived from VIX — so this number cannot disagree with it at any VIX level. It was removed from the composite for that reason: two names for one measurement gave VIX double weight in an equal-weight mean. Shown because the row is part of Citi's published model, kept unscored because this site cannot source it."
                       : ""
                   }
                 />
