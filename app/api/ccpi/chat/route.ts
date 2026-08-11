@@ -1,4 +1,6 @@
+import { NextResponse } from "next/server"
 import { streamText, convertToModelMessages, type UIMessage } from "ai"
+import { isDryRun, dryRunPayload } from "@/lib/dry-run"
 import { createOpenAI } from "@ai-sdk/openai"
 import { createAnthropic } from "@ai-sdk/anthropic"
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
@@ -140,6 +142,22 @@ ${
     // Budget guard (E-5): refresh before spending, so `config.key()` below
     // resolves to "" for guarded providers once the kill switch has tripped.
     await ensureBudgetGuardFresh()
+
+    // P2-4. The dry run returns plain JSON rather than a stream, and that is
+    // the honest shape: there is no stream, because there is no model. A probe
+    // that returned an empty UI-message stream would be asserting that the
+    // streaming path works when nothing streamed. What this DOES cover is the
+    // part of the route that has actually been wrong before — the system-prompt
+    // build, where P6-19 found pillars rendered as "0/100" to the model, and
+    // the budget-guard refresh above it. The streaming transport itself stays
+    // unverified and is recorded as such.
+    if (isDryRun(req, { messages, ccpiContext })) {
+      return NextResponse.json({
+        ...dryRunPayload("/api/ccpi/chat", "providerConfigs chain (streamText)", systemPrompt.length),
+        streams: true,
+        note: "Request path exercised; no model was called, so no stream was opened and no content was generated.",
+      })
+    }
 
     let lastError: Error | null = null
 

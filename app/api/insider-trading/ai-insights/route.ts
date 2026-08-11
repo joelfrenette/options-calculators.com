@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { generateWithFallback } from "@/lib/ai-providers"
+import { isDryRun, dryRunPayload } from "@/lib/dry-run"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 30
@@ -157,6 +158,19 @@ Return JSON in EXACTLY this shape:
 }
 
 Provide 3-5 signals max, ordered by importance. Keep it tight and specific to the tickers in the data.`
+
+    // P2-4. Stops after the trades validation and the aggregation above — so
+    // the probe covers the 400 path, the per-ticker aggregation and the prompt
+    // build, which is everything here that can break without a provider.
+    if (isDryRun(request, body)) {
+      return NextResponse.json(
+        dryRunPayload(
+          "/api/insider-trading/ai-insights",
+          "generateWithFallback (preferred: openai)",
+          systemPrompt.length + userPrompt.length,
+        ),
+      )
+    }
 
     const result = await generateWithFallback({
       system: systemPrompt,

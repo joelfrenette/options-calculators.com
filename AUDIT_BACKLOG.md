@@ -216,7 +216,7 @@ recomputes it.
 | P2-1 | P1 | fixed | The three routes return 502 on upstream failure. |
 | P2-2 | P2 | fixed | **Route deleted 2026-08-11**, with three writers and one reader. It cost a self-fetch per request to write a module-level variable the next isolate could not read. Routes 61 → 60. |
 | P2-3 | P3 | open | Triage done, verdicts partly executed — see P0-1 for what survives. |
-| P2-4 | P2 | open | **Partial 2026-08-11.** `lib/dry-run.ts` built; `/api/ccpi/executive-summary` and `/api/scenario-analysis` converted from `skip` to real contract probes. Three LLM routes and eleven others remain. |
+| P2-4 | P2 | fixed | **Closed 2026-08-11 for the LLM group.** All five routes skipped for model cost are contract-tested via `lib/dry-run.ts`; skipped contracts 16 → 10. The ten left are store writes, auth side effects, fan-outs and metered scraping quota — a different problem, recorded separately. |
 | P2-5 | P3 | fixed | `scripts/check-contract-coverage.ts` fails the build on drift and runs in `check:contracts`. |
 | P2-6 | P3 | wontfix | Local TLS interception, not a repo defect. Recorded so it is not re-diagnosed. |
 | P3-1 | P0 | fixed | CCPI reads real FRED spot VIX. |
@@ -388,7 +388,7 @@ recomputes it.
 
 ### The open list, by severity
 
-213 findings recorded · **165 fixed · 7 wontfix · 0 verified-ok · 41 open.**
+213 findings recorded · **166 fixed · 7 wontfix · 0 verified-ok · 40 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14.)_
 
@@ -406,10 +406,9 @@ _(`P3-15`, `P3-17` and `P3-18` were confirmed and closed on 2026-08-11 — see b
 `P5-1` closed with Phase 7.2. The prediction that "three of the four are probably
 already done" was **wrong on two of them**, which is the point of confirming.)_
 
-**P2 — 7.**
+**P2 — 6.**
 `S-18` (the scanner's hidden gates, estimate badges, expected
-move and step-number drift) · `P2-4` (16 routes with no automated
-verification) · `P6-31` · `P6-65` **— Joel's weight decision** · `P6-85` **— Phase 7.0** ·
+move and step-number drift) · `P6-31` · `P6-65` **— Joel's weight decision** · `P6-85` **— Phase 7.0** ·
 `P7-7` **— `next build` runs on neither bundler here; the second blocker on Phase 7.0** ·
 `P7-10`.
 
@@ -424,7 +423,7 @@ verification) · `P6-31` · `P6-65` **— Joel's weight decision** · `P6-85` **
 **Closed on rationale rather than a change — 7.**
 `S-4` · `P0-7` · `P2-6` · `E-8b` · `E-8e` · `E-8f` · `P6-35`.
 
-**What this changes about "work the backlog by severity".** The real defect list is 25
+**What this changes about "work the backlog by severity".** The real defect list is 24
 items, not the 213 the file's length suggests — and half the P1s on it are bookkeeping,
 not work. Nobody could see that before, which is the point of this section: closure was
 recorded in fourteen vocabularies, and the file's own summary line was still calling
@@ -1477,3 +1476,29 @@ four and stopped — the easy 24 were sitting behind the hard 17.
 | ID | Sev | Tab / area | Finding |
 |---|---|---|---|
 | P7-9 | P3 | ops / lib | **41 → 17.** Twenty-four exports un-exported (used internally; typecheck confirms no importer), nine deleted earlier in the phase. **The 17 that remain need a decision each, not a sweep:** `streamWithFallback`, `getProviderStatus`, `recordApiUsage`, `getServiceUsage`, `isPasswordHashed`, `providerToKey`, `isBudgetGuardTrippedSync`, `clearCCPICache`, `loadHistoryFromCache`, `saveSummaryToCache`, `loadSummaryFromCache`, `getBarColor`, `getRegimeColor`, `getIndicatorStatus`, `isQuiverConfigured`, `getTwitterSentiment`, `getFinnhubNewsSentiment`. Note `recordApiUsage` is A-13's finding — the function whose absence of callers made the admin Costs tab read a permanent 0 — and the three `lib/ccpi/calculations.ts` colour helpers sit in a module no check script can load (P6-85). **OPEN.** |
+
+---
+
+## Phase 7.4 (eighth pass) — P2-4 closed: all five LLM routes probeable (2026-08-11)
+
+Skipped contracts **16 → 10**. Every route that was skipped *because a probe costs a
+model call* is now contract-tested, at a 5s budget instead of 30–60s:
+
+| Route | What the probe now covers |
+|---|---|
+| `/api/ccpi/executive-summary` | Body parsing, the null-aware pillar rendering, **and the budget-guard refresh** — the dry run deliberately returns *after* `ensureBudgetGuardFresh()`, because a guard that fails to refresh is the silent spend-control break this route had no test for. |
+| `/api/scenario-analysis` | The `question` validation and its 400 path, then the prompt build. |
+| `/api/insider-trading/ai-insights` | The trades validation, the 400 path, and the whole per-ticker aggregation — the deterministic half of the route, and the half that can be wrong without anyone noticing. |
+| `/api/earnings-calendar/insights` | Body parsing, and it **reports the fan-out it would have caused** (`wouldCallCount` = one call per earnings row, one per economic row, plus a summary). This was the most expensive probe on the site, which is why it was skipped, which meant the costliest route had the least verification. |
+| `/api/ccpi/chat` | The system-prompt build — **where P6-19 found pillars rendered to the model as "0/100"** — and the budget-guard refresh. It answers JSON rather than a stream, and that is the honest shape: there is no stream because there is no model. A probe returning an empty UI-message stream would assert that streaming works when nothing streamed. **The streaming transport itself stays unverified**, and the contract says so. |
+
+**The ten that remain are skipped for reasons a dry run does not address**, and none of
+them is an LLM cost: five cron pipelines that write to the market stores, two auth
+routes with rate-limit and session side effects, two fan-out audit endpoints that would
+double every provider's call volume, and the metered ScrapingBee route. Those need
+either a test environment or a decision that probing them is acceptable — a different
+problem from this one, and not one to hide behind the same word.
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| P2-4 | P2 | site-wide | **CLOSED for the LLM group.** All five routes skipped for model cost are now contract-tested via `lib/dry-run.ts`; skipped contracts 16 → 10. Every remaining skip is a store write, an auth side effect, a fan-out, or metered scraping quota — recorded above so "16 routes have no verification" is not carried forward as though it were still one problem. |

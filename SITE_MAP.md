@@ -234,8 +234,8 @@ _None._
 | `app/page.tsx` | 697 | 97 |
 | `components/cpi-inflation-analysis.tsx` | 669 | 69 |
 | `components/admin/health-check-panel.tsx` | 622 | 22 |
+| `lib/api-contracts.ts` | 621 | 21 |
 | `components/earnings-economic-calendar.tsx` | 603 | 3 |
-| `lib/api-contracts.ts` | 603 | 3 |
 | `components/scanner/use-wheel-scanner.ts` | 601 | 1 |
 
 ## 6. PHASE 6 SIGN-OFF LEDGER

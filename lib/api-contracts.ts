@@ -103,8 +103,15 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
   {
     path: "/api/ccpi/chat",
     method: "POST",
-    skip: "Spends an LLM call on every probe.",
-    budgetMs: 30000,
+    // P2-4. Was skipped. The dry run answers JSON rather than a stream, which
+    // is the honest shape — there is no stream because there is no model, and a
+    // probe returning an empty UI-message stream would assert that streaming
+    // works when nothing streamed. Covered: the system-prompt build (where
+    // P6-19 found pillars rendered to the model as "0/100") and the
+    // budget-guard refresh. NOT covered: the streaming transport itself.
+    canary: { body: { dryRun: true, messages: [], ccpiContext: { ccpi: 42, pillars: { momentum: 50, riskAppetite: null, valuation: 50, macro: 50 } } } },
+    schema: z.object({ dryRun: z.literal(true), route: z.string(), wouldCall: z.string(), streams: z.literal(true) }),
+    budgetMs: 5000,
     tabs: ["ccpi"],
   },
   {
@@ -127,8 +134,14 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
   {
     path: "/api/earnings-calendar/insights",
     method: "POST",
-    skip: "Spends an LLM call on every probe.",
-    budgetMs: 60000,
+    // P2-4. Was skipped, and it is the most expensive probe on the site: one
+    // model call per earnings row, one per economic row, plus a weekly summary.
+    // Skipping it meant the most costly route had the least verification. The
+    // dry run sends empty arrays, so the fan-out it reports is 0 + 0 + 1 — the
+    // point being that it reports the count at all.
+    canary: { body: { dryRun: true, earnings: [], economic: [], label: "contract probe" } },
+    schema: z.object({ dryRun: z.literal(true), route: z.string(), wouldCall: z.string(), promptChars: z.number() }).extend({ wouldCallCount: z.number() }),
+    budgetMs: 5000,
     tabs: ["earnings-calendar"],
   },
   {
@@ -306,8 +319,13 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
   {
     path: "/api/insider-trading/ai-insights",
     method: "POST",
-    skip: "Spends an LLM call on every probe.",
-    budgetMs: 30000,
+    // P2-4. Was skipped. The dry run returns after the trades validation and
+    // the per-ticker aggregation, so the probe covers the 400 path and the
+    // aggregation — the deterministic half of this route, and the half that
+    // can be wrong without anyone noticing.
+    canary: { body: { dryRun: true, trades: [{ date: "2026-01-01", type: "Buy", owner: "probe", role: "probe", category: "corporate", ticker: "AAPL", shares: "1", price: "$1", value: "$1K", notes: "" }] } },
+    schema: z.object({ dryRun: z.literal(true), route: z.string(), wouldCall: z.string(), promptChars: z.number() }),
+    budgetMs: 5000,
     tabs: ["insiders"],
   },
   {
