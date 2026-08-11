@@ -352,19 +352,29 @@ async function fetchCongressionalTrades(days = 30) {
 }
 
 // ---------------------------------------------------------------------------
-// Seed / fallback — used when ALL live sources fail
+// There is no seed fallback, on purpose.
+//
+// `getSeedTransactions()` used to return seven invented Form 4 and STOCK Act
+// filings attributed to named real people — "Cook Timothy D, CEO, AAPL,
+// -100,000 shares, $220.00, $22M, Routine divestiture", and the same for Jensen
+// Huang, Mark Zuckerberg, Nancy Pelosi, Tommy Tuberville and Josh Gottheimer.
+// They were served whenever every live source failed, and on the catch path
+// they went out with `success: true` and a fresh `lastUpdated` timestamp, which
+// the house rules forbid outright: an error is an error status, never a 200
+// carrying made-up rows.
+//
+// The UI's own status line showed what this looked like from outside — a yellow
+// dot reading "Data unavailable (4 trades)" directly above four rendered
+// transactions. Both halves came from the same response.
+//
+// This is also where P6-42 came from. The hardcoded "AI Insights" prose deleted
+// from insider-trading-dashboard.tsx named exactly these people and tickers: it
+// was written to narrate the seed rows, so the fabrication propagated from the
+// route into prose that asserted the trades had happened "this week".
+//
+// A route that cannot reach any source now says so with 503. Missing data is
+// absence, not a plausible-looking placeholder.
 // ---------------------------------------------------------------------------
-function getSeedTransactions() {
-  return [
-    { _date: "2025-11-25", type: "Sell", owner: "Cook Timothy D", role: "CEO", category: "corporate", ticker: "AAPL", shares: "-100,000", price: "$220.00", value: "$22M", notes: "Routine divestiture", dataSource: "Seed data" },
-    { _date: "2025-11-24", type: "Buy",  owner: "Pelosi Nancy",   role: "Representative", category: "congressional", ticker: "MSFT", shares: "$50K-$100K", price: "N/A", value: "$50K-$100K", notes: "Spousal trade (STOCK Act)", dataSource: "Seed data" },
-    { _date: "2025-11-23", type: "Sell", owner: "Huang Jensen",   role: "CEO", category: "corporate", ticker: "NVDA", shares: "-50,000", price: "$140.00", value: "$7M", notes: "10b5-1 plan", dataSource: "Seed data" },
-    { _date: "2025-11-22", type: "Buy",  owner: "Rep. Josh Gottheimer", role: "Representative", category: "congressional", ticker: "XOM", shares: "$15K-$50K", price: "N/A", value: "$15K-$50K", notes: "Energy position", dataSource: "Seed data" },
-    { _date: "2025-11-21", type: "Sell", owner: "Zuckerberg Mark", role: "CEO", category: "corporate", ticker: "META", shares: "-75,000", price: "$580.00", value: "$43.5M", notes: "Scheduled sale", dataSource: "Seed data" },
-    { _date: "2025-11-20", type: "Buy",  owner: "Sen. Tommy Tuberville", role: "Senator", category: "congressional", ticker: "LMT", shares: "$100K-$250K", price: "N/A", value: "$100K-$250K", notes: "Defense allocation", dataSource: "Seed data" },
-    { _date: "2025-11-18", type: "Sell", owner: "Dabiri John",    role: "Officer", category: "corporate", ticker: "NVDA", shares: "-17,792", price: "$179.42", value: "$3.2M", notes: "Open market sale", dataSource: "Seed data" },
-  ]
-}
 
 // ---------------------------------------------------------------------------
 // GET handler
@@ -484,13 +494,23 @@ export async function GET(request: Request) {
 
     const usingLiveData = transactions.length > 0
 
-    // ---- Seed fallback ----
+    // Every source came back empty. Report that, rather than filling the table.
     if (!usingLiveData) {
-      for (const t of getSeedTransactions()) {
-        transactions.push({ ...t, date: formatDate(t._date) })
-        if (t.category === "corporate") corporateCount++
-        else congressionalCount++
-      }
+      return NextResponse.json(
+        {
+          success: false,
+          error: "No insider-trading data available",
+          message:
+            "Finnhub, SEC EDGAR and the congressional feeds all returned nothing for this window. No filings are shown because none were retrieved.",
+          transactions: [],
+          volumeData: [],
+          dataSources: {
+            corporate: { source: "Unavailable", count: 0, isLive: false },
+            congressional: { source: "Unavailable", count: 0, isLive: false },
+          },
+        },
+        { status: 503 },
+      )
     }
 
     // Sort by date, most recent first
@@ -526,11 +546,11 @@ export async function GET(request: Request) {
       // Rows with no usable price, excluded from volumeData rather than
       // added as zero.
       unpricedTransactions,
-      source: usingLiveData ? "live" : "seed",
+      source: "live",
       lastUpdated: new Date().toISOString(),
       dataSources: {
         corporate: {
-          source: finnhubData.length > 0 ? "Finnhub (SEC Form 4)" : edgarData.length > 0 ? "SEC EDGAR" : "Seed data",
+          source: finnhubData.length > 0 ? "Finnhub (SEC Form 4)" : edgarData.length > 0 ? "SEC EDGAR" : "Unavailable",
           count: corporateCount,
           isLive: usingLiveData && (finnhubData.length > 0 || edgarData.length > 0),
         },
@@ -544,17 +564,22 @@ export async function GET(request: Request) {
     })
   } catch (error) {
     console.error("[v0] Insider trading API error:", error)
-    const seed = getSeedTransactions().map((t) => ({ ...t, date: formatDate(t._date) }))
-    return NextResponse.json({
-      success: true,
-      transactions: seed,
-      volumeData: [],
-      source: "seed",
-      lastUpdated: new Date().toISOString(),
-      dataSources: {
-        corporate: { source: "Seed data", count: 4, isLive: false },
-        congressional: { source: "Seed data", count: 3, isLive: false },
+    // Was `success: true` with seven fabricated filings and a fresh
+    // `lastUpdated`. The counts beside them (4 and 3) were hardcoded too, so
+    // they described the seed rather than anything measured.
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Insider-trading lookup failed",
+        message: error instanceof Error ? error.message : "The insider-trading sources could not be read.",
+        transactions: [],
+        volumeData: [],
+        dataSources: {
+          corporate: { source: "Unavailable", count: 0, isLive: false },
+          congressional: { source: "Unavailable", count: 0, isLive: false },
+        },
       },
-    })
+      { status: 502 },
+    )
   }
 }

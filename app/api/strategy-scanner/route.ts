@@ -1443,49 +1443,34 @@ export async function GET(request: NextRequest) {
 
 // ========== POST HANDLER (AI Strategy Scanning) ==========
 export async function POST(request: NextRequest) {
-  try {
-    const { strategy, strategyName } = await request.json()
-
-    const userPrompt = `Based on current market conditions (late November 2025, VIX around 18-22, markets near all-time highs), provide 3 specific ${strategyName} trade setups.
-
-For each setup, provide in this EXACT JSON format:
-{
-  "setups": [
+  // This handler used to invent three trade setups and serve them at HTTP 200.
+  //
+  // Its own comment said what it was doing — "Since AI functionality is not
+  // used, we return default setups" — and it returned SPY 595/590 for $2.35 at
+  // 72% POP, QQQ 510/505 for $2.10 at 70%, IWM 235/230 for $1.85 at 68%. Real
+  // tickers, specific strikes, specific credits, specific probabilities, none
+  // of them measured. The prices were anchored to a prompt template that opens
+  // "Based on current market conditions (late November 2025, VIX around 18-22)",
+  // so they were stale as well as invented.
+  //
+  // The consequence was the opposite of harmless. options-strategy-toolbox
+  // renders `config.setups` by default and labels them honestly — "illustrative
+  // teaching examples, not live trade recommendations". Pressing Scan replaced
+  // that labelled set with THESE, and stamped "Last scanned: <time>" beside
+  // them. The refresh made the page less honest than it was at rest, and the
+  // timestamp is what sold it: an illustrative example wearing a scan time
+  // reads as a result. Nine LEARN tabs share that component.
+  //
+  // There is no live setup scan behind this route, so it now says so with a
+  // real status code rather than 200 (house rule: never 200 with an error
+  // body). The UI keeps showing its labelled examples, which is the honest
+  // resting state it already had.
+  return NextResponse.json(
     {
-      "ticker": "SYMBOL",
-      "setup": "Specific strikes and structure (e.g., '545/540 Put Credit Spread' or '550/545-580/585 Iron Condor')",
-      "credit": "$X.XX",
-      "pop": "XX%",
-      "direction": "Bullish/Bearish/Neutral"
-    }
-  ]
-}
-
-Use realistic current prices for major ETFs and stocks:
-- SPY: ~$595
-- QQQ: ~$510
-- IWM: ~$235
-- AAPL: ~$235
-- NVDA: ~$145
-- MSFT: ~$430
-- AMZN: ~$210
-- META: ~$580
-- GOOGL: ~$175
-- TSLA: ~$350
-
-Return ONLY valid JSON, no other text.`
-
-    // Placeholder for AI response handling
-    // Since AI functionality is not used, we return default setups
-    return NextResponse.json({
-      setups: [
-        { ticker: "SPY", setup: `595/590 ${strategyName}`, credit: "$2.35", pop: "72%", direction: "Neutral" },
-        { ticker: "QQQ", setup: `510/505 ${strategyName}`, credit: "$2.10", pop: "70%", direction: "Neutral" },
-        { ticker: "IWM", setup: `235/230 ${strategyName}`, credit: "$1.85", pop: "68%", direction: "Neutral" },
-      ],
-    })
-  } catch (error) {
-    console.error("Strategy scanner error:", error)
-    return NextResponse.json({ error: "Failed to scan for setups" }, { status: 500 })
-  }
+      error: "Live setup scanning is not available",
+      message:
+        "This site does not scan for specific trade setups. The examples shown are illustrative and are not refreshed from market data.",
+    },
+    { status: 501 },
+  )
 }

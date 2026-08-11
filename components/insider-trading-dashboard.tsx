@@ -116,6 +116,11 @@ const InsiderTradingDashboard = () => {
   const [sortDirection, setSortDirection] = useState<SortDirection>(null)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
   const [data, setData] = useState<any | null>(null)
+  // The route can now fail honestly (503 when every source is empty, 502 on
+  // error) instead of returning invented filings at 200. That only helps if the
+  // page says so — a failed refresh that silently leaves the previous table on
+  // screen reads exactly like a successful one.
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   // Smart filter state
   const [tickerFilter, setTickerFilter] = useState("")
@@ -139,17 +144,27 @@ const InsiderTradingDashboard = () => {
       const params = new URLSearchParams({ days: String(daysBack) })
       if (activeTicker) params.set("ticker", activeTicker)
       const response = await fetch(`/api/insider-trading?${params.toString()}`)
-      if (response.ok) {
-        const json = await response.json()
-        if (json.success && json.transactions?.length > 0) {
-          setTrades(json.transactions)
-          setDataSource(json.source || "live")
-          setLastUpdated(new Date().toLocaleString())
-          setData(json)
-        }
+      const json = await response.json().catch(() => null)
+      if (!response.ok || !json?.success) {
+        // Clear the table. Leaving the last good result up under a new filter
+        // would attribute those filings to a window they did not come from.
+        setFetchError(json?.message || json?.error || `The insider-trading feed returned ${response.status}.`)
+        setTrades([])
+        setData(null)
+        setLastUpdated(null)
+        return
       }
+      setFetchError(null)
+      setTrades(json.transactions ?? [])
+      setDataSource(json.source || "live")
+      setLastUpdated(new Date().toLocaleString())
+      setData(json)
     } catch (error) {
       console.error("Error fetching insider trading data:", error)
+      setFetchError("Could not reach the insider-trading feed.")
+      setTrades([])
+      setData(null)
+      setLastUpdated(null)
     } finally {
       setIsLoading(false)
     }
@@ -417,6 +432,12 @@ const InsiderTradingDashboard = () => {
               {" "}· last {daysBack === 180 ? "6 months" : daysBack === 365 ? "1 year" : `${daysBack} days`}
               {" "}— click column headers to sort
             </CardDescription>
+            {fetchError && (
+              <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+                <strong>No filings retrieved.</strong> {fetchError} Nothing is shown below, because nothing was read —
+                this page does not fall back to placeholder trades.
+              </div>
+            )}
             {data?.dataSources && (
               <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mt-2 pt-2 border-t">
                 <span className="flex items-center gap-1.5">

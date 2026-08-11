@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import {
   DollarSign,
@@ -17,7 +16,6 @@ import {
   Calculator,
   RefreshCw,
   BarChart2,
-  Loader2,
   Info,
 } from "lucide-react"
 import { Area, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from "recharts"
@@ -655,41 +653,24 @@ interface OptionsStrategyToolboxProps {
 export function OptionsStrategyToolbox({ strategy = "credit-spreads" }: OptionsStrategyToolboxProps) {
   const config = STRATEGIES[strategy]
 
-  const [setups, setSetups] = useState<StrategySetup[]>([])
-  const [isScanning, setIsScanning] = useState(false)
-  const [lastScanned, setLastScanned] = useState<Date | null>(null)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
   const [walkthroughSetup, setWalkthroughSetup] = useState<WalkthroughSetup | null>(null)
 
-  // The example cards are static teaching examples drawn from the strategy
-  // config (not live scanner output). Scanned results, when present, refresh them.
-  const exampleSetups: StrategySetup[] = setups.length > 0 ? setups : config.setups
+  // The example cards render `config.setups` and only that — static teaching
+  // examples, labelled as such where they appear.
+  //
+  // There used to be a `setups` state that overrode them from a POST to
+  // /api/strategy-scanner, plus `isScanning` and `lastScanned`. That route did
+  // not scan: it returned three invented setups (SPY 595/590 at $2.35 / 72% POP,
+  // and two more) at HTTP 200, its own comment admitting "Since AI functionality
+  // is not used, we return default setups". The override therefore swapped a
+  // correctly-labelled teaching example for an invented one and stamped it
+  // "Last scanned: <time>" — which is the part that did the damage, because a
+  // timestamp turns an illustration into a result. Nine LEARN tabs share this
+  // component. The route now returns 501 and this state is gone.
 
   if (!config) {
     return <div className="p-8 text-center text-gray-500">Strategy not found</div>
-  }
-
-  const handleRefreshSetups = async () => {
-    setIsScanning(true)
-    try {
-      const response = await fetch("/api/strategy-scanner", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ strategy, strategyName: config.name }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        if (data.setups && data.setups.length > 0) {
-          setSetups(data.setups)
-          setLastScanned(new Date())
-        }
-      }
-    } catch (error) {
-      console.error("Error scanning for setups:", error)
-    } finally {
-      setIsScanning(false)
-    }
   }
 
   const getPayoffChartData = (payoffData: { x: number; y: number }[]) => {
@@ -728,20 +709,22 @@ export function OptionsStrategyToolbox({ strategy = "credit-spreads" }: OptionsS
                     {config.name}
                   </h1>
                   <Badge className={config.badgeColor}>{config.badge}</Badge>
+                  {/* Said "with real-time market examples". The examples are a
+                      static array in this file — nothing about them is real-time. */}
                   <InfoTooltip
-                    content={`${config.name}: ${config.tagline}. This page shows you how to set up and manage ${config.name.toLowerCase()} trades with real-time market examples.`}
+                    content={`${config.name}: ${config.tagline}. This page shows you how to set up and manage ${config.name.toLowerCase()} trades, using worked examples chosen to illustrate the structure.`}
                   />
                 </div>
                 <p className="text-lg text-teal-700">{config.tagline}</p>
               </div>
+              {/* The Scan control and its "Last scanned: <time>" stamp are gone
+                  with the route that fed them. There is no live setup scan on
+                  this site, and a timestamp is what turned a labelled teaching
+                  example into something that read as a result. */}
               <div className="flex items-center gap-2">
                 <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
-                <RefreshButton onClick={handleRefreshSetups} disabled={isScanning} />
               </div>
             </div>
-            {lastScanned && (
-              <p className="text-xs text-teal-600 mt-2">Last scanned: {lastScanned.toLocaleTimeString()}</p>
-            )}
           </div>
         </div>
 
@@ -893,20 +876,15 @@ export function OptionsStrategyToolbox({ strategy = "credit-spreads" }: OptionsS
               <h2 className="text-xl font-bold" style={{ color: "#1E3A8A" }}>
                 Example Setups (For Learning)
               </h2>
-              <InfoTooltip content="These are illustrative teaching examples — not live trade recommendations. Each example shows a realistic ticker, the specific options to trade, premium, and probability of profit. Click Run Scenario for a step-by-step walkthrough of how to place the trade. Always do your own research before trading." />
-              {isScanning && (
-                <Badge className="bg-teal-100 text-teal-700 ml-2">
-                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                  AI Scanning Markets...
-                </Badge>
-              )}
+              {/* The "AI Scanning Markets..." badge went with the scan: no model
+                  ran and no market was read. This tooltip was already the most
+                  honest sentence on the page — it is why the defect was worth
+                  fixing rather than relabelling. */}
+              <InfoTooltip content="These are illustrative teaching examples — not live trade recommendations, and they do not update with the market. Each example shows a realistic ticker, the specific options to trade, premium, and probability of profit. Click Run Scenario for a step-by-step walkthrough of how to place the trade. Always do your own research before trading." />
             </div>
             <div className="grid md:grid-cols-3 gap-4">
-              {exampleSetups.map((setup, idx) => (
-                <Card
-                  key={idx}
-                  className={`shadow-md hover:shadow-lg transition-shadow ${isScanning ? "opacity-50" : ""}`}
-                >
+              {config.setups.map((setup, idx) => (
+                <Card key={idx} className="shadow-md hover:shadow-lg transition-shadow">
                   <CardContent className="p-5">
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-2xl font-bold" style={{ color: "#1E3A8A" }}>

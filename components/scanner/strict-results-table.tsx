@@ -232,6 +232,12 @@ export function StrictResultsTable({
                     // Evaluate criteria for each stock to show which filters passed/failed
                     const criteria = evaluateCriteria(stock, technicalFilterSettings)
                     const isSynthesized = stock.priceSource === "synthesized"
+                    // The delta column keys off its OWN provenance field rather
+                    // than the price's. They resolve identically today — both
+                    // come from the same `useEstimatedGreeks` branch — but a
+                    // provenance field nothing reads is how priceSource ended up
+                    // logged and discarded in the first place.
+                    const deltaEstimated = stock.deltaSource === "estimated" || isSynthesized
                     return (
                       <tr
                         key={`${stock.ticker}-${stock.expiryDate}-${idx}`}
@@ -272,11 +278,11 @@ export function StrictResultsTable({
                         </td>
                         <td
                           className={`text-center p-3 ${
-                            isSynthesized ? "text-amber-700" : stock.delta < -0.2 ? "text-green-700" : ""
+                            deltaEstimated ? "text-amber-700" : stock.delta < -0.2 ? "text-green-700" : ""
                           }`}
                         >
                           {stock.delta.toFixed(3)}
-                          {isSynthesized && <span className="ml-1 text-[10px]">est.</span>}
+                          {deltaEstimated && <span className="ml-1 text-[10px]">est.</span>}
                         </td>
                         <td className="text-right p-3">
                           <span className={`font-bold ${isSynthesized ? "text-amber-700" : "text-green-800"}`}>

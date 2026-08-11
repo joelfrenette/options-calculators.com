@@ -281,5 +281,97 @@ for (const table of ["strict-results-table.tsx", "relaxed-results-table.tsx"]) {
   )
 }
 
+// ---------------------------------------------------------------------------
+// 6. No API route ships a ticker with a price attached.
+// ---------------------------------------------------------------------------
+//
+// P6-52. `/api/strategy-scanner`'s POST handler returned three invented trade
+// setups at HTTP 200 — SPY 595/590 for $2.35 at 72% POP, and two more — under
+// its own comment, "Since AI functionality is not used, we return default
+// setups". A component then rendered them and stamped "Last scanned: <time>".
+//
+// The rule is deliberately blunt: a route's job is to fetch or compute, so a
+// literal symbol sitting next to a literal price in a route file is either
+// fabricated output or a prompt anchoring a model to stale prices. The
+// strategy-scanner had both, and the prompt's "SPY: ~$595" was what made the
+// fabricated numbers look plausible.
+//
+// Components are exempt: static teaching examples live there on purpose, and
+// they are labelled where they render.
+
+const API_FILES = walk(join(ROOT, "app", "api"), (p) => p.endsWith(".ts"))
+const TICKER_WITH_PRICE =
+  /\bticker:\s*["'][A-Z.]{1,6}["'][^\n]*?(?:\$[0-9]|\bcredit:|\bpop:|\bpremium:|\bstrike:)|["'][A-Z]{2,5}["']\s*:\s*["']?~?\$[0-9]/
+
+const fabricatedRows: string[] = []
+for (const f of API_FILES) {
+  for (const line of code(f).split("\n")) {
+    if (TICKER_WITH_PRICE.test(line)) fabricatedRows.push(`${rel(f)}: ${line.trim().slice(0, 70)}`)
+  }
+}
+check(
+  "no API route ships a hardcoded ticker with a hardcoded price",
+  fabricatedRows.length === 0,
+  fabricatedRows.length ? fabricatedRows.join("; ") : "routes fetch or compute; they do not carry quotes",
+)
+
+// ---------------------------------------------------------------------------
+// 7. A metric the route withholds has no filter control in the UI.
+// ---------------------------------------------------------------------------
+//
+// P6-53. An earlier pass found `historicalVolatility` and `priceStability` were
+// restatements of beta wearing the names of independent measurements, and
+// correctly set both to null in the route. It stopped there. The calendar-spread
+// scanner kept two sliders bound to them — draggable 50 to 95, filtering on
+// `x !== null && ...`, which is never true — above a tooltip telling the user to
+// "Look for 75% or higher" on a column rendering "not measured" on every row.
+//
+// Same family as the handler-less Refresh buttons: a control that accepts input
+// and does nothing. It is the predictable second half of withholding a value,
+// and the reason it survived is that removing a computation looks finished the
+// moment the number stops being wrong.
+
+const withheldFields: string[] = []
+for (const f of API_FILES) {
+  for (const m of code(f).matchAll(/const\s+(\w+)\s*(?::[^=]+)?=\s*null\b/g)) withheldFields.push(m[1])
+}
+const orphanControls: string[] = []
+for (const field of new Set(withheldFields)) {
+  const Cap = field[0].toUpperCase() + field.slice(1)
+  // A slider/input state named min<Field> or max<Field> is a control over it.
+  const control = new RegExp(`\\b(?:min|max)${Cap}\\b`)
+  for (const f of UI_FILES) {
+    if (control.test(code(f))) orphanControls.push(`${rel(f)} filters on withheld "${field}"`)
+  }
+}
+check(
+  "no UI control filters on a value the route hardcodes to null",
+  orphanControls.length === 0,
+  orphanControls.length ? orphanControls.join("; ") : `${new Set(withheldFields).size} withheld field(s), none driving a control`,
+)
+
+// ---------------------------------------------------------------------------
+// 8. An estimated Greek is marked wherever a measured one would be.
+// ---------------------------------------------------------------------------
+//
+// The companion to rule 5. `deltaSource` has existed on QualifyingStock since
+// the Phase 4 split and no component ever read it, which is exactly how
+// priceSource came to be logged and discarded — a provenance field nothing
+// consumes is indistinguishable from no provenance at all.
+
+const scannerTypes = code(join(ROOT, "components", "scanner", "types.ts"))
+for (const field of ["priceSource", "deltaSource"]) {
+  const declared = scannerTypes.includes(`${field}?:`) || scannerTypes.includes(`${field}:`)
+  const consumed = UI_FILES.some((f) => {
+    const src = code(f)
+    return src.includes(`stock.${field}`) || src.includes(`s.${field}`) || src.includes(`.${field} ===`)
+  })
+  check(
+    `${field} is read by the UI, not just declared`,
+    !declared || consumed,
+    declared ? (consumed ? "a renderer reads it" : "declared but nothing consumes it") : "not declared",
+  )
+}
+
 console.log(failures === 0 ? "\nAll provenance checks passed." : `\n${failures} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)

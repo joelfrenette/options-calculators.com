@@ -66,8 +66,6 @@ export function CalendarSpreadScanner() {
   const [error, setError] = useState<string | null>(null)
   const [spreadType, setSpreadType] = useState<"all" | "call" | "put">("all")
   const [maxBeta, setMaxBeta] = useState(1.0)
-  const [maxHV, setMaxHV] = useState(35)
-  const [minStability, setMinStability] = useState(70)
   const [maxDebit, setMaxDebit] = useState(1000) // Step 1 dollar filter: max net debit per spread ($)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [isLiveData, setIsLiveData] = useState(false)
@@ -102,10 +100,10 @@ export function CalendarSpreadScanner() {
       if (maxDebit < 5000 && s.debit * 100 > maxDebit) return false
       if (spreadType !== "all" && s.type !== spreadType) return false
       if (s.beta > maxBeta) return false
-      // historicalVolatility and priceStability are no longer produced (they were
-      // restatements of beta). Rows are not excluded on data that does not exist.
-      if (s.historicalVolatility !== null && s.historicalVolatility > maxHV) return false
-      if (s.priceStability !== null && s.priceStability < minStability) return false
+      // historicalVolatility and priceStability are hardcoded null in the route —
+      // both were restatements of beta presented as independent measurements. The
+      // two sliders that used to drive these lines went with them; beta above is
+      // the real filter, and it is what they were paraphrasing.
       return true
     })
     .sort((a, b) => rankScore(b) - rankScore(a))
@@ -290,32 +288,19 @@ export function CalendarSpreadScanner() {
               />
               <span className="text-sm font-medium w-8">{maxBeta.toFixed(1)}</span>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-sm text-slate-600 whitespace-nowrap">Max HV:</span>
-              <InfoTooltip content="Historical Volatility (HV) shows how much the stock has actually moved in the past 30 days, expressed as a percentage. Lower HV (under 25%) means the stock has been calm and predictable. Calendar spreads need low-volatility stocks because you profit when the stock stays near your strike. High HV stocks are too unpredictable for this strategy." />
-              <Slider
-                value={[maxHV]}
-                onValueChange={(v) => setMaxHV(v[0])}
-                min={10}
-                max={60}
-                step={5}
-                className="w-24"
-              />
-              <span className="text-sm font-medium w-8">{maxHV}%</span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-sm text-slate-600 whitespace-nowrap">Min Stability:</span>
-              <InfoTooltip content="Price Stability Score measures what percentage of the last 30 days the stock stayed within a tight trading range. A score of 80% means the stock stayed put 80% of the time. Higher stability is BETTER for calendar spreads - you want boring, predictable stocks that don't make sudden moves. Look for 75% or higher." />
-              <Slider
-                value={[minStability]}
-                onValueChange={(v) => setMinStability(v[0])}
-                min={50}
-                max={95}
-                step={5}
-                className="w-24"
-              />
-              <span className="text-sm font-medium w-8">{minStability}%</span>
-            </div>
+            {/* The "Max HV" and "Min Stability" sliders are gone.
+                `historicalVolatility` and `priceStability` are hardcoded null in
+                /api/strategy-scanner — an earlier pass removed them once it found
+                both were restatements of beta dressed up as independent
+                measurements (HV was derived from beta; stability was
+                `100 - beta*20 - HV*0.5`). The filters correctly stopped excluding
+                rows on data that no longer exists, which left two sliders the user
+                could drag from 50 to 95 with no effect whatsoever, above a tooltip
+                telling them to "Look for 75% or higher" on a column that renders
+                "not measured" on every row. Same defect as the handler-less
+                Refresh buttons (P6-38): a control that takes input and does
+                nothing. Beta is still filterable above, and it is the real
+                measurement these two were paraphrasing. */}
           </div>
 
           {/* Key Metrics Legend */}

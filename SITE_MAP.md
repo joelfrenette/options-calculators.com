@@ -26,7 +26,7 @@
 | Tab id | Label | Component | File | Lines | Internal APIs |
 |---|---|---|---|---|---|
 | `wheel-scanner` | Sell Put Scanner | `WheelScanner` | `components/wheel-scanner.tsx` | 389 | none (static) |
-| `calendar-spread-scanner` | Calendar Spreads | `CalendarSpreadScanner` | `components/calendar-spread-scanner.tsx` | 571 | `/api/strategy-scanner` |
+| `calendar-spread-scanner` | Calendar Spreads | `CalendarSpreadScanner` | `components/calendar-spread-scanner.tsx` | 556 | `/api/strategy-scanner` |
 | `credit-spread-scanner` | Credit Spreads | `CreditSpreadScanner` | `components/credit-spread-scanner.tsx` | 394 | `/api/strategy-scanner` |
 | `iron-condor-scanner` | Iron Condors | `IronCondorScanner` | `components/iron-condor-scanner.tsx` | 395 | `/api/strategy-scanner` |
 | `butterfly-scanner` | Butterflies | `ButterflyScanner` | `components/butterfly-scanner.tsx` | 546 | `/api/strategy-scanner` |
@@ -37,7 +37,7 @@
 
 | Tab id | Label | Component | File | Lines | Internal APIs |
 |---|---|---|---|---|---|
-| `insiders` | Insider Activity | `InsiderTradingDashboard` | `components/insider-trading-dashboard.tsx` | 830 | `/api/insider-trading`<br>`/api/insider-trading/ai-insights` |
+| `insiders` | Insider Activity | `InsiderTradingDashboard` | `components/insider-trading-dashboard.tsx` | 851 | `/api/insider-trading`<br>`/api/insider-trading/ai-insights` |
 | `insider-clusters` | Cluster Buys | `InsiderClusters` | `components/insider-clusters.tsx` | 243 | `/api/insider-clusters` |
 | `form-144` | Form 144 Watch | `Form144Watch` | `components/form-144-watch.tsx` | 187 | `/api/form-144` |
 | `congress-feed` | Congress Trade Feed | `CongressTradeFeed` | `components/congress-trade-feed.tsx` | 456 | `/api/congress-trades` |
@@ -51,18 +51,18 @@
 
 | Tab id | Label | Component | File | Lines | Internal APIs |
 |---|---|---|---|---|---|
-| `wheel-strategy` | The Wheel | `OptionsStrategyToolbox strategy="wheel-strategy"` | `components/options-strategy-toolbox.tsx` | 1049 | `/api/strategy-scanner` |
+| `wheel-strategy` | The Wheel | `OptionsStrategyToolbox strategy="wheel-strategy"` | `components/options-strategy-toolbox.tsx` | 1027 | none (static) |
 | `learn-csp` | Cash-Secured Puts | `LearnCSP` | `components/learn-csp.tsx` | 98 | none (static) |
 | `learn-cc` | Covered Calls | `LearnCC` | `components/learn-cc.tsx` | 102 | none (static) |
 | `learn-leaps` | LEAPS | `LearnLEAPS` | `components/learn-leaps.tsx` | 100 | none (static) |
 | `learn-pmcc` | PMCC | `LearnPMCC` | `components/learn-pmcc.tsx` | 124 | none (static) |
-| `credit-spreads` | Credit Spreads | `OptionsStrategyToolbox strategy="credit-spreads"` | `components/options-strategy-toolbox.tsx` | 1049 | `/api/strategy-scanner` |
-| `iron-condors` | Iron Condors | `OptionsStrategyToolbox strategy="iron-condors"` | `components/options-strategy-toolbox.tsx` | 1049 | `/api/strategy-scanner` |
-| `straddles-strangles` | Straddles | `OptionsStrategyToolbox strategy="straddles-strangles"` | `components/options-strategy-toolbox.tsx` | 1049 | `/api/strategy-scanner` |
-| `diagonals` | Diagonals | `OptionsStrategyToolbox strategy="diagonals"` | `components/options-strategy-toolbox.tsx` | 1049 | `/api/strategy-scanner` |
-| `calendar-spreads` | Calendars | `OptionsStrategyToolbox strategy="calendar-spreads"` | `components/options-strategy-toolbox.tsx` | 1049 | `/api/strategy-scanner` |
-| `butterflies` | Butterflies | `OptionsStrategyToolbox strategy="butterflies"` | `components/options-strategy-toolbox.tsx` | 1049 | `/api/strategy-scanner` |
-| `collars` | Collars | `OptionsStrategyToolbox strategy="collars"` | `components/options-strategy-toolbox.tsx` | 1049 | `/api/strategy-scanner` |
+| `credit-spreads` | Credit Spreads | `OptionsStrategyToolbox strategy="credit-spreads"` | `components/options-strategy-toolbox.tsx` | 1027 | none (static) |
+| `iron-condors` | Iron Condors | `OptionsStrategyToolbox strategy="iron-condors"` | `components/options-strategy-toolbox.tsx` | 1027 | none (static) |
+| `straddles-strangles` | Straddles | `OptionsStrategyToolbox strategy="straddles-strangles"` | `components/options-strategy-toolbox.tsx` | 1027 | none (static) |
+| `diagonals` | Diagonals | `OptionsStrategyToolbox strategy="diagonals"` | `components/options-strategy-toolbox.tsx` | 1027 | none (static) |
+| `calendar-spreads` | Calendars | `OptionsStrategyToolbox strategy="calendar-spreads"` | `components/options-strategy-toolbox.tsx` | 1027 | none (static) |
+| `butterflies` | Butterflies | `OptionsStrategyToolbox strategy="butterflies"` | `components/options-strategy-toolbox.tsx` | 1027 | none (static) |
+| `collars` | Collars | `OptionsStrategyToolbox strategy="collars"` | `components/options-strategy-toolbox.tsx` | 1027 | none (static) |
 | `exit-rules` | Exit Rules | `ExitRulesDashboard` | `components/exit-rules-dashboard.tsx` | 559 | none (static) |
 | `earnings-iv-crusher` | Earnings EM | `EarningsVolatilityCalculator` | `components/earnings-volatility-calculator.tsx` | 534 | none (static) |
 | `greeks` | Greeks Calc | `GreeksCalculator` | `components/greeks-calculator.tsx` | 489 | none (static) |
@@ -128,7 +128,7 @@ Every route: HTTP verbs, segment config, upstream hosts, env keys, timeout wirin
 | `/api/serper-finance` | GET | — | google.serper.dev<br>serper.dev | SERPER_API_KEY | yes | `lib/api-contracts.ts`<br>`lib/remediation.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/smart-money-etfs` | GET | dynamic="force-dynamic" | api.polygon.io | POLYGON_API_KEY | yes | `components/smart-money-etfs.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/social-sentiment` | GET | dynamic="force-dynamic"<br>maxDuration=90 | api.polygon.io<br>api.stocktwits.com<br>finnhub.io | FINNHUB_API_KEY<br>POLYGON_API_KEY | yes | `components/social-sentiment.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
-| `/api/strategy-scanner` | GET, POST | — | api.polygon.io<br>finnhub.io | FINNHUB_API_KEY<br>POLYGON_API_KEY | yes | `components/butterfly-scanner.tsx`<br>`components/calendar-spread-scanner.tsx`<br>`components/credit-spread-scanner.tsx`<br>`components/earnings-plays-scanner.tsx`<br>`components/high-iv-watchlist.tsx`<br>`components/iron-condor-scanner.tsx`<br>`components/leaps-scanner.tsx`<br>`components/options-strategy-toolbox.tsx`<br>`components/wheel-strategy-screener.tsx`<br>`components/zebra-scanner.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
+| `/api/strategy-scanner` | GET, POST | — | api.polygon.io<br>finnhub.io | FINNHUB_API_KEY<br>POLYGON_API_KEY | yes | `components/butterfly-scanner.tsx`<br>`components/calendar-spread-scanner.tsx`<br>`components/credit-spread-scanner.tsx`<br>`components/earnings-plays-scanner.tsx`<br>`components/high-iv-watchlist.tsx`<br>`components/iron-condor-scanner.tsx`<br>`components/leaps-scanner.tsx`<br>`components/wheel-strategy-screener.tsx`<br>`components/zebra-scanner.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/time-server` | GET | — | worldtimeapi.org | — | **no** | `components/scanner/enrichment.ts`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/top-performers` | GET | dynamic="force-dynamic" | — | — | **no** | `components/top-performers.tsx`<br>`lib/api-contracts.ts`<br>`lib/remediation.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/trend-analysis` | GET | dynamic="force-dynamic" | query1.finance.yahoo.com | — | **no** | `components/trend-analysis.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
@@ -224,11 +224,11 @@ _None._
 | `components/fomc-predictions.tsx` | 1461 | 861 |
 | `components/trend-analysis.tsx` | 1173 | 573 |
 | `components/panic-euphoria.tsx` | 1139 | 539 |
-| `components/options-strategy-toolbox.tsx` | 1049 | 449 |
+| `components/options-strategy-toolbox.tsx` | 1027 | 427 |
 | `components/ccpi-dashboard.tsx` | 917 | 317 |
 | `components/trade-walkthrough-modal.tsx` | 866 | 266 |
+| `components/insider-trading-dashboard.tsx` | 851 | 251 |
 | `components/risk-calculator.tsx` | 845 | 245 |
-| `components/insider-trading-dashboard.tsx` | 830 | 230 |
 | `lib/ccpi/scoring.ts` | 805 | 205 |
 | `components/jobs-report-dashboard.tsx` | 751 | 151 |
 | `lib/remediation.ts` | 748 | 148 |
@@ -292,8 +292,6 @@ Marks survive `pnpm inventory` — they are read back and merged by tab id.
 | `earnings-iv-crusher` | ☑ | ☐ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
 | `greeks` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
 | `risk-rewards` | ☑ | ☐ | ☐ | ☐ | ☑ | ☑ | ☐ | ☐ |
-
-_Dropped (tab no longer exists): `ccpi`._
 
 ## 7. CLIENT-SIDE CACHE KEYS
 

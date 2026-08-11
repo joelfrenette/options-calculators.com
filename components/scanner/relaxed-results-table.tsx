@@ -393,6 +393,12 @@ export function RelaxedResultsTable({
                     // Same enrichment path as the strict table: no quote means
                     // premium/delta/both yields came from a fixed 35% IV.
                     const isSynthesized = stock.priceSource === "synthesized"
+                    // The delta column keys off its OWN provenance field rather
+                    // than the price's. They resolve identically today — both
+                    // come from the same `useEstimatedGreeks` branch — but a
+                    // provenance field nothing reads is how priceSource ended up
+                    // logged and discarded in the first place.
+                    const deltaEstimated = stock.deltaSource === "estimated" || isSynthesized
 
                     return (
                       <tr
@@ -430,11 +436,11 @@ export function RelaxedResultsTable({
                         </td>
                         <td
                           className={`text-center p-3 ${
-                            isSynthesized ? "text-amber-700" : stock.delta < -0.2 ? "text-purple-700" : ""
+                            deltaEstimated ? "text-amber-700" : stock.delta < -0.2 ? "text-purple-700" : ""
                           }`}
                         >
                           {stock.delta.toFixed(3)}
-                          {isSynthesized && <span className="ml-1 text-[10px]">est.</span>}
+                          {deltaEstimated && <span className="ml-1 text-[10px]">est.</span>}
                         </td>
                         <td className="text-right p-3">
                           <span className={`font-bold ${isSynthesized ? "text-amber-700" : "text-purple-800"}`}>
