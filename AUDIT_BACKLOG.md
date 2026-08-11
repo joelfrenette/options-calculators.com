@@ -180,7 +180,7 @@ recomputes it.
 | S-6 | P3 | fixed | wheel-scanner 4,439 → 386 lines. General module-size debt is P6-13, not this. |
 | S-7 | P3 | open | Both `MEGA_CAP_STOCKS` tables deleted; `MAJOR_INDEX_TICKERS` fallback survives and is still unlabelled when it is the universe actually used (verified 2026-08-11). |
 | S-8 | P2 | fixed | **Closed 2026-08-11.** Dead `maxPE` deleted with its "FIX: Declare maxPE state variable" comment. The two hidden gates are now stated on the Step 4 card — 1% minimum yield, 2M minimum volume — and the false comment calling `minVolumeTechnicals` unused is replaced. **Sliders remain unbuilt**; naming a gate the user cannot adjust is the honest half, not the whole fix. |
-| S-9 | P2 | open | `useEstimatedGreeks` badge coverage still unverified per cell. Partly overtaken by P6-43. |
+| S-9 | P2 | fixed | **Verified 2026-08-11**, which is what the row asked for. P6-43 satisfied it and nobody re-marked: both results tables mark every affected cell `est.`, each carries a title naming the fixed 35% IV assumption, and the header states how many of N rows have no live quote and warns that sorting by yield ranks them against real quotes. The estimate constants are cited, not merely flagged. |
 | S-10 | P2 | fixed | **Closed 2026-08-11.** Now `S · σ · √T` off measured IV, computed in `enrichment.ts` where an IV exists, and withheld when the IV is synthesized. The `lib/black-scholes.ts` docstring had claimed this fix since Phase 1 while the call site kept the fudge. |
 | S-11 | P3 | fixed | Owner dropped the pillar. The wider AAII footprint is P6-31, not this. |
 | S-12 | P3 | fixed | `/api/market-breadth` retired; E-6a replaced it. |
@@ -388,7 +388,7 @@ recomputes it.
 
 ### The open list, by severity
 
-213 findings recorded · **163 fixed · 7 wontfix · 0 verified-ok · 43 open.**
+213 findings recorded · **164 fixed · 7 wontfix · 0 verified-ok · 42 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14.)_
 
@@ -406,8 +406,8 @@ _(`P3-15`, `P3-17` and `P3-18` were confirmed and closed on 2026-08-11 — see b
 `P5-1` closed with Phase 7.2. The prediction that "three of the four are probably
 already done" was **wrong on two of them**, which is the point of confirming.)_
 
-**P2 — 9.**
-`S-9` · `S-18` (the scanner's hidden gates, estimate badges, expected
+**P2 — 8.**
+`S-18` (the scanner's hidden gates, estimate badges, expected
 move and step-number drift) · `P2-2` (the CCPI cache that does not cache) · `P2-4` (16 routes with no automated
 verification) · `P6-31` · `P6-65` **— Joel's weight decision** · `P6-85` **— Phase 7.0** ·
 `P7-7` **— `next build` runs on neither bundler here; the second blocker on Phase 7.0** ·
@@ -424,7 +424,7 @@ verification) · `P6-31` · `P6-65` **— Joel's weight decision** · `P6-85` **
 **Closed on rationale rather than a change — 7.**
 `S-4` · `P0-7` · `P2-6` · `E-8b` · `E-8e` · `E-8f` · `P6-35`.
 
-**What this changes about "work the backlog by severity".** The real defect list is 27
+**What this changes about "work the backlog by severity".** The real defect list is 26
 items, not the 213 the file's length suggests — and half the P1s on it are bookkeeping,
 not work. Nobody could see that before, which is the point of this section: closure was
 recorded in fourteen vocabularies, and the file's own summary line was still calling
@@ -1376,3 +1376,28 @@ counts references by word match. It cannot tell an import from a coincidental
 identifier, so a symbol with a common enough name hides in plain sight. Recorded in the
 script's limits rather than papered over; closing it properly means parsing imports
 instead of text, which is a different tool.
+
+---
+
+## Phase 7.4 (fourth pass) — S-9 verified, the CCPI barrel deleted (2026-08-11)
+
+**S-9 was already fixed and nobody had re-marked it — the third time in two days.**
+Its exit condition was "verify the `useEstimatedGreeks` badge actually renders on every
+affected cell; if not, add it. Cite the constants' provenance in the tooltip." All of
+it holds: `strict-results-table.tsx` and `relaxed-results-table.tsx` mark every affected
+cell `est.`, each carries a title reading "No live quote — computed from a fixed 35% IV
+assumption", and the header states how many of N rows have no live quote **and warns
+that sorting by yield ranks them against real quotes**. P6-43 did this work; the row
+kept saying it was open. Confirming rows costs minutes and the ledger has now been
+wrong in both directions.
+
+**`lib/ccpi/index.ts` deleted (P7-9).** A barrel re-exporting six modules with zero
+runtime importers — its only mentions were in `API_USAGE.md`, documenting an import
+style nobody used. **This is the second unused indirection layer this directory has
+grown**: P6-29 deleted seven duplicate components and their barrel here for the same
+reason. The note added to the README is the point worth keeping:
+
+> **A barrel makes every module in a directory look reachable, which is exactly what
+> hides the ones that are not.** `scripts/check-dead-exports.ts` cannot see past one
+> either — `export * from "./x"` names no symbols, so it neither creates nor resolves a
+> reference.

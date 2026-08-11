@@ -96,3 +96,21 @@ These utilities were extracted from `components/ccpi-dashboard.tsx` to improve:
 - Type safety
 
 The original component will be gradually refactored to use these utilities.
+
+## There is no barrel here, and that is deliberate
+
+`lib/ccpi/index.ts` was deleted on 2026-08-11 (P7-9). It re-exported six modules
+and **nothing imported it** — a repo-wide search for `@/lib/ccpi"` returned zero
+runtime referrers; its only mentions were in `API_USAGE.md`, which documented an
+import style nobody used.
+
+This is the second time this directory has grown an unused indirection layer.
+P6-29 deleted seven duplicate components and their barrel here for the same
+reason, and the note that survived that clean-up applies again: **a barrel makes
+every module in a directory look reachable, which is exactly what hides the ones
+that are not.** The dead-export rule (`scripts/check-dead-exports.ts`) cannot see
+past one either, since `export * from "./x"` names no symbols.
+
+Import the module you need directly — `@/lib/ccpi/scoring`, `@/lib/ccpi/cache`,
+and so on. The examples in `API_USAGE.md` that import from `@/lib/ccpi` are
+historical and do not resolve.
