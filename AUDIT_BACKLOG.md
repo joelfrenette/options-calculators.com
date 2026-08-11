@@ -382,10 +382,12 @@ recomputes it.
 | P7-5 | P2 | fixed | `check-provenance.ts` printed the wrong line number for any file with a block comment above the hit. |
 | P7-6 | P1 | fixed | Eleven defaulted-number sites across six public tabs, including a "Support" reference line drawn at y = 0 on a price chart. |
 | P7-7 | P2 | open | **`next build` does not run on this machine, by either bundler — a second blocker on Phase 7.0.** Needs a Vercel preview deploy or a local Node downgrade. |
+| P7-8 | P2 | fixed | The dead-code lens is now a rule (`check-dead-exports.ts`, ratcheted at 51). Its first run cleared itself because the allowlist named its own findings. |
+| P7-9 | P3 | open | 51 of `lib/`'s 282 exported values are referenced only by their own file. Measured and ratcheted; deleted module by module, not in one sweep. |
 
 ### The open list, by severity
 
-210 findings recorded · **159 fixed · 7 wontfix · 0 verified-ok · 44 open.**
+212 findings recorded · **160 fixed · 7 wontfix · 0 verified-ok · 45 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14.)_
 
@@ -410,9 +412,9 @@ move and step-number drift) · `P0-4` (timeout coverage, never re-measured) ·
 verification) · `P6-31` · `P6-65` **— Joel's weight decision** · `P6-85` **— Phase 7.0** ·
 `P7-7` **— `next build` runs on neither bundler here; the second blocker on Phase 7.0**.
 
-**P3 — 12.**
+**P3 — 13.**
 `S-5` · `S-7` · `S-13` **— Joel's Vercel action** · `S-16` · `S-17` · `P0-1` · `P0-6` ·
-`P1-13` · `P2-3` · `P4-1` · `P6-13` · `P6-87` **— Phase 7.0** · `E-8i`.
+`P1-13` · `P2-3` · `P4-1` · `P6-13` · `P6-87` **— Phase 7.0** · `E-8i` · `P7-9`.
 
 **Enhancements and unbuilt features — 16.**
 `E-1` · `E-2` · `E-3` · `E-4` · `P4-4` · `E-6` (+ `E-6b`, `E-6c`, `E-6d`) ·
@@ -421,8 +423,8 @@ verification) · `P6-31` · `P6-65` **— Joel's weight decision** · `P6-85` **
 **Closed on rationale rather than a change — 7.**
 `S-4` · `P0-7` · `P2-6` · `E-8b` · `E-8e` · `E-8f` · `P6-35`.
 
-**What this changes about "work the backlog by severity".** The real defect list is 28
-items, not the 210 the file's length suggests — and half the P1s on it are bookkeeping,
+**What this changes about "work the backlog by severity".** The real defect list is 29
+items, not the 212 the file's length suggests — and half the P1s on it are bookkeeping,
 not work. Nobody could see that before, which is the point of this section: closure was
 recorded in fourteen vocabularies, and the file's own summary line was still calling
 three items "remaining" (P6-29, S-11, S-14) that had each been fixed the day before.
@@ -1263,3 +1265,81 @@ plus 90 substitutions, several of which sit inside prose that reads differently
 depending on the number. That is a mechanical edit whose only real verification is
 looking at the rendered pages, and the browser pane in this sandbox cannot reach a dev
 server on the port in use. Scoped, measured, and left for a session that can render it.
+
+---
+
+## Phase 7.3 — which lenses can honestly become rules (2026-08-11)
+
+The step's own instruction: *"Convert a lens into a rule only where the rule can be
+honest. Where a lens cannot be mechanised, record that in the limits list rather than
+writing a rule that gives the appearance of coverage."* This is the determination, made
+lens by lens, with the reasoning kept so it does not have to be re-derived.
+
+**One lens became a rule. Seven are recorded as limits. That ratio is the finding.**
+
+### Became a rule
+
+**Dead code — `scripts/check-dead-exports.ts`, 4 assertions.** The highest-yield lens
+the audit had with no check behind it. **Three of the audit's P1s were dormant when
+found** — P6-72 (four `|| <const>` helpers bypassing P6-34 in a module nobody re-read),
+P6-81 (an uncalled second Fear & Greed counting one instrument three times), P7-4
+(`validateCCPICalculation` returning "valid" for a composite it could not compute). Rules
+1-19 all ask whether a label matches the code behind it; **an unreferenced function has
+no label and no user and passes every one of them.** P6-82 swept for this by hand and
+deleted four exports; a hand sweep rots in a release, which is the argument that produced
+`check-provenance.ts` in the first place.
+
+**It ships as a ratchet, not a zero, and that is the honest form here.** `lib/` currently
+holds **51 exported values referenced only by their own file**, out of 282 across 53
+modules. Turning the rule on as `dead.length === 0` would have meant deleting 51 exports
+in the commit that introduced it — an unreviewable sweep across 20 modules including the
+auth and spend-control paths. The usual alternative, an exception list, is a rule switched
+off. So the 51 are named, their count is asserted, **anything not on the list fails**, and
+removing one never fails. The debt can only shrink, and the rule states its size rather
+than implying `lib/` is clean.
+
+### Found while building it, and it is the P6-75 shape again
+
+**The first run reported `lib/` completely clean, and it was wrong.** The reference scan
+walks `scripts/`, and the allowlist names all 51 symbols as string literals — so every
+dead export was "referenced" by the list recording that it is unreferenced. The check
+found itself.
+
+> **A check whose scope is decided by content can be switched off by writing the right
+> content, including its own.** Rule 13 lost a file to a reworded `console.log`; this one
+> lost its entire finding set to its own allowlist. The only reason it surfaced on the
+> first run instead of passing quietly forever is a defensive NOTE line printing which
+> known-dead entries had "become referenced" — it printed all 51 at once, which is not a
+> shape real progress has.
+
+The rule now excludes its own file, and this is recorded rather than quietly fixed
+because the lesson generalises: **any check that names its own findings must exclude
+itself from its own scan.**
+
+### Recorded as limits, with the reason each cannot honestly be a rule
+
+| Lens | Why not a rule |
+|---|---|
+| Whether a number is right | Needs a reference value or a backtest. This is what CCPI Phase 3 is blocked on; no amount of source scanning substitutes. |
+| Whether a model's answer is true | Rule 2 proves a provider is reachable. P6-34 is the standing decision instead: AI estimates do not score. |
+| Composite internal redundancy | Needs someone to ask of each pair "can A ever disagree with B". All six composites were walked by hand (P6-67); four were defective. A rule would need to know which inputs are algebraically derivable from which, which is the analysis itself. |
+| Unsourced prose | P6-42 asserted that named people had traded stock and contained no matchable token. The JSX world-claim inventory (limit 3) is re-runnable but is a **procedure**, not a rule: its output is twenty candidates a person reads, nineteen of which were fine. |
+| Anything rendered from data | The rules scan source. Copy from Supabase, an LLM or a feed is invisible, and making it visible means asserting on live data — which is a health check, not a build check. |
+| Staleness beyond the pinned registry | Rule 10 pins eight claims to the decisions they depend on. Nothing forces a NEW decision-dependent claim to be registered, and nothing could without knowing which sentences depend on which decisions. **This remains the largest single gap** and its mitigation is procedural: every owner decision recorded in this file should ask what UI copy now depends on it. |
+| A value nobody renders but something structurally requires (**new, P3-18**) | Its four fabricated fields were displayed nowhere and reached the client only through a cache-validity predicate that required them to be numbers. Detecting "a field whose only consumer is a predicate written around its shape" is not a pattern; it is a reading. |
+| Mobile | Needs a rendered page on a real device. The Browser pane does not composite in this sandbox. |
+
+### The count, said plainly
+
+**Twenty rules now run** (19 provenance + the new dead-export set), and the honest
+summary from the Phase 6 synthesis is unchanged: they are a ratchet against regression,
+not a proof of correctness. **P6-81 would still pass all of them** — it was dead code
+inside a route file, and the new rule deliberately does not scope route files, because a
+route legitimately exports only its handlers and every internal helper would read as
+dead. The lens is wider than the rule. That gap is recorded here rather than closed by
+widening the rule until it produces noise nobody reads.
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| P7-8 | P2 | tooling | **The dead-code lens is now a rule, and it caught itself on the first run.** `scripts/check-dead-exports.ts` (4 assertions, `check:formulas` 507 → 511) walks `lib/` structurally, counts 282 exported values across 53 modules, and fails on any that no other file references. Ships as a ratchet against a named baseline of 51 rather than a zero, for the reason given above. **Its first run reported `lib/` clean because the allowlist names all 51 symbols and the scan walks `scripts/`** — the check referenced its own findings and cleared them. Excluded itself; verified by adding a deliberately dead export and watching it fail, then restoring from a scratchpad copy rather than `git checkout --` (P6-64). |
+| P7-9 | P3 | ops / lib | **51 of `lib/`'s 282 exported values are referenced only by their own file, and some are whole modules.** All four exports of `lib/ccpi/logger.ts`, both of `lib/ccpi/progress.ts`, five of six in `lib/ccpi/cache.ts`, three of `lib/serper-finance.ts` and two of `lib/sentiment-sources.ts` — the last being the module S-11 already deleted one dead scraper from. Measured, named and ratcheted by P7-8; **not deleted, deliberately.** Several sit on the auth (`getSession`, `isPasswordHashed`) and spend-control (`getDailyHardStop`, `getMonthlyHardStop`, `isBudgetGuardTrippedSync`) paths, where "nothing references it" and "nothing references it yet" need to be told apart one at a time before anything is removed. **OPEN**, to be burned down module by module as each is next touched. |

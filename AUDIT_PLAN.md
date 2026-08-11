@@ -240,7 +240,22 @@ rendered from data rather than written in source (limit 4), or the email/metadat
 **Expect the same five shapes, because the synthesis's causes are structural, not
 tab-specific.**
 
-**7.3 — Convert a lens into a rule only where the rule can be honest.**
+**7.3 — Convert a lens into a rule only where the rule can be honest. DONE 2026-08-11.**
+The determination is in `AUDIT_BACKLOG.md` → "Phase 7.3 — which lenses can honestly
+become rules", lens by lens with the reasoning kept. **One became a rule; seven are
+recorded as limits, and that ratio is the finding.** The rule is
+`scripts/check-dead-exports.ts` (4 assertions, `check:formulas` 507 → 511) — dead code
+was the highest-yield lens with no check behind it, since **three of the audit's P1s
+were dormant when found** (P6-72, P6-81, P7-4) and a provenance rule cannot see an
+unreferenced function because it makes no claim. It ships as a **ratchet against a named
+baseline of 51 unreferenced exports out of 282**, not a zero: turning it on clean would
+have meant deleting 51 exports across 20 modules including the auth and spend-control
+paths, and an exception list of 51 is a rule switched off. **Its first run reported
+`lib/` clean because the allowlist names all 51 symbols and the scan walks `scripts/` —
+the check cleared its own findings.** New standing rule from that: any check that names
+its own findings must exclude itself from its own scan.
+
+_Original statement of the step:_
 Thirteen provenance rules exist and P6-81 would pass all of them. Where a lens cannot be
 mechanised — composite redundancy, unsourced prose, staleness beyond the pinned-claim
 registry — **record that in the limits list rather than writing a rule that gives the

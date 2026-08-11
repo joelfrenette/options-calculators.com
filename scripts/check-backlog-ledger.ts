@@ -42,18 +42,18 @@ const BACKLOG = "AUDIT_BACKLOG.md"
  * findings set that quietly shrinks, fails loudly instead of passing quietly.
  * Update them deliberately in the same commit that changes the counts.
  */
-const EXPECTED_LEDGER_ROWS = 210
-const EXPECTED_OPEN = 44
-const EXPECTED_FIXED = 159
+const EXPECTED_LEDGER_ROWS = 212
+const EXPECTED_OPEN = 45
+const EXPECTED_FIXED = 160
 const EXPECTED_WONTFIX = 7
 const EXPECTED_VERIFIED_OK = 0
 
 /**
- * IDs reachable from a table's first cell. The remainder of the ledger (210 - 200)
+ * IDs reachable from a table's first cell. The remainder of the ledger (212 - 202)
  * is sub-items that exist only inside a parent row's prose — E-6a..E-6d, E-7a/b/d,
  * E-8a/c/d. Asserted so that findings cannot quietly stop being table rows.
  */
-const EXPECTED_TABLE_IDS = 200
+const EXPECTED_TABLE_IDS = 202
 
 /**
  * Table rows whose first cell is deliberately not a finding ID: they record a piece
@@ -139,16 +139,35 @@ for (let i = ledgerStart; i < ledgerEnd; i++) {
 const found = new Map<string, number>()
 const unnumbered: { cell: string; line: number }[] = []
 
-// The severity legend at the top of the file is a table whose first column holds
-// P0..P3, not finding IDs. Scope starts at the first section heading — structural,
-// so it cannot be switched off by an edit to the legend's wording.
-const firstHeading = lines.findIndex((l) => l.startsWith("## "))
+// A FINDINGS TABLE is one whose header row's first column is literally `ID`.
+// Everything else in this file — the severity legend, the 7.3 limits table, any
+// future comparison table — is prose in a grid and is skipped.
+//
+// This is deliberately a STRUCTURAL test (P6-75): the marker is the table's own
+// header cell, a position, not a keyword appearing somewhere nearby. Widening
+// the scan to every table instead was tried first and immediately produced eight
+// false "unnumbered finding" reports from a table of lenses — a check that cries
+// wolf on prose is a check somebody deletes.
+let inFindingsTable = false
 
-for (let i = firstHeading; i < lines.length; i++) {
+for (let i = 0; i < lines.length; i++) {
   if (i >= ledgerStart && i < ledgerEnd) continue
   const cell = firstCell(lines[i])
-  if (cell === null) continue
-  if (cell === "ID" || cell === "Sev" || cell === "#") continue
+  // A blank line does NOT end the table. Three Wave-3 findings (P6-24, P6-25,
+  // P6-26) are separated from their header by blank lines, which is sloppy
+  // markdown that renders fine and would otherwise have dropped three real
+  // findings out of scope — the exact failure this check exists to catch,
+  // committed by the check itself. Only real prose, or a new heading, ends it.
+  if (!lines[i].startsWith("|")) {
+    if (lines[i].trim() !== "") inFindingsTable = false
+    continue
+  }
+  if (cell === null) continue // separator row: leave the flag as it is
+  if (cell === "ID") {
+    inFindingsTable = true
+    continue
+  }
+  if (!inFindingsTable) continue
   const ids = cell.match(ID)
   if (!ids) {
     if (!NARRATIVE_ROWS.includes(cell)) unnumbered.push({ cell, line: i + 1 })
