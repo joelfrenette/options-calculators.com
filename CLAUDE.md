@@ -88,8 +88,17 @@ down from 12 to 11.
 
 **Count the PASS lines — do not trust the exit code alone.** The suites chain with
 `&&`, so a script that stops *running* is indistinguishable from one that passes, and
-this has cost the project a commit twice. Current baselines: **formulas 492**,
+this has cost the project a commit twice. Current baselines: **formulas 507**,
 contracts 61 routes / 61 contracts, remediation 31.
+
+**A finding's status lives in AUDIT_BACKLOG.md's §STATUS LEDGER and nowhere else.**
+Write the narrative in the finding row; write `open` / `fixed` / `wontfix` /
+`verified-ok` in the ledger. Do not add a summary line of what is still open — the file
+has had three of those and all three drifted, one of them still listing as "remaining"
+three items fixed the day before. `scripts/check-backlog-ledger.ts` fails the suite on a
+finding with no ledger row, a ledger row with no finding, an invented status word, or a
+row count that moved without the baseline moving with it. **It cannot tell whether a
+status is true** — `fixed` means the record says so, not that anyone re-read the code.
 
 ## Data-integrity house rules (from the 2026-08 audit — see AUDIT_PLAN.md, AUDIT_BACKLOG.md, FORMULAS.md)
 - Missing data is `null`, never 0 or an invented constant; UI renders "—"/"insufficient data".

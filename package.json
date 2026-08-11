@@ -8,7 +8,7 @@
     "check": "pnpm typecheck && pnpm check:formulas && pnpm check:contracts && pnpm check:remediation",
     "check:contracts": "node scripts/check-contract-coverage.ts",
     "check:remediation": "node scripts/check-remediation.ts",
-    "check:formulas": "node scripts/check-black-scholes.ts && node scripts/check-macd.ts && node scripts/check-indicators.ts && node scripts/check-ccpi-scoring.ts && node scripts/check-yoy.ts && node scripts/check-yield-curve.ts && node scripts/check-breadth-backtest.ts && node scripts/check-fomc-schedule.ts && node scripts/check-ccpi-canaries.ts && node scripts/check-drawdowns.ts && node scripts/check-lead-time.ts && node scripts/check-signals.ts && node scripts/check-allocation.ts && node scripts/check-provenance.ts && node scripts/ccpi-certainty-ceiling.ts && node scripts/check-ops-guards.ts && node scripts/site-inventory.ts --check",
+    "check:formulas": "node scripts/check-black-scholes.ts && node scripts/check-macd.ts && node scripts/check-indicators.ts && node scripts/check-ccpi-scoring.ts && node scripts/check-yoy.ts && node scripts/check-yield-curve.ts && node scripts/check-breadth-backtest.ts && node scripts/check-fomc-schedule.ts && node scripts/check-ccpi-canaries.ts && node scripts/check-drawdowns.ts && node scripts/check-lead-time.ts && node scripts/check-signals.ts && node scripts/check-allocation.ts && node scripts/check-provenance.ts && node scripts/ccpi-certainty-ceiling.ts && node scripts/check-ops-guards.ts && node scripts/check-backlog-ledger.ts && node scripts/site-inventory.ts --check",
     "inventory": "node scripts/site-inventory.ts",
     "lint": "eslint .",
     "start": "next start",

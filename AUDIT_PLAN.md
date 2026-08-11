@@ -191,7 +191,21 @@ which is not the same as the code that matters.** Then add the assertion P6-85 i
 and could not write: that `CCPI_THRESHOLDS` and `CCPI_ALLOCATION` still agree on their
 boundaries and level names.
 
-**7.1 — Reconcile the ledger before working from it.**
+**7.1 — Reconcile the ledger before working from it. DONE 2026-08-11.**
+`AUDIT_BACKLOG.md` §STATUS LEDGER is now the single place a status lives: 203 findings,
+**148 fixed · 7 wontfix · 0 verified-ok · 48 open**, of which the real defect list is 32
+(the rest are unbuilt enhancements). `scripts/check-backlog-ledger.ts` (15 assertions,
+`check:formulas` 492 → 507) enforces coverage in both directions, the four-word
+vocabulary, and the row and status counts. Four of the eight open P1s are Phase-3 rows
+that a later Phase-6 fix almost certainly closed and nobody re-marked — **confirm those
+before treating them as work.** Three findings the file's own summary line still called
+"remaining" (P6-29, S-11, S-14) had each been fixed the previous day; that line, and the
+two other competing summaries, are now pointers to the ledger. The unnumbered P1
+regression row from 2026-08-09 got an ID (P6-89) so a programmatic pass can see it.
+**The limit, recorded rather than left implicit: the check cannot tell whether a status
+is true.** `fixed` means the record says fixed. 7.4 confirms before acting.
+
+_Original statement of the step:_
 The backlog's closure markers are inconsistent — some rows say FIXED, some say CLOSED,
 some record the fix in prose, and some rows are reports rather than defects. **A
 programmatic pass over it currently cannot tell open from closed**, which means "work the
