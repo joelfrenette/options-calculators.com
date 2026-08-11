@@ -469,71 +469,49 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                 </div>
               </div>
 
+              {/* Was "Weekly Outlook & Options Trading Tips", and each CCPI band
+                  carried a list of options strategies under a "Recommended
+                  Strategies This Week" heading. Those lists are gone, per the same
+                  owner decision that removed the "Options Strategy Guide by CCPI
+                  Crash Risk Level" card in 19f4778: the CCPI is a market-wide
+                  crash index and has not demonstrated lead time, so it is not a
+                  basis for recommending trades. The low-risk list also named AAPL,
+                  MSFT and GOOGL as put candidates — the index reads nothing about
+                  any individual ticker — and quoted a "70% POP" nothing computes.
+                  "Weekly" went too: the index refreshes on ISR, not on a week.
+                  What survives is the regime sentence, every number in which is
+                  measured — the band, the active canary count, the indicator total
+                  and the certainty. */}
               <div className="p-4 bg-white rounded-lg border border-blue-200 shadow-sm">
                 <h5 className="font-semibold text-gray-800 flex items-center gap-2">
                   <TrendingDown className="h-4 w-4 text-primary" />
-                  Weekly Outlook & Options Trading Tips
+                  Current Regime
                 </h5>
                 <div className="space-y-2 text-sm text-gray-700">
                   {data.ccpi <= 39 ? (
-                    <>
-                      <p>
-                        <span className="font-semibold text-green-700">Regime: {data.regime.name}</span> - With{" "}
-                        {countActiveWarnings(data.canaries)} of {data.totalIndicators || 29} warning signals active and{" "}
-                        {data.certainty}% data quality, the market is in a {data.ccpi <= 19 ? "low-risk" : "normal"}{" "}
-                        state.
-                      </p>
-                      <div className="bg-green-50 p-3 rounded border border-green-200">
-                        {/* "This Week" claimed a weekly refresh of a fixed list,
-                            and the list named AAPL, MSFT and GOOGL as put
-                            candidates. The CCPI is a market-wide index — it reads
-                            nothing about any individual ticker, so naming three was
-                            invented specificity. "target 70% POP" was the same:
-                            a precise figure nothing computes. */}
-                        <p className="font-semibold text-green-800">What this regime generally favours:</p>
-                        <ul className="list-disc list-inside mt-1 text-green-700 space-y-1">
-                          <li>Premium selling is more forgiving here than in a stressed regime</li>
-                          <li>Defined-risk range trades suit a market that is not trending hard</li>
-                          <li>Covered calls if holding long equity positions</li>
-                          <li>Pullbacks are entries rather than warnings in this state</li>
-                        </ul>
-                      </div>
-                    </>
+                    <p>
+                      <span className="font-semibold text-green-700">Regime: {data.regime.name}</span> - With{" "}
+                      {countActiveWarnings(data.canaries)} of {data.totalIndicators || 29} warning signals active and{" "}
+                      {data.certainty}% data quality, the market is in a {data.ccpi <= 19 ? "low-risk" : "normal"}{" "}
+                      state.
+                    </p>
                   ) : data.ccpi <= 59 ? (
-                    <>
-                      <p>
-                        <span className="font-semibold text-yellow-700">Regime: {data.regime.name}</span> - With{" "}
-                        {countActiveWarnings(data.canaries)} of {data.totalIndicators || 29} warning signals active,
-                        elevated caution is warranted. Monitor for regime shift.
-                      </p>
-                      <div className="bg-yellow-50 p-3 rounded border border-yellow-200">
-                        <p className="font-semibold text-yellow-800">What this regime generally favours:</p>
-                        <ul className="list-disc list-inside mt-1 text-yellow-700 space-y-1">
-                          <li>Reduce position sizes by 25-50%</li>
-                          <li>Use defined-risk spreads only - no naked options</li>
-                          <li>Consider protective puts on core holdings</li>
-                          <li>Wait for VIX spikes to sell premium</li>
-                        </ul>
-                      </div>
-                    </>
+                    <p>
+                      <span className="font-semibold text-yellow-700">Regime: {data.regime.name}</span> - With{" "}
+                      {countActiveWarnings(data.canaries)} of {data.totalIndicators || 29} warning signals active,
+                      elevated caution is warranted. Monitor for regime shift.
+                    </p>
                   ) : (
-                    <>
-                      <p>
-                        <span className="font-semibold text-red-700">Regime: {data.regime.name}</span> - With{" "}
-                        {countActiveWarnings(data.canaries)} of {data.totalIndicators || 29} warning signals active and
-                        CCPI at {data.ccpi}, extreme caution required.
-                      </p>
-                      <div className="bg-red-50 p-3 rounded border border-red-200">
-                        <p className="font-semibold text-red-800">What this regime generally favours:</p>
-                        <ul className="list-disc list-inside mt-1 text-red-700 space-y-1">
-                          <li>Close or hedge existing short premium positions</li>
-                          <li>Consider long puts or put debit spreads for protection</li>
-                          <li>VIX calls as crash insurance if VIX under 20</li>
-                          <li>Preserve capital - cash is a valid position</li>
-                        </ul>
-                      </div>
-                    </>
+                    <p>
+                      <span className="font-semibold text-red-700">Regime: {data.regime.name}</span> - With{" "}
+                      {countActiveWarnings(data.canaries)} of {data.totalIndicators || 29} warning signals active and
+                      CCPI at {data.ccpi}, extreme caution required.
+                    </p>
                   )}
+                  <p className="text-xs text-gray-500">
+                    The index describes market conditions. It does not select trades — no strategy on this site is
+                    chosen from the CCPI band.
+                  </p>
                 </div>
               </div>
             </div>

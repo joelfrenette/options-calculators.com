@@ -233,7 +233,9 @@ export function RiskRewardCalculator() {
               <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm font-semibold text-blue-900 mb-1 flex items-center">
                   Trade Insight
-                  <InfoTooltip content="This is an AI-generated recommendation based on your trade's risk/reward profile compared to passive investing alternatives." />
+                  {/* Was "an AI-generated recommendation". The line below is a
+                      four-branch if/else on annualizedROI in this file. */}
+                  <InfoTooltip content="A fixed comparison against passive-investing benchmarks: your annualized ROI is placed against the 10% and 4% reference returns shown above. No model is involved — the wording changes only with the number you entered." />
                 </p>
                 <p className="text-sm text-blue-800">
                   {annualizedROI >= 15

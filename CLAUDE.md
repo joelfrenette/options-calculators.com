@@ -74,8 +74,13 @@ block present, menu present, first options specific to this turn.
 
 ## Verification before any commit
 Run `pnpm check:formulas && pnpm check:contracts` (typecheck via `pnpm typecheck`;
-~20 known errors remain, do not add new ones). Regenerate SITE_MAP.md with
+10 known errors remain, do not add new ones). Regenerate SITE_MAP.md with
 `pnpm inventory` when routes/components change.
+
+**Count the PASS lines — do not trust the exit code alone.** The suites chain with
+`&&`, so a script that stops *running* is indistinguishable from one that passes, and
+this has cost the project a commit twice. Current baselines: **formulas 436**,
+contracts 61 routes / 61 contracts, remediation 31.
 
 ## Data-integrity house rules (from the 2026-08 audit — see AUDIT_PLAN.md, AUDIT_BACKLOG.md, FORMULAS.md)
 - Missing data is `null`, never 0 or an invented constant; UI renders "—"/"insufficient data".
@@ -85,3 +90,9 @@ Run `pnpm check:formulas && pnpm check:contracts` (typecheck via `pnpm typecheck
 - Error responses use real HTTP error statuses — never 200 with an `{error}` body.
 - Allocation copy: positions are shares/LEAPS/options/cash only; diversification is
   expressed via sectors and indexes (e.g. GDX, XLU, SPY) — never separate asset classes.
+- **A label is a claim, and `scripts/check-provenance.ts` enforces it.** Do not write
+  "AI", "live", "implied", "this week" or a named methodology into UI copy unless the
+  code behind that component actually does it. Phase 6 found fourteen tabs where the
+  numbers were fine and the noun was false — including one asserting that named real
+  people had traded stock (P6-42). The check refuses handler-less controls, AI claims
+  with no reachable model, and market-implied wording while no futures feed is wired.

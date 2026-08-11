@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Info, TrendingUp, Activity } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 
 // Black-Scholes Greeks calculations
@@ -217,8 +216,11 @@ export function GreeksCalculator() {
                 <InfoTooltip content="Enter your option details here to calculate the Greeks. These are the 5 key inputs that determine an option's price and how it will behave as market conditions change." />
               </CardTitle>
               <div className="flex items-center gap-2">
+                {/* No Refresh control: every Greek here is computed from the five
+                    inputs below, so there is nothing to re-fetch. This was a fifth
+                    handler-less Refresh, missed by the P6-38 sweep and caught by
+                    scripts/check-provenance.ts on its first run. */}
                 <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
-                <RefreshButton onClick={() => {}} />
               </div>
             </div>
           </CardHeader>
