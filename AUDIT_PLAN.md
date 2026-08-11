@@ -172,7 +172,74 @@ to trust, not this sentence):
 Order: SCAN (Sell Put = template) → ANALYZE (CCPI first) → COPY → LEARN (payoff math + 2 calculators).
 
 ### Phase 7 — Backlog Burn-down & Regression Guard (ongoing)
-- Work `AUDIT_BACKLOG.md` by severity; keep CI green; monthly health review via Admin page.
+
+> Rewritten 2026-08-11 from two lines ("work the backlog by severity; keep CI green") after
+> Phase 6 produced fifty-one findings in a day. **Read `AUDIT_BACKLOG.md` → "PHASE 6
+> SYNTHESIS" first.** The ordering below is not arbitrary: each step exists because
+> Phase 6 demonstrated the cost of doing it later, and the first two steps unblock
+> everything after them.
+
+**7.0 — Make the unverifiable verifiable. Do this first.**
+Three modules cannot be loaded by any check script, and that constraint has been
+silently deciding what gets tested — `lib/ccpi/calculations.ts` and `lib/ccpi/constants.ts`
+(extensionless relative imports node's type-stripping cannot resolve, P6-85) and
+`lib/budget-guard.ts` (imports Supabase-touching modules, P6-87). The first two need
+`.ts` on two imports plus a `next build` to confirm the bundler accepts it; the third
+needs `readBudget` extracted into an import-free module. **Until this is done, every
+later step in this phase is writing checks for the code that happens to be reachable,
+which is not the same as the code that matters.** Then add the assertion P6-85 identified
+and could not write: that `CCPI_THRESHOLDS` and `CCPI_ALLOCATION` still agree on their
+boundaries and level names.
+
+**7.1 — Reconcile the ledger before working from it.**
+The backlog's closure markers are inconsistent — some rows say FIXED, some say CLOSED,
+some record the fix in prose, and some rows are reports rather than defects. **A
+programmatic pass over it currently cannot tell open from closed**, which means "work the
+backlog by severity" has no reliable input. Normalise the status vocabulary (the header
+already defines `open` / `fixed` / `wontfix` / `verified-ok`), then produce the open list.
+Do not skip to burn-down on the assumption the list is obvious: P6-66 shipped two
+contradicting rows for one finding, and P6-79 found a planning document 40% wrong about
+its own inventory.
+
+**7.2 — Point the two new lenses at what they have never touched.**
+Provenance ("does the label match the code behind it") and composite independence ("can
+input A ever disagree with input B") were applied for the first time on 2026-08-11 and
+**fourteen already-ticked tabs failed one or both**. They have now swept the public tabs,
+`lib/`, and the API routes. They have NOT swept: the admin surfaces (`/admin`, the health
+panel, the costs tab — which display numbers about the site's own operation), anything
+rendered from data rather than written in source (limit 4), or the email/metadata layer.
+**Expect the same five shapes, because the synthesis's causes are structural, not
+tab-specific.**
+
+**7.3 — Convert a lens into a rule only where the rule can be honest.**
+Thirteen provenance rules exist and P6-81 would pass all of them. Where a lens cannot be
+mechanised — composite redundancy, unsourced prose, staleness beyond the pinned-claim
+registry — **record that in the limits list rather than writing a rule that gives the
+appearance of coverage.** Any new check must derive its scope from structure, never from
+incidental content, and must assert the size of any file set it walks (P6-75, P6-77).
+
+**7.4 — Burn down by severity, P0 → P3, with the Phase 6 method.**
+In order of yield, as measured: follow a label to the code behind it; ask of each pair in
+a composite whether A can ever disagree with B; write an assertion for anything untested
+(this found a defect four times out of four this phase, rather than confirming absence);
+compare two numbers that should agree. **Do not sweep for `|| <const>`** — it found the
+early Phase 6 defects and missed every one of the fifty-one.
+
+**7.5 — Standing regression guard.**
+Keep `pnpm check` green; monthly health review via the Admin page. Re-run the doc-figure
+sweep whenever a weight table, a route count or a data path changes — the ceilings are
+pinned (`scripts/ccpi-certainty-ceiling.ts`) but prose figures elsewhere are not.
+
+**What Phase 7 must NOT do:**
+- **Do not "finish" CCPI Phase 3 by inventing weights.** §6b measured every free macro
+  series and none earned lead time. It unblocks on ~2 years of accumulated breadth or a
+  paid source with real history (§8a), not on effort.
+- **Do not mass un-tick SITE_MAP §6.** Every defect behind the fourteen stale ticks is
+  fixed and pinned; clearing marks would destroy real information to make a point the
+  ledger's standing note already makes.
+- **Do not treat the check suite as proof of correctness.** It is a ratchet against
+  regression. "We have a check for that" is the false assurance this audit exists to
+  remove.
 
 **Suggested execution:** Phases 0–2 in the first audit session; 3–4 next; 5 as its own build
 session; 6 fanned out (can parallelize with subagents per tab); 7 standing.
