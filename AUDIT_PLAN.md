@@ -155,6 +155,15 @@ Single admin view answering "what is the total health and cost of this site?"
   and the estimate-badge count currently shown to users.
 
 ### Phase 6 — Page-by-Page Sign-off (3–5 days, parallelizable)
+
+> **Before starting Phase 7, read `AUDIT_BACKLOG.md` → "PHASE 6 SYNTHESIS — how this
+> codebase fails".** Phase 6 produced fifty-one findings on 2026-08-11 alone, and they
+> reduce to five recurring shapes with different tells. The synthesis also records what
+> found them, what did NOT (grep sweeps for `|| <const>` missed every one of them), and
+> what the check suite deliberately does not cover. **A tick in §6 records the lenses
+> that existed when it was granted** — fourteen already-ticked tabs failed the
+> provenance and composite-independence lenses the first time those were applied.
+
 March through every tab with a fixed checklist; record sign-off in SITE_MAP.md §6,
 which lists them (42 as of 2026-08-11 — the ledger is generated, so it is the count
 to trust, not this sentence):

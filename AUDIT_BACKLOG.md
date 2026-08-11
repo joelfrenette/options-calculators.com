@@ -16,6 +16,114 @@
 **ID scheme:** `S-n` seeded from AUDIT_PLAN §6 · `P1-n` found in Phase 1 · `P2-n` found in Phase 2 · etc.
 
 **Status:** `open` · `fixed` (commit noted) · `wontfix` (rationale noted) · `verified-ok` (investigated, not a defect).
+---
+
+## PHASE 6 SYNTHESIS — how this codebase fails
+
+> Written 2026-08-11 after fifty-one findings landed in one day (P6-38…P6-88).
+> **Read this instead of the rows.** The rows record what was wrong; this records
+> what kept going wrong, which is the part that transfers to Phase 7.
+
+### The five shapes
+
+Every finding this phase is one of five, and naming them is worth more than the
+list, because each has a different tell:
+
+1. **A label naming a provenance the code does not have.** "AI Insights" over a
+   string literal; CME FedWatch over a rule-based tally; "SOURCE: Weekly AAII
+   survey" over a number derived from VIX. **Three separate tabs borrowed an
+   institution's name because the OUTPUT resembled that institution's output.
+   Nobody checked the input in any of the three.**
+2. **Invented data served as measured.** Fabricated Form 4 filings naming real
+   people; synthesized option premiums sorted alongside real quotes; three trade
+   setups returned at HTTP 200 under a comment admitting they were defaults.
+3. **A missing value rendered as neutral or reassuring.** Neutral-50 on a fear
+   scale; a `$0.00` price target; a proximity bar defaulting to the end its own
+   legend labels "Safe". **This one appears at every layer** — route, response
+   and component — and the component side had never been swept at all.
+4. **A composite counting one input twice.** `aaii = investorIntelligence × 0.9`,
+   both scored; NYSE highs/lows synthesized from the SPY momentum that is
+   already indicator 1; price stability that was beta restated.
+5. **A control that accepts input and does nothing.** Five Refresh buttons, two
+   sliders bound to withheld values.
+
+### What actually causes them
+
+- **Every composite defect arose from a fallback, never from a decision to
+  double-count.** A source could not supply a number, someone derived it from a
+  number they had, gave it the missing thing's name, and the average then treated
+  the derivation as evidence. **A proxy is a labelling problem right up until it
+  enters an average, at which point it becomes an arithmetic one.**
+- **A decision enforced in one module is not enforced.** P6-34 stopped AI
+  estimates scoring — in `unified-ai-fallback.ts`. The identical pattern sat in
+  `grok-market-data.ts` untouched, and two scrapers self-reported `status:
+  "live"` for LLM answers, walking around the decision entirely on a 55-point
+  input. The same shape appeared with a default encryption key that two hardening
+  passes had routed *around* rather than removed.
+- **Dead code is where defects wait.** Three of this phase's P1s were dormant:
+  a second Fear & Greed implementation counting VIX three times, AI helpers
+  ending `return value || 30`, a hardcoded credential. **Dead code makes no
+  claims, so no check can see it.**
+- **The record drifts as readily as the code.** An erased sign-off ledger, two
+  contradicting rows for one finding, a breadth trough dated from expectation
+  rather than a query, a plan document 40% wrong on its own inventory, and a
+  generator that silently dropped the flagship tab. **A document is a claim until
+  something recomputes it.**
+
+### What finds them
+
+In rough order of yield this phase:
+
+1. **Following a label to the code behind it.** Found P6-42, P6-45, P6-58 and
+   P6-72. The prose is a pointer, not the defect — the fabrication is usually a
+   layer down.
+2. **Asking of each pair in a composite: can A ever disagree with B?** If
+   `B = f(A)` and f is monotonic, B carries no information. Four composites
+   failed this; two passed.
+3. **Writing an assertion for something untested.** Four times this phase the
+   test found a defect rather than confirming its absence — an untested live
+   function, an accuracy claim half an order of magnitude optimistic, and a
+   blank env var that set the spend hard-stop to $0.
+4. **Comparing two numbers that should agree.** A doc sweep noticing "41 tabs"
+   where it had read 42 is what exposed the dropped ledger row.
+
+### What does not find them
+
+- **Grep sweeps for `|| <const>`.** They found the early phase-6 defects and
+  **missed every single one from this phase**: the numbers were fine, the nouns
+  were false, and the constants that remained were `let x = 150` assignments the
+  pattern never matched.
+- **Reading code for correctness.** P6-21 established it and this phase
+  confirmed it: a sign convention, a boundary or a redundancy is not reviewable
+  by reading. It needs a test with real numbers in it.
+- **The checks alone.** Thirteen provenance rules now exist and **P6-81 would
+  pass all of them.**
+
+### The checks, and what they deliberately do not cover
+
+`scripts/check-provenance.ts` (13 rules), `ccpi-certainty-ceiling.ts`,
+`check-ops-guards.ts` and `site-inventory.ts --check` are a ratchet against
+regression, not a proof of correctness. Their blind spots are listed in
+*"What check-provenance.ts cannot see"* below and should be read with them.
+Two are worth repeating here:
+
+- **A check that stops COVERING is as invisible as one that stops running.**
+  Rule 13's scope was once a keyword scan; rewording a `console.log` removed the
+  only token putting a file in scope, and the suite went on passing with the
+  count silently down from 12 to 11. Scope must come from structure — imports,
+  call sites — never from incidental prose, and any check deriving a file set
+  should assert that set's size.
+- **"We have a check for that" is the false assurance this audit exists to
+  remove.** Where a check has a known gap, the gap is recorded beside it.
+
+### Three modules cannot be tested at all
+
+`lib/ccpi/calculations.ts` and `lib/ccpi/constants.ts` (extensionless relative
+imports node's type-stripping cannot resolve), and `lib/budget-guard.ts` (imports
+Supabase-touching modules). The first two need one character per import plus a
+`next build` to confirm; the third needs a small extraction. **This constraint
+silently decides what can be verified**, which is a strange thing for a project
+with 492 assertions to leave undecided. One decision, next session.
 
 ---
 
