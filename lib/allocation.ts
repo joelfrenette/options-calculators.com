@@ -72,7 +72,7 @@ export interface AllocationScale {
 }
 
 /** Crash risk: 0 is calm, 100 is crash watch. Cash rises with risk. */
-export const CCPI_ALLOCATION_BANDS: readonly AllocationBand[] = [
+const CCPI_ALLOCATION_BANDS: readonly AllocationBand[] = [
   {
     range: "0-19",
     min: 0,
@@ -122,7 +122,7 @@ export const CCPI_ALLOCATION: AllocationScale = {
 }
 
 /** Fear and greed: 0 is extreme fear, 100 is extreme greed. Cash rises with greed. */
-export const SENTIMENT_ALLOCATION_BANDS: readonly AllocationBand[] = [
+const SENTIMENT_ALLOCATION_BANDS: readonly AllocationBand[] = [
   {
     range: "0-24",
     min: 0,
@@ -187,7 +187,7 @@ export const SENTIMENT_ALLOCATION: AllocationScale = {
  * more than three unstated ones — but it is a change, so it is written down
  * rather than discovered later.
  */
-export const PANIC_EUPHORIA_ALLOCATION_BANDS: readonly AllocationBand[] = [
+const PANIC_EUPHORIA_ALLOCATION_BANDS: readonly AllocationBand[] = [
   {
     range: "−1.00 to −0.45",
     min: -1,

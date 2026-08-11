@@ -157,7 +157,7 @@ export async function createSession() {
   return token
 }
 
-export async function getSession() {
+async function getSession() {
   return (await cookies()).get(COOKIE_NAME)?.value
 }
 

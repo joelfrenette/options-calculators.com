@@ -104,7 +104,7 @@ export interface BacktestResult {
   scoringGate: string
 }
 
-export const SURVIVORSHIP_WARNING =
+const SURVIVORSHIP_WARNING =
   "The breadth universe is a 2026 membership list. Applied to an episode before that date it measures only the constituents that survived to 2026 — the ones that fell hardest are missing — so any lead time it reports is biased and must not be used as evidence for scoring weight."
 
 const SCORING_GATE =

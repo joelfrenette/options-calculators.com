@@ -108,7 +108,7 @@ export function loadSummaryFromCache(): string | null {
 /**
  * Checks if cached data is fresh (within specified minutes)
  */
-export function isCacheFresh(cachedAt: string | undefined, maxAgeMinutes = 5): boolean {
+function isCacheFresh(cachedAt: string | undefined, maxAgeMinutes = 5): boolean {
   if (!cachedAt) return false
 
   const cacheTime = new Date(cachedAt).getTime()

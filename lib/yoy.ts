@@ -13,7 +13,7 @@ export interface SeriesTrend {
 }
 
 /** Shift a YYYY-MM-01 monthly key back n months, staying on the first. */
-export function monthsBack(day: string, n: number): string {
+function monthsBack(day: string, n: number): string {
   const [y, m] = day.split("-").map(Number)
   const d = new Date(Date.UTC(y, m - 1 - n, 1))
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-01`

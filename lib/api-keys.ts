@@ -140,7 +140,7 @@ export function clearBudgetKillSnapshot(): void {
  * a successful refresh says otherwise, because staying off is the safe
  * direction for a spend control.
  */
-export function isBudgetKilled(name: string): boolean {
+function isBudgetKilled(name: string): boolean {
   if (budgetSnapshot === null || !budgetSnapshot.tripped) return false
   return budgetSnapshot.guardedKeys.includes(name.toUpperCase())
 }
@@ -174,13 +174,13 @@ export function getKeyOverrideSnapshot(): KeyOverrideSnapshot | null {
 }
 
 /** The admin-set value for a key, or "" when there isn't one. */
-export function getKeyOverride(name: string): string {
+function getKeyOverride(name: string): string {
   if (overrideSnapshot === null) return ""
   return overrideSnapshot.values[name.toUpperCase()] ?? ""
 }
 
 /** Is this key currently supplied by an admin override rather than the env? */
-export function isOverridden(name: string): boolean {
+function isOverridden(name: string): boolean {
   return getKeyOverride(name).length > 0
 }
 
@@ -236,7 +236,7 @@ export function getApiKey(keyName: string): string {
 }
 
 // Is a given service configured (any alias present)? Respects the kill switch.
-export function isKeyConfigured(name: string): boolean {
+function isKeyConfigured(name: string): boolean {
   return resolveApiKey(name).length > 0
 }
 

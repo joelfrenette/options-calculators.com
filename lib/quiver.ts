@@ -29,7 +29,7 @@ import { meteredFetch } from "@/lib/metered-fetch"
  * wikipedia) and is deliberately absent — an endpoint we cannot call has no
  * business being reachable from application code.
  */
-export const QUIVER_DATASETS = {
+const QUIVER_DATASETS = {
   congresstrading: "https://api.quiverquant.com/beta/live/congresstrading",
   offexchange: "https://api.quiverquant.com/beta/live/offexchange",
   govcontracts: "https://api.quiverquant.com/beta/live/govcontractsall",

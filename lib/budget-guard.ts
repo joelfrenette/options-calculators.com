@@ -65,11 +65,11 @@ function readBudget(envName: string, fallback: number): number {
   return Number.isFinite(n) && n >= 0 ? n : fallback
 }
 
-export function getDailyHardStop(): number {
+function getDailyHardStop(): number {
   return readBudget("DAILY_BUDGET_HARD_STOP", DEFAULT_DAILY_HARD_STOP)
 }
 
-export function getMonthlyHardStop(): number {
+function getMonthlyHardStop(): number {
   return readBudget("MONTHLY_BUDGET_HARD_STOP", DEFAULT_MONTHLY_HARD_STOP)
 }
 
@@ -151,12 +151,12 @@ interface SpendRow {
 // --------------------------------------------------------------- utilities
 
 /** UTC day string (YYYY-MM-DD) — must match the view's date_trunc bucket. */
-export function utcDay(now = new Date()): string {
+function utcDay(now = new Date()): string {
   return now.toISOString().slice(0, 10)
 }
 
 /** UTC month string (YYYY-MM). */
-export function utcMonth(now = new Date()): string {
+function utcMonth(now = new Date()): string {
   return now.toISOString().slice(0, 7)
 }
 

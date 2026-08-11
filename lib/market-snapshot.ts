@@ -30,10 +30,10 @@ import { computeTermStructure } from "@/lib/vix-term"
  * ^SPX is deliberately absent: Polygon's grouped stock endpoint carries no
  * indices, so that symbol stays on its live fetch.
  */
-export const CHART_TICKERS = ["SPY", "QQQ"] as const
+const CHART_TICKERS = ["SPY", "QQQ"] as const
 
 /** Every ticker whose daily close the snapshot stores. */
-export const STORED_TICKERS: string[] = [...BREADTH_UNIVERSE, ...CHART_TICKERS]
+const STORED_TICKERS: string[] = [...BREADTH_UNIVERSE, ...CHART_TICKERS]
 
 // Every FRED series consumed anywhere on the site (ccpi, fomc-predictions,
 // cpi-inflation, jobs-report, macro-indicators, panic-euphoria, vix term
@@ -357,7 +357,7 @@ export async function computeBreadth(): Promise<BreadthResult> {
 }
 
 /** Series key for the stored VIX3M / spot-VIX ratio. */
-export const VIX_TERM_SERIES = "calc:vix_term_structure"
+const VIX_TERM_SERIES = "calc:vix_term_structure"
 
 export interface VixTermResult {
   ok: boolean
@@ -377,7 +377,7 @@ export interface VixTermResult {
  * VIX3M (or the reverse) manufactures a ratio move out of a data gap, and this
  * ratio crossing 1 is the backwardation signal.
  */
-export async function computeVixTermStructure(): Promise<VixTermResult> {
+async function computeVixTermStructure(): Promise<VixTermResult> {
   const [spotRows, vix3mRows] = await Promise.all([
     getSeriesHistory("fred:VIXCLS", 10),
     getSeriesHistory("fred:VXVCLS", 10),

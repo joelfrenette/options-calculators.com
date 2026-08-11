@@ -143,7 +143,7 @@ function writeCachedEstimate(key: string, value: number, source: AiSource): void
   }
 }
 
-export async function fetchWithAIFallback(
+async function fetchWithAIFallback(
   indicatorName: string,
   grokFunc: () => Promise<number | null>,
   groqLLMFunc: () => Promise<number | null>,

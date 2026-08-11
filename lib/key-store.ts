@@ -204,7 +204,7 @@ export async function ensureKeyOverridesFresh(): Promise<void> {
 }
 
 /** Force the next read to hit Supabase. Called after any write. */
-export async function reloadKeyOverrides(): Promise<void> {
+async function reloadKeyOverrides(): Promise<void> {
   inFlight = null
   await refresh()
 }

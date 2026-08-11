@@ -32,11 +32,11 @@ function readPositiveInt(envName: string, fallback: number): number {
   return Number.isInteger(raw) && raw > 0 ? raw : fallback
 }
 
-export function getMaxFailures(): number {
+function getMaxFailures(): number {
   return readPositiveInt("LOGIN_MAX_FAILURES", MAX_FAILURES)
 }
 
-export function getWindowMinutes(): number {
+function getWindowMinutes(): number {
   return readPositiveInt("LOGIN_WINDOW_MINUTES", WINDOW_MINUTES)
 }
 

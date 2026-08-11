@@ -383,7 +383,7 @@ recomputes it.
 | P7-6 | P1 | fixed | Eleven defaulted-number sites across six public tabs, including a "Support" reference line drawn at y = 0 on a price chart. |
 | P7-7 | P2 | open | **`next build` does not run on this machine, by either bundler — a second blocker on Phase 7.0.** Needs a Vercel preview deploy or a local Node downgrade. |
 | P7-8 | P2 | fixed | The dead-code lens is now a rule (`check-dead-exports.ts`, ratcheted at 51). Its first run cleared itself because the allowlist named its own findings. |
-| P7-9 | P3 | open | 51 of `lib/`'s 282 exported values are referenced only by their own file. Measured and ratcheted; deleted module by module, not in one sweep. |
+| P7-9 | P3 | open | **51 → 17.** Nine deleted, 24 un-exported (used internally; typecheck confirms no importer). `lib/` now 251 exports across 52 files. The 17 left need a decision each — three on security or spend-control code. |
 | P7-10 | P2 | open | `nvidiaMomentum ?? 50` — a neutral-50 on a scored 0-100 momentum input. Excluded from scoring by its baseline tier; the display side is unverified. |
 
 ### The open list, by severity
@@ -1444,3 +1444,36 @@ analysis or a number that could be read as a reading.
 routing, auth, body parsing, input validation, the budget guard, key resolution and the
 response envelope are covered. **Whether a provider answers is not.** `/api/ai-status`
 covers reachability; P6-34 is the standing decision on what a model's answer is worth.
+
+---
+
+## Phase 7.4 (seventh pass) — the dead-export list, 41 → 17 (2026-08-11)
+
+**The 41 split cleanly in two, and the split is what made the work safe.** For each
+symbol, count its occurrences inside its own file: more than one means it is used
+internally and the `export` keyword is the only thing that is wrong; exactly one means
+the declaration is the sole occurrence and the code itself is dead.
+
+- **24 used internally — `export` removed, code kept.** The change is one keyword per
+  symbol and **`pnpm typecheck` is the proof**: if anything had imported them the build
+  would fail immediately, and it did not. This is the right move on the paths that
+  needed care — `getSession`, `isKeyConfigured`, `getDailyHardStop`,
+  `getMonthlyHardStop`, `isBudgetKilled` are all live logic that was merely wearing a
+  public surface it did not have callers for.
+- **17 with no use at all — left for a deliberate pass.** Deleting these removes
+  behaviour, not a keyword, and three sit on security or spend-control code
+  (`isPasswordHashed`, `isBudgetGuardTrippedSync`, `providerToKey`). They are named in
+  the ledger row below so the judgement is a list to work through rather than a sweep.
+
+`lib/` is now **251 exported values across 52 files**, down from 282 across 53. The
+ratchet baseline moves 41 → 17 with it.
+
+**The distinction is worth keeping as a rule.** "Unused export" is two different
+findings wearing one name: **a false public surface**, which is a keyword and a
+typecheck away from fixed, and **dead code**, which needs someone to decide whether the
+behaviour should exist. Treating them as one list is why P6-82's hand sweep deleted only
+four and stopped — the easy 24 were sitting behind the hard 17.
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| P7-9 | P3 | ops / lib | **41 → 17.** Twenty-four exports un-exported (used internally; typecheck confirms no importer), nine deleted earlier in the phase. **The 17 that remain need a decision each, not a sweep:** `streamWithFallback`, `getProviderStatus`, `recordApiUsage`, `getServiceUsage`, `isPasswordHashed`, `providerToKey`, `isBudgetGuardTrippedSync`, `clearCCPICache`, `loadHistoryFromCache`, `saveSummaryToCache`, `loadSummaryFromCache`, `getBarColor`, `getRegimeColor`, `getIndicatorStatus`, `isQuiverConfigured`, `getTwitterSentiment`, `getFinnhubNewsSentiment`. Note `recordApiUsage` is A-13's finding — the function whose absence of callers made the admin Costs tab read a permanent 0 — and the three `lib/ccpi/calculations.ts` colour helpers sit in a module no check script can load (P6-85). **OPEN.** |
