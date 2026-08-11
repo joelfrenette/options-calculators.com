@@ -89,7 +89,7 @@ down from 12 to 11.
 **Count the PASS lines — do not trust the exit code alone.** The suites chain with
 `&&`, so a script that stops *running* is indistinguishable from one that passes, and
 this has cost the project a commit twice. Current baselines: **formulas 514**,
-contracts 61 routes / 61 contracts, remediation 31.
+contracts 60 routes / 60 contracts, remediation 31.
 
 **A finding's status lives in AUDIT_BACKLOG.md's §STATUS LEDGER and nowhere else.**
 Write the narrative in the finding row; write `open` / `fixed` / `wontfix` /

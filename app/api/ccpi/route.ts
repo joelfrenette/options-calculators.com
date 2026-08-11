@@ -291,18 +291,11 @@ export async function GET() {
       cachedAt: new Date().toISOString(),
     }
 
-    try {
-      await fetch(new URL("/api/ccpi/cache", process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // Was `JSON.JSON.stringify` — a TypeError swallowed by the catch below,
-        // so the cache was never populated through this path (AUDIT_BACKLOG P3-x).
-        body: JSON.stringify(response),
-      })
-    } catch (cacheError) {
-      console.warn("[v0] Failed to cache CCPI data:", cacheError)
-      // Don't fail the request if caching fails
-    }
+    // P2-2. This route used to POST its own response to /api/ccpi/cache — a
+    // server-side fetch from a route back into the same deployment, to write a
+    // module-level variable that the next invocation would not see. On Vercel
+    // each request may get a fresh isolate, so the write was usually invisible
+    // and always cost a round trip. The route and the self-fetch are both gone.
 
     console.log("[v0] CCPI GET: Returning response...")
     return NextResponse.json(response)

@@ -214,7 +214,7 @@ recomputes it.
 | P1-13 | P3 | fixed | **Verified 2026-08-11**, which is what the row asked for. Two of the four constants were deleted by P3-19; the survivors are per-series tiered (P6-6), baseline-excluded (P3-12), and the dashboard renders per-pillar provenance. Surfaced P7-10 on the way. |
 | P1-14 | P3 | fixed | **Closed 2026-08-11.** The ~40 commented-out `Math.random()` lines and the header claiming "we generate realistic mock historical data" are gone; the file now says why the history is empty. A comment is a claim about the code, and that one described an honest empty response as a mock generator waiting to be switched on. |
 | P2-1 | P1 | fixed | The three routes return 502 on upstream failure. |
-| P2-2 | P2 | open | `/api/ccpi/cache` is still a module-level mutable variable. |
+| P2-2 | P2 | fixed | **Route deleted 2026-08-11**, with three writers and one reader. It cost a self-fetch per request to write a module-level variable the next isolate could not read. Routes 61 → 60. |
 | P2-3 | P3 | open | Triage done, verdicts partly executed — see P0-1 for what survives. |
 | P2-4 | P2 | open | 16 routes still have no automated verification; the `?dryRun=1` the row proposes was never built. |
 | P2-5 | P3 | fixed | `scripts/check-contract-coverage.ts` fails the build on drift and runs in `check:contracts`. |
@@ -388,7 +388,7 @@ recomputes it.
 
 ### The open list, by severity
 
-213 findings recorded · **164 fixed · 7 wontfix · 0 verified-ok · 42 open.**
+213 findings recorded · **165 fixed · 7 wontfix · 0 verified-ok · 41 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14.)_
 
@@ -406,9 +406,9 @@ _(`P3-15`, `P3-17` and `P3-18` were confirmed and closed on 2026-08-11 — see b
 `P5-1` closed with Phase 7.2. The prediction that "three of the four are probably
 already done" was **wrong on two of them**, which is the point of confirming.)_
 
-**P2 — 8.**
+**P2 — 7.**
 `S-18` (the scanner's hidden gates, estimate badges, expected
-move and step-number drift) · `P2-2` (the CCPI cache that does not cache) · `P2-4` (16 routes with no automated
+move and step-number drift) · `P2-4` (16 routes with no automated
 verification) · `P6-31` · `P6-65` **— Joel's weight decision** · `P6-85` **— Phase 7.0** ·
 `P7-7` **— `next build` runs on neither bundler here; the second blocker on Phase 7.0** ·
 `P7-10`.
@@ -424,7 +424,7 @@ verification) · `P6-31` · `P6-65` **— Joel's weight decision** · `P6-85` **
 **Closed on rationale rather than a change — 7.**
 `S-4` · `P0-7` · `P2-6` · `E-8b` · `E-8e` · `E-8f` · `P6-35`.
 
-**What this changes about "work the backlog by severity".** The real defect list is 26
+**What this changes about "work the backlog by severity".** The real defect list is 25
 items, not the 213 the file's length suggests — and half the P1s on it are bookkeeping,
 not work. Nobody could see that before, which is the point of this section: closure was
 recorded in fourteen vocabularies, and the file's own summary line was still calling
@@ -1401,3 +1401,24 @@ reason. The note added to the README is the point worth keeping:
 > hides the ones that are not.** `scripts/check-dead-exports.ts` cannot see past one
 > either — `export * from "./x"` names no symbols, so it neither creates nor resolves a
 > reference.
+
+---
+
+## Phase 7.4 (fifth pass) — P2-2, the cache that cost a round trip to not cache (2026-08-11)
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| P2-2 | P2 | ANALYZE → CCPI | **`/api/ccpi/cache` deleted.** It held `let cachedCCPIData` at module scope, so on Vercel the isolate that wrote it is usually not the isolate that reads it. The row said "the cache mostly does not cache"; what re-reading it added is that **the misses were not free.** Three writers and one reader all paid for the illusion: `/api/ccpi` POSTed **its own response back into its own deployment** over HTTP on every request; the dashboard POSTed the same payload again from the browser; `lib/ccpi/api.ts` fired a third write whose `.catch` swallowed every failure — which is precisely why nobody noticed; and `/api/data-source-status` GET it first "because it is cheap", then fell through to `/api/ccpi` anyway. The common path was a wasted round trip followed by the real work. **FIXED (staging):** route, contract, `KNOWN_ROUTES` entry, both server writes, the browser write and the dead `cacheCCPIToServer` all removed. `data-source-status` now reads the live route, which was always the real implementation. **Client-side caching is untouched** — `saveCCPIToCache` uses localStorage and genuinely persists. Routes 61 → 60. |
+
+**Supabase was the row's other option and was not taken.** It would work, but it needs a
+migration, and migrations on this project are applied to production on the owner's
+explicit instruction (see the 0009/0010 row). Deleting a cache that does not cache needs
+no permission and removes three writes and a self-fetch; adding a table that does cache
+is a build with an owner in the loop. If per-request CCPI cost becomes the problem, the
+store already exists for it — `market_series` and the E-7 pattern — and this is the row
+to reopen.
+
+**`check-route-timeouts.ts` failed on the deletion, one commit after being written.**
+It asserts the route count, so 61 → 60 broke it exactly as intended. That is the
+P6-77 rule earning itself: had it merely *printed* the count, the suite would have gone
+green over a route set that had silently changed size.

@@ -259,18 +259,16 @@ interface CcpiPayload {
   timestamp?: string
 }
 
-/** Try the in-process CCPI cache first (cheap), then the live route. */
+/**
+ * Read the live CCPI route.
+ *
+ * P2-2. This used to try `/api/ccpi/cache` first "because it is cheap". It was
+ * not cheap and it was not a cache: the route held a module-level variable, and
+ * on Vercel the instance that wrote it is usually not the instance that reads
+ * it, so the common path was a wasted round trip followed by this one anyway.
+ * The route is deleted; the fallback was always the real implementation.
+ */
 async function loadCcpi(origin: string): Promise<{ payload: CcpiPayload; from: string } | null> {
-  try {
-    const cached = await fetchWithTimeout(new URL("/api/ccpi/cache", origin), { cache: "no-store" })
-    if (cached.ok) {
-      const json = (await cached.json()) as CcpiPayload & { cached?: boolean }
-      if (json?.provenance) return { payload: json, from: "/api/ccpi/cache" }
-    }
-  } catch {
-    // fall through to the live route
-  }
-
   try {
     const res = await fetchWithTimeout(new URL("/api/ccpi", origin), { cache: "no-store" })
     // /api/ccpi answers 503 with a provenance block when every pillar is

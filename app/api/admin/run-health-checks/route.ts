@@ -374,7 +374,7 @@ function contractCoverage() {
     "/api/ai-status", "/api/apify-proxy", "/api/ccpi-signals",
     "/api/auth/login", "/api/auth/logout", "/api/auth/reset-password",
     "/api/breadth", "/api/ccpi",
-    "/api/ccpi/cache", "/api/ccpi/chat", "/api/ccpi/executive-summary", "/api/ccpi/history",
+    "/api/ccpi/chat", "/api/ccpi/executive-summary", "/api/ccpi/history",
     "/api/breadth-backtest", "/api/congress-trades", "/api/cpi-inflation", "/api/cron/breadth", "/api/cron/budget-guard", "/api/cron/fred-snapshot", "/api/cron/market-snapshot", "/api/cron/quiver-probe",
     "/api/data-source-status",
     "/api/earnings-calendar", "/api/earnings-calendar/insights", "/api/federal-money",

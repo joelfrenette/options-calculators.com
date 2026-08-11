@@ -87,15 +87,6 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     tabs: ["ccpi"],
   },
   {
-    path: "/api/ccpi/cache",
-    method: "GET",
-    schema: anyObject,
-    // 404 `{cached:false}` is this route's cache-miss signal, not a failure.
-    okStatuses: [404],
-    budgetMs: 2000,
-    tabs: ["ccpi"],
-  },
-  {
     path: "/api/ccpi/executive-summary",
     method: "POST",
     skip: "Spends an LLM call on every probe. Covered by /api/ai-status instead.",

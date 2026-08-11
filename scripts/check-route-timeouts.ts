@@ -38,7 +38,7 @@ const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..")
 const rel = (p: string) => relative(ROOT, p).split(sep).join("/")
 
 /** Asserted, not printed. Update deliberately when the route set really changes. */
-const EXPECTED_ROUTES = 61
+const EXPECTED_ROUTES = 60
 const MIN_OUTBOUND_ROUTES = 30
 
 let failures = 0

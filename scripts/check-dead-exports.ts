@@ -197,7 +197,6 @@ const KNOWN_DEAD: ReadonlySet<string> = new Set([
   "lib/budget-guard.ts:utcDay",
   "lib/budget-guard.ts:utcMonth",
   "lib/budget-guard.ts:isBudgetGuardTrippedSync",
-  "lib/ccpi/api.ts:cacheCCPIToServer",
   "lib/ccpi/cache.ts:clearCCPICache",
   "lib/ccpi/cache.ts:loadHistoryFromCache",
   "lib/ccpi/cache.ts:saveSummaryToCache",
@@ -221,7 +220,7 @@ const KNOWN_DEAD: ReadonlySet<string> = new Set([
   "lib/yoy.ts:monthsBack",
 ])
 
-const KNOWN_DEAD_BASELINE = 42
+const KNOWN_DEAD_BASELINE = 41
 
 check(
   `the known-dead list still holds ${KNOWN_DEAD_BASELINE} entries`,

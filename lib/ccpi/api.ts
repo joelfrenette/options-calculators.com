@@ -49,20 +49,9 @@ export async function fetchExecutiveSummary(ccpiData: CCPIData): Promise<string>
   return result.summary
 }
 
-/**
- * Caches CCPI data to the server
- */
-export async function cacheCCPIToServer(data: CCPIData): Promise<void> {
-  const response = await fetch("/api/ccpi/cache", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  })
-
-  if (!response.ok) {
-    throw new Error(`Failed to cache CCPI data: ${response.status}`)
-  }
-}
+// P2-2 / P7-9. `cacheCCPIToServer` deleted here: it POSTed to /api/ccpi/cache,
+// which is gone, and nothing outside this file called it anyway — it was already
+// on the dead-export list before the route was removed.
 
 /**
  * Comprehensive CCPI data refresh
@@ -81,10 +70,10 @@ export async function refreshCCPIData(): Promise<{
     timestamp: new Date().toISOString(),
   }
 
-  // Cache to server (non-blocking)
-  cacheCCPIToServer(dataWithTimestamp).catch((error) => {
-    console.error("[v0] Failed to cache CCPI data to server:", error)
-  })
+  // P2-2. The non-blocking `cacheCCPIToServer(...)` call was here. It wrote to a
+  // module-level variable on whichever serverless instance answered, so the next
+  // request usually could not read it back — and its `.catch` swallowed the
+  // failure, which is why nobody noticed the cache mostly did not cache.
 
   // Fetch executive summary (can fail gracefully)
   let summary: string | null = null

@@ -149,15 +149,11 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
       saveCCPIToCache(cachedData)
       setCacheTimestamp(cachedData.timestamp)
 
-      try {
-        await fetch("/api/ccpi/cache", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(cachedData),
-        })
-      } catch (cacheError) {
-        console.error("[v0] Failed to cache CCPI data:", cacheError)
-      }
+      // P2-2. The POST to /api/ccpi/cache is gone with the route. It wrote a
+      // module-level variable on whichever serverless instance answered, and the
+      // next request would probably not reach that instance. Client-side caching
+      // is unaffected — that is `saveCCPIToCache` above, which uses localStorage
+      // and actually persists.
 
       await fetchExecutiveSummary(cachedData)
     } catch (error) {
