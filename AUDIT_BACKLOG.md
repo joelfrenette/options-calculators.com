@@ -327,7 +327,7 @@ recomputes it.
 | P6-39 | P2 | fixed | `exit-rules` "AI Insights" over a string literal. |
 | P6-40 | P3 | fixed | learn-leaps leverage range vs its own example. |
 | P6-41 | P3 | fixed | Static tabs can now complete the sign-off ledger. |
-| P6-42 | P1 | fixed | **Fixed on staging; LIVE ON PRODUCTION until the merge.** Fabricated trades attributed to named real people, deleted. Source was P6-52. |
+| P6-42 | P1 | fixed | **Shipped to production 2026-08-11 in the third merge (`21be470`).** Fabricated trades attributed to named real people, deleted. Source was P6-52. |
 | P6-43 | P1 | fixed | Synthesized option premiums now labelled, not sorted alongside quotes unmarked. |
 | P6-44 | P2 | fixed | "pre-qualified for active options markets" removed. |
 | P6-45 | P1 | fixed | CME FedWatch name removed from a heuristic that reads no futures. |
@@ -337,7 +337,7 @@ recomputes it.
 | P6-49 | P2 | fixed | `scripts/check-provenance.ts` created. |
 | P6-50 | P2 | fixed | Three more false AI labels. |
 | P6-51 | P1 | fixed | Homepage "AI-powered crash probability model". |
-| P6-52 | P1 | fixed | **Fixed on staging; LIVE ON PRODUCTION until the merge.** Seven invented Form 4 filings at HTTP 200 — the source of P6-42. |
+| P6-52 | P1 | fixed | **Shipped to production 2026-08-11 in the third merge (`21be470`).** Seven invented Form 4 filings at HTTP 200 — the source of P6-42. |
 | P6-53 | P1 | fixed | `/api/strategy-scanner` POST returned three invented setups. |
 | P6-54 | P2 | fixed | Two dead sliders over a "not measured" column. |
 | P6-55 | P3 | fixed | check-provenance extended from nouns to numbers. |
@@ -1165,7 +1165,7 @@ contracts 61 routes / 61 contracts · remediation 31 PASS.
 record what was wrong; the synthesis records what kept going wrong, which is what
 transfers to Phase 7.
 
-**Two P1s are LIVE ON PRODUCTION until the merge:** P6-42 (the `insiders` tab
+**Two P1s were LIVE ON PRODUCTION when Phase 6 closed. They shipped in the third merge, `21be470`, on 2026-08-11 evening — see the merge record at the end of this file:** P6-42 (the `insiders` tab
 publishing invented trades attributed to named real people) and P6-52 (the seed data
 that fed it, served at HTTP 200 with a fresh timestamp).
 
@@ -1502,3 +1502,27 @@ problem from this one, and not one to hide behind the same word.
 | ID | Sev | Tab / area | Finding |
 |---|---|---|---|
 | P2-4 | P2 | site-wide | **CLOSED for the LLM group.** All five routes skipped for model cost are now contract-tested via `lib/dry-run.ts`; skipped contracts 16 → 10. Every remaining skip is a store write, an auth side effect, a fan-out, or metered scraping quota — recorded above so "16 routes have no verification" is not carried forward as though it were still one problem. |
+
+---
+
+## THIRD PRODUCTION MERGE — 2026-08-11 evening
+
+**`5e129f5` → `21be470`, 36 commits, fast-forward, on the owner's explicit UAT
+approval.** `main` and `audit-preview` are identical.
+
+**The two P1s are off production.** P6-42 — the `insiders` tab publishing fabricated
+trades attributed to Tim Cook, Jensen Huang, Mark Zuckerberg, Sen. Tuberville and Rep.
+Gottheimer as "this week" — and P6-52, the seed data that fed it at HTTP 200 with a
+fresh timestamp. They had been live on www.options-calculators.com since the audit found
+them on 2026-08-11 morning. **Any statement elsewhere in this file that they are live is
+historical; the §STATUS LEDGER is the current record.**
+
+Checks at merge, run individually: typecheck **10 known** · formulas **514** ·
+contracts **60 routes / 60 contracts** · remediation **31**.
+
+Ships Phase 7 steps 7.1 (the STATUS LEDGER + its check), 7.2 (the admin sweep, P7-1…P7-7),
+7.3 (dead code becomes a rule) and eight 7.4 burn-down passes — P0-4, P1-13, P1-14, P2-2,
+P2-4, P3-15, P3-17, P3-18, S-8, S-9 and S-10 closed, dead exports 51 → 17, four new check
+scripts. **Routes 61 → 60** (`/api/ccpi/cache` deleted, P2-2).
+
+**Not verified on www yet.** Nothing has been checked against production since it moved.
