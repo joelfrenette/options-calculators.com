@@ -411,13 +411,19 @@ const componentTooltips = {
 
 // Null has no sentiment. Every comparison here is false against null, so an
 // unmeasured component used to come out labelled "NEUTRAL".
+/**
+ * Label for a single component indicator, on the same 0-100 fear/greed scale.
+ *
+ * Reads SENTIMENT_ALLOCATION rather than carrying its own thresholds. Its old
+ * chain classified 45-54.99 as NEUTRAL but 55-55.99 as GREED, while the
+ * headline bands put 55.5 in Neutral — a third disagreeing set of boundaries
+ * on one scale. The upper-cased band level is exactly the vocabulary this
+ * already used, so `getSentimentColor` keeps working unchanged.
+ */
 const getIndicatorSentiment = (score: number | null): string => {
   if (score === null) return "NO DATA"
-  if (score < 25) return "EXTREME FEAR"
-  if (score < 45) return "FEAR"
-  if (score >= 55 && score < 75) return "GREED"
-  if (score >= 75) return "EXTREME GREED"
-  return "NEUTRAL"
+  const level = bandForScore(SENTIMENT_ALLOCATION.bands, score)?.level
+  return level ? level.toUpperCase() : "NO DATA"
 }
 
 const getSentimentColor = (sentiment: string): string => {
@@ -853,21 +859,39 @@ export function MarketSentiment() {
     return date.toLocaleString()
   }
 
-  const getScoreColor = (score: number) => {
-    if (score >= 75) return "text-green-600" // Extreme Greed
-    if (score >= 56) return "text-green-500" // Greed
-    if (score >= 45) return "text-yellow-600" // Neutral
-    if (score >= 25) return "text-orange-500" // Fear
-    return "text-red-600" // Extreme Fear
+  /*
+    ONE classification per gauge. Everything below is a lookup on the level
+    SENTIMENT_ALLOCATION already decided — there is no second set of thresholds
+    to drift out of step.
+
+    This is not hypothetical tidying. Colour used >= 25/45/56/75 while the
+    recommendation text used <= 24/44/55/74; identical for whole numbers, and
+    the API rounds to one decimal, so 36 of the 1001 reachable scores were
+    coloured one level and described as another.
+  */
+  const levelFor = (score: number) => bandForScore(SENTIMENT_ALLOCATION.bands, score)?.level ?? null
+
+  const SCORE_COLORS: Record<string, string> = {
+    "Extreme Greed": "text-green-600",
+    Greed: "text-green-500",
+    Neutral: "text-yellow-600",
+    Fear: "text-orange-500",
+    "Extreme Fear": "text-red-600",
   }
 
-  const getScoreBackground = (score: number) => {
-    if (score >= 75) return "bg-green-50 border-green-200"
-    if (score >= 56) return "bg-green-50 border-green-200"
-    if (score >= 45) return "bg-yellow-50 border-yellow-200"
-    if (score >= 25) return "bg-orange-50 border-orange-200"
-    return "bg-red-50 border-red-200"
+  const SCORE_BACKGROUNDS: Record<string, string> = {
+    "Extreme Greed": "bg-green-50 border-green-200",
+    Greed: "bg-green-50 border-green-200",
+    Neutral: "bg-yellow-50 border-yellow-200",
+    Fear: "bg-orange-50 border-orange-200",
+    "Extreme Fear": "bg-red-50 border-red-200",
   }
+
+  // Grey rather than a level colour when there is no band — an unreadable
+  // score must not be styled as a real reading (P6-30).
+  const getScoreColor = (score: number) => SCORE_COLORS[levelFor(score) ?? ""] ?? "text-gray-500"
+  const getScoreBackground = (score: number) =>
+    SCORE_BACKGROUNDS[levelFor(score) ?? ""] ?? "bg-gray-50 border-gray-200"
 
   // const getSentimentColor = (score: number) => { // REMOVED AND REPLACED BY getSentimentColor FUNCTION ABOVE
   //   if (score > 20) return "bg-green-500"
@@ -876,13 +900,11 @@ export function MarketSentiment() {
   //   return "bg-red-500"
   // }
 
-  const getTradeRecommendations = (score: number) => {
-    // Boundaries are lower-edge (< 25, < 45, < 56, < 75) to match getScoreColor
-    // above and SENTIMENT_ALLOCATION in lib/allocation.ts. They used to read
-    // <= 24 / 44 / 55 / 74, which is equivalent ONLY for whole numbers — and
-    // the API rounds to one decimal (Math.round(x * 10) / 10), so a score of
-    // 24.5 was coloured Extreme Fear while this chain called it Fear.
-    if (score < 25) {
+  // Keyed by level, never by score. The caller has already asked
+  // SENTIMENT_ALLOCATION which band it is in; re-deriving it here is what
+  // produced the colour-versus-text mismatch this replaced.
+  const getTradeRecommendations = (level: string | null) => {
+    if (level === "Extreme Fear") {
       return {
         level: "Extreme Fear",
         positionSize: "Larger positions (3-5% per trade)",
@@ -901,7 +923,7 @@ export function MarketSentiment() {
         coachTips:
           "Top coaches recommend being greedy when others are fearful. This is prime time for put selling on quality stocks.",
       }
-    } else if (score < 45) {
+    } else if (level === "Fear") {
       return {
         level: "Fear",
         positionSize: "Standard positions (2-3% per trade)",
@@ -920,7 +942,7 @@ export function MarketSentiment() {
         coachTips:
           "Market showing some fear - favorable for options sellers. Focus on quality underlyings and maintain discipline.",
       }
-    } else if (score < 56) {
+    } else if (level === "Neutral") {
       return {
         level: "Neutral",
         positionSize: "Conservative positions (1-2% per trade)",
@@ -938,7 +960,7 @@ export function MarketSentiment() {
         ],
         coachTips: "Neutral market conditions - maintain discipline and don't force trades. Wait for better setups.",
       }
-    } else if (score < 75) {
+    } else if (level === "Greed") {
       return {
         level: "Greed",
         positionSize: "Small positions (0.5-1% per trade)",
@@ -1022,9 +1044,10 @@ export function MarketSentiment() {
     return <LoadingSpinner message="Loading market data..." />
   }
 
-  const recommendations = getTradeRecommendations(marketData.overallScore)
-  // null when the score is missing — never falls back to the calmest band.
+  // The single classification of this score. null when it is unreadable —
+  // never falls back to the calmest band. Everything below reads off it.
   const sentimentBand = bandForScore(SENTIMENT_ALLOCATION.bands, marketData.overallScore)
+  const recommendations = getTradeRecommendations(sentimentBand?.level ?? null)
 
   const safeSentimentData = Array.isArray(sentimentData) ? sentimentData : []
 

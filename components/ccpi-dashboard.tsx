@@ -747,7 +747,13 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
           and not when, and that momentum confirms rather than predicts, without
           the pillar numbering being reshuffled to say it.
         */}
-        <Accordion type="multiple" defaultValue={["pillar2", "pillar3", "pillar4"]} className="space-y-4">
+        {/*
+          All four open on load, by owner decision. §7a asked for the coincident
+          group to be collapsed by default; the badge and caveat on the pillar
+          carry that warning whether it is open or shut, so collapsing it bought
+          nothing the label does not already say.
+        */}
+        <Accordion type="multiple" defaultValue={["pillar1", "pillar2", "pillar3", "pillar4"]} className="space-y-4">
           <PillarMomentum
             score={pillarScores.momentum}
             prov={data.provenance?.momentum}

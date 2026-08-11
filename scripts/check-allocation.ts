@@ -189,5 +189,36 @@ check(
 )
 check("a score outside [−1, 1] yields no band", bandForScore(PANIC_EUPHORIA_ALLOCATION.bands, 1.5) === null)
 
+// ---------------------------------------------------------------------------
+// 8. Level names are now an API, not a label.
+//
+//    market-sentiment.tsx and panic-euphoria.tsx look up colours, backgrounds,
+//    labels and strategy copy in Record<string, string> maps keyed by these
+//    exact strings. A rename here would not fail to compile — every lookup
+//    would quietly fall through to the grey "no data" default and the pages
+//    would render as though the gauge were unreadable. Pin them.
+// ---------------------------------------------------------------------------
+const levelNames = (scale: AllocationScale) => scale.bands.map((b) => b.level).join(" | ")
+check(
+  "CCPI level names are unchanged",
+  levelNames(CCPI_ALLOCATION) === "Low Risk | Normal | Caution | High Alert | Crash Watch",
+  levelNames(CCPI_ALLOCATION),
+)
+check(
+  "Sentiment level names are unchanged (keys in market-sentiment.tsx)",
+  levelNames(SENTIMENT_ALLOCATION) === "Extreme Fear | Fear | Neutral | Greed | Extreme Greed",
+  levelNames(SENTIMENT_ALLOCATION),
+)
+check(
+  "Panic/Euphoria level names are unchanged (keys in panic-euphoria.tsx)",
+  levelNames(PANIC_EUPHORIA_ALLOCATION) ===
+    "Extreme Panic | Panic | Neutral/Complacent | Euphoria | Extreme Euphoria",
+  levelNames(PANIC_EUPHORIA_ALLOCATION),
+)
+check(
+  "level names are unique within each scale",
+  SCALES.every(([, s]) => new Set(s.bands.map((b) => b.level)).size === s.bands.length),
+)
+
 console.log(failures === 0 ? "\nAll allocation checks passed." : `\n${failures} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)

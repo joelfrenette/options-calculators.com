@@ -173,34 +173,48 @@ export function PanicEuphoria() {
     setRefreshing(false)
   }
 
-  const getScoreColor = (score: number) => {
-    if (score < -0.45) return "text-green-700" // Extreme Panic (GOOD - buy signal)
-    if (score < -0.17) return "text-green-600" // Panic (good)
-    if (score < 0.41) return "text-yellow-600" // Neutral/Complacent
-    if (score < 0.7) return "text-red-500" // Euphoria (bad)
-    return "text-red-700" // Extreme Euphoria (BAD - sell signal)
+  /*
+    ONE classification per gauge — PANIC_EUPHORIA_ALLOCATION decides the level
+    and everything below is a lookup on it. Four parallel threshold chains for
+    colour, background, label and recommendations is four chances to disagree,
+    and the sentiment page proved that is not theoretical.
+  */
+  const levelFor = (score: number) => bandForScore(PANIC_EUPHORIA_ALLOCATION.bands, score)?.level ?? null
+
+  const SCORE_COLORS: Record<string, string> = {
+    "Extreme Panic": "text-green-700", // GOOD - buy signal
+    Panic: "text-green-600",
+    "Neutral/Complacent": "text-yellow-600",
+    Euphoria: "text-red-500",
+    "Extreme Euphoria": "text-red-700", // BAD - sell signal
   }
 
-  const getScoreBackground = (score: number) => {
-    if (score < -0.45) return "bg-green-100 border-green-400"
-    if (score < -0.17) return "bg-green-50 border-green-300"
-    if (score < 0.41) return "bg-yellow-50 border-yellow-200"
-    if (score < 0.7) return "bg-red-50 border-red-300"
-    return "bg-red-100 border-red-400"
+  const SCORE_BACKGROUNDS: Record<string, string> = {
+    "Extreme Panic": "bg-green-100 border-green-400",
+    Panic: "bg-green-50 border-green-300",
+    "Neutral/Complacent": "bg-yellow-50 border-yellow-200",
+    Euphoria: "bg-red-50 border-red-300",
+    "Extreme Euphoria": "bg-red-100 border-red-400",
   }
 
-  // Added getScoreLabel for the updated contrarian scale
-  const getScoreLabel = (score: number) => {
-    if (score < -0.45) return "EXTREME PANIC (Buy Signal)"
-    if (score < -0.17) return "PANIC (Contrarian Bullish)"
-    if (score < 0.41) return "NEUTRAL/COMPLACENT"
-    if (score < 0.7) return "EUPHORIA (Contrarian Bearish)"
-    return "EXTREME EUPHORIA (Sell Signal)"
+  const SCORE_LABELS: Record<string, string> = {
+    "Extreme Panic": "EXTREME PANIC (Buy Signal)",
+    Panic: "PANIC (Contrarian Bullish)",
+    "Neutral/Complacent": "NEUTRAL/COMPLACENT",
+    Euphoria: "EUPHORIA (Contrarian Bearish)",
+    "Extreme Euphoria": "EXTREME EUPHORIA (Sell Signal)",
   }
 
-  const getTradeRecommendations = (score: number, aboveMA: boolean) => {
-    // Extreme Panic: score < -0.45
-    if (score < -0.45) {
+  // Grey and "NO DATA" when the score is unreadable — never a level's styling
+  // on a reading that does not exist (P6-30).
+  const getScoreColor = (score: number) => SCORE_COLORS[levelFor(score) ?? ""] ?? "text-gray-500"
+  const getScoreBackground = (score: number) =>
+    SCORE_BACKGROUNDS[levelFor(score) ?? ""] ?? "bg-gray-50 border-gray-200"
+  const getScoreLabel = (score: number) => SCORE_LABELS[levelFor(score) ?? ""] ?? "NO DATA"
+
+  // Keyed by level, never by score.
+  const getTradeRecommendations = (level: string | null, aboveMA: boolean) => {
+    if (level === "Extreme Panic") {
       return {
         level: "Extreme Panic",
         signal: "STRONG BUY",
@@ -222,8 +236,8 @@ export function PanicEuphoria() {
       }
     }
 
-    // Panic (Contrarian Bullish): -0.45 < score < -0.17
-    if (score < -0.17 && score >= -0.45) {
+    // Panic (Contrarian Bullish)
+    if (level === "Panic") {
       return {
         level: "Panic",
         signal: "BUY",
@@ -245,8 +259,8 @@ export function PanicEuphoria() {
       }
     }
 
-    // Neutral/Complacent: -0.17 < score < 0.41
-    if (score < 0.41 && score >= -0.17) {
+    // Neutral/Complacent
+    if (level === "Neutral/Complacent") {
       return {
         level: "Neutral/Complacent",
         signal: "HOLD",
@@ -267,8 +281,8 @@ export function PanicEuphoria() {
       }
     }
 
-    // Euphoria: 0.41 <= score < 0.70
-    if (score >= 0.41 && score < 0.7) {
+    // Euphoria
+    if (level === "Euphoria") {
       return {
         level: "Euphoria",
         signal: "CAUTION/SELL",
@@ -288,7 +302,7 @@ export function PanicEuphoria() {
       }
     }
 
-    // Extreme Euphoria: score >= 0.70
+    // Extreme Euphoria
     return {
       level: "Extreme Euphoria",
       signal: "STRONG SELL",
@@ -317,35 +331,35 @@ export function PanicEuphoria() {
         level: "Extreme Panic",
         description: "Rare generational buying opportunity (>95% win rate)",
         signal: "STRONG BUY",
-        guidance: getTradeRecommendations(-0.5, true),
+        guidance: getTradeRecommendations("Extreme Panic", true),
       },
       {
         range: "-0.45 to -0.17",
         level: "Panic",
         description: "High probability contrarian bullish setup",
         signal: "BUY",
-        guidance: getTradeRecommendations(-0.3, true),
+        guidance: getTradeRecommendations("Panic", true),
       },
       {
         range: "-0.17 to +0.41",
         level: "Neutral/Complacent",
         description: "Market lacks extreme sentiment; wait for better setups",
         signal: "HOLD",
-        guidance: getTradeRecommendations(0.1, true),
+        guidance: getTradeRecommendations("Neutral/Complacent", true),
       },
       {
         range: "+0.41 to +0.70",
         level: "Euphoria",
         description: "Significant optimism, elevated risk",
         signal: "CAUTION/SELL",
-        guidance: getTradeRecommendations(0.55, true),
+        guidance: getTradeRecommendations("Euphoria", true),
       },
       {
         range: "≥ +0.70",
         level: "Extreme Euphoria",
         description: "Excessive optimism (>80% chance of lower prices in 1yr)",
         signal: "STRONG SELL",
-        guidance: getTradeRecommendations(0.8, true),
+        guidance: getTradeRecommendations("Extreme Euphoria", true),
       },
     ]
   }
@@ -366,9 +380,9 @@ export function PanicEuphoria() {
     )
   }
 
-  const recommendations = getTradeRecommendations(data.overallScore, data.aboveMA)
-  // null when the score is missing — never falls back to a benign band.
+  // The single classification of this score. Everything else reads off it.
   const allocationBand = bandForScore(PANIC_EUPHORIA_ALLOCATION.bands, data.overallScore)
+  const recommendations = getTradeRecommendations(allocationBand?.level ?? null, data.aboveMA)
   const allLevelGuidance = getAllLevelGuidance()
 
   const ConditionalTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => {
