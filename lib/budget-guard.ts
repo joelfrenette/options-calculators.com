@@ -47,10 +47,22 @@ const DEFAULT_DAILY_HARD_STOP = 50
 const DEFAULT_MONTHLY_HARD_STOP = 100
 
 function readBudget(envName: string, fallback: number): number {
-  const raw = Number(process.env[envName])
-  // A budget of 0 is meaningful ("cut off immediately"), so only reject
-  // negatives and non-numbers.
-  return Number.isFinite(raw) && raw >= 0 ? raw : fallback
+  // A budget of 0 is meaningful ("cut off immediately"), so 0 must be accepted
+  // when it is genuinely CONFIGURED — and that is precisely what made the old
+  // version dangerous. `Number("")` is 0, not NaN, so a DEFINED-BUT-BLANK
+  // `DAILY_HARD_STOP` or `MONTHLY_HARD_STOP` read as a deliberate "cut off
+  // immediately" and killed every metered API on the first cent of spend.
+  //
+  // Worse here than in `getMonthlyBudgetTarget` (P6-86): that one sets a
+  // reporting target, this one is the hard stop. An empty string is the most
+  // likely malformed value for an env var — Vercel produces one whenever a
+  // variable exists with no value — so the single most probable operator
+  // mistake took the site's paid data offline with nothing on screen to explain
+  // it. Trim first, treat blank as unset, and only then let 0 mean zero.
+  const raw = process.env[envName]?.trim()
+  if (!raw) return fallback
+  const n = Number(raw)
+  return Number.isFinite(n) && n >= 0 ? n : fallback
 }
 
 export function getDailyHardStop(): number {

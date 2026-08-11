@@ -57,8 +57,21 @@ export function isServiceDisabled(name: string): boolean {
 
 // Monthly budget target (USD) for the cost dashboard. Default $40.
 export function getMonthlyBudgetTarget(): number {
-  const raw = Number(process.env.MONTHLY_BUDGET_TARGET)
-  return Number.isFinite(raw) && raw >= 0 ? raw : 40
+  // `Number("")` is 0, not NaN — so a DEFINED-BUT-BLANK env var used to set the
+  // monthly budget target to $0 rather than falling back to 40. That is the
+  // most likely way for this variable to be malformed: Vercel hands you an
+  // empty string whenever a variable exists with no value, which is exactly the
+  // state a half-finished dashboard edit leaves behind.
+  //
+  // The consequence was not cosmetic. A $0 target makes the E-5 budget guard
+  // treat any spend at all as a breach, so it would kill the metered keys and
+  // the site would degrade for a reason nothing on screen explains.
+  //
+  // Found by writing the first assertion this function has ever had (P6-86).
+  const raw = process.env.MONTHLY_BUDGET_TARGET?.trim()
+  if (!raw) return 40
+  const n = Number(raw)
+  return Number.isFinite(n) && n >= 0 ? n : 40
 }
 
 // --- Budget guard (E-5) ---------------------------------------------------

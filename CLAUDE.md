@@ -88,7 +88,7 @@ down from 12 to 11.
 
 **Count the PASS lines — do not trust the exit code alone.** The suites chain with
 `&&`, so a script that stops *running* is indistinguishable from one that passes, and
-this has cost the project a commit twice. Current baselines: **formulas 475**,
+this has cost the project a commit twice. Current baselines: **formulas 492**,
 contracts 61 routes / 61 contracts, remediation 31.
 
 ## Data-integrity house rules (from the 2026-08 audit — see AUDIT_PLAN.md, AUDIT_BACKLOG.md, FORMULAS.md)
