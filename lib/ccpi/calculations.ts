@@ -74,29 +74,17 @@ export function sortCanaries(canaries: CCPIData["canaries"]): CCPIData["canaries
   })
 }
 
-/**
- * Weighted-average CCPI from pillar values, renormalized over the non-null
- * pillars — mirroring lib/ccpi/scoring.ts's composite semantics. A pillar is
- * null when its scored weight fell below the minimum after baseline exclusion.
- * Returns null when no pillar is scoreable; treating null as 0 here is exactly
- * the un-renormalized bug the scoring rework removed (AUDIT P3-12).
- */
-export function calculateCCPI(pillars: CCPIData["pillars"]): number | null {
-  const entries: Array<[number | null, number]> = [
-    [pillars.momentum, PILLAR_WEIGHTS.momentum],
-    [pillars.riskAppetite, PILLAR_WEIGHTS.riskAppetite],
-    [pillars.valuation, PILLAR_WEIGHTS.valuation],
-    [pillars.macro, PILLAR_WEIGHTS.macro],
-  ]
-  let weighted = 0
-  let totalWeight = 0
-  for (const [score, weight] of entries) {
-    if (score === null) continue
-    weighted += score * weight
-    totalWeight += weight
-  }
-  return totalWeight > 0 ? weighted / totalWeight : null
-}
+// P7-14. `calculateCCPI` was deleted here — **a second implementation of the
+// composite**, which its own docstring admitted: "mirroring lib/ccpi/scoring.ts's
+// composite semantics". Mirroring is the problem. `lib/ccpi/scoring.ts` owns the
+// composite, including the renormalisation over non-null pillars that P3-12
+// established, and this copy existed only so `lib/ccpi/logger.ts` could print a
+// number next to the real one.
+//
+// Its last referrer went with that logger. It sat in the module no check script
+// can load (P6-85), so the two composites could have diverged with nothing able
+// to compare them — and a composite that disagrees with itself is the single
+// worst defect this index can have.
 
 // `validateCCPICalculation` was deleted here (P7-4). It was a function named
 // "validate" that answered `true` — valid — for a composite it could not
@@ -116,21 +104,9 @@ export function calculateCCPI(pillars: CCPIData["pillars"]): number | null {
 // implementations of one decision, one right and one wrong — keep the one the
 // admin panel actually renders.
 
-/**
- * Formats pillar contribution for logging. Null pillars print "n/a (excluded)".
- */
-export function formatPillarContribution(pillars: CCPIData["pillars"]): string {
-  const line = (label: string, score: number | null, weight: number) =>
-    score === null
-      ? `${label}: n/a (excluded — insufficient scored weight)`
-      : `${label}: ${score} × ${(weight * 100).toFixed(0)}% = ${(score * weight).toFixed(1)}`
-  return [
-    line("Momentum", pillars.momentum, PILLAR_WEIGHTS.momentum),
-    line("Risk Appetite", pillars.riskAppetite, PILLAR_WEIGHTS.riskAppetite),
-    line("Valuation", pillars.valuation, PILLAR_WEIGHTS.valuation),
-    line("Macro", pillars.macro, PILLAR_WEIGHTS.macro),
-  ].join("\n")
-}
+// P7-14. `formatPillarContribution` deleted here: it built a console string for
+// `lib/ccpi/logger.ts`, and that module went with the unreachable hook that was
+// its only caller. Nothing rendered it to a user.
 
 /**
  * Counts active warnings (high and medium severity canaries)

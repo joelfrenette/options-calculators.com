@@ -211,9 +211,19 @@ for (const s of symbols) {
 // unreferenced export in lib/ fails the suite. If a genuinely-needed export
 // lands with no caller yet, the honest move is to add it here WITH the reason
 // and raise the baseline in the same commit — not to widen the scope above.
-const KNOWN_DEAD: ReadonlySet<string> = new Set([])
+const KNOWN_DEAD: ReadonlySet<string> = new Set([
+  // P7-14, and the first entry added under the rule above rather than
+  // inherited from the 51. `hasFreshCache` lost its only importer when the
+  // unreachable hooks/use-ccpi-data.ts was deleted. It is kept because it is
+  // the age check the LIVE path is missing: components/ccpi-dashboard.tsx
+  // loads the cached CCPI snapshot at any age and renders neither the fact
+  // that it is cached nor its timestamp (P7-16). Deleting it would remove the
+  // tool for that fix. Drop this line and the export together if P7-16 is
+  // resolved another way.
+  "lib/ccpi/cache.ts:hasFreshCache",
+])
 
-const KNOWN_DEAD_BASELINE = 0
+const KNOWN_DEAD_BASELINE = 1
 
 check(
   `the known-dead list still holds ${KNOWN_DEAD_BASELINE} entries`,

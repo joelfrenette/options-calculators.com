@@ -388,12 +388,13 @@ recomputes it.
 | P7-11 | P2 | fixed | `check-dead-exports.ts` counted a same-named local declaration as a reference, so a lib export with a diverged twin — the dangerous case — read as live. |
 | P7-12 | P2 | fixed | The Greeks calculator's own Black-Scholes is gone; gamma/theta/rho added to `lib/black-scholes.ts` with 19 new tests. The real bug was a missing `else` leaving stale Greeks on screen, not the NaN first recorded. |
 | P7-13 | P3 | fixed | `expectedMove` recomputed inline in `/api/strategy-scanner` now calls `lib/black-scholes.ts` and skips the row when it returns null. |
-| P7-14 | P2 | open | **`hooks/use-ccpi-data.ts` has no consumer anywhere**, and transitively keeps eight `lib/` exports off the dead list. The rule tests reference, not reachability. |
+| P7-14 | P2 | fixed | The unreachable hook is deleted, with its cascade: two whole modules, two aliases and a second composite implementation. `lib/` 230 → 224 exports. The rule's one-hop limit is recorded, not half-fixed. |
+| P7-16 | P2 | open | **The CCPI tab renders cached data of any age without saying it is cached.** `fromCache` and `cacheTimestamp` are written at four sites and read at none. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-218 findings recorded · **170 fixed · 8 wontfix · 0 verified-ok · 40 open.**
+219 findings recorded · **171 fixed · 8 wontfix · 0 verified-ok · 40 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -1749,3 +1750,72 @@ way; the dashboard imports those directly.
 | P7-13 | P3 | site-wide | **FIXED.** `/api/strategy-scanner` calls `expectedMove` from `lib/black-scholes.ts` and skips the row on null, instead of recomputing the formula inline over upstream data that can be zero. |
 | P7-14 | P2 | ANALYZE → CCPI | **`hooks/use-ccpi-data.ts` is unreachable — nothing imports `useCCPIData`** — and it is the only referrer for eight `lib/` exports, which therefore pass the dead-export rule while being unreachable from any page. **The rule tests reference, not reachability**, and one unreachable module holds its whole import surface open. **OPEN**, because deleting it cascades into eight further decisions. |
 | P7-15 | P3 | tooling / lib | **`daysBetween` is written three times, deliberately.** `lib/ccpi/lead-time.ts` documents why: a module a check script must load under bare node has to stay import-free, since type stripping cannot resolve extensionless local imports (the P6-85 constraint). All three bodies are behaviourally identical. **WONTFIX** — collapsing it trades test coverage for tidiness. |
+
+---
+
+## Phase 7.4 (eleventh pass) — P7-14: one unreachable file held eight exports open (2026-08-11)
+
+`hooks/use-ccpi-data.ts` exported `useCCPIData` and **nothing in the repo imported it.**
+Deleting it dropped eight `lib/` exports onto the dead list in one step, then two more
+behind those — every one of which had been passing `check-dead-exports.ts` honestly,
+because they *were* referenced. Just referenced by something no page could reach.
+
+**What went, and why each was its own decision:**
+
+| Deleted | Decision |
+|---|---|
+| `hooks/use-ccpi-data.ts` | Unreachable. It is also a full second CCPI data layer, and **it auto-fetches on mount** — `useEffect(() => loadInitialData(), [])` — which is precisely what the dashboard's `DataLoadGate` ("Nothing loads until you choose to") exists to prevent. Wiring it up would have silently restored the cost-and-consent behaviour that gate was built to remove. |
+| `lib/ccpi/api.ts` (whole module: `fetchCCPI`, `fetchCCPIHistory`, `fetchExecutiveSummary`, `refreshCCPIData`) | The hook was its only importer. Its `fetchExecutiveSummary` also POSTs raw `CCPIData` where the dashboard's live path builds a deliberate payload carrying the P6-19 fix (pillars rendered null-aware rather than as "0/100") and the P7-2 fix (`totalIndicators` from the payload, not the canary-array length). **The fix had been applied to one of the two paths.** |
+| `lib/ccpi/logger.ts` (whole module: `logError`) | A one-line `console.error` wrapper. Its four siblings were deleted in P7-9 for the same reason; this was the last one, kept alive only by the hook. |
+| `getCachedData` / `setCachedData` | Pure aliases of `loadCCPIFromCache` / `saveCCPIToCache`. Two names for one function is how half the call sites end up on each. |
+| `calculateCCPI` | **A second implementation of the composite**, and its own docstring said so — "mirroring lib/ccpi/scoring.ts's composite semantics". Mirroring is the defect. It existed so the logger could print a number beside the real one, it lived in the module no check script can load (P6-85), and a composite that can disagree with itself is the worst defect this index can carry. |
+| `formatPillarContribution` | Built the logger's console string. Nothing rendered it to a user. |
+
+`lib/` is 224 exports across 49 files, down from 230/51.
+
+### The limit this exposed, stated plainly
+
+`check-dead-exports.ts` answers **"is this symbol referenced"** — one hop. It cannot
+answer **"is this symbol reachable"**, which is the transitive question, and a module
+nothing imports keeps its entire import surface alive underneath it. P7-9 burned a list
+of 51 down to zero against a rule that a single unreachable file was holding open in
+eight places.
+
+This is recorded as a limit rather than fixed. Walking the import graph from `app/`
+entry points is a materially different check — it has to resolve the `@/` alias, handle
+dynamic imports and Next's file-based routing, and decide what counts as an entry point
+— and a half-built reachability check that silently misses an entry point would report a
+clean repo for the wrong reason. That is the failure mode this phase keeps finding, and
+building it badly is worse than naming it.
+
+### P7-16 — the CCPI tab can show an old snapshot without saying so
+
+Found while deciding whether `hasFreshCache` should go with the rest.
+
+`components/ccpi-dashboard.tsx` loads `loadCCPIFromCache()` **unconditionally, at any
+age**. It sets `fromCache` and `cacheTimestamp` into component state at four sites —
+lines 116, 150, 196, 197 — and **reads neither anywhere**. There is no render site for
+either value.
+
+So the tab can display a CCPI snapshot from any point in the past with nothing on screen
+marking it as cached or dating it. The freshness machinery to prevent that exists in
+`lib/ccpi/cache.ts` and was wired only into the unreachable hook.
+
+It is the same family as P7-12's stale Greeks, one level up: state that stops being
+current while the display keeps asserting it. It is worse here in one respect — the
+Greeks panel recomputed from inputs still on screen, whereas this snapshot has no visible
+input at all to contradict it.
+
+**`hasFreshCache` is therefore kept with no caller and allowlisted**, with the reason in
+both the export's docstring and the allowlist entry. It is the exception the `KNOWN_DEAD`
+comment describes — an export with no caller *yet* — and it is the first entry added
+under that rule rather than inherited from the original 51. `KNOWN_DEAD_BASELINE` is 1.
+
+Not fixed here: rendering a cache-age line is user-visible copy on a public tab, it needs
+`check-provenance` review (a label is a claim), and it wants UAT. It is a change, not a
+cleanup.
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| P7-14 | P2 | ANALYZE → CCPI | **FIXED.** `hooks/use-ccpi-data.ts` was unreachable and held eight `lib/` exports open; deleting it and following the cascade removed two whole modules (`lib/ccpi/api.ts`, `lib/ccpi/logger.ts`), two aliases and a **second composite implementation** (`calculateCCPI`). The hook also auto-fetched on mount, which would have defeated the dashboard's load gate. `lib/` 230 → 224 exports. **The rule's one-hop limit is recorded above rather than half-fixed.** |
+| P7-16 | P2 | ANALYZE → CCPI | **The CCPI tab renders cached data of any age without saying it is cached.** `fromCache` and `cacheTimestamp` are written at four sites in `components/ccpi-dashboard.tsx` and read at none; `loadCCPIFromCache()` is called with no age check. `hasFreshCache` is the tool for the fix and is kept dead-but-allowlisted for it. **OPEN.** |
