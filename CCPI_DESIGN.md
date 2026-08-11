@@ -438,6 +438,19 @@ information the badges do not carry. Everything in "What Phase 2 must NOT do" be
 binds — no score, no gauge, no row without its record, no `NO DATA` rendered as `QUIET`, no
 reordering rows by importance.
 
+**All four pillars now open on load, which overrides "collapsed by default" in item 3
+below.** Same reasoning as the grouping, applied one level down: the point of collapsing
+the coincident section was to stop a reader treating those indicators as predictive, and
+the `COINCIDENT` badge sits in the accordion trigger where it is visible open or shut, with
+the full caveat inside. A collapsed section communicates "less important", which is vaguer
+than the sentence actually printed on it. Do not re-collapse it to satisfy the older
+wording.
+
+**The general rule these two amendments share:** §7a's layout instructions were always
+proxies for statements about what an indicator can and cannot do. Where the statement is
+made directly and unmissably, the proxy has done its job and can go. Where it is not, the
+proxy stands.
+
 *One further UAT change, recorded here because it touched the same commit:* the five-column
 portfolio allocation table was replaced by a single cash-vs-stocks ratio per regime, now
 living in `lib/ccpi/allocation.ts`. That consolidation exposed a defect worth naming — the
@@ -479,7 +492,9 @@ elevated since 2017. It describes how far a fall could go, not when."* Today's i
 largely unsourced (P6-34 removed the LLM guesses), so most of it renders "—" — which is honest
 and, for once, also instructive: it shows the reader how thin this evidence actually is.
 
-**3. COINCIDENT** — collapsed by default, clearly labelled.
+**3. COINCIDENT** — collapsed by default, clearly labelled. *(Superseded on the collapse
+point by the UAT amendment above: it ships expanded, carrying its label as a badge. The
+labelling requirement is unchanged and still binds.)*
 
 QQQ SMA breaches, consecutive down days, spot VIX level, VIX term structure. These tell you a
 decline is **already underway**. Useful for confirmation, worthless for warning, and mixing them
