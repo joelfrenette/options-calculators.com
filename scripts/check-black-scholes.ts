@@ -14,6 +14,7 @@ import {
   probabilityBetween,
   probabilityITM,
   calculateVega,
+  normalCDF,
 } from "../lib/black-scholes.ts"
 
 let failures = 0
@@ -85,6 +86,36 @@ isNull("zero time → null", calculateOptionPrice({ ...hull, timeToExpiry: 0 }, 
 isNull("zero vol → null", calculateCallDelta({ ...hull, volatility: 0 }))
 isNull("negative price → null", calculateOptionPrice({ ...hull, stockPrice: -1 }, true))
 isNull("NaN vol → null", calculatePutDelta({ ...hull, volatility: Number.NaN }))
+
+// --- normalCDF. The single most load-bearing function in this file: every
+// delta, every price and vega's own d-terms run through it, so an error here is
+// an error in all of them at once. It was covered only INDIRECTLY, by assertions
+// on the things built from it — which means a compensating error in two places
+// could have passed.
+//
+// ACCURACY, MEASURED RATHER THAN CITED. The implementation is Zelen & Severo
+// 26.2.17, whose published bound is |ε| < 7.5e-8. This implementation does not
+// achieve that: sweeping x over [-5, 5] against a high-precision erf reference
+// gives a max |error| of **1.494e-7**, worst at x = 0 where it returns
+// 0.49999985 instead of 0.5. The cause is benign — the coefficients here are
+// 7-digit truncations of the published ones — but the honest tolerance is the
+// measured one, and writing 7.5e-8 in a comment would be the same
+// citing-instead-of-checking this audit keeps finding. 2e-7 leaves headroom
+// without accepting a real regression.
+//
+// Materiality: 1.5e-7 on a delta of 0.7791, or on a probability rendered to two
+// decimals, is invisible. It is documented because "verified reference" in
+// FORMULAS.md should mean the number was checked, not that a paper was cited.
+const CDF_TOL = 2e-7
+near("normalCDF(0) = 0.5", normalCDF(0), 0.5, CDF_TOL)
+near("normalCDF(1)", normalCDF(1), 0.8413447, CDF_TOL)
+near("normalCDF(-1) mirrors", normalCDF(-1), 0.1586553, CDF_TOL)
+near("normalCDF(1.96) ≈ 0.975", normalCDF(1.96), 0.9750021, CDF_TOL)
+near("normalCDF(-3) far tail", normalCDF(-3), 0.0013499, CDF_TOL)
+near("symmetry: CDF(x) + CDF(-x) = 1", normalCDF(0.7) + normalCDF(-0.7), 1, CDF_TOL)
+// Monotonicity — a lookup table or a sign slip would break this where a
+// point-value check might not.
+near("monotone increasing", normalCDF(0.5) < normalCDF(0.51) ? 1 : 0, 1, 0)
 
 // --- Vega. Untested until 2026-08-11 despite being LIVE: it drives the Newton
 // step inside estimateImpliedVolatility, so a wrong vega makes implied
