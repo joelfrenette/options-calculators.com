@@ -76,30 +76,46 @@ async function getStockTwitsSentiment(
 }
 
 // ========== FINNHUB NEWS ==========
-async function getFinnhubSentiment(): Promise<{ score: number; source: string; articles: number }> {
-  if (!resolveApiKey("FINNHUB_API_KEY")) return { score: -1, source: "unavailable", articles: 0 }
+//
+// ONE fetch, two lenses. `getFinnhubSentiment` and `getNewsFearGreed` used to
+// issue separate requests to the byte-identical URL — same endpoint, same
+// `category=general`, same seven-day window — and then scored the result two
+// different ways. Two HTTP calls per request against a metered free tier for
+// one article list.
+//
+// The composite consequence mattered more. Both entered the weighted mean as
+// their own indicator, 0.11 + 0.08 = 0.19 of the weight, and the second was
+// named "News Fear & Greed", which conceals that it IS Finnhub's general feed.
+// The source list showed six sources over five corpora. They are not scalar
+// multiples of each other and can genuinely disagree — the lenses differ, one
+// scoring headline tone over the top 50 and the other counting greed/fear words
+// over the top 30 — so this is milder than P6-61. But two readings of one
+// article set are two opinions, not two witnesses.
+async function fetchFinnhubGeneralNews(): Promise<any[] | null> {
+  const key = resolveApiKey("FINNHUB_API_KEY")
+  if (!key) return null
   try {
     const today = new Date().toISOString().split("T")[0]
     const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString().split("T")[0]
     const res = await fetch(
-      `https://finnhub.io/api/v1/news?category=general&from=${weekAgo}&to=${today}&token=${resolveApiKey("FINNHUB_API_KEY")}`,
+      `https://finnhub.io/api/v1/news?category=general&from=${weekAgo}&to=${today}&token=${key}`,
       { signal: AbortSignal.timeout(10000) },
     )
-    if (res.ok) {
-      const articles = await res.json()
-      if (Array.isArray(articles) && articles.length > 0) {
-        const score = headlineScore(articles.slice(0, 50).map((a: any) => a.headline))
-        if (score >= 0) {
-          console.log(`[v0] ✓ Finnhub News: ${score}/100 (${articles.length} articles)`)
-          return { score, source: "finnhub_news", articles: articles.length }
-        }
-      }
-    }
-    return { score: -1, source: "no_data", articles: 0 }
+    if (!res.ok) return null
+    const articles = await res.json()
+    return Array.isArray(articles) && articles.length > 0 ? articles : null
   } catch (err) {
-    console.log("[v0] Finnhub error:", err instanceof Error ? err.message : "Unknown")
-    return { score: -1, source: "error", articles: 0 }
+    console.log("[v0] Finnhub news error:", err instanceof Error ? err.message : "Unknown")
+    return null
   }
+}
+
+function getFinnhubSentiment(articles: any[] | null): { score: number; source: string; articles: number } {
+  if (!articles) return { score: -1, source: "unavailable", articles: 0 }
+  const score = headlineScore(articles.slice(0, 50).map((a: any) => a.headline))
+  if (score < 0) return { score: -1, source: "no_data", articles: 0 }
+  console.log(`[v0] ✓ Finnhub News: ${score}/100 (${articles.length} articles)`)
+  return { score, source: "finnhub_news", articles: articles.length }
 }
 
 // ========== POLYGON NEWS ==========
@@ -127,41 +143,22 @@ async function getPolygonNewsSentiment(): Promise<{ score: number; source: strin
   }
 }
 
-// ========== NEWS FEAR / GREED (Finnhub general news, fear vs greed lexicon) ==========
-async function getNewsFearGreed(): Promise<{ score: number; source: string }> {
-  if (!resolveApiKey("FINNHUB_API_KEY")) return { score: -1, source: "unavailable" }
-  try {
-    const today = new Date().toISOString().split("T")[0]
-    const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString().split("T")[0]
-    const res = await fetch(
-      `https://finnhub.io/api/v1/news?category=general&from=${weekAgo}&to=${today}&token=${resolveApiKey("FINNHUB_API_KEY")}`,
-      { signal: AbortSignal.timeout(8000) },
-    )
-    if (res.ok) {
-      const articles = await res.json()
-      if (Array.isArray(articles) && articles.length > 0) {
-        const greedWords = ["surge", "rally", "record", "bull", "boom", "soar", "jump", "gain", "optimism", "growth"]
-        const fearWords = ["crash", "plunge", "fear", "bear", "panic", "recession", "crisis", "tumble", "sell-off", "warning"]
-        let greed = 0
-        let fear = 0
-        for (const a of articles.slice(0, 30)) {
-          const h = (a.headline || "").toLowerCase()
-          if (greedWords.some((w) => h.includes(w))) greed++
-          if (fearWords.some((w) => h.includes(w))) fear++
-        }
-        const total = greed + fear
-        if (total > 0) {
-          const score = Math.round((greed / total) * 100)
-          console.log(`[v0] ✓ News Fear/Greed: ${score}/100 (${greed} greed / ${fear} fear)`)
-          return { score, source: "news_fear_greed" }
-        }
-      }
-    }
-    return { score: -1, source: "no_data" }
-  } catch (err) {
-    console.log("[v0] News Fear/Greed error:", err instanceof Error ? err.message : "Unknown")
-    return { score: -1, source: "error" }
+function getNewsFearGreed(articles: any[] | null): { score: number; source: string } {
+  if (!articles) return { score: -1, source: "unavailable" }
+  const greedWords = ["surge", "rally", "record", "bull", "boom", "soar", "jump", "gain", "optimism", "growth"]
+  const fearWords = ["crash", "plunge", "fear", "bear", "panic", "recession", "crisis", "tumble", "sell-off", "warning"]
+  let greed = 0
+  let fear = 0
+  for (const a of articles.slice(0, 30)) {
+    const h = (a.headline || "").toLowerCase()
+    if (greedWords.some((w) => h.includes(w))) greed++
+    if (fearWords.some((w) => h.includes(w))) fear++
   }
+  const total = greed + fear
+  if (total === 0) return { score: -1, source: "no_data" }
+  const score = Math.round((greed / total) * 100)
+  console.log(`[v0] ✓ News Fear/Greed (same Finnhub feed): ${score}/100 (${greed} greed / ${fear} fear)`)
+  return { score, source: "news_fear_greed" }
 }
 
 // ========== AAII INVESTOR SURVEY — REMOVED (S-11, owner decision 2026-08-10) ==========
@@ -254,9 +251,8 @@ export async function GET() {
       googleNews,
       cnnFearGreed,
       stocktwitsSPY,
-      finnhub,
+      finnhubArticles,
       polygon,
-      newsFearGreed,
       // per-symbol StockTwits (real, symbol-specific)
       stQQQ,
       stIWM,
@@ -265,13 +261,16 @@ export async function GET() {
       getGoogleNewsSentiment(),
       getCNNFearGreedSentiment(),
       getStockTwitsSentiment("SPY"),
-      getFinnhubSentiment(),
+      fetchFinnhubGeneralNews(),
       getPolygonNewsSentiment(),
-      getNewsFearGreed(),
       getStockTwitsSentiment("QQQ"),
       getStockTwitsSentiment("IWM"),
       getStockTwitsSentiment("DIA"),
     ])
+
+    // Both news lenses read the ONE article list fetched above.
+    const finnhub = getFinnhubSentiment(finnhubArticles)
+    const newsFearGreed = getNewsFearGreed(finnhubArticles)
 
     // Build indicator list (name, score, weight, group). score -1 => not live.
     // Reliability weighting: hard data feeds (CNN F&G, news APIs) > social scrapes.
@@ -280,7 +279,7 @@ export async function GET() {
       { name: "CNN Fear & Greed", score: cnnFearGreed.score, source: cnnFearGreed.source, weight: 0.16, group: "macro", description: cnnFearGreed.score >= 0 ? `CNN multi-factor index${cnnFearGreed.detail ? ` (${cnnFearGreed.detail})` : ""}` : "CNN multi-factor index (no live reading)" },
       { name: "Finnhub News", score: finnhub.score, source: finnhub.source, weight: 0.11, group: "macro", description: `Financial news headline sentiment (${finnhub.articles} articles)` },
       { name: "Polygon News", score: polygon.score, source: polygon.source, weight: 0.1, group: "macro", description: `Polygon.io news sentiment (${polygon.articles} articles)` },
-      { name: "News Fear & Greed", score: newsFearGreed.score, source: newsFearGreed.source, weight: 0.08, group: "macro", description: "Greed vs fear language across general market news" },
+      { name: "News Fear & Greed", score: newsFearGreed.score, source: newsFearGreed.source, weight: 0.08, group: "macro", description: "Greed vs fear word counts over the SAME Finnhub general-news feed as the row above — a second lens, not a second source" },
       // --- Social / retail scrapes (lower reliability) ---
       { name: "StockTwits", score: stocktwitsSPY.score, source: stocktwitsSPY.source, weight: 0.11, group: "social", description: `SPY bullish/bearish tags (${stocktwitsSPY.bullish}B/${stocktwitsSPY.bearish}Be)` },
       { name: "Google News", score: googleNews.score, source: googleNews.source, weight: 0.08, group: "social", description: `Market headline pulse (${googleNews.detail})` },
