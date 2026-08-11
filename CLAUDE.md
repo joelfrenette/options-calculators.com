@@ -77,6 +77,12 @@ Run `pnpm check:formulas && pnpm check:contracts` (typecheck via `pnpm typecheck
 10 known errors remain, do not add new ones). Regenerate SITE_MAP.md with
 `pnpm inventory` when routes/components change.
 
+**A check that stops COVERING is as invisible as one that stops running (P6-75).**
+Derive a check's scope from structure — imports, call sites — never from incidental
+prose. Rule 13 once scoped itself by keyword, and rewording a `console.log` removed the
+only token putting a file in scope; the suite went on passing with the count silently
+down from 12 to 11.
+
 **Count the PASS lines — do not trust the exit code alone.** The suites chain with
 `&&`, so a script that stops *running* is indistinguishable from one that passes, and
 this has cost the project a commit twice. Current baselines: **formulas 453**,

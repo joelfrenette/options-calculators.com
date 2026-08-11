@@ -562,7 +562,14 @@ async function fetchMarketData() {
             ? "ai-estimate"
             : aiTier(putCallResult.source),
       fearGreedIndex: fearGreedLive ? "live" : "baseline",
-      aaiiBullish: aaiData.status === "live" ? "live" : aiTier(aaiiBullishResult.source),
+      // Same self-report bypass as putCallRatio above (P6-72): the scraper's
+      // Grok path used to claim "live", and live scores.
+      aaiiBullish:
+        aaiData.status === "live"
+          ? "live"
+          : aaiData.status === "ai-estimate"
+            ? "ai-estimate"
+            : aiTier(aaiiBullishResult.source),
       shortInterest: aiTier(shortInterestResult.source),
     },
     valuation: {

@@ -261,7 +261,8 @@ export async function scrapeAAIISentiment(): Promise<{
   bearish: number
   neutral: number
   spread: number
-  status: "live" | "baseline"
+  // "ai-estimate" added for the Grok path below — see P6-72.
+  status: "live" | "ai-estimate" | "baseline"
 }> {
   try {
     const result = await scrapeUrl("https://www.aaii.com/sentimentsurvey", {
@@ -308,17 +309,26 @@ export async function scrapeAAIISentiment(): Promise<{
       )
 
       if (bullishValue && bullishValue > 0 && bullishValue < 100) {
-        // Estimate bearish and neutral based on typical distributions
-        const bearish = Math.max(15, Math.min(50, 65 - bullishValue)) // Inverse correlation
+        // Second instance of P6-72's bypass, in the same file. This returned
+        // `status: "live"` for an LLM's recollection of the AAII survey, and
+        // /api/ccpi scores `live` — `aaiiBullish` is worth 26 of Risk
+        // Appetite's 100 points.
+        //
+        // It is also P6-61: only `bullish` came from the model. `bearish` was
+        // `65 - bullish` clamped to 15-50 and `neutral` was the remainder, so
+        // the whole three-way split — and the `spread` computed from it — was
+        // manufactured from one guess. A survey's three figures are three
+        // measurements; these could not disagree with each other.
+        const bearish = Math.max(15, Math.min(50, 65 - bullishValue))
         const neutral = 100 - bullishValue - bearish
 
-        console.log(`[v0] ✓ AAII Bullish %: Using Grok xAI (${bullishValue})`)
+        console.log(`[v0] AAII bullish ${bullishValue} from Grok (ai-estimate — does not score)`)
         return {
           bullish: bullishValue,
           bearish: Number.parseFloat(bearish.toFixed(1)),
           neutral: Number.parseFloat(neutral.toFixed(1)),
           spread: bullishValue - bearish,
-          status: "live",
+          status: "ai-estimate",
         }
       }
     } catch (grokError) {

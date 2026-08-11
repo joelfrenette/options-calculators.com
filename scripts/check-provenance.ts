@@ -659,9 +659,26 @@ check(
 //       value — that is the invented baseline by another name;
 //   (b) no function that reads an AI provider may return `status: "live"`.
 
-const AI_MODULES = walk(join(ROOT, "lib"), (p) => p.endsWith(".ts") || p.endsWith(".tsx")).filter((f) =>
-  PROVIDER_MARKER.test(code(f)),
-)
+// Scope is STRUCTURAL, not keyword-based, and that distinction cost a real
+// miss. This started as `PROVIDER_MARKER.test(code(f))`, and the only token
+// putting `lib/scraping-bee.tsx` in scope turned out to be the string "xAI"
+// inside a console.log. Rewording that log line — while fixing an unrelated
+// defect three lines away — silently dropped the file out of the rule, and the
+// check went on reporting PASS. The single visible symptom was the detail
+// changing from "12 AI module(s) checked" to "11", which nothing reads.
+//
+// **A check whose scope is inferred from incidental content is a check that can
+// be switched off by editing a comment.** That is the same defect this whole
+// file exists to catch, turned on the file itself: the label ("AI module")
+// stopped matching what the code did, and nothing noticed.
+//
+// A module is in scope if it CALLS a provider SDK or imports a module that
+// does — both of which require an edit to the module's actual behaviour.
+const AI_HELPER_IMPORT = /from\s+["'](?:\.\.?\/|@\/lib\/)(grok-market-data|unified-ai-fallback|ai-providers|earnings-calendar-ai)["']/
+const AI_MODULES = walk(join(ROOT, "lib"), (p) => p.endsWith(".ts") || p.endsWith(".tsx")).filter((f) => {
+  const src = code(f)
+  return PROVIDER_MARKER.test(src) || AI_HELPER_IMPORT.test(src)
+})
 const aiConstants: string[] = []
 const aiLiveClaims: string[] = []
 for (const f of AI_MODULES) {
@@ -671,12 +688,20 @@ for (const f of AI_MODULES) {
   })
   // A module that calls a provider must not hand back a "live" tier for it.
   // `scrapeBuffettIndicator` and the CBOE branch legitimately do — they return
-  // live for a SCRAPE — so this only flags a live status within ~6 lines of an
-  // AI call, which is where the laundering happened.
+  // live for a SCRAPE — so this flags a live status only inside the block that
+  // follows an AI call.
+  //
+  // The window was 8 lines when this rule was written, and that was not an
+  // arbitrary choice so much as an unexamined one: it was wide enough for
+  // `scrapePutCallRatio`, the case in hand. `scrapeAAIISentiment` has 16 lines
+  // between its Grok call and its `status: "live"` — because it derives two
+  // more figures in between — so the rule missed a live instance of exactly
+  // what it was written to catch, in the same file, and a human found it.
+  // 30 lines covers every current call site with room to spare.
   const lines = src.split("\n")
   lines.forEach((line, i) => {
     if (!/WithGrok\(|fetchMarketDataWithGrok\(|generateWithFallback\(/.test(line)) return
-    const window = lines.slice(i, i + 8).join("\n")
+    const window = lines.slice(i, i + 30).join("\n")
     if (/status:\s*["']live["']/.test(window)) aiLiveClaims.push(`${rel(f)}:${i + 1}`)
   })
 }
