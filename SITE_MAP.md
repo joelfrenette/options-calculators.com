@@ -66,7 +66,7 @@
 | `collars` | Collars | `OptionsStrategyToolbox strategy="collars"` | `components/options-strategy-toolbox.tsx` | 1027 | none (static) |
 | `exit-rules` | Exit Rules | `ExitRulesDashboard` | `components/exit-rules-dashboard.tsx` | 559 | none (static) |
 | `earnings-iv-crusher` | Earnings EM | `EarningsVolatilityCalculator` | `components/earnings-volatility-calculator.tsx` | 534 | none (static) |
-| `greeks` | Greeks Calc | `GreeksCalculator` | `components/greeks-calculator.tsx` | 489 | none (static) |
+| `greeks` | Greeks Calc | `GreeksCalculator` | `components/greeks-calculator.tsx` | 506 | none (static) |
 | `risk-rewards` | ROI Calc | `RiskRewardCalculator` | `components/risk-reward-calculator.tsx` | 316 | none (static) |
 
 ## 2. API DEPENDENCY GRAPH

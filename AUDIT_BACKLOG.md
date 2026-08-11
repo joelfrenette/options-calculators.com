@@ -386,12 +386,14 @@ recomputes it.
 | P7-9 | P3 | fixed | **17 → 0, decided one at a time.** Fourteen deleted, two wired to the caller that had reimplemented them, one un-exported. `KNOWN_DEAD` is now empty, so any new unreferenced export in `lib/` fails. |
 | P7-10 | P2 | open | `nvidiaMomentum ?? 50` — a neutral-50 on a scored 0-100 momentum input. Excluded from scoring by its baseline tier; the display side is unverified. |
 | P7-11 | P2 | fixed | `check-dead-exports.ts` counted a same-named local declaration as a reference, so a lib export with a diverged twin — the dangerous case — read as live. |
-| P7-12 | P2 | open | **`components/greeks-calculator.tsx` computes Black-Scholes itself**, with no degenerate-input guard: T=0 or IV=0 renders NaN where `lib/black-scholes.ts` returns null. |
-| P7-13 | P3 | open | Three more same-name duplicates of live code, surfaced by P7-11's NOTE line: `expectedMove`, `fetchExecutiveSummary`, and `daysBetween` in three modules. |
+| P7-12 | P2 | fixed | The Greeks calculator's own Black-Scholes is gone; gamma/theta/rho added to `lib/black-scholes.ts` with 19 new tests. The real bug was a missing `else` leaving stale Greeks on screen, not the NaN first recorded. |
+| P7-13 | P3 | fixed | `expectedMove` recomputed inline in `/api/strategy-scanner` now calls `lib/black-scholes.ts` and skips the row when it returns null. |
+| P7-14 | P2 | open | **`hooks/use-ccpi-data.ts` has no consumer anywhere**, and transitively keeps eight `lib/` exports off the dead list. The rule tests reference, not reachability. |
+| P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-216 findings recorded · **168 fixed · 7 wontfix · 0 verified-ok · 41 open.**
+218 findings recorded · **170 fixed · 8 wontfix · 0 verified-ok · 40 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -1636,3 +1638,114 @@ to change one behaviour.
 |---|---|---|---|
 | P7-12 | P2 | LEARN → Greeks | **The Greeks calculator computes Black-Scholes itself and skips the degenerate-input guard.** `lib/black-scholes.ts` returns null for T≤0 or IV≤0 so the UI can render "—"; the local copy divides by zero and renders NaN. **OPEN.** |
 | P7-13 | P3 | site-wide | **Three same-name duplicates of live code**, surfaced by P7-11's NOTE: `expectedMove` inline in `/api/strategy-scanner`, `fetchExecutiveSummary` in `components/ccpi-dashboard.tsx`, and `daysBetween` in three modules. **OPEN.** |
+
+---
+
+## Phase 7.4 (tenth pass) — P7-12 and P7-13, and a correction (2026-08-11)
+
+### The correction first
+
+**P7-12 was recorded as "renders NaN on a public calculator tab". That was wrong.**
+The `useEffect` in `components/greeks-calculator.tsx` screened its inputs
+(`if (stock > 0 && strike > 0 && days > 0 && iv > 0)`) before calling the local math, so
+no NaN ever reached the screen. The row is corrected rather than quietly reworded,
+because a backlog that overstates a defect is the same failure as one that understates it
+— and this file's whole argument is that the record has to be checkable.
+
+**The real defect was in the same four lines, and it was live.** That `if` had no `else`,
+so when any input went to zero or was cleared, `setGreeks` was never called and the panel
+below went on rendering **the last computed set**. Delete the implied volatility, and the
+screen kept showing Greeks for an IV that was no longer entered — stale numbers presented
+as current, with nothing marking them stale. Fixed by making the effect unconditional:
+`calculateGreeks` now returns `null` on unusable inputs and the panel hides, which is the
+same behaviour the rest of the site uses for absent data.
+
+### P7-12 — the library could not supply what the rule demanded
+
+`components/greeks-calculator.tsx` declared its own `normalCDF`, `normalPDF` and
+`calculateGreeks` against a house rule that says option math comes from
+`lib/black-scholes.ts` and is never re-implemented locally.
+
+**The reason it did is the part worth recording: `lib/black-scholes.ts` had delta and
+vega, and no gamma, theta or rho.** Two of the five Greeks that component renders. The
+rule was not followable for that file, so whoever wrote it did the only thing available.
+A rule with no implementation behind it gets broken by anyone doing the work, and blaming
+the call site misses where the fix belongs.
+
+So the fix went into the library first. `calculateGamma`, `calculateTheta` and
+`calculateRho` now exist, with the module's existing contract: dividend yield applied, and
+`null` — never a number — on non-positive time, price or volatility.
+
+Two substantive differences died with the copy:
+
+- **The local theta dropped the dividend term**, which overstates decay on dividend
+  payers. Same direction of error as the delta fix P6 already made in this module.
+- **The guard lived in the caller, not the math.** The `useEffect` screened its inputs, so
+  that one call site was safe; anything else importing the local helpers would not have
+  been. `dTerms()` now refuses degenerate inputs for every caller. Gamma is the one that
+  matters most — its denominator carries σ√T, so an unguarded implementation returns
+  `Infinity` exactly at expiry, and `Infinity` formats onto a screen rather than failing.
+
+**Nineteen new reference checks, against a published source.** The fixture is Hull ch. 19's
+worked example (S=49, K=50, r=5%, σ=20%, T=20 weeks) chosen precisely because its Greeks
+are printed in the book: delta 0.522, gamma 0.066, vega 12.1, theta −4.31/year, rho 8.91.
+An external reference cannot be re-derived from the implementation the way a
+self-generated expectation can. All five match. The unit conversions are asserted
+explicitly — Hull quotes vega per unit of vol and theta per year, this module reports vega
+per percentage point and theta per calendar day — because a units slip is the most likely
+error here and the least visible.
+
+One tolerance is set by **Hull's precision, not ours**: he prints three significant
+figures, so "12.1" is any value in [12.05, 12.15], and the computed 12.1055 agrees with
+it. A tighter band would have been rejecting the reference's rounding and calling it a
+defect. Formulas 514 → 533.
+
+### P7-13 — one of the three was a fix, and the other two were not
+
+`expectedMove` **fixed.** `/api/strategy-scanner` recomputed `price * ivData.atmIV *
+Math.sqrt(1/365)` inline instead of calling the library function of that name. Same
+formula — but `ivData.atmIV` is upstream data, so a zero is a state the loop can reach,
+and the library returns `null` there instead of producing a number from it. The route now
+skips the row.
+
+`fetchExecutiveSummary` **is not a duplicate to collapse** — it is P7-14. See below.
+
+`daysBetween` **wontfix, and the reason is in the code already.** `lib/ccpi/lead-time.ts`
+declares in its own header that it is deliberately dependency-free: *"node's type
+stripping cannot resolve extensionless local imports, so anything a check script must load
+stays import-free."* The same constraint that makes `lib/ccpi/calculations.ts` untestable
+(P6-85) is what forces this helper to be written where it is used. All three bodies return
+`NaN` on malformed input, so they are behaviourally identical; collapsing them would trade
+test coverage for tidiness. Recorded as P7-15 so the next reader does not re-open it.
+
+### P7-14 — reference is not reachability
+
+Chasing P7-13's `fetchExecutiveSummary` found something the dead-export rule cannot see.
+
+`hooks/use-ccpi-data.ts` exports `useCCPIData`, and **nothing in the repo imports it.**
+The CCPI dashboard carries its own state and its own fetches. The hook is unreachable
+code.
+
+It is also the sole referrer for eight `lib/` exports — `fetchCCPI`, `fetchCCPIHistory`,
+`fetchExecutiveSummary` and `refreshCCPIData` in `lib/ccpi/api.ts`, the `getCachedData` /
+`setCachedData` / `hasFreshCache` trio in `lib/ccpi/cache.ts`, and `logError` in
+`lib/ccpi/logger.ts`. Every one of them passes `check-dead-exports.ts`, correctly: they
+*are* referenced. They are just referenced by something no page can reach.
+
+**This is the honest limit of the rule as built, stated rather than pretended away.** It
+answers "is this symbol referenced", which is one hop. Reachability is the transitive
+question, and a module that nothing imports keeps its whole import surface alive
+underneath it. P7-9 burned a list down to zero against a rule that a single unreachable
+file can hold open.
+
+Left OPEN rather than swept: deleting the hook cascades into eight more one-at-a-time
+decisions, which is the P7-9 discipline again and deserves its own pass — not a tail
+appended to this one. Note that `saveCCPIToCache` / `loadCCPIFromCache` survive either
+way; the dashboard imports those directly.
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| P7-12 | P2 | LEARN → Greeks | **FIXED, and the original wording corrected.** The component's own Black-Scholes is deleted; `lib/black-scholes.ts` gained gamma, theta and rho — whose absence was why the copy existed — with 19 checks against Hull ch. 19's published values. The live bug was an `if` with no `else` leaving the previous Greeks on screen after an input was cleared, not the NaN first recorded. |
+| P7-13 | P3 | site-wide | **FIXED.** `/api/strategy-scanner` calls `expectedMove` from `lib/black-scholes.ts` and skips the row on null, instead of recomputing the formula inline over upstream data that can be zero. |
+| P7-14 | P2 | ANALYZE → CCPI | **`hooks/use-ccpi-data.ts` is unreachable — nothing imports `useCCPIData`** — and it is the only referrer for eight `lib/` exports, which therefore pass the dead-export rule while being unreachable from any page. **The rule tests reference, not reachability**, and one unreachable module holds its whole import surface open. **OPEN**, because deleting it cascades into eight further decisions. |
+| P7-15 | P3 | tooling / lib | **`daysBetween` is written three times, deliberately.** `lib/ccpi/lead-time.ts` documents why: a module a check script must load under bare node has to stay import-free, since type stripping cannot resolve extensionless local imports (the P6-85 constraint). All three bodies are behaviourally identical. **WONTFIX** — collapsing it trades test coverage for tidiness. |

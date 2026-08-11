@@ -1,6 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { resolveApiKey } from "@/lib/api-keys"
-import { calculateDelta as bsDelta, calculateOptionPrice, probabilityBetween, probabilityOTM } from "@/lib/black-scholes"
+import {
+  calculateDelta as bsDelta,
+  calculateOptionPrice,
+  probabilityBetween,
+  probabilityOTM,
+  expectedMove as bsExpectedMove,
+} from "@/lib/black-scholes"
 import { meteredFetch } from "@/lib/metered-fetch"
 
 // Resolved through lib/api-keys so the DISABLED_APIS kill switch and the
@@ -576,7 +582,13 @@ async function generateEarningsPlays() {
 
     // One-session expected move: S · IV · √(1/365). The straddle is priced from
     // the model at the ATM strike rather than the previous `expectedMove * 1.1`.
-    const expectedMove = price * ivData.atmIV * Math.sqrt(1 / 365)
+    //
+    // P7-13: computed by `expectedMove` in lib/black-scholes.ts rather than
+    // inline. Same formula, but the library returns null on non-positive price,
+    // IV or time instead of producing a number from them — and `ivData.atmIV`
+    // is upstream data, so "0" is a state this loop can actually reach.
+    const expectedMove = bsExpectedMove(price, ivData.atmIV, 1 / 365)
+    if (expectedMove === null) continue
     const expectedMovePercent = (expectedMove / price) * 100
     const atmStrike = Math.round(price / 5) * 5
     const straddleParams = {

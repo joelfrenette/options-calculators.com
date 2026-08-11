@@ -14,6 +14,10 @@ import {
   probabilityBetween,
   probabilityITM,
   calculateVega,
+  calculateGamma,
+  calculateTheta,
+  calculateRho,
+  calculateDelta,
   normalCDF,
 } from "../lib/black-scholes.ts"
 
@@ -134,6 +138,73 @@ near("vega ~0 deep ITM", calculateVega({ ...vegaBase, strikePrice: 50 }), 0.0002
 near("vega rises with a dividend yield", calculateVega({ ...vegaBase, dividendYield: 0.03 }), 0.37949, 1e-5)
 isNull("vega zero time → null", calculateVega({ ...vegaBase, timeToExpiry: 0 }))
 isNull("vega zero vol → null", calculateVega({ ...vegaBase, volatility: 0 }))
+
+
+// --- Gamma, theta and rho (P7-12). New here because they were new to the
+// module: lib/black-scholes.ts could supply only two of the five Greeks the
+// Greeks calculator renders, which is why that component carried its own
+// Black-Scholes. Moving math out of an untested component and into an untested
+// library would have moved the problem, not fixed it.
+//
+// The fixture is HULL, ch. 19's worked example — S=49, K=50, r=5%, sigma=20%,
+// T=20 weeks — precisely because its Greeks are PUBLISHED: delta 0.522,
+// gamma 0.066, vega 12.1, theta -4.31/year, rho 8.91. An external reference
+// cannot be quietly re-derived from the implementation the way a
+// self-generated expectation can.
+const hullGreeks = { stockPrice: 49, strikePrice: 50, timeToExpiry: 20 / 52, volatility: 0.2, riskFreeRate: 0.05 }
+
+near("Hull ch19: call delta 0.522", calculateDelta(hullGreeks, true), 0.522, 5e-4)
+near("Hull ch19: gamma 0.066", calculateGamma(hullGreeks), 0.066, 5e-4)
+// Hull quotes vega per UNIT of vol and theta per YEAR; this module reports vega
+// per percentage point and theta per calendar day. The conversions are asserted
+// rather than hidden, because a units slip here is the most likely error and
+// the least visible one.
+//
+// Tolerances are set by HULL'S OWN PRECISION, not by ours. He prints these to
+// three significant figures, so "12.1" is any value in [12.05, 12.15]; the
+// computed 12.1055 agrees with the published figure and a 5e-3 band would have
+// been rejecting the reference's rounding rather than a defect in the code.
+near("Hull ch19: vega 12.1 per unit vol", (calculateVega(hullGreeks) as number) * 100, 12.1, 1e-2)
+near("Hull ch19: theta -4.31 per year", (calculateTheta(hullGreeks, true) as number) * 365, -4.31, 5e-3)
+near("Hull ch19: rho 8.91 per unit rate", (calculateRho(hullGreeks, true) as number) * 100, 8.91, 5e-3)
+
+const atm = { stockPrice: 100, strikePrice: 100, timeToExpiry: 1, volatility: 0.2, riskFreeRate: 0.05 }
+
+// Gamma is identical for calls and puts — it has no isCall parameter, and this
+// asserts that is a property of the math rather than an omission in the API.
+near("gamma ATM 1y", calculateGamma(atm), 0.018762, 1e-6)
+near("gamma rises as expiry nears", calculateGamma({ ...atm, timeToExpiry: 0.25 }), 0.039288, 1e-6)
+
+// Long options decay: theta is negative on both sides. The put is LESS negative
+// than the call at r>0 because the interest carry works the other way — a sign
+// slip in the carry term would flip this ordering while leaving both negative.
+near("theta call ATM per day", calculateTheta(atm, true), -0.0175727, 1e-6)
+near("theta put ATM per day", calculateTheta(atm, false), -0.0045421, 1e-6)
+near(
+  "put theta is less negative than call theta at r>0",
+  (calculateTheta(atm, false) as number) > (calculateTheta(atm, true) as number) ? 1 : 0,
+  1,
+  0,
+)
+// The dividend term the component copy omitted. Without it this value is
+// unchanged from the no-dividend case; with it, decay is materially smaller.
+near("theta includes the dividend term", calculateTheta({ ...atm, dividendYield: 0.03 }, true), -0.0122918, 1e-6)
+
+// Rho is positive for calls and negative for puts: a rate rise lifts the call
+// and depresses the put.
+near("rho call ATM", calculateRho(atm, true), 0.532325, 1e-6)
+near("rho put ATM", calculateRho(atm, false), -0.418904, 1e-6)
+
+// Degenerate inputs return null, never 0 and never Infinity. Gamma is the one
+// that matters most: its denominator carries sigma and sqrt(T), so an unguarded
+// implementation returns Infinity exactly at expiry — a number that formats as
+// "Infinity" on screen rather than failing loudly.
+isNull("gamma zero time → null", calculateGamma({ ...atm, timeToExpiry: 0 }))
+isNull("gamma zero vol → null", calculateGamma({ ...atm, volatility: 0 }))
+isNull("theta zero time → null", calculateTheta({ ...atm, timeToExpiry: 0 }, true))
+isNull("theta zero vol → null", calculateTheta({ ...atm, volatility: 0 }, true))
+isNull("rho zero time → null", calculateRho({ ...atm, timeToExpiry: 0 }, true))
+isNull("rho zero price → null", calculateRho({ ...atm, stockPrice: 0 }, true))
 
 console.log(failures === 0 ? "\nAll black-scholes reference checks passed." : `\n${failures} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)

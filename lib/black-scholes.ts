@@ -27,6 +27,11 @@ export function normalCDF(x: number): number {
   return x > 0 ? 1 - prob : prob
 }
 
+/** Standard normal PDF, φ(x). */
+function normalPDF(x: number): number {
+  return Math.exp((-x * x) / 2) / Math.sqrt(2 * Math.PI)
+}
+
 export interface BlackScholesParams {
   stockPrice: number
   strikePrice: number
@@ -96,8 +101,63 @@ export function calculateVega(params: BlackScholesParams): number | null {
   const d = dTerms(params)
   if (!d) return null
   const { stockPrice, timeToExpiry, dividendYield = 0 } = params
-  const pdf = Math.exp((-d.d1 * d.d1) / 2) / Math.sqrt(2 * Math.PI)
-  return (stockPrice * Math.exp(-dividendYield * timeToExpiry) * Math.sqrt(timeToExpiry) * pdf) / 100
+  return (stockPrice * Math.exp(-dividendYield * timeToExpiry) * Math.sqrt(timeToExpiry) * normalPDF(d.d1)) / 100
+}
+
+// P7-12 added gamma, theta and rho below. Their absence was the reason
+// components/greeks-calculator.tsx carried a second Black-Scholes: the module
+// the house rule points at could supply two of the five Greeks it renders, so
+// "never re-implement locally" was not actually followable for that component.
+// A rule with no implementation behind it gets broken by anyone doing the work.
+
+/**
+ * Gamma = e^(-qT) · φ(d1) / (S · σ · √T). Identical for calls and puts.
+ *
+ * Rate of change of delta per $1 of underlying. Largest at the money and near
+ * expiry, which is exactly where the degenerate-input guard matters: as T → 0
+ * the denominator → 0 and an unguarded implementation returns Infinity.
+ */
+export function calculateGamma(params: BlackScholesParams): number | null {
+  const d = dTerms(params)
+  if (!d) return null
+  const { stockPrice, timeToExpiry, volatility, dividendYield = 0 } = params
+  return (
+    (Math.exp(-dividendYield * timeToExpiry) * normalPDF(d.d1)) /
+    (stockPrice * volatility * Math.sqrt(timeToExpiry))
+  )
+}
+
+/**
+ * Theta PER CALENDAR DAY (the annual figure divided by 365), which is how every
+ * surface in this app displays it. Negative for long options.
+ *
+ * Includes the dividend term: for a call, +qS·e^(-qT)·N(d1); for a put,
+ * -qS·e^(-qT)·N(-d1). Dropping it — as the component copy did — overstates
+ * decay on dividend payers, the same direction of error P6's delta fix removed.
+ */
+export function calculateTheta(params: BlackScholesParams, isCall: boolean): number | null {
+  const d = dTerms(params)
+  if (!d) return null
+  const { stockPrice, strikePrice, timeToExpiry, volatility, riskFreeRate = 0.045, dividendYield = 0 } = params
+  const discountedStock = stockPrice * Math.exp(-dividendYield * timeToExpiry)
+  const decay = -(discountedStock * normalPDF(d.d1) * volatility) / (2 * Math.sqrt(timeToExpiry))
+  const carry = riskFreeRate * strikePrice * Math.exp(-riskFreeRate * timeToExpiry)
+  const annual = isCall
+    ? decay - carry * normalCDF(d.d2) + dividendYield * discountedStock * normalCDF(d.d1)
+    : decay + carry * normalCDF(-d.d2) - dividendYield * discountedStock * normalCDF(-d.d1)
+  return annual / 365
+}
+
+/**
+ * Rho per 1 percentage-point change in the risk-free rate.
+ * Call: K·T·e^(-rT)·N(d2) / 100. Put: -K·T·e^(-rT)·N(-d2) / 100.
+ */
+export function calculateRho(params: BlackScholesParams, isCall: boolean): number | null {
+  const d = dTerms(params)
+  if (!d) return null
+  const { strikePrice, timeToExpiry, riskFreeRate = 0.045 } = params
+  const base = (strikePrice * timeToExpiry * Math.exp(-riskFreeRate * timeToExpiry)) / 100
+  return isCall ? base * normalCDF(d.d2) : -base * normalCDF(-d.d2)
 }
 
 // -------------------------------------------------------------------- price

@@ -8,55 +8,67 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Info, TrendingUp, Activity } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
+import {
+  calculateDelta,
+  calculateGamma,
+  calculateTheta,
+  calculateVega,
+  calculateRho,
+} from "@/lib/black-scholes"
 
-// Black-Scholes Greeks calculations
-function normalCDF(x: number): number {
-  const t = 1 / (1 + 0.2316419 * Math.abs(x))
-  const d = 0.3989423 * Math.exp((-x * x) / 2)
-  const prob = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))))
-  return x > 0 ? 1 - prob : prob
-}
+/**
+ * P7-12. This file used to declare its own `normalCDF`, `normalPDF` and
+ * `calculateGreeks` — a second Black-Scholes implementation in a repo whose
+ * house rule is "option math from lib/black-scholes.ts, never re-implement
+ * locally". The `normalCDF` bodies were byte-identical, so the copy was not
+ * *wrong* on the day it was written; it was a place a future fix would have to
+ * be applied twice, and the audit has watched that fail four times.
+ *
+ * Two substantive differences went with it. The local theta dropped the
+ * dividend term, which overstates decay on dividend payers — the same
+ * direction of error P6 removed from delta. And the local functions had no
+ * degenerate-input guard: `lib/black-scholes.ts` runs `isUsable()` and returns
+ * `null` for non-positive time, price or volatility, so the caller can render
+ * "—". The copy would have divided by zero. The `useEffect` below happened to
+ * screen its inputs first, so no NaN ever reached the screen — but the guard
+ * lived in the caller rather than the math, which means it protected this one
+ * call site and nothing else.
+ */
+type Greeks = { delta: number; gamma: number; theta: number; vega: number; rho: number }
 
-function normalPDF(x: number): number {
-  return Math.exp((-x * x) / 2) / Math.sqrt(2 * Math.PI)
-}
-
+/**
+ * All five Greeks, or null if any is unavailable.
+ *
+ * All-or-nothing on purpose: a partial set would need five independent "—"
+ * states in the panel below, and there is no input that makes one Greek
+ * computable and another not — `dTerms` either resolves for the whole set or
+ * for none of it.
+ */
 function calculateGreeks(
   stockPrice: number,
   strikePrice: number,
-  timeToExpiration: number,
-  volatility: number,
-  riskFreeRate: number,
+  daysToExpiration: number,
+  volatilityPercent: number,
+  riskFreeRatePercent: number,
   optionType: "call" | "put",
-) {
-  const T = timeToExpiration / 365
-  const S = stockPrice
-  const K = strikePrice
-  const sigma = volatility / 100
-  const r = riskFreeRate / 100
+): Greeks | null {
+  const isCall = optionType === "call"
+  // lib/black-scholes.ts takes YEARS and DECIMALS; this form takes days and percents.
+  const params = {
+    stockPrice,
+    strikePrice,
+    timeToExpiry: daysToExpiration / 365,
+    volatility: volatilityPercent / 100,
+    riskFreeRate: riskFreeRatePercent / 100,
+  }
 
-  const d1 = (Math.log(S / K) + (r + (sigma * sigma) / 2) * T) / (sigma * Math.sqrt(T))
-  const d2 = d1 - sigma * Math.sqrt(T)
+  const delta = calculateDelta(params, isCall)
+  const gamma = calculateGamma(params)
+  const theta = calculateTheta(params, isCall)
+  const vega = calculateVega(params)
+  const rho = calculateRho(params, isCall)
 
-  // Delta
-  const delta = optionType === "call" ? normalCDF(d1) : normalCDF(d1) - 1
-
-  // Gamma (same for calls and puts)
-  const gamma = normalPDF(d1) / (S * sigma * Math.sqrt(T))
-
-  // Theta (per day)
-  const thetaCall = ((-S * normalPDF(d1) * sigma) / (2 * Math.sqrt(T)) - r * K * Math.exp(-r * T) * normalCDF(d2)) / 365
-  const thetaPut = ((-S * normalPDF(d1) * sigma) / (2 * Math.sqrt(T)) + r * K * Math.exp(-r * T) * normalCDF(-d2)) / 365
-  const theta = optionType === "call" ? thetaCall : thetaPut
-
-  // Vega (per 1% change in IV)
-  const vega = (S * normalPDF(d1) * Math.sqrt(T)) / 100
-
-  // Rho (per 1% change in interest rate)
-  const rhoCall = (K * T * Math.exp(-r * T) * normalCDF(d2)) / 100
-  const rhoPut = (-K * T * Math.exp(-r * T) * normalCDF(-d2)) / 100
-  const rho = optionType === "call" ? rhoCall : rhoPut
-
+  if (delta === null || gamma === null || theta === null || vega === null || rho === null) return null
   return { delta, gamma, theta, vega, rho }
 }
 
@@ -189,7 +201,7 @@ export function GreeksCalculator() {
   const [daysToExpiration, setDaysToExpiration] = useState("30")
   const [impliedVolatility, setImpliedVolatility] = useState("30")
   const [optionType, setOptionType] = useState<"call" | "put">("put")
-  const [greeks, setGreeks] = useState<any>(null)
+  const [greeks, setGreeks] = useState<Greeks | null>(null)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
 
   useEffect(() => {
@@ -198,10 +210,15 @@ export function GreeksCalculator() {
     const days = Number.parseFloat(daysToExpiration) || 0
     const iv = Number.parseFloat(impliedVolatility) || 0
 
-    if (stock > 0 && strike > 0 && days > 0 && iv > 0) {
-      const calculated = calculateGreeks(stock, strike, days, iv, 4.5, optionType)
-      setGreeks(calculated)
-    }
+    // P7-12. This `if` had no `else`, so clearing or zeroing any input left
+    // `greeks` holding the LAST computed set and the panel below went on
+    // rendering it. Delete the IV, and the screen kept showing Greeks for an
+    // IV that was no longer entered — stale numbers presented as current,
+    // with nothing on screen marking them stale. Setting null hides the panel,
+    // which is the same "—" behaviour the rest of the site uses for absent
+    // data. `calculateGreeks` also returns null on degenerate inputs now, so
+    // the guard exists in the math as well as here.
+    setGreeks(calculateGreeks(stock, strike, days, iv, 4.5, optionType))
   }, [stockPrice, strikePrice, daysToExpiration, impliedVolatility, optionType])
 
   return (
