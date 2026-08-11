@@ -835,3 +835,30 @@ Remaining: P6-29 dead CCPI duplicates; S-11 and S-14; the modules still over the
 600-line budget. **CCPI Phase 3 (scoring) is blocked by design, not effort** — nothing has
 earned weight, and it unblocks only on ~2 years of accumulated breadth or a paid credit
 source with real history (§8a). Do not "finish" it by inventing weights.
+
+---
+
+## PHASE 6 CLOSED — 2026-08-11
+
+**51 findings (P6-38…P6-88), 24 commits on `audit-preview` at `4caa43f`, production
+still `5e129f5`.** Checks at close, run individually because `pnpm check`
+short-circuits: typecheck 10 known errors · formulas **492** PASS / 0 FAIL ·
+contracts 61 routes / 61 contracts · remediation 31 PASS.
+
+**Read the PHASE 6 SYNTHESIS near the top of this file, not these rows.** The rows
+record what was wrong; the synthesis records what kept going wrong, which is what
+transfers to Phase 7.
+
+**Two P1s are LIVE ON PRODUCTION until the merge:** P6-42 (the `insiders` tab
+publishing invented trades attributed to named real people) and P6-52 (the seed data
+that fed it, served at HTTP 200 with a fresh timestamp).
+
+**Open and owned by Joel:** the P6-65 weight decision (should 0.19 of
+social-sentiment's composite rest on one Finnhub corpus?), UAT, the `mob` column
+across 42 tabs, and clearing any blank `DAILY_HARD_STOP` / `MONTHLY_HARD_STOP` /
+`MONTHLY_BUDGET_TARGET` in Vercel (P6-86).
+
+**Phase 7 is planned in [AUDIT_PLAN.md](AUDIT_PLAN.md) as six ordered steps.** It
+starts at **7.0 — make the unverifiable verifiable**, which needs a `next build` and
+therefore a clean branch; if the merge has not happened, **7.1 (reconcile this file's
+inconsistent closure markers) needs no build and can start immediately.**
