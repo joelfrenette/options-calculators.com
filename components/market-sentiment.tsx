@@ -1060,11 +1060,25 @@ export function MarketSentiment() {
               <div className="flex items-start gap-3">
                 <InfoIcon />
                 <div>
-                  <h3 className="font-bold text-yellow-900 mb-1">Using Calculated Values</h3>
+                  {/* Was: "the same 7-indicator methodology. Values may differ
+                      slightly from CNN's official index but follow the same
+                      formula." The equal-weight arithmetic does match CNN's. The
+                      inputs do not: "Put and Call Options" is computed from VIX
+                      against its 50-day MA rather than from any options ratio, so
+                      two of the seven components read the same instrument. And
+                      "slightly" was never supported — components can drop out
+                      entirely, and the fallback previously invented the NYSE
+                      highs/lows behind Stock Price Strength from SPY momentum,
+                      which indicator 1 already measures. Same move as claiming
+                      CME FedWatch because the output was a probability (P6-45). */}
+                  <h3 className="font-bold text-yellow-900 mb-1">Using This Site&apos;s Own Calculation</h3>
                   <p className="text-sm text-yellow-800 leading-relaxed">
-                    CNN's Fear & Greed Index is currently unavailable. We're using our own calculation based on real
-                    market data (VIX, S&P 500, bond spreads) with the same 7-indicator methodology. Values may differ
-                    slightly from CNN's official index but follow the same formula.
+                    CNN&apos;s Fear &amp; Greed Index is unreachable, so this reading is computed here from VIX, SPY,
+                    TLT and HYG. It borrows CNN&apos;s seven component names and their equal weighting, but the inputs
+                    are this site&apos;s own — Put and Call Options is derived from VIX rather than an options ratio.
+                    Components with no data are excluded and the average is taken over the rest, so expect this number
+                    to differ from CNN&apos;s by more than a rounding step. Treat it as a second opinion, not a
+                    substitute.
                   </p>
                 </div>
               </div>

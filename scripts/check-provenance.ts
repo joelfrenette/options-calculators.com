@@ -436,5 +436,96 @@ check(
   badStatus.length ? [...new Set(badStatus)].join(", ") : "failures carry a failure status",
 )
 
+// ---------------------------------------------------------------------------
+// 10. A claim that rests on a decision is pinned to that decision's code.
+// ---------------------------------------------------------------------------
+//
+// P6-51 is the failure this rule exists for, and it runs the opposite way to
+// every other rule here. The homepage called the CCPI an "AI-powered crash
+// probability model" and that was TRUE when it was written. P6-34 then removed
+// ai-estimate from pillar scoring — the index got more honest — and the claim
+// became false without anyone touching it. Nothing compares a sentence against
+// the decision it depends on, so nothing noticed for a day.
+//
+// Each entry names a claim, the file it lives in, and a fact about the code
+// that has to remain true for the claim to stay true. BOTH directions fail:
+//
+//   - the code changes and the claim goes stale  -> the dependency fails
+//   - the claim is edited or removed             -> the entry is stale itself
+//
+// The second half matters as much as the first. A registry nobody prunes is
+// the same kind of rotting record as SITE_MAP's erased ledger (P6-23).
+
+interface PinnedClaim {
+  finding: string
+  claimFile: string
+  /** Text that must still be present in the UI. */
+  claim: string
+  dependsOnFile: string
+  /** Must still match in dependsOnFile for the claim to remain true. */
+  dependsOn: RegExp
+  why: string
+}
+
+const PINNED: PinnedClaim[] = [
+  {
+    finding: "P6-34",
+    claimFile: "app/page.tsx",
+    claim: "Only measured readings are scored",
+    dependsOnFile: "lib/ccpi/scoring.ts",
+    dependsOn: /tier === "baseline" \|\| tier === "ai-estimate"/,
+    why: "if ai-estimate ever scores again, the homepage's headline description of the CCPI is false",
+  },
+  {
+    finding: "P6-43",
+    claimFile: "components/scanner/strict-results-table.tsx",
+    claim: "computed from a fixed 35%",
+    dependsOnFile: "components/scanner/enrichment.ts",
+    dependsOn: /estimatedIV = 0\.35/,
+    why: "the banner names a specific assumption; if the synthesis changes, the number in the copy is wrong",
+  },
+  {
+    finding: "P6-45",
+    claimFile: "components/fomc-predictions.tsx",
+    claim: "It is NOT a market-implied rate",
+    dependsOnFile: "app/api/fomc-predictions/route.ts",
+    dependsOn: /predictionScore/,
+    why: "the disclaimer describes a rule-based tally; if the route ever prices futures, it must be withdrawn",
+  },
+  {
+    finding: "P6-58",
+    claimFile: "components/market-sentiment.tsx",
+    claim: "Components with no data are excluded",
+    dependsOnFile: "app/api/market-sentiment/route.ts",
+    dependsOn: /excludedComponents/,
+    why: "the banner promises exclusion; a return to neutral-50 defaults would make it false",
+  },
+]
+
+for (const p of PINNED) {
+  let claimSrc = ""
+  try {
+    claimSrc = read(join(ROOT, p.claimFile.split("/").join(sep)))
+  } catch {
+    /* missing file fails below */
+  }
+  const claimPresent = claimSrc.includes(p.claim)
+  if (!claimPresent) {
+    check(
+      `${p.finding}: pinned claim still exists in ${p.claimFile}`,
+      false,
+      `"${p.claim}" is gone — remove or update this entry so the registry does not rot`,
+    )
+    continue
+  }
+  let depSrc = ""
+  try {
+    depSrc = code(join(ROOT, p.dependsOnFile.split("/").join(sep)))
+  } catch {
+    /* missing file fails below */
+  }
+  check(`${p.finding}: "${p.claim}" still holds`, p.dependsOn.test(depSrc), p.why)
+}
+
 console.log(failures === 0 ? "\nAll provenance checks passed." : `\n${failures} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)

@@ -323,19 +323,26 @@ async function calculateFallbackIndex() {
     const hyg20DayReturn =
       ((hygPrices[hygPrices.length - 1] - hygPrices[hygPrices.length - 20]) / hygPrices[hygPrices.length - 20]) * 100
 
-    // NYSE highs/lows (from ScrapingBee or approximation)
-    let nyseHighs = 150
-    let nyseLows = 80
+    // NYSE highs/lows. Available or not — never approximated.
+    //
+    // The else branch here used to read:
+    //   nyseHighs = Math.round(150 + spyMomentum * 10)
+    //   nyseLows  = Math.round(80  - spyMomentum * 5)
+    // which made "Stock Price Strength" a restatement of SPY momentum — and
+    // SPY-vs-125-day-MA is already indicator 1. Two of the seven equal-weighted
+    // components were then the same measurement, so the average double-counted
+    // it. The starting values (150/80) were invented too: with the scrape down
+    // and momentum flat they scored 65, a Greed reading produced from no data.
+    // A second default pair further up this file (50/100) scored 33, Fear, from
+    // the same absence.
+    let nyseHighs: number | null = null
+    let nyseLows: number | null = null
     if (nyseData) {
       nyseHighs = nyseData.highs
       nyseLows = nyseData.lows
       console.log(`[v0] NYSE Data (Live from ScrapingBee): Highs=${nyseHighs}, Lows=${nyseLows}`)
     } else {
-      // Approximate from SPY momentum
-      const spyMomentum = ((currentSpy - spy125DayMA) / spy125DayMA) * 100
-      nyseHighs = Math.round(150 + spyMomentum * 10)
-      nyseLows = Math.round(80 - spyMomentum * 5)
-      console.log(`[v0] NYSE Data (Approximated from SPY momentum): Highs=${nyseHighs}, Lows=${nyseLows}`)
+      console.log(`[v0] NYSE highs/lows unavailable — Stock Price Strength is excluded, not approximated`)
     }
 
     console.log("[v0] STEP 1 COMPLETE: All indicators collected")
@@ -366,44 +373,62 @@ async function calculateFallbackIndex() {
       `[v0]   Raw score calculation: 50 + (${percentAboveMA.toFixed(2)} * 5) = ${(50 + percentAboveMA * 5).toFixed(1)}`,
     )
 
-    // Neutral 50 when the underlying MA could not be computed (null-aware)
-    const i1_marketMomentum = spy125DayMANullable !== null ? calculateMarketMomentum(currentSpy, spy125DayMA) : 50
+    // Named here so the response can report which components were dropped —
+    // "4 of 7 measured" and "7 of 7 measured" are very different readings and
+    // the payload could not previously tell them apart.
+    const excludedComponents: string[] = []
 
-    const i2_stockStrength = calculateStockStrength(nyseHighs, nyseLows)
-    const i3_stockBreadth = calculateStockBreadth(volumeRatios, priceChanges)
-    const i4_putCallRatio = vix50DayMANullable !== null ? calculatePutCallRatio(currentVix, vix50DayMA) : 50
+    // A missing input scores NOTHING. It used to score 50 — and on this scale 50
+    // is not "absent", it is a real NEUTRAL reading, which is the P6-18 defect
+    // exactly. Excluded components are named in the response and the average
+    // renormalises over what was actually measured, the way the CCPI pillars do.
+    const i1_marketMomentum = spy125DayMANullable !== null ? calculateMarketMomentum(currentSpy, spy125DayMA) : null
+    const i2_stockStrength =
+      nyseHighs !== null && nyseLows !== null ? calculateStockStrength(nyseHighs, nyseLows) : null
+    const i3_stockBreadth = priceChanges.length > 0 ? calculateStockBreadth(volumeRatios, priceChanges) : null
+    const i4_putCallRatio = vix50DayMANullable !== null ? calculatePutCallRatio(currentVix, vix50DayMA) : null
     const i5_marketVolatility = calculateMarketVolatility(currentVix, vix50DayMA)
     const i6_safeHavenDemand = calculateSafeHavenDemand(spy20DayReturn, tlt20DayReturn)
     const i7_junkBondDemand = calculateJunkBondDemand(hyg20DayReturn, tlt20DayReturn)
 
+    const fmt = (v: number | null) => (v === null ? "NO DATA" : `${v.toFixed(1)}/100`)
     console.log("[v0] STEP 2 COMPLETE: Individual scores calculated")
     console.log(
-      `[v0]   I1 - Market Momentum: ${i1_marketMomentum.toFixed(1)}/100 (SPY ${percentAboveMA >= 0 ? "ABOVE" : "BELOW"} MA by ${Math.abs(percentAboveMA).toFixed(2)}%)`,
+      `[v0]   I1 - Market Momentum: ${fmt(i1_marketMomentum)} (SPY ${percentAboveMA >= 0 ? "ABOVE" : "BELOW"} MA by ${Math.abs(percentAboveMA).toFixed(2)}%)`,
     )
-    console.log(`[v0]   I2 - Stock Strength: ${i2_stockStrength.toFixed(1)}/100`)
-    console.log(`[v0]   I3 - Stock Breadth: ${i3_stockBreadth.toFixed(1)}/100`)
-    console.log(`[v0]   I4 - Put and Call Options: ${i4_putCallRatio.toFixed(1)}/100`)
-    console.log(`[v0]   I5 - Market Volatility: ${i5_marketVolatility.toFixed(1)}/100`)
-    console.log(`[v0]   I6 - Safe Haven Demand: ${i6_safeHavenDemand.toFixed(1)}/100`)
-    console.log(`[v0]   I7 - Junk Bond Demand: ${i7_junkBondDemand.toFixed(1)}/100`)
+    console.log(`[v0]   I2 - Stock Strength: ${fmt(i2_stockStrength)}`)
+    console.log(`[v0]   I3 - Stock Breadth: ${fmt(i3_stockBreadth)}`)
+    console.log(`[v0]   I4 - Put and Call Options: ${fmt(i4_putCallRatio)}`)
+    console.log(`[v0]   I5 - Market Volatility: ${fmt(i5_marketVolatility)}`)
+    console.log(`[v0]   I6 - Safe Haven Demand: ${fmt(i6_safeHavenDemand)}`)
+    console.log(`[v0]   I7 - Junk Bond Demand: ${fmt(i7_junkBondDemand)}`)
 
-    // CALCULATE OVERALL SCORE using CNN's equal-weight formula
-    console.log("[v0] STEP 3: Calculating overall score using CNN methodology...")
-    console.log("[v0] Formula: (I1 + I2 + I3 + I4 + I5 + I6 + I7) / 7")
-    console.log(
-      `[v0] Calculation: (${i1_marketMomentum.toFixed(1)} + ${i2_stockStrength.toFixed(1)} + ${i3_stockBreadth.toFixed(1)} + ${i4_putCallRatio.toFixed(1)} + ${i5_marketVolatility.toFixed(1)} + ${i6_safeHavenDemand.toFixed(1)} + ${i7_junkBondDemand.toFixed(1)}) / 7`,
-    )
+    console.log("[v0] STEP 3: Averaging the components that had data")
 
     const overallScore =
-      (i1_marketMomentum +
-        i2_stockStrength +
-        i3_stockBreadth +
-        i4_putCallRatio +
-        i5_marketVolatility +
-        i6_safeHavenDemand +
-        i7_junkBondDemand) /
-      7
+      (() => {
+        const scored = [
+          ["Market Momentum", i1_marketMomentum],
+          ["Stock Price Strength", i2_stockStrength],
+          ["Stock Price Breadth", i3_stockBreadth],
+          ["Put and Call Options", i4_putCallRatio],
+          ["Market Volatility", i5_marketVolatility],
+          ["Safe Haven Demand", i6_safeHavenDemand],
+          ["Junk Bond Demand", i7_junkBondDemand],
+        ] as Array<[string, number | null]>
+        const live = scored.filter(([, v]) => v !== null) as Array<[string, number]>
+        excludedComponents.push(...scored.filter(([, v]) => v === null).map(([n]) => n))
+        // Fewer than four of seven is not a Fear & Greed reading, it is a
+        // fragment of one. Say so rather than publishing a confident number.
+        if (live.length < 4) return null
+        return live.reduce((sum, [, v]) => sum + v, 0) / live.length
+      })()
 
+    if (overallScore === null) {
+      throw new Error(
+        `Fear & Greed cannot be computed: only ${7 - excludedComponents.length} of 7 components had data (missing ${excludedComponents.join(", ")}).`,
+      )
+    }
     const finalScore = Math.round(overallScore * 10) / 10
 
     console.log(`[v0] STEP 3 COMPLETE: Overall Score = ${finalScore}/100`)
@@ -524,14 +549,23 @@ async function calculateFallbackIndex() {
         cboeSkewIndex: 100 + (currentVix - 15) * 2,
       },
       calculationDetails: {
-        formula: "(I1 + I2 + I3 + I4 + I5 + I6 + I7) / 7",
-        weighting: "Equal weight (14.29% each indicator)",
-        methodology: "CNN Fear & Greed Index methodology",
+        formula: "equal-weight mean of the components that had data",
+        weighting: `Equal weight across ${7 - excludedComponents.length} measured component(s)`,
+        // Was "CNN Fear & Greed Index methodology". The AGGREGATION matches
+        // CNN's — seven named components, equal weight — but the inputs do not.
+        // "Put and Call Options" here is computed from VIX against its 50-day
+        // MA, so it is a second volatility reading wearing the put/call name,
+        // and CNN's component is an actual options ratio. Claiming the
+        // methodology because the arithmetic matched is the same move as
+        // claiming CME FedWatch because the output was a probability (P6-45).
+        methodology:
+          "CNN's component names and equal weighting, computed from this site's own inputs. Put and Call Options is derived from VIX, not from an options ratio, so it is not CNN's component of that name.",
+        excludedComponents,
         individualScores: {
-          i1_marketMomentum: i1_marketMomentum.toFixed(2),
-          i2_stockStrength: i2_stockStrength.toFixed(2),
-          i3_stockBreadth: i3_stockBreadth.toFixed(2),
-          i4_putCallRatio: i4_putCallRatio.toFixed(2),
+          i1_marketMomentum: i1_marketMomentum?.toFixed(2) ?? null,
+          i2_stockStrength: i2_stockStrength?.toFixed(2) ?? null,
+          i3_stockBreadth: i3_stockBreadth?.toFixed(2) ?? null,
+          i4_putCallRatio: i4_putCallRatio?.toFixed(2) ?? null,
           i5_marketVolatility: i5_marketVolatility.toFixed(2),
           i6_safeHavenDemand: i6_safeHavenDemand.toFixed(2),
           i7_junkBondDemand: i7_junkBondDemand.toFixed(2),
