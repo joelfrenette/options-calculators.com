@@ -642,5 +642,54 @@ check(
     : `${UI_FILES.length} components checked — missing values render "—", not 0`,
 )
 
+// ---------------------------------------------------------------------------
+// 13. An AI answer never returns a `live` status, and never carries a constant.
+// ---------------------------------------------------------------------------
+//
+// P6-72. P6-34 was the audit's biggest decision: `ai-estimate` stopped scoring,
+// and `fetchWithAIFallback` stopped inventing a baseline. It changed
+// `lib/unified-ai-fallback.ts`. **The identical pattern was sitting in
+// `lib/grok-market-data.ts` the whole time** — four helpers ending
+// `return value || 30 / 1.2 / 55 / 32` — and, worse, `scrapePutCallRatio`
+// labelled a Grok answer `status: "live"`, which `/api/ccpi` mapped straight to
+// the scoring tier. A decision enforced in one module is not enforced.
+//
+// Two rules, both cheap:
+//   (a) no `|| <number>` or `?? <number>` on the same line as a returned AI
+//       value — that is the invented baseline by another name;
+//   (b) no function that reads an AI provider may return `status: "live"`.
+
+const AI_MODULES = walk(join(ROOT, "lib"), (p) => p.endsWith(".ts") || p.endsWith(".tsx")).filter((f) =>
+  PROVIDER_MARKER.test(code(f)),
+)
+const aiConstants: string[] = []
+const aiLiveClaims: string[] = []
+for (const f of AI_MODULES) {
+  const src = code(f)
+  src.split("\n").forEach((line, i) => {
+    if (/return\s+\w*[Vv]alue\s*(?:\|\||\?\?)\s*-?\d/.test(line)) aiConstants.push(`${rel(f)}:${i + 1}`)
+  })
+  // A module that calls a provider must not hand back a "live" tier for it.
+  // `scrapeBuffettIndicator` and the CBOE branch legitimately do — they return
+  // live for a SCRAPE — so this only flags a live status within ~6 lines of an
+  // AI call, which is where the laundering happened.
+  const lines = src.split("\n")
+  lines.forEach((line, i) => {
+    if (!/WithGrok\(|fetchMarketDataWithGrok\(|generateWithFallback\(/.test(line)) return
+    const window = lines.slice(i, i + 8).join("\n")
+    if (/status:\s*["']live["']/.test(window)) aiLiveClaims.push(`${rel(f)}:${i + 1}`)
+  })
+}
+check(
+  "no AI helper returns a hardcoded constant when the model fails",
+  aiConstants.length === 0,
+  aiConstants.length ? aiConstants.join(", ") : `${AI_MODULES.length} AI module(s) checked`,
+)
+check(
+  "no AI answer is handed back with a live status",
+  aiLiveClaims.length === 0,
+  aiLiveClaims.length ? aiLiveClaims.join(", ") : "AI values are tiered ai-estimate, which does not score (P6-34)",
+)
+
 console.log(failures === 0 ? "\nAll provenance checks passed." : `\n${failures} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)

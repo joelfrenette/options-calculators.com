@@ -119,34 +119,16 @@ Respond with ONLY the number, nothing else.`
 }
 
 // Specific helper functions for common indicators
-export async function fetchShillerCAPEWithGrok(): Promise<number> {
-  const value = await fetchMarketDataWithGrok(
-    "Shiller CAPE ratio (cyclically adjusted price-to-earnings ratio for S&P 500)",
-    "Current value as of today",
-  )
-  return value || 30 // Fallback to baseline if AI fails
-}
 
-export async function fetchShortInterestWithGrok(): Promise<number> {
-  const value = await fetchMarketDataWithGrok(
-    "SPY ETF short interest ratio as percentage of float",
-    "Current short interest percentage",
-  )
-  return value || 1.2 // Fallback to baseline if AI fails
-}
-
-export async function fetchMag7ConcentrationWithGrok(): Promise<number> {
-  const value = await fetchMarketDataWithGrok(
-    "Magnificent 7 stocks (AAPL, MSFT, GOOGL, AMZN, NVDA, TSLA, META) market cap as percentage of QQQ ETF",
-    "Current concentration percentage",
-  )
-  return value || 55 // Fallback to baseline if AI fails
-}
-
-export async function fetchQQQPEWithGrok(): Promise<number> {
-  const value = await fetchMarketDataWithGrok(
-    "QQQ ETF forward price-to-earnings ratio",
-    "Current forward P/E for Invesco QQQ Trust",
-  )
-  return value || 32 // Fallback to baseline if AI fails
-}
+// The four helpers that lived here — fetchShillerCAPEWithGrok,
+// fetchShortInterestWithGrok, fetchMag7ConcentrationWithGrok and
+// fetchQQQPEWithGrok — are deleted. Each asked an LLM to recall a published
+// figure and then ended `return value || <constant>`: 30, 1.2, 55, 32. None was
+// imported by anything live.
+//
+// This is P6-34's dead-getter cleanup, one module over. That finding removed
+// getSPXPE/getFearGreed/getYieldCurve for the same reason and made
+// fetchWithAIFallback stop inventing a baseline at all — but it only touched
+// lib/unified-ai-fallback.ts, and the identical pattern sat here untouched.
+// `|| <constant>` after an AI call is the invented-data layer wearing a
+// different import path.

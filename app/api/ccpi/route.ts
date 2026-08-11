@@ -551,7 +551,16 @@ async function fetchMarketData() {
       vixTermStructure: vixTermLive ? "live" : "baseline",
     },
     riskAppetite: {
-      putCallRatio: putCallData.status === "live" ? "live" : aiTier(putCallResult.source),
+      // `status === "live"` used to be trusted outright, which let
+      // scrapePutCallRatio self-report an LLM answer and a VIX-derived number as
+      // live — and live scores. The scraper now distinguishes its own tiers, so
+      // only a real CBOE reading claims live.
+      putCallRatio:
+        putCallData.status === "live"
+          ? "live"
+          : putCallData.status === "ai-estimate"
+            ? "ai-estimate"
+            : aiTier(putCallResult.source),
       fearGreedIndex: fearGreedLive ? "live" : "baseline",
       aaiiBullish: aaiData.status === "live" ? "live" : aiTier(aaiiBullishResult.source),
       shortInterest: aiTier(shortInterestResult.source),

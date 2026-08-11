@@ -442,6 +442,20 @@ function render(): string {
   out.push("")
   out.push("Marks survive `pnpm inventory` — they are read back and merged by tab id.")
   out.push("")
+  out.push("**A tick records the lenses that existed when it was granted, not a clean bill.**")
+  out.push("On 2026-08-11 two new lenses were applied for the first time — provenance (does a")
+  out.push("label match the code behind it) and composite independence (can input A ever")
+  out.push("disagree with input B). **Fourteen tabs that already carried ticks failed one or")
+  out.push("both**: `insiders`, `market-sentiment`, `panic-euphoria`, `trend-analysis`,")
+  out.push("`social-sentiment`, `jobs`, `fomc-predictions`, `earnings-calendar`,")
+  out.push("`calendar-spread-scanner`, `risk-rewards`, `greeks`, `earnings-iv-crusher`,")
+  out.push("`wheel-scanner`, `exit-rules` — see AUDIT_BACKLOG P6-38…P6-72. Every one of")
+  out.push("those defects is now fixed, and rules 1-13 in `scripts/check-provenance.ts`")
+  out.push("stop them returning. The point of this note is narrower and outlives them:")
+  out.push("**a ☑ granted before a lens existed was never tested by it**, and the ledger")
+  out.push("cannot show that on its own. Adding a lens means re-reading the ticks, not")
+  out.push("trusting them.")
+  out.push("")
   out.push(
     table(
       ["Tab", "data", "api", "math", "fb", "copy", "err", "mob", "size"],

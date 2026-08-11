@@ -89,7 +89,7 @@ Every route: HTTP verbs, segment config, upstream hosts, env keys, timeout wirin
 | `/api/auth/reset-password` | POST | — | — | — | **no** | `lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/breadth` | GET | dynamic="force-dynamic" | — | — | yes | `lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/breadth-backtest` | GET | dynamic="force-dynamic"<br>maxDuration=120 | — | — | yes | `lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
-| `/api/ccpi` | GET | — | api.stlouisfed.org<br>production.dataviz.cnn.io<br>www.alphavantage.co | ALPHA_VANTAGE_API_KEY<br>FRED_API_KEY<br>NEXT_PUBLIC_BASE_URL | yes | `components/ccpi-audit-admin.tsx`<br>`components/ccpi-dashboard.tsx`<br>`lib/api-contracts.ts`<br>`lib/ccpi/api.ts`<br>`app/api/admin/run-health-checks/route.ts`<br>`app/api/data-source-status/route.ts` |
+| `/api/ccpi` | GET | — | api.stlouisfed.org<br>production.dataviz.cnn.io<br>www.alphavantage.co | ALPHA_VANTAGE_API_KEY<br>FRED_API_KEY<br>NEXT_PUBLIC_BASE_URL | yes | `components/ccpi-audit-admin.tsx`<br>`components/ccpi-dashboard.tsx`<br>`lib/api-contracts.ts`<br>`lib/ccpi/api.ts`<br>`lib/scraping-bee.tsx`<br>`app/api/admin/run-health-checks/route.ts`<br>`app/api/data-source-status/route.ts` |
 | `/api/ccpi-signals` | GET | dynamic="force-dynamic"<br>revalidate=0<br>maxDuration=60 | — | — | **no** | `components/ccpi/trigger-section.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/ccpi/cache` | GET, POST | — | — | — | **no** | `components/ccpi-dashboard.tsx`<br>`lib/api-contracts.ts`<br>`lib/ccpi/api.ts`<br>`app/api/admin/run-health-checks/route.ts`<br>`app/api/ccpi/route.ts`<br>`app/api/data-source-status/route.ts` |
 | `/api/ccpi/chat` | POST | maxDuration=30 | api.groq.com<br>api.x.ai<br>openrouter.ai | ANTHROPIC_API_KEY<br>GOOGLE_AI_API_KEY<br>GROQ_API_KEY<br>OPENAI_API_KEY<br>OPENROUTER_API_KEY<br>OPENROUTER_FREE_MODEL<br>XAI_API_KEY | **no** | `components/ccpi-chat-modal.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
@@ -147,7 +147,7 @@ _None._
 | Host | Used by |
 |---|---|
 | finance.yahoo.com | `/api/yahoo-proxy`<br>`components/butterfly-scanner.tsx`<br>`components/calendar-spread-scanner.tsx`<br>`components/congress-trade-feed.tsx`<br>`components/credit-spread-scanner.tsx`<br>`components/earnings-economic-calendar.tsx`<br>`components/earnings-plays-scanner.tsx`<br>`components/high-iv-watchlist.tsx`<br>`components/insider-clusters.tsx`<br>`components/insider-trading-dashboard.tsx`<br>`components/iron-condor-scanner.tsx`<br>`components/leaps-scanner.tsx`<br>`components/politician-spotlight.tsx`<br>`components/scanner/fundamental-results-table.tsx`<br>`components/scanner/relaxed-results-table.tsx`<br>`components/scanner/strict-results-table.tsx`<br>`components/smart-money-etfs.tsx`<br>`components/wheel-strategy-screener.tsx`<br>`components/zebra-scanner.tsx` |
-| api.polygon.io | `/api/admin/api-status`<br>`/api/earnings-calendar`<br>`/api/polygon-proxy`<br>`/api/polygon-tickers`<br>`/api/smart-money-etfs`<br>`/api/social-sentiment`<br>`/api/strategy-scanner`<br>`lib/market-snapshot.ts`<br>`lib/qqq-technicals.ts`<br>`lib/scraping-bee.tsx`<br>`lib/sentiment-sources.ts` |
+| api.polygon.io | `/api/admin/api-status`<br>`/api/earnings-calendar`<br>`/api/polygon-proxy`<br>`/api/polygon-tickers`<br>`/api/smart-money-etfs`<br>`/api/social-sentiment`<br>`/api/strategy-scanner`<br>`lib/market-snapshot.ts`<br>`lib/qqq-technicals.ts`<br>`lib/sentiment-sources.ts` |
 | api.stlouisfed.org | `/api/admin/api-status`<br>`/api/ccpi`<br>`/api/cpi-inflation`<br>`/api/fomc-predictions`<br>`/api/jobs-report`<br>`/api/macro-indicators`<br>`/api/panic-euphoria`<br>`components/cpi-inflation-analysis.tsx`<br>`lib/market-snapshot.ts`<br>`lib/vix-term-structure.ts` |
 | finnhub.io | `/api/admin/api-status`<br>`/api/earnings-calendar`<br>`/api/insider-clusters`<br>`/api/insider-trading`<br>`/api/landmine-check`<br>`/api/social-sentiment`<br>`/api/strategy-scanner`<br>`lib/remediation.ts`<br>`lib/sentiment-sources.ts` |
 | app.scrapingbee.com | `/api/admin/api-status`<br>`/api/market-sentiment`<br>`/api/panic-euphoria`<br>`/api/scraping-bee`<br>`/api/scraping-bee/diagnostics`<br>`lib/remediation.ts`<br>`lib/scraping-bee.tsx`<br>`lib/sentiment-sources.ts` |
@@ -156,11 +156,11 @@ _None._
 | google.serper.dev | `/api/admin/api-status`<br>`/api/google-trends`<br>`/api/serper-finance`<br>`lib/sentiment-sources.ts`<br>`lib/serper-finance.ts` |
 | openrouter.ai | `/api/admin/api-status`<br>`/api/ccpi/chat`<br>`/api/ccpi/executive-summary`<br>`lib/ai-providers.ts`<br>`lib/remediation.ts` |
 | query1.finance.yahoo.com | `/api/market-sentiment`<br>`/api/panic-euphoria`<br>`/api/trend-analysis`<br>`/api/vix`<br>`/api/vix-history` |
-| www.alphavantage.co | `/api/admin/api-status`<br>`/api/ccpi`<br>`/api/macro-indicators`<br>`lib/remediation.ts`<br>`lib/scraping-bee.tsx` |
 | api.apify.com | `/api/admin/api-status`<br>`/api/apify-proxy`<br>`lib/apify-yahoo-finance.ts`<br>`lib/sentiment-sources.ts` |
 | api.quiverquant.com | `/api/cron/quiver-probe`<br>`/api/insider-trading`<br>`/api/panic-euphoria`<br>`lib/quiver.ts` |
 | production.dataviz.cnn.io | `/api/admin/api-status`<br>`/api/ccpi`<br>`/api/market-sentiment`<br>`lib/sentiment-sources.ts` |
 | vercel.com | `/api/admin/backup`<br>`app/admin/page.tsx`<br>`components/api-keys-manager.tsx`<br>`lib/remediation.ts` |
+| www.alphavantage.co | `/api/admin/api-status`<br>`/api/ccpi`<br>`/api/macro-indicators`<br>`lib/remediation.ts` |
 | financialmodelingprep.com | `/api/admin/api-status`<br>`/api/polygon-tickers`<br>`lib/fmp-valuation.ts` |
 | www.sec.gov | `/api/form-144`<br>`/api/hedge-fund-13f`<br>`/api/insider-trading` |
 | api.anthropic.com | `/api/admin/api-status`<br>`lib/ai-providers.ts` |
@@ -181,7 +181,6 @@ _None._
 | data.sec.gov | `/api/hedge-fund-13f` |
 | efts.senate.gov | `/api/insider-trading` |
 | example.com | `app/admin/page.tsx` |
-| finviz.com | `lib/scraping-bee.tsx` |
 | fredaccount.stlouisfed.org | `lib/remediation.ts` |
 | groqstatus.com | `lib/remediation.ts` |
 | hebbkx1anhila5yf.public.blob.vercel-storage.com | `components/rotating-ad-banner.tsx` |
@@ -209,7 +208,6 @@ _None._
 | www.cnn.com | `/api/market-sentiment` |
 | www.example.com | `/api/scraping-bee/diagnostics` |
 | www.gurufocus.com | `lib/scraping-bee.tsx` |
-| www.marketwatch.com | `lib/scraping-bee.tsx` |
 | www.options-calculators.com | `/api/cron/budget-guard` |
 | www.perplexity.ai | `lib/remediation.ts` |
 | www.quiverquant.com | `lib/remediation.ts` |
@@ -249,6 +247,20 @@ reach all-☑; without a third mark it would sit half-blank forever and read as
 unaudited. `–` says the column was considered and does not apply.
 
 Marks survive `pnpm inventory` — they are read back and merged by tab id.
+
+**A tick records the lenses that existed when it was granted, not a clean bill.**
+On 2026-08-11 two new lenses were applied for the first time — provenance (does a
+label match the code behind it) and composite independence (can input A ever
+disagree with input B). **Fourteen tabs that already carried ticks failed one or
+both**: `insiders`, `market-sentiment`, `panic-euphoria`, `trend-analysis`,
+`social-sentiment`, `jobs`, `fomc-predictions`, `earnings-calendar`,
+`calendar-spread-scanner`, `risk-rewards`, `greeks`, `earnings-iv-crusher`,
+`wheel-scanner`, `exit-rules` — see AUDIT_BACKLOG P6-38…P6-72. Every one of
+those defects is now fixed, and rules 1-13 in `scripts/check-provenance.ts`
+stop them returning. The point of this note is narrower and outlives them:
+**a ☑ granted before a lens existed was never tested by it**, and the ledger
+cannot show that on its own. Adding a lens means re-reading the ticks, not
+trusting them.
 
 | Tab | data | api | math | fb | copy | err | mob | size |
 |---|---|---|---|---|---|---|---|---|
