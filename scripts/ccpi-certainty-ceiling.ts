@@ -131,6 +131,46 @@ const PILLARS: Array<[string, ReadonlyArray<WeightEntry>, number]> = [
   ["macro", MACRO_WEIGHTS, PILLAR_WEIGHTS.macro],
 ]
 
+/**
+ * The figures AUDIT_BACKLOG (P6-35, P6-76) states in prose.
+ *
+ * Pinning them here is the whole point of the exercise. P6-70 and P6-76 both
+ * found backlog numbers that had never been recomputed — one wrong (a breadth
+ * trough dated October when it is late September), one right but describing
+ * behaviour the code was not exhibiting. In both cases the document was read as
+ * evidence when it was only ever a claim.
+ *
+ * With these assertions the prose and the arithmetic cannot drift apart
+ * silently: change a weight table or a data path and the suite fails here,
+ * naming the figure that needs updating in the backlog. **That is the same
+ * structural move as lib/allocation.ts storing only cash — one source, and the
+ * other side derived rather than restated.**
+ */
+const PUBLISHED: Record<string, number> = {
+  "Everything reachable": 81,
+  "ScrapingBee off": 62,
+  "ScrapingBee and CNN off": 55,
+  "ScrapingBee off, BEFORE P6-72/P6-74 (historical — do not restore)": 79,
+}
+
+let failures = 0
+function assertCeiling(name: string, computed: number): void {
+  const published = PUBLISHED[name]
+  if (published === undefined) {
+    failures++
+    console.log(`FAIL  ${name}: computed ${computed}, but no published figure is pinned`)
+    return
+  }
+  if (published !== computed) {
+    failures++
+    console.log(
+      `FAIL  ${name}: computed ${computed}, AUDIT_BACKLOG says ${published} — update the backlog (P6-35/P6-76) or the assumptions here`,
+    )
+    return
+  }
+  console.log(`PASS  ceiling "${name}" = ${computed}, matching AUDIT_BACKLOG`)
+}
+
 console.log("CCPI certainty ceilings — computed from the live weight tables\n")
 console.log(`MIN_SCORED_MAX = ${MIN_SCORED_MAX} (a pillar below this reports null)\n`)
 
@@ -146,9 +186,22 @@ for (const s of SCENARIOS) {
         `share ${(share * 100).toFixed(0).padStart(2)}%  ${dropped ? "<- BELOW MIN_SCORED_MAX, pillar reports null" : ""}`,
     )
   }
-  console.log(`  ${s.name}: certainty ${Math.round(certainty * 100)}`)
+  const computed = Math.round(certainty * 100)
+  console.log(`  ${s.name}: certainty ${computed}`)
   rows.forEach((r) => console.log(r))
-  console.log(`    ${s.note}\n`)
+  console.log(`    ${s.note}`)
+  assertCeiling(s.name, computed)
+  console.log("")
+}
+
+// A pinned figure whose scenario has been renamed or removed fails too —
+// otherwise the record could keep an entry nothing computes, which is the exact
+// state P6-76 found the backlog in.
+for (const name of Object.keys(PUBLISHED)) {
+  if (!SCENARIOS.some((s) => s.name === name)) {
+    failures++
+    console.log(`FAIL  pinned figure for "${name}" has no matching scenario`)
+  }
 }
 
 console.log(
@@ -156,3 +209,7 @@ console.log(
     "MIN_SCORED_MAX still contributes 0 to certainty either way — the two mechanisms are\n" +
     "separate, and a low certainty does not by itself mean a pillar was dropped.",
 )
+
+console.log(failures === 0 ? "\nAll CCPI certainty ceilings match the record." : `\n${failures} CEILING CHECK(S) FAILED`)
+process.exit(failures === 0 ? 0 : 1)
+process.exit(failures === 0 ? 0 : 1)

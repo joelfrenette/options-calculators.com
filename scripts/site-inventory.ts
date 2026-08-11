@@ -188,7 +188,20 @@ function parseTabs(pageSrc: string): TabDef[] {
   for (const arrayName of Object.keys(FUNCTION_OF)) {
     const block = pageSrc.match(new RegExp(`const ${arrayName}[^=]*=\\s*\\[([\\s\\S]*?)\\n\\]`))
     if (!block) continue
-    const entryRe = /id:\s*"([a-z0-9-]+)",\s*\n?\s*label:\s*"([^"]+)"([\s\S]{0,400}?)(?=\{\s*\n?\s*id:|$)/g
+    // The `{0,400}` window this used to carry silently DROPPED any entry whose
+    // body ran longer — the lookahead could not be satisfied inside it, so the
+    // match failed and the tab vanished from the inventory AND from the §6
+    // sign-off ledger, taking its marks with it.
+    //
+    // That is exactly P6-23, and it happened again on 2026-08-11: adding an
+    // explanatory comment to the `ccpi` entry in app/page.tsx pushed it past
+    // 400 characters and the flagship tab disappeared from both. Nothing failed;
+    // the totals line quietly read 41 instead of 42.
+    //
+    // No cap now — the lookahead alone bounds each entry — and the count is
+    // asserted below, because a parser that can drop a row must not be the only
+    // thing that knows how many rows there should be.
+    const entryRe = /id:\s*"([a-z0-9-]+)",\s*\n?\s*label:\s*"([^"]+)"([\s\S]*?)(?=\{\s*\n?\s*id:|$)/g
     let e: RegExpExecArray | null
     while ((e = entryRe.exec(block[1]))) {
       const comp = tabComponent.get(e[1]) ?? null
@@ -204,6 +217,23 @@ function parseTabs(pageSrc: string): TabDef[] {
       })
     }
   }
+  // A parse that silently loses entries is worse than one that crashes: the
+  // generated file still looks complete. Cross-check the count against the raw
+  // `id:` occurrences in the same source, so a regex that stops matching fails
+  // loudly instead of quietly shrinking the site map and the sign-off ledger.
+  let declared = 0
+  for (const arrayName of Object.keys(FUNCTION_OF)) {
+    const block = pageSrc.match(new RegExp(`const ${arrayName}[^=]*=\\s*\\[([\\s\\S]*?)\\n\\]`))
+    if (block) declared += [...block[1].matchAll(/\bid:\s*"[a-z0-9-]+"/g)].length
+  }
+  if (tabs.length !== declared) {
+    throw new Error(
+      `Tab parse lost entries: matched ${tabs.length} but app/page.tsx declares ${declared}. ` +
+        `The entry regex stopped matching something — fix it rather than regenerating, or SITE_MAP ` +
+        `and the §6 sign-off ledger will both silently drop a tab (P6-23, and again 2026-08-11).`,
+    )
+  }
+
   return tabs
 }
 
