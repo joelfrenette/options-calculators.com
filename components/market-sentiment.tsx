@@ -11,6 +11,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Info } from "lucide-react"
+import { SENTIMENT_ALLOCATION, bandForScore, formatRange, stocksRange } from "@/lib/allocation"
 
 // import {
 //   Activity,
@@ -878,8 +879,6 @@ export function MarketSentiment() {
     if (score <= 24) {
       return {
         level: "Extreme Fear",
-        cashAllocation: "10-20%",
-        marketExposure: "80-90%",
         positionSize: "Larger positions (3-5% per trade)",
         strategies: [
           "Aggressive cash-secured puts on quality stocks",
@@ -899,8 +898,6 @@ export function MarketSentiment() {
     } else if (score <= 44) {
       return {
         level: "Fear",
-        cashAllocation: "20-30%",
-        marketExposure: "70-80%",
         positionSize: "Standard positions (2-3% per trade)",
         strategies: [
           "Moderate cash-secured put selling",
@@ -920,8 +917,6 @@ export function MarketSentiment() {
     } else if (score <= 55) {
       return {
         level: "Neutral",
-        cashAllocation: "30-40%",
-        marketExposure: "60-70%",
         positionSize: "Conservative positions (1-2% per trade)",
         strategies: [
           "Balanced approach to put selling",
@@ -940,8 +935,6 @@ export function MarketSentiment() {
     } else if (score <= 74) {
       return {
         level: "Greed",
-        cashAllocation: "40-60%",
-        marketExposure: "40-60%",
         positionSize: "Small positions (0.5-1% per trade)",
         strategies: [
           "Reduce new put selling significantly",
@@ -961,8 +954,6 @@ export function MarketSentiment() {
     } else {
       return {
         level: "Extreme Greed",
-        cashAllocation: "60-80%",
-        marketExposure: "20-40%",
         positionSize: "Minimal positions (0.25-0.5% per trade)",
         strategies: [
           "STOP opening new put positions",
@@ -982,124 +973,6 @@ export function MarketSentiment() {
     }
   }
 
-  const getPortfolioAllocation = (score: number) => {
-    if (score <= 24) {
-      return {
-        level: "Extreme Fear",
-        stocks: "55-65%",
-        options: "20-30%",
-        cash: "10-15%",
-        description: "Maximum equity exposure - time to be aggressive with quality assets",
-        rationale: [
-          "Stocks/ETFs: Focus on quality dividend-paying stocks, S&P 500 ETFs, and beaten-down tech leaders",
-          "Options: Aggressive put selling and LEAPS calls on quality names with high IV",
-          "Sectors: Spread buying across sectors and broad indexes (SPY/QQQ) rather than one theme",
-          "Cash: Keep 10-15% for potential further dips and margin requirements",
-        ],
-      }
-    } else if (score <= 44) {
-      return {
-        level: "Fear",
-        stocks: "50-60%",
-        options: "15-25%",
-        cash: "15-25%",
-        description: "Strong equity exposure with balanced defensive positioning",
-        rationale: [
-          "Stocks/ETFs: Diversified portfolio across sectors, favor quality over speculation",
-          "Options: Moderate put selling and credit spreads on high-quality underlyings",
-          "Sectors: Add defensive sector weight (XLU/XLP) as insurance against volatility",
-          "Cash: Build reserves for opportunities and risk management",
-        ],
-      }
-    } else if (score <= 55) {
-      return {
-        level: "Neutral",
-        stocks: "40-50%",
-        options: "10-15%",
-        cash: "35-45%",
-        description: "Balanced allocation with increased defensive positioning",
-        rationale: [
-          "Stocks/ETFs: Reduce exposure, favor dividend stocks and defensive sectors (utilities, consumer staples)",
-          "Options: Selective put selling, tight credit spreads, consider protective puts on long positions",
-          "Sectors: Rotate further into defensive sectors and gold-industry names (GDX) for insurance",
-          "Cash: Build significant reserves - opportunity will come",
-        ],
-      }
-    } else if (score <= 74) {
-      return {
-        level: "Greed",
-        stocks: "30-40%",
-        options: "5-10%",
-        cash: "50-65%",
-        description: "Defensive positioning with heavy cash reserves",
-        rationale: [
-          "Stocks/ETFs: Trim winners aggressively, hold only highest-conviction positions",
-          "Options: Minimal new positions, close profitable trades early, consider protective strategies",
-          "Sectors: What stays invested leans defensive - staples, utilities, gold-industry names (GDX)",
-          "Cash: Build maximum reserves - correction likely coming",
-        ],
-      }
-    } else {
-      return {
-        level: "Extreme Greed",
-        stocks: "15-25%",
-        options: "0-5%",
-        cash: "70-85%",
-        description: "Maximum defensive positioning - prepare for correction",
-        rationale: [
-          "Stocks/ETFs: Minimum exposure - only hold absolute best quality defensive stocks",
-          "Options: STOP new positions. Close everything profitable. Consider protective puts.",
-          "Sectors: Remaining equity in defensive sectors (XLU/XLP) and gold-industry names (GDX) only",
-          "Cash: Maximum reserves - you'll have amazing opportunities soon",
-        ],
-      }
-    }
-  }
-
-  const getAllLevelGuidance = () => {
-    return [
-      {
-        range: "0-24",
-        level: "Extreme Fear",
-        description: "Maximum buying opportunity - deploy capital aggressively",
-        signal: "STRONG BUY",
-        guidance: getTradeRecommendations(12),
-        allocation: getPortfolioAllocation(12),
-      },
-      {
-        range: "25-44",
-        level: "Fear",
-        description: "Good environment for premium sellers",
-        signal: "BUY",
-        guidance: getTradeRecommendations(34),
-        allocation: getPortfolioAllocation(34),
-      },
-      {
-        range: "45-55",
-        level: "Neutral",
-        description: "Market balanced - be selective",
-        signal: "HOLD",
-        guidance: getTradeRecommendations(50),
-        allocation: getPortfolioAllocation(50),
-      },
-      {
-        range: "56-74",
-        level: "Greed",
-        description: "Reduce exposure and build cash",
-        signal: "CAUTION",
-        guidance: getTradeRecommendations(65),
-        allocation: getPortfolioAllocation(65),
-      },
-      {
-        range: "75-100",
-        level: "Extreme Greed",
-        description: "High risk of correction - maximum defensive positioning",
-        signal: "AVOID/SELL",
-        guidance: getTradeRecommendations(87),
-        allocation: getPortfolioAllocation(87),
-      },
-    ]
-  }
 
   if (!loaded) {
     return (
@@ -1144,8 +1017,8 @@ export function MarketSentiment() {
   }
 
   const recommendations = getTradeRecommendations(marketData.overallScore)
-  const portfolioAllocation = getPortfolioAllocation(marketData.overallScore)
-  const allLevelGuidance = getAllLevelGuidance()
+  // null when the score is missing — never falls back to the calmest band.
+  const sentimentBand = bandForScore(SENTIMENT_ALLOCATION.bands, marketData.overallScore)
 
   const safeSentimentData = Array.isArray(sentimentData) ? sentimentData : []
 
@@ -1424,13 +1297,25 @@ export function MarketSentiment() {
                           <h3 className="font-bold text-gray-900">Portfolio Allocation</h3>
                         </div>
                         <div className="space-y-3">
+                          {/*
+                            Cash and stocks come from lib/allocation.ts, where cash is the
+                            only stored figure and stocks is its complement. Storing both is
+                            what let this card drift from the (now deleted) second table in
+                            this same component.
+                          */}
                           <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
                             <span className="text-sm font-medium text-gray-700">Cash on Hand</span>
-                            <span className="text-sm font-bold text-primary">{recommendations.cashAllocation}</span>
+                            <span className="text-sm font-bold text-primary">
+                              {sentimentBand ? formatRange(sentimentBand.cashMin, sentimentBand.cashMax) : "—"}
+                            </span>
                           </div>
                           <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                            <span className="text-sm font-medium text-gray-700">Market Exposure</span>
-                            <span className="text-sm font-bold text-primary">{recommendations.marketExposure}</span>
+                            <span className="text-sm font-medium text-gray-700">Stocks</span>
+                            <span className="text-sm font-bold text-primary">
+                              {sentimentBand
+                                ? formatRange(stocksRange(sentimentBand).min, stocksRange(sentimentBand).max)
+                                : "—"}
+                            </span>
                           </div>
                           <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
                             <span className="text-sm font-medium text-gray-700">Position Size</span>

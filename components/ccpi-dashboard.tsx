@@ -15,7 +15,7 @@ import type { CCPIData, HistoricalData } from "@/lib/ccpi/types"
 import { getReadableColor, getRegimeZone, sortCanaries, countActiveWarnings } from "@/lib/ccpi/calculations"
 import { saveCCPIToCache, loadCCPIFromCache, saveHistoryToCache } from "@/lib/ccpi/cache"
 import { REFRESH_STATUS_MESSAGES } from "@/lib/ccpi/constants"
-import { ALLOCATION_BANDS, bandForScore, formatRange, stocksRange } from "@/lib/ccpi/allocation"
+import { CCPI_ALLOCATION, bandForScore, formatRange, stocksRange } from "@/lib/allocation"
 import { CCPIChatModal } from "./ccpi-chat-modal"
 import { RefreshButton } from "./ui/refresh-button" // Assuming RefreshButton is in ui/refresh-button.tsx
 import { DataLoadGate } from "@/components/data-load-gate"
@@ -241,7 +241,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
   // Narrowed once so indicator blocks don't each re-check for undefined.
   const indicators: Record<string, any> = data.indicators ?? {}
   // null when the score is missing — never falls back to the benign first band.
-  const currentBand = bandForScore(ccpiScore)
+  const currentBand = bandForScore(CCPI_ALLOCATION.bands, ccpiScore)
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -830,7 +830,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
               <AccordionContent>
                 <CardContent className="pt-4 pb-4">
                   <div className="space-y-2">
-                    {ALLOCATION_BANDS.map((band) => {
+                    {CCPI_ALLOCATION.bands.map((band) => {
                       const stocks = stocksRange(band)
                       const isCurrent = currentBand?.range === band.range
 
@@ -993,7 +993,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                       const isCurrent =
                         ccpiScore >= Number.parseInt(item.range.split("-")[0]) &&
                         ccpiScore <= Number.parseInt(item.range.split("-")[1])
-                      const band = ALLOCATION_BANDS.find((b) => b.range === item.range) ?? null
+                      const band = CCPI_ALLOCATION.bands.find((b) => b.range === item.range) ?? null
 
                       return (
                         <div
