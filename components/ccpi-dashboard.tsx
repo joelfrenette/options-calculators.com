@@ -13,7 +13,7 @@ import { Download } from "lucide-react"
 
 import type { CCPIData, HistoricalData } from "@/lib/ccpi/types"
 import { getReadableColor, getRegimeZone, sortCanaries, countActiveWarnings } from "@/lib/ccpi/calculations"
-import { saveCCPIToCache, loadCCPIFromCache } from "@/lib/ccpi/cache"
+import { saveCCPIToCache, loadCCPIFromCache, hasFreshCache, CACHE_FRESH_MINUTES } from "@/lib/ccpi/cache"
 import { REFRESH_STATUS_MESSAGES } from "@/lib/ccpi/constants"
 import { CCPI_ALLOCATION, bandForScore } from "@/lib/allocation"
 import { AllocationBar } from "@/components/allocation-bar"
@@ -43,6 +43,30 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
   const [fromCache, setFromCache] = useState(false)
   const [cacheTimestamp, setCacheTimestamp] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
+
+  /**
+   * P7-16. What the header says about this reading's age, or null when there is
+   * no reading to date.
+   *
+   * `cached` and `when` come from state that already existed and was never
+   * read; `stale` is `hasFreshCache()` inverted — the age check that had been
+   * wired only into the unreachable hook deleted in P7-14.
+   *
+   * The staleness flag is deliberately shown only for a CACHED reading. A fresh
+   * fetch is current by construction, and running the localStorage age check
+   * against it would report on the stored copy rather than on what is displayed.
+   */
+  const reading = useMemo(() => {
+    const iso = cacheTimestamp ?? data?.timestamp ?? null
+    if (!iso) return null
+    const when = new Date(iso)
+    if (Number.isNaN(when.getTime())) return null
+    return {
+      cached: fromCache,
+      when: when.toLocaleString(),
+      stale: fromCache && !hasFreshCache(CACHE_FRESH_MINUTES),
+    }
+  }, [fromCache, cacheTimestamp, data])
 
   const ccpiScore = useMemo(() => (data ? Math.round(data.ccpi) : 0), [data])
   const zone = useMemo(() => getRegimeZone(ccpiScore), [ccpiScore])
@@ -285,13 +309,33 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold tracking-tight">Crash &amp; Corrections Prediction Index (CCPI)</h2>
-            <p className="text-muted-foreground">Real-time market crash risk assessment across 4 key dimensions</p>
+            {/* P7-16. This said "Real-time market crash risk assessment". The tab
+                restores a localStorage snapshot on load and does not refetch
+                until the user asks, so "real-time" was a claim the component
+                contradicts on its most common path — the first render after a
+                revisit. The freshness claim now lives on the timestamp line
+                below, where it is derived from the data instead of asserted
+                over it. */}
+            <p className="text-muted-foreground">Market crash risk assessment across 4 key dimensions</p>
             <p className="text-xs text-muted-foreground italic mt-0.5">
               Original index designed by Joel Frenette
             </p>
-            {data?.lastUpdated && (
+            {/* P7-16. This block read `data?.lastUpdated`, which /api/ccpi never
+                returns: `lastUpdated` exists only inside each `apiStatus` source
+                entry, and the type marks the top-level field optional, so the
+                guard silently failed and NO date rendered at all. Meanwhile
+                `fromCache` and `cacheTimestamp` were written at four sites and
+                read at none. The result was a tab that could show a snapshot of
+                any age with nothing on screen dating it.
+                `timestamp` is the field the route actually sends. */}
+            {reading && (
               <p className="text-xs text-muted-foreground mt-1">
-                Last updated: {new Date(data.lastUpdated).toLocaleString()}
+                {reading.cached ? "Cached reading from" : "Updated"} {reading.when}
+                {reading.stale && (
+                  <span className="ml-1 font-medium text-amber-700">
+                    · over {CACHE_FRESH_MINUTES} min old — press Refresh for current data
+                  </span>
+                )}
               </p>
             )}
           </div>

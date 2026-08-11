@@ -389,12 +389,12 @@ recomputes it.
 | P7-12 | P2 | fixed | The Greeks calculator's own Black-Scholes is gone; gamma/theta/rho added to `lib/black-scholes.ts` with 19 new tests. The real bug was a missing `else` leaving stale Greeks on screen, not the NaN first recorded. |
 | P7-13 | P3 | fixed | `expectedMove` recomputed inline in `/api/strategy-scanner` now calls `lib/black-scholes.ts` and skips the row when it returns null. |
 | P7-14 | P2 | fixed | The unreachable hook is deleted, with its cascade: two whole modules, two aliases and a second composite implementation. `lib/` 230 → 224 exports. The rule's one-hop limit is recorded, not half-fixed. |
-| P7-16 | P2 | open | **The CCPI tab renders cached data of any age without saying it is cached.** `fromCache` and `cacheTimestamp` are written at four sites and read at none. |
+| P7-16 | P2 | fixed | The header now dates every reading, marks a cached one as cached, and flags it stale past the shared threshold. The date line had been wired to a field /api/ccpi never returns. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-219 findings recorded · **171 fixed · 8 wontfix · 0 verified-ok · 40 open.**
+219 findings recorded · **172 fixed · 8 wontfix · 0 verified-ok · 39 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -1819,3 +1819,75 @@ cleanup.
 |---|---|---|---|
 | P7-14 | P2 | ANALYZE → CCPI | **FIXED.** `hooks/use-ccpi-data.ts` was unreachable and held eight `lib/` exports open; deleting it and following the cascade removed two whole modules (`lib/ccpi/api.ts`, `lib/ccpi/logger.ts`), two aliases and a **second composite implementation** (`calculateCCPI`). The hook also auto-fetched on mount, which would have defeated the dashboard's load gate. `lib/` 230 → 224 exports. **The rule's one-hop limit is recorded above rather than half-fixed.** |
 | P7-16 | P2 | ANALYZE → CCPI | **The CCPI tab renders cached data of any age without saying it is cached.** `fromCache` and `cacheTimestamp` are written at four sites in `components/ccpi-dashboard.tsx` and read at none; `loadCCPIFromCache()` is called with no age check. `hasFreshCache` is the tool for the fix and is kept dead-but-allowlisted for it. **OPEN.** |
+
+---
+
+## Phase 7.4 (twelfth pass) — P7-16: the CCPI tab now dates what it is showing (2026-08-11)
+
+Three defects in the same six lines of header, each hiding the next.
+
+**1. The date line was wired to a field the API does not return.** The header read
+`data?.lastUpdated`, and `/api/ccpi` has no top-level `lastUpdated` — the name exists only
+inside each `apiStatus` source entry (`DataSourceStatus`), and `lib/ccpi/types.ts` marks
+the top-level field optional. So the guard was always false and **no date rendered at
+all**, on any path, fresh or cached. An optional field plus a truthiness guard is a
+render that cannot fail loudly: there is no error, no empty box, just an absence nobody
+can distinguish from a design decision. The field the route actually sends is `timestamp`.
+
+**2. The cached state was tracked and never shown.** `fromCache` and `cacheTimestamp` were
+written at four sites — lines 116, 150, 196, 197 — and read at none. The dashboard
+restores a localStorage snapshot on load, deliberately does not refetch ("Don't auto-fetch
+— only refresh when user clicks button"), and had no way to say so.
+
+Together those two mean the tab could show a snapshot from any point in the past as
+though it were current. Same family as P7-12's stale Greeks, and worse in one respect:
+the Greeks panel recomputed from inputs still on screen, so a user had something to
+contradict it with. A CCPI reading has no visible input at all.
+
+**3. The subtitle asserted "Real-time market crash risk assessment".** On the most common
+path — a revisit, which restores the cache and does not refetch — that was false at first
+render. A label is a claim (CLAUDE.md), and this one was contradicted by the component
+carrying it. The subtitle no longer asserts freshness; the timestamp line below states it,
+derived from the data rather than asserted over it.
+
+### What it says now
+
+| State | Header |
+|---|---|
+| Fresh fetch | `Updated <local time>` |
+| Cached, under the threshold | `Cached reading from <local time>` |
+| Cached, over the threshold | `Cached reading from <local time> · over 5 min old — press Refresh for current data` |
+
+The staleness flag is shown **only for a cached reading**, on purpose. A fresh fetch is
+current by construction, and running the localStorage age check against it would report on
+the stored copy rather than on what is displayed.
+
+**The threshold is a shared constant, not a shared style.** `CACHE_FRESH_MINUTES` is
+exported from `lib/ccpi/cache.ts` and read by both `hasFreshCache`'s default and the copy
+that prints "over N min old". Writing `5` in the code and `5` in the sentence would have
+been the label-drifts-from-the-code shape `check-provenance.ts` exists to catch — change
+one and the other keeps asserting the old threshold, with nothing to notice.
+
+### The allowlist worked as designed
+
+`lib/ccpi/cache.ts:hasFreshCache` was in `KNOWN_DEAD` for **exactly one commit**. P7-14
+kept it with no caller because it was the age check the live path was missing, and said so
+in both the export's docstring and the allowlist entry. This pass wired it in, so it came
+straight back off and the baseline returned to 0.
+
+That is what the exception is for: an entry with a stated reason and a fix attached, not a
+permanent carve-out. An allowlist that only ever grows is a rule being switched off one
+line at a time.
+
+### Verification
+
+The Browser pane does not composite in this environment, so the header was not exercised
+interactively. What was checked: the new subtitle and the stale-warning string are present
+in the compiled client chunk under `.next/static` and the old "Real-time" copy is absent
+from it; the dev server compiles and serves the page at HTTP 200 with no server errors.
+**The rendered states themselves — particularly the stale branch, which needs a cached
+snapshot older than five minutes — want UAT on staging.**
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| P7-16 | P2 | ANALYZE → CCPI | **FIXED.** The header dates every reading, says when one is cached, and flags it stale past `CACHE_FRESH_MINUTES` using the `hasFreshCache` P7-14 kept for it. Two further defects surfaced in the same lines: the existing date line read `data?.lastUpdated`, which `/api/ccpi` never returns, so no date had been rendering on any path; and the subtitle claimed "Real-time" on a tab whose most common path restores a cache without refetching. |

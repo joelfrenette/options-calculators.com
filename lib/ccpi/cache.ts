@@ -69,9 +69,21 @@ export function loadCCPIFromCache(): CCPIData | null {
 // and `hasFreshCache`, which is kept DELIBERATELY DEAD. See below.
 
 /**
+ * Age at which a cached CCPI snapshot stops counting as fresh, in minutes.
+ *
+ * P7-16: exported, and it is a shared number rather than a shared style. The
+ * dashboard's header prints "over N min old", which is a claim about what this
+ * check does. With `5` written as a default here and `5` typed into the copy,
+ * changing one would have left the other asserting the old threshold — the
+ * label-drifts-from-the-code shape check-provenance.ts exists to catch. One
+ * constant, read by both.
+ */
+export const CACHE_FRESH_MINUTES = 5
+
+/**
  * Checks if cached data is fresh (within specified minutes)
  */
-function isCacheFresh(cachedAt: string | undefined, maxAgeMinutes = 5): boolean {
+function isCacheFresh(cachedAt: string | undefined, maxAgeMinutes = CACHE_FRESH_MINUTES): boolean {
   if (!cachedAt) return false
 
   const cacheTime = new Date(cachedAt).getTime()
@@ -84,23 +96,13 @@ function isCacheFresh(cachedAt: string | undefined, maxAgeMinutes = 5): boolean 
 /**
  * Whether the cached CCPI snapshot is younger than `maxAgeMinutes`.
  *
- * **P7-14: kept with no caller, on purpose, and allowlisted in
- * scripts/check-dead-exports.ts with this reason.** Its only importer was the
- * unreachable `hooks/use-ccpi-data.ts`, so deleting it would have been
- * consistent with every other decision in this phase — except that it is the
- * one piece of machinery the LIVE path is missing.
- *
- * components/ccpi-dashboard.tsx loads `loadCCPIFromCache()` unconditionally, at
- * any age, and holds `fromCache` and `cacheTimestamp` in state that nothing
- * renders. So the CCPI tab can show an arbitrarily old snapshot with nothing on
- * screen saying it is cached or when it was taken (P7-16). Deleting the age
- * check would remove the tool for that fix and leave the gap.
- *
- * This is the exception the KNOWN_DEAD comment describes: an export with no
- * caller YET, listed with its reason rather than swept. If P7-16 is resolved
- * some other way, delete this and drop the allowlist entry together.
+ * P7-14 kept this with no caller — its only importer had been the unreachable
+ * `hooks/use-ccpi-data.ts` — on the grounds that it was the age check the live
+ * path was missing. P7-16 wired it into the CCPI dashboard header, which now
+ * marks a cached reading older than {@link CACHE_FRESH_MINUTES} as stale
+ * instead of presenting it as current.
  */
-export function hasFreshCache(maxAgeMinutes = 5): boolean {
+export function hasFreshCache(maxAgeMinutes = CACHE_FRESH_MINUTES): boolean {
   const cached = loadCCPIFromCache()
   if (!cached) return false
   return isCacheFresh(cached.cachedAt, maxAgeMinutes)

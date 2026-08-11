@@ -211,19 +211,14 @@ for (const s of symbols) {
 // unreferenced export in lib/ fails the suite. If a genuinely-needed export
 // lands with no caller yet, the honest move is to add it here WITH the reason
 // and raise the baseline in the same commit — not to widen the scope above.
-const KNOWN_DEAD: ReadonlySet<string> = new Set([
-  // P7-14, and the first entry added under the rule above rather than
-  // inherited from the 51. `hasFreshCache` lost its only importer when the
-  // unreachable hooks/use-ccpi-data.ts was deleted. It is kept because it is
-  // the age check the LIVE path is missing: components/ccpi-dashboard.tsx
-  // loads the cached CCPI snapshot at any age and renders neither the fact
-  // that it is cached nor its timestamp (P7-16). Deleting it would remove the
-  // tool for that fix. Drop this line and the export together if P7-16 is
-  // resolved another way.
-  "lib/ccpi/cache.ts:hasFreshCache",
-])
+// `lib/ccpi/cache.ts:hasFreshCache` was listed here for exactly one commit.
+// P7-14 kept it with no caller because it was the age check the live CCPI path
+// was missing; P7-16 wired it into the dashboard header, so it came straight
+// back off. That is the allowlist behaving as intended — an entry with a stated
+// reason and a fix attached, not a permanent exception.
+const KNOWN_DEAD: ReadonlySet<string> = new Set([])
 
-const KNOWN_DEAD_BASELINE = 1
+const KNOWN_DEAD_BASELINE = 0
 
 check(
   `the known-dead list still holds ${KNOWN_DEAD_BASELINE} entries`,
