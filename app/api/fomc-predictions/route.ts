@@ -346,8 +346,18 @@ export async function GET() {
         confidenceMultiplier = 1.0
       }
 
-      // Apply decay factor for meetings further out (less certainty)
-      const decayFactor = 1.0 - i * 0.15 // Reduce expected change by 15% for each meeting out
+      // Apply decay factor for meetings further out (less certainty).
+      //
+      // P3-17, confirmed 2026-08-11. This was `1.0 - i * 0.15` unclamped, which
+      // is negative from i = 7 onward — so the eighth scheduled meeting and
+      // every one after it would have had its expected change **sign-flipped**:
+      // a forecast of cuts silently starts predicting hikes, and the cumulative
+      // implied path walks back on itself. It is not live today only because
+      // `lib/fomc-schedule.ts` currently holds about five future meetings; it
+      // becomes live the first time someone extends the schedule by a year,
+      // which is annual maintenance. Certainty decays toward zero, never through
+      // it.
+      const decayFactor = Math.max(0, 1.0 - i * 0.15)
       const adjustedChange = expectedChangePerMeeting * decayFactor
 
       // Calculate implied rate cumulatively

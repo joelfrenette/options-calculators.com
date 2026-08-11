@@ -66,6 +66,15 @@ export function Step4TechnicalCard({
             </CardTitle>
             <CardDescription>
               Adjust technical thresholds to relax or tighten entry criteria for optimal put-selling setups.
+              {/* S-8. Two gates filter this step and have no control here. Stating
+                  them is the honest half of the fix — a threshold the user cannot
+                  see is still a threshold that removed rows from their results.
+                  Sliders are the other half and are still open. */}
+              <span className="block mt-2 text-xs text-amber-800">
+                Two further gates are applied automatically and are not adjustable here: a minimum yield of{" "}
+                <strong>1%</strong> and a minimum average volume of <strong>2M</strong> shares. Rows below either are
+                filtered out of this step.
+              </span>
             </CardDescription>
           </CardHeader>
           <CardContent className="p-6 space-y-6">

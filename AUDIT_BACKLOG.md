@@ -179,7 +179,7 @@ recomputes it.
 | S-5 | P3 | open | 21 → 10 TypeScript errors. The 10 are the standing baseline. |
 | S-6 | P3 | fixed | wheel-scanner 4,439 → 386 lines. General module-size debt is P6-13, not this. |
 | S-7 | P3 | open | Both `MEGA_CAP_STOCKS` tables deleted; `MAJOR_INDEX_TICKERS` fallback survives and is still unlabelled when it is the universe actually used (verified 2026-08-11). |
-| S-8 | P2 | open | `maxPE` is still declared and read by nothing — the only edit it received was a comment reading "FIX: Declare maxPE state variable", which declares it rather than fixing it. `minYield` / `minVolumeTechnicals` still have no UI control (verified 2026-08-11). |
+| S-8 | P2 | fixed | **Closed 2026-08-11.** Dead `maxPE` deleted with its "FIX: Declare maxPE state variable" comment. The two hidden gates are now stated on the Step 4 card — 1% minimum yield, 2M minimum volume — and the false comment calling `minVolumeTechnicals` unused is replaced. **Sliders remain unbuilt**; naming a gate the user cannot adjust is the honest half, not the whole fix. |
 | S-9 | P2 | open | `useEstimatedGreeks` badge coverage still unverified per cell. Partly overtaken by P6-43. |
 | S-10 | P2 | open | ATR×1.5 expected move not yet replaced with the IV-based form. |
 | S-11 | P3 | fixed | Owner dropped the pillar. The wider AAII footprint is P6-31, not this. |
@@ -212,7 +212,7 @@ recomputes it.
 | P1-11 | P1 | fixed | Route and lib deleted. |
 | P1-12 | P2 | fixed | Keys resolve through `resolveApiKey`. |
 | P1-13 | P3 | open | The row's own exit condition — "verify the dashboard surfaces the baseline flag, then mark verified-ok" — was never carried out. The CCPI provenance rework almost certainly satisfies it; confirm and re-mark. |
-| P1-14 | P3 | open | **Still present (verified 2026-08-11):** `app/api/ccpi/history/route.ts:5` still reads "we generate realistic mock historical data" above ~22 commented-out `Math.random()` lines. |
+| P1-14 | P3 | fixed | **Closed 2026-08-11.** The ~40 commented-out `Math.random()` lines and the header claiming "we generate realistic mock historical data" are gone; the file now says why the history is empty. A comment is a claim about the code, and that one described an honest empty response as a mock generator waiting to be switched on. |
 | P2-1 | P1 | fixed | The three routes return 502 on upstream failure. |
 | P2-2 | P2 | open | `/api/ccpi/cache` is still a module-level mutable variable. |
 | P2-3 | P3 | open | Triage done, verdicts partly executed — see P0-1 for what survives. |
@@ -228,10 +228,10 @@ recomputes it.
 | P3-12 | P1 | fixed | Baseline exclusion + renormalisation. |
 | P3-13 | P1 | fixed | Certainty is data-quality only; playbook branches on regime; yield curve scored once. |
 | P3-14 | P1 | fixed | Real VIX3M/VIX ratio from FRED VXVCLS. |
-| P3-15 | P1 | open | Almost certainly closed by P6-34 (AI estimates no longer score) and P6-72/P6-74 (the two bypasses). No row records it as closed; confirm in 7.4 and re-mark. |
-| P3-16 | P1 | open | Panic/Euphoria. Partly closed by P6-8, P6-14, P6-61, P6-62 — P6-8 records what remains. |
-| P3-17 | P1 | open | The FedWatch claim (P6-45) and the `^FVX`/sign defects (P6-17, P6-21) are closed. The decay factor going negative at meeting 8+ and the meeting list ending Mar-2027 are not recorded as closed anywhere. |
-| P3-18 | P1 | open | The invented constants (P6-18) and the unused-MA parameter (P6-59) are closed. The fabricated `lastMonthChange` historical deltas are not recorded as closed. |
+| P3-15 | P1 | fixed | **Confirmed 2026-08-11**, the re-mark 7.1 called for. `ai-estimate` has not scored since P6-34, and the `> 0` acceptance filter was replaced by per-metric plausibility windows. The only surviving `> 0` in the file parses an env-var TTL. |
+| P3-16 | P1 | open | Panic/Euphoria. Partly closed by P6-8, P6-14, P6-61, P6-62. **Its open remainder is P6-8's open remainder — the same item under two IDs.** Work P6-8; this row closes with it. Needs an owner rebuild-or-retire decision, not code. |
+| P3-17 | P1 | fixed | **Confirmed and closed 2026-08-11.** FedWatch (P6-45) and `^FVX`/sign (P6-17, P6-21) were already closed. The decay factor **was** still `1.0 - i * 0.15` unclamped — negative from the eighth meeting on, which sign-flips the expected change and walks the implied path backwards. Latent rather than live: the schedule holds about five future meetings today, and it becomes live the first time someone extends it a year. Clamped at zero. Schedule exhaustion was already handled. |
+| P3-18 | P1 | fixed | **Confirmed LIVE and closed 2026-08-11 — the re-mark found two fabrications still shipping.** (a) `lastMonthChange = finalScore - weekAgoScore * 1.2` and `lastYearChange = ... * 2`: the week-ago score times an arbitrary constant, published as the month-ago and year-ago readings. (b) The scrape path set all four historical points to today's score under the caption "Extract historical data points", so every change computed to exactly 0.0 and `trend` reported "neutral" on every request. Both null now. **They survived every visual sweep because none of the four is rendered** — they reached the UI only through a cache-validity gate that REQUIRED them to be numbers, which is what made the fabrication load-bearing. |
 | P3-19 | P1 | fixed | Unsourced indicators deleted from the scoring set. |
 | P3-24 | P2 | fixed | SMA short-series no longer returns 0; the IPO false golden cross is gone. |
 | P3-25 | P2 | fixed | Planner "% of stock price" 100× fix. |
@@ -385,32 +385,34 @@ recomputes it.
 
 ### The open list, by severity
 
-210 findings recorded · **154 fixed · 7 wontfix · 0 verified-ok · 49 open.**
-_(Updated 2026-08-11 by Phase 7.2, which added P7-1…P7-7: six fixed, one open.)_
+210 findings recorded · **159 fixed · 7 wontfix · 0 verified-ok · 44 open.**
+_(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
+pass then closed P3-15, P3-17, P3-18, S-8 and P1-14.)_
 
 `verified-ok` is empty on purpose. The vocabulary allows it and nothing currently
 qualifies: every investigated-and-clean result on this project was recorded inside
 another finding's row (P6-67's two clean composites, P6-77's twelve clean check
 scripts) rather than as a finding of its own.
 
-**P1 — 8.**
-`P3-15` · `P3-16` · `P3-17` · `P3-18` — four Phase-3 rows never marked closed, each
-substantially covered by a later Phase-6 fix. **Confirm and re-mark before doing any
-work on them; three of the four are probably already done.**
-`P5-1` — the admin sign-off half, which is Phase 7.2.
+**P1 — 4.**
+`P3-16` — Panic/Euphoria; the same open remainder as `P6-8`, under two IDs.
 `P6-8` · `P6-11` — both need an owner rebuild-or-retire decision, not code.
 `P6-27` — needs one live grouped Polygon call.
 
-**P2 — 11.**
-`S-8` · `S-9` · `S-10` · `S-18` (the scanner's hidden gates, estimate badges, expected
+_(`P3-15`, `P3-17` and `P3-18` were confirmed and closed on 2026-08-11 — see below.
+`P5-1` closed with Phase 7.2. The prediction that "three of the four are probably
+already done" was **wrong on two of them**, which is the point of confirming.)_
+
+**P2 — 9.**
+`S-9` · `S-10` · `S-18` (the scanner's hidden gates, estimate badges, expected
 move and step-number drift) · `P0-4` (timeout coverage, never re-measured) ·
 `P2-2` (the CCPI cache that does not cache) · `P2-4` (16 routes with no automated
 verification) · `P6-31` · `P6-65` **— Joel's weight decision** · `P6-85` **— Phase 7.0** ·
 `P7-7` **— `next build` runs on neither bundler here; the second blocker on Phase 7.0**.
 
-**P3 — 14.**
+**P3 — 12.**
 `S-5` · `S-7` · `S-13` **— Joel's Vercel action** · `S-16` · `S-17` · `P0-1` · `P0-6` ·
-`P1-13` · `P1-14` · `P2-3` · `P4-1` · `P6-13` · `P6-87` **— Phase 7.0** · `E-8i`.
+`P1-13` · `P2-3` · `P4-1` · `P6-13` · `P6-87` **— Phase 7.0** · `E-8i`.
 
 **Enhancements and unbuilt features — 16.**
 `E-1` · `E-2` · `E-3` · `E-4` · `P4-4` · `E-6` (+ `E-6b`, `E-6c`, `E-6d`) ·
@@ -419,7 +421,7 @@ verification) · `P6-31` · `P6-65` **— Joel's weight decision** · `P6-85` **
 **Closed on rationale rather than a change — 7.**
 `S-4` · `P0-7` · `P2-6` · `E-8b` · `E-8e` · `E-8f` · `P6-35`.
 
-**What this changes about "work the backlog by severity".** The real defect list is 33
+**What this changes about "work the backlog by severity".** The real defect list is 28
 items, not the 210 the file's length suggests — and half the P1s on it are bookkeeping,
 not work. Nobody could see that before, which is the point of this section: closure was
 recorded in fourteen vocabularies, and the file's own summary line was still calling
@@ -1216,3 +1218,48 @@ fix its sibling did not, and in both cases the fixed module carried a comment
 explaining the defect while the unfixed one carried the defect. The synthesis already
 named this cause; what is new is that **the comment recording a fix is a reliable place
 to look for the instance that was missed.**
+
+---
+
+## Phase 7.4 (first pass) — confirming the four open P1s, which found two live (2026-08-11)
+
+7.1 left four Phase-3 rows marked open with the note that each was "substantially
+covered by a later Phase-6 fix — confirm and re-mark before doing any work on them;
+three of the four are probably already done." **That prediction was wrong on two of
+them, and being wrong in that direction is the whole reason the step exists.** A
+bookkeeping pass over a stale ledger would have closed all four.
+
+| ID | Predicted | Measured | Outcome |
+|---|---|---|---|
+| P3-15 | closed | closed | `ai-estimate` has not scored since P6-34, and the `> 0` acceptance filter is now per-metric plausibility windows. The one surviving `> 0` in `unified-ai-fallback.ts` parses an env-var TTL. **Re-marked `fixed`.** |
+| P3-16 | open | open | Panic/Euphoria. Its open remainder is P6-8's open remainder — **the same item carried under two IDs since Phase 3**, which nothing had noticed. Cross-referenced; it closes when P6-8 does, and that needs an owner decision rather than code. |
+| P3-17 | closed | **LATENT, still real** | FedWatch (P6-45) and `^FVX`/sign (P6-17, P6-21) were closed. The decay factor was still `1.0 - i * 0.15` **unclamped** — negative from the eighth meeting onward, which sign-flips the expected change so a forecast of cuts starts predicting hikes and the cumulative implied path walks backwards. Not live only because `lib/fomc-schedule.ts` currently holds about five future meetings; **it goes live the first time someone extends the schedule by a year, which is annual maintenance.** Clamped at zero. |
+| P3-18 | closed | **LIVE, two fabrications** | (a) `lastMonthChange = finalScore − weekAgoScore × 1.2` and `lastYearChange = … × 2` — the week-ago score times an arbitrary constant, published as the month-ago and year-ago readings. Nothing in the route reads either period. (b) The scrape path set all four historical points to *today's score* under the caption "Extract historical data points for changes", so every delta computed to exactly `0.0` and `trend` reported `"neutral"` on every request. All four are null now, and `trend` is null when there is nothing to compare against. |
+
+**Why P3-18 survived four sweeps, and the lesson worth keeping.** None of the four
+change fields is rendered anywhere. They reached the client only through the
+cache-validity predicate in `market-sentiment.tsx`, which **required all four to be
+numbers** — so the fabrication was load-bearing: making the values honest would have
+marked every cached payload invalid and refetched CNN on every mount. That is a new
+shape for the ledger:
+
+> **An invented value with no display can still be structurally required.** Every sweep
+> this audit has run looked for numbers a user sees. This one was a number only a
+> predicate saw, and the predicate had been written around the fabrication's shape. A
+> field nobody renders is not therefore harmless — ask what depends on it before
+> concluding it is dead.
+
+**Also closed in the same pass** (the two rows 7.1 flagged as wrong in the unsafe
+direction): **S-8** — the dead `maxPE` and its "FIX: Declare maxPE state variable"
+comment are deleted, and the two hidden Step-4 gates (1% yield, 2M volume) are now
+stated on the card, with the false comment calling `minVolumeTechnicals` unused
+replaced. Sliders remain unbuilt; naming a gate the user cannot adjust is the honest
+half, not the whole fix. **P1-14** — the ~40 commented-out `Math.random()` lines and the
+header reading "we generate realistic mock historical data" are gone.
+
+**Not done, and why: S-18.** The step-number drift is now **90 literal "Step N" strings
+across nine files**, up from the 40 the row recorded. The fix is one shared constant
+plus 90 substitutions, several of which sit inside prose that reads differently
+depending on the number. That is a mechanical edit whose only real verification is
+looking at the rendered pages, and the browser pane in this sandbox cannot reach a dev
+server on the port in use. Scoped, measured, and left for a session that can render it.

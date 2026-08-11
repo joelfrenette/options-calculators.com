@@ -31,8 +31,12 @@ export function useWheelScanner() {
   // Step 3 market-cap floor — index into PRE_FILTER_MARKET_CAP_TIERS.
   // Default 5 = $2B+ (was a hidden hardcoded $10B floor before being exposed as a slider).
   const [minMarketCapCategory, setMinMarketCapCategory] = useState([5])
-  // FIX: Declare maxPE state variable
-  const [maxPE, setMaxPE] = useState([20])
+  // S-8, closed 2026-08-11. `maxPE` was declared here and read by nothing —
+  // no filter, no UI control, no return. The only edit it had ever received was
+  // the comment "FIX: Declare maxPE state variable", which declared it rather
+  // than fixing anything, and then read as evidence that the gap had been
+  // handled. Deleted. Confirmed by a repo-wide symbol search: the declaration
+  // and that comment were the sole occurrences of `maxPE` in the tree.
 
   const [preFilterMarketCap, setPreFilterMarketCap] = useState([7]) // 12-stop scale — see PRE_FILTER_MARKET_CAP_TIERS below; default 7 = $10B+
   const [preFilterVolatility, setPreFilterVolatility] = useState([2]) // index into PRE_FILTER_VOLATILITY_TIERS; default 3%+ (premium-richness bias)
@@ -107,9 +111,19 @@ export function useWheelScanner() {
 
   const [cacheStatus, setCacheStatus] = useState<string>("")
 
-  // FIX: Declare and initialize minYield and minVolumeTechnicals state variables
-  const [minYield, setMinYield] = useState([1])
-  const [minVolumeTechnicals, setMinVolumeTechnicals] = useState([2]) // This variable is declared but not used in the provided code snippet.
+  // S-8. **These two are HIDDEN GATES: they filter Step 3 results and no UI
+  // control exposes them.** `technical-criteria.ts` tests `yieldCheck` on
+  // `minYield` and `volumeCheck` on `minVolumeTechnicals`, so a stock can be
+  // dropped from the scan by a threshold the user never set and cannot see.
+  // Recorded here, and stated in the Step 3 explainer, until sliders exist.
+  //
+  // The comment that used to sit on the second line read "This variable is
+  // declared but not used in the provided code snippet" — flatly false, and the
+  // Wave-2 split introduced it. **A comment asserting that a live filter is
+  // dead is worse than no comment**: it invites the next reader to delete a
+  // gate that is changing results.
+  const [minYield, setMinYield] = useState([1]) // percent — filters at yieldCheck
+  const [minVolumeTechnicals, setMinVolumeTechnicals] = useState([2]) // millions — filters at volumeCheck
 
   const [relaxedResults, setRelaxedResults] = useState<QualifyingStock[]>([])
   const [relaxedResultsEnriched, setRelaxedResultsEnriched] = React.useState(false)

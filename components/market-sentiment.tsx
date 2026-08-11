@@ -43,11 +43,20 @@ interface MarketData {
   safeHavenDemand: number | null
   overallScore: number
   sentiment: string
-  trend: "up" | "down" | "neutral"
-  yesterdayChange: number
-  lastWeekChange: number
-  lastMonthChange: number
-  lastYearChange: number
+  // Null when no prior reading exists to derive a direction from (P3-18). The
+  // scrape path used to report "neutral" on every request because its own
+  // yesterday-change was structurally zero.
+  trend: "up" | "down" | "neutral" | null
+  // P3-18. Null when the route has no historical point to measure the change
+  // FROM. `lastMonthChange`/`lastYearChange` are now always null on both paths:
+  // nothing in this route reads a month-ago or year-ago score, and the values
+  // that used to appear here were the week-ago score times 1.2 and 2. None of
+  // the four is rendered — they reached the UI only through the cache-validity
+  // gate below, which is why a fabrication survived every visual sweep.
+  yesterdayChange: number | null
+  lastWeekChange: number | null
+  lastMonthChange: number | null
+  lastYearChange: number | null
   volatilitySkew: number | null
   openInterestPutCall: number | null
   vixTermStructure: string | number | null
@@ -699,14 +708,14 @@ export function MarketSentiment() {
           data.cnnComponents &&
           Array.isArray(data.cnnComponents) &&
           data.cnnComponents.length === 7 &&
-          typeof data.yesterdayChange === "number" &&
-          typeof data.lastWeekChange === "number" &&
-          typeof data.lastMonthChange === "number" &&
-          typeof data.lastYearChange === "number" &&
-          !isNaN(data.yesterdayChange) &&
-          !isNaN(data.lastWeekChange) &&
-          !isNaN(data.lastMonthChange) &&
-          !isNaN(data.lastYearChange) &&
+          // P3-18. This gate used to require all four changes to be numbers,
+          // which is why the fabrication was load-bearing: making them honest
+          // would have made every cached payload "invalid" and refetched CNN on
+          // every mount. A cache entry is valid when its SCORE is usable; a null
+          // change is a correct value, not a corrupt one. The fields are not
+          // rendered anywhere, so they never belonged in this predicate.
+          (data.yesterdayChange === null || Number.isFinite(data.yesterdayChange)) &&
+          (data.lastWeekChange === null || Number.isFinite(data.lastWeekChange)) &&
           data.chartData?.dates?.length > 0 && // Require chartData with actual dates
           data.chartData?.spy?.length > 0 && // Require SPY price data
           data.chartData?.vix?.length > 0 // Require VIX data

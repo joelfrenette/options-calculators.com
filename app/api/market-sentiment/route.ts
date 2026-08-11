@@ -473,14 +473,20 @@ async function calculateFallbackIndex() {
           : finalScore < yesterdayScore - 1
             ? ("down" as const)
             : ("neutral" as const),
-      yesterdayChange: isFinite(finalScore - yesterdayScore) ? Math.round((finalScore - yesterdayScore) * 10) / 10 : 0,
-      lastWeekChange: isFinite(finalScore - weekAgoScore) ? Math.round((finalScore - weekAgoScore) * 10) / 10 : 0,
-      lastMonthChange: isFinite(finalScore - weekAgoScore * 1.2)
-        ? Math.round((finalScore - weekAgoScore * 1.2) * 10) / 10
-        : 0,
-      lastYearChange: isFinite(finalScore - weekAgoScore * 2)
-        ? Math.round((finalScore - weekAgoScore * 2) * 10) / 10
-        : 0,
+      // P3-18, confirmed live 2026-08-11. `lastMonthChange` was
+      // `finalScore - weekAgoScore * 1.2` and `lastYearChange` was
+      // `finalScore - weekAgoScore * 2` — **the week-ago score multiplied by an
+      // arbitrary constant, published as the month-ago and year-ago readings.**
+      // Nothing here fetches a month-ago or year-ago score, so there is no such
+      // change to report. The route only ever reads two points, and now only
+      // reports two. The `: 0` arms went with them: a change that could not be
+      // computed is not a change of zero.
+      yesterdayChange: isFinite(finalScore - yesterdayScore)
+        ? Math.round((finalScore - yesterdayScore) * 10) / 10
+        : null,
+      lastWeekChange: isFinite(finalScore - weekAgoScore) ? Math.round((finalScore - weekAgoScore) * 10) / 10 : null,
+      lastMonthChange: null,
+      lastYearChange: null,
       components: [
         {
           name: "Market Momentum",
@@ -705,12 +711,18 @@ async function scrapeCNNFearGreed() {
       console.log(`[v0] CNN Indicator: ${indicator.name} = ${foundScore}/100 (${foundSentiment})`)
     }
 
-    // Extract historical data points for changes
+    // P3-18, confirmed live 2026-08-11. This block was captioned "Extract
+    // historical data points for changes" and extracted nothing: all four were
+    // set to `mainScore`, today's reading, so every change downstream computed
+    // to exactly 0.0 and was published as a measured delta meaning "unchanged".
+    // **A comment describing an extraction that does not happen is the same
+    // defect as a label naming a source the code does not read.** The scrape
+    // reads one page showing one score; it has no history, and now says so.
     const historical = {
-      yesterday: mainScore,
-      lastWeek: mainScore,
-      lastMonth: mainScore,
-      lastYear: mainScore,
+      yesterday: null,
+      lastWeek: null,
+      lastMonth: null,
+      lastYear: null,
     }
 
     return {
@@ -782,14 +794,20 @@ export async function GET(request: Request) {
         console.log(`[v0]   ${idx + 1}. ${ind.name}: ${ind.score}/100 (${ind.sentiment || "NO SENTIMENT"})`)
       })
 
-      // Calculate changes
-      const yesterdayChange = scrapedData.score - scrapedData.historical.yesterday
-      const lastWeekChange = scrapedData.score - scrapedData.historical.lastWeek
-      const lastMonthChange = scrapedData.score - scrapedData.historical.lastMonth
-      const lastYearChange = scrapedData.score - scrapedData.historical.lastYear
+      // P3-18. A change exists only where a historical point does, and the
+      // scrape supplies none — so all four are null rather than a computed 0.0.
+      const delta = (past: number | null) =>
+        typeof past === "number" && Number.isFinite(scrapedData.score - past)
+          ? Math.round((scrapedData.score - past) * 10) / 10
+          : null
+      const yesterdayChange = delta(scrapedData.historical.yesterday)
+      const lastWeekChange = delta(scrapedData.historical.lastWeek)
+      const lastMonthChange = delta(scrapedData.historical.lastMonth)
+      const lastYearChange = delta(scrapedData.historical.lastYear)
 
+      const fmtDelta = (d: number | null) => (d === null ? "not supplied" : d.toFixed(1))
       console.log(
-        `[v0] Historical Changes: Yesterday=${yesterdayChange.toFixed(1)}, Week=${lastWeekChange.toFixed(1)}, Month=${lastMonthChange.toFixed(1)}, Year=${lastYearChange.toFixed(1)}`,
+        `[v0] Historical Changes: Yesterday=${fmtDelta(yesterdayChange)}, Week=${fmtDelta(lastWeekChange)}, Month=${fmtDelta(lastMonthChange)}, Year=${fmtDelta(lastYearChange)}`,
       )
 
       // Also fetch live Yahoo data for the raw indicator values
@@ -830,11 +848,21 @@ export async function GET(request: Request) {
         score: scrapedData.score, // Added missing 'score' field for client compatibility
         overallScore: scrapedData.score,
         sentiment: scrapedData.sentiment,
-        trend: (yesterdayChange > 1 ? "up" : yesterdayChange < -1 ? "down" : "neutral") as "up" | "down" | "neutral",
-        yesterdayChange: Math.round(yesterdayChange * 10) / 10,
-        lastWeekChange: Math.round(lastWeekChange * 10) / 10,
-        lastMonthChange: Math.round(lastMonthChange * 10) / 10,
-        lastYearChange: Math.round(lastYearChange * 10) / 10,
+        // P3-18. `trend` was derived from a change that was structurally 0 on
+        // this path, so the scrape branch reported "neutral" on every request
+        // regardless of what the market did — a direction asserted from an
+        // arithmetic identity. Null when there is no prior point to compare to.
+        trend: (yesterdayChange === null
+          ? null
+          : yesterdayChange > 1
+            ? "up"
+            : yesterdayChange < -1
+              ? "down"
+              : "neutral") as "up" | "down" | "neutral" | null,
+        yesterdayChange,
+        lastWeekChange,
+        lastMonthChange,
+        lastYearChange,
         cnnComponents: scrapedData.indicators.map((ind) => ({
           name: ind.name,
           score: ind.score,

@@ -247,7 +247,25 @@ registry — **record that in the limits list rather than writing a rule that gi
 appearance of coverage.** Any new check must derive its scope from structure, never from
 incidental content, and must assert the size of any file set it walks (P6-75, P6-77).
 
-**7.4 — Burn down by severity, P0 → P3, with the Phase 6 method.**
+**7.4 — Burn down by severity, P0 → P3, with the Phase 6 method. FIRST PASS DONE 2026-08-11.**
+Confirmed the four open P1s the 7.1 ledger flagged as probably-already-fixed. **Two of
+the four were still real**, so the prediction was wrong in the unsafe direction: P3-17's
+FOMC decay factor was still unclamped and sign-flips the rate path from the eighth
+scheduled meeting on (latent — the schedule holds about five today, so it arms itself
+the next time someone extends it), and **P3-18 was live**, publishing `lastMonthChange`
+and `lastYearChange` as the week-ago score times 1.2 and 2, with a scrape path whose
+four historical points were all today's score so every delta was exactly 0.0 and `trend`
+read "neutral" on every request. Both fixed. P3-15 confirmed closed; P3-16 turns out to
+be P6-8's remainder under a second ID. Also closed: S-8 (dead `maxPE`, hidden Step-4
+gates now stated) and P1-14 (the mock-history block and its false header). Open P1s
+4 → down from 8; the real defect list is 28. **New shape for the ledger, from P3-18: an
+invented value with no display can still be structurally required** — its four fields
+were rendered nowhere but a cache-validity predicate demanded they be numbers, so the
+fabrication was load-bearing and every visual sweep missed it. **Left undone: S-18**,
+now measured at 90 literal "Step N" strings across nine files (the row said 40); the fix
+is verifiable only against rendered pages.
+
+_Original statement of the step:_
 In order of yield, as measured: follow a label to the code behind it; ask of each pair in
 a composite whether A can ever disagree with B; write an assertion for anything untested
 (this found a defect four times out of four this phase, rather than confirming absence);
