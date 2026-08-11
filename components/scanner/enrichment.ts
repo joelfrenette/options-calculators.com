@@ -3,6 +3,7 @@
 // Extracted verbatim from components/wheel-scanner.tsx (Phase 4) — the only edits
 // are the TS18048 fixes (typed locals for bid/ask/premium).
 
+import { expectedMove } from "@/lib/black-scholes"
 import type { QualifyingStock } from "./types"
 
   export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -389,6 +390,17 @@ import type { QualifyingStock } from "./types"
               bidPrice: bid,
               askPrice: ask,
               iv,
+              // S-10. The expected move is computed HERE, not in the
+              // fundamental scan, because this is the first point at which an
+              // implied volatility exists. `iv` is a percentage; `expectedMove`
+              // takes a decimal. Undefined when there is no earnings date, no
+              // IV, or the IV is synthesized from the fixed 35% assumption
+              // (P6-43) — a move derived from an assumed volatility is not an
+              // implied move and must not be shown beside ones that are.
+              expectedMove:
+                stock.daysToEarnings != null && iv != null && priceSource !== "synthesized"
+                  ? (expectedMove(stock.currentPrice, iv / 100, Math.max(stock.daysToEarnings, 1) / 365) ?? undefined)
+                  : undefined,
               priceSource,
               deltaSource: useEstimatedGreeks ? ("estimated" as const) : ("polygon" as const),
             })

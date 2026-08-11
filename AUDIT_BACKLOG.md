@@ -181,7 +181,7 @@ recomputes it.
 | S-7 | P3 | open | Both `MEGA_CAP_STOCKS` tables deleted; `MAJOR_INDEX_TICKERS` fallback survives and is still unlabelled when it is the universe actually used (verified 2026-08-11). |
 | S-8 | P2 | fixed | **Closed 2026-08-11.** Dead `maxPE` deleted with its "FIX: Declare maxPE state variable" comment. The two hidden gates are now stated on the Step 4 card — 1% minimum yield, 2M minimum volume — and the false comment calling `minVolumeTechnicals` unused is replaced. **Sliders remain unbuilt**; naming a gate the user cannot adjust is the honest half, not the whole fix. |
 | S-9 | P2 | open | `useEstimatedGreeks` badge coverage still unverified per cell. Partly overtaken by P6-43. |
-| S-10 | P2 | open | ATR×1.5 expected move not yet replaced with the IV-based form. |
+| S-10 | P2 | fixed | **Closed 2026-08-11.** Now `S · σ · √T` off measured IV, computed in `enrichment.ts` where an IV exists, and withheld when the IV is synthesized. The `lib/black-scholes.ts` docstring had claimed this fix since Phase 1 while the call site kept the fudge. |
 | S-11 | P3 | fixed | Owner dropped the pillar. The wider AAII footprint is P6-31, not this. |
 | S-12 | P3 | fixed | `/api/market-breadth` retired; E-6a replaced it. |
 | S-13 | P3 | open | Zero `REDDIT_CLIENT` references remain in code; the Vercel env deletion is Joel's and is outstanding. |
@@ -388,7 +388,7 @@ recomputes it.
 
 ### The open list, by severity
 
-213 findings recorded · **162 fixed · 7 wontfix · 0 verified-ok · 44 open.**
+213 findings recorded · **163 fixed · 7 wontfix · 0 verified-ok · 43 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14.)_
 
@@ -406,8 +406,8 @@ _(`P3-15`, `P3-17` and `P3-18` were confirmed and closed on 2026-08-11 — see b
 `P5-1` closed with Phase 7.2. The prediction that "three of the four are probably
 already done" was **wrong on two of them**, which is the point of confirming.)_
 
-**P2 — 10.**
-`S-9` · `S-10` · `S-18` (the scanner's hidden gates, estimate badges, expected
+**P2 — 9.**
+`S-9` · `S-18` (the scanner's hidden gates, estimate badges, expected
 move and step-number drift) · `P2-2` (the CCPI cache that does not cache) · `P2-4` (16 routes with no automated
 verification) · `P6-31` · `P6-65` **— Joel's weight decision** · `P6-85` **— Phase 7.0** ·
 `P7-7` **— `next build` runs on neither bundler here; the second blocker on Phase 7.0** ·
@@ -424,7 +424,7 @@ verification) · `P6-31` · `P6-65` **— Joel's weight decision** · `P6-85` **
 **Closed on rationale rather than a change — 7.**
 `S-4` · `P0-7` · `P2-6` · `E-8b` · `E-8e` · `E-8f` · `P6-35`.
 
-**What this changes about "work the backlog by severity".** The real defect list is 28
+**What this changes about "work the backlog by severity".** The real defect list is 27
 items, not the 213 the file's length suggests — and half the P1s on it are bookkeeping,
 not work. Nobody could see that before, which is the point of this section: closure was
 recorded in fourteen vocabularies, and the file's own summary line was still calling
@@ -1359,3 +1359,20 @@ four phases and was therefore never started.
 | P0-4 | P2 | site-wide | **"40 of 61 routes have no timeout/abort wiring" was wrong: 35 routes make outbound calls, 26 were already wired, 9 were not.** The row's proposed fix — "a shared `fetchWithTimeout` helper; enforce presence via the contract tests" — had never been built, so every route wanting a deadline hand-rolled an `AbortController` and the rest had none. A hung upstream ties the function up until the platform kills it: the caller waits, the budget is spent, and nothing in the response names the upstream that stalled. **FIXED (staging):** new `lib/fetch-timeout.ts` — deliberately import-free, so it does not inherit the untestability of `lib/budget-guard.ts` (P6-87) — with a 10s default chosen to fail *before* Vercel's own limit so the route can still return a real status. **The dead-export rule written an hour earlier failed on this very module** — `DEFAULT_TIMEOUT_MS` and an `isTimeoutError` helper were exported and imported by nobody. They were removed rather than allowlisted: an unused export is speculative API, which is the thing that rule exists to stop accumulating. (The work `isTimeoutError` was for is real and open: no route yet distinguishes a deadline from a refusal, so a stalled upstream reports 502 where it should report 504.) All 9 routes wired (17 call sites). New `scripts/check-route-timeouts.ts`, 3 assertions in `check:formulas`, deriving its scope from file layout and asserting both counts (P6-75, P6-77) — because "0 routes without timeouts" is also what you get when you find 0 routes. **A number nobody recomputes is a number that drifts**, and that is precisely what cost this row four phases. |
 | P1-13 | P3 | ANALYZE → CCPI | **Closed by verification, which is what the row asked for and nobody had done.** It required checking that the dashboard surfaces the baseline flag for four literal constants before it could be marked clean. Two of the four (`ltv`, `spotVol`) were deleted outright by P3-19. The survivors are correctly tiered per-series since P6-6 — `tedSpread: fredData?.tedSpread != null ? "live" : "baseline"` — a `baseline` tier is excluded from scoring and renormalized away (P3-12), and the dashboard renders a per-pillar provenance line off `data.provenance`. The mechanism is real and in place. **FIXED.** |
 | P7-10 | P2 | ANALYZE → CCPI | **`nvidiaMomentum: alphaVantageData?.nvidiaMomentum ?? 50` — a neutral-50 default on a 0-100 momentum scale, found while verifying P1-13.** It is scored at `max: 9` in the momentum pillar, and on this scale **50 is a real neutral reading, not an absence** — the exact P6-18 / P6-30 shape. It is not currently a scoring defect: the tier is `alphaVantageLive ? "live" : "baseline"`, so when Alpha Vantage is down the value carries `baseline` and is excluded from the composite. **What is unverified is the display side.** The raw value reaches the dashboard's momentum pillar, and whether it renders "50" beside a baseline label or is withheld was not established. **OPEN**, and deliberately not changed at the end of a long session on scoring-adjacent code: the honest fix is `?? null` with the pillar's null path exercised, and that needs a run against a live CCPI payload. Note the pattern — **P6-4 fixed this exact idiom for AAII in this same route and left the NVDA one**, which is the "a decision enforced in one module is not enforced" cause for the fourth time this phase. |
+
+---
+
+## Phase 7.4 (third pass) — S-10, and the first nine dead exports deleted (2026-08-11)
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| S-10 | P2 | SCAN → Sell Put Scanner (Landmine expected move) | **The fix existed, was tested, and was never wired.** `expectedMove = price × (ATR% / 100) × √(days/7) × 1.5` — a `1.5` fudge with no reference anywhere, rendered as an expected move. `expectedMove()` in `lib/black-scholes.ts` has implemented the standard `S · σ · √T` since Phase 1, **and its own docstring already claimed it "replaces the ad-hoc ATR × 1.5 fudge (AUDIT_BACKLOG S-10)"** while the scanner went on using the fudge. A docstring is a claim about the code, and this one described work nobody had finished. **FIXED (staging):** the fundamental scan cannot compute it — the options chain is not fetched until enrichment, so no IV exists at that point — so it now supplies the earnings date and leaves the move undefined, and `enrichment.ts` fills it from the measured IV it has just read. **Withheld when the IV is synthesized** from the fixed 35% assumption (P6-43): a move derived from an assumed volatility is not an implied move and must not sit in the same column as ones that are. |
+| P7-9 | P3 | ops / lib | **First nine of the 51 deleted; 42 remain and the ratchet is lowered to match.** Two whole modules: `lib/serper-finance.ts` (175 lines, three exports, no importer anywhere — `/api/serper-finance` re-implements Serper itself) and `lib/ccpi/progress.ts` (39 lines, referenced only by a barrel that nothing imports). Plus four `console.log` wrappers from `lib/ccpi/logger.ts`, whose only live export is `logError`. `lib/` is now 274 exports across 52 files. **Still open, and one of them is P6-29's shape exactly:** `lib/ccpi/index.ts` is a re-export barrel whose only referrer is a markdown file. |
+
+**A false negative in the new rule, found while using it.** `expectedMove` in
+`lib/black-scholes.ts` is imported by nobody, yet it never appeared among the 51 —
+because `/api/strategy-scanner` declares a **local** `const expectedMove`, and the rule
+counts references by word match. It cannot tell an import from a coincidental
+identifier, so a symbol with a common enough name hides in plain sight. Recorded in the
+script's limits rather than papered over; closing it properly means parsing imports
+instead of text, which is a different tool.

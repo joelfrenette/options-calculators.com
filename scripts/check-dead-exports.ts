@@ -206,12 +206,6 @@ const KNOWN_DEAD: ReadonlySet<string> = new Set([
   "lib/ccpi/calculations.ts:getBarColor",
   "lib/ccpi/calculations.ts:getRegimeColor",
   "lib/ccpi/calculations.ts:getIndicatorStatus",
-  "lib/ccpi/logger.ts:logCCPIDataLoaded",
-  "lib/ccpi/logger.ts:logPillarBreakdown",
-  "lib/ccpi/logger.ts:logCacheOperation",
-  "lib/ccpi/logger.ts:logExecutiveSummary",
-  "lib/ccpi/progress.ts:startProgressSimulation",
-  "lib/ccpi/progress.ts:completeProgress",
   "lib/key-store.ts:reloadKeyOverrides",
   "lib/login-rate-limit.ts:getMaxFailures",
   "lib/login-rate-limit.ts:getWindowMinutes",
@@ -223,14 +217,11 @@ const KNOWN_DEAD: ReadonlySet<string> = new Set([
   "lib/quiver.ts:isQuiverConfigured",
   "lib/sentiment-sources.ts:getTwitterSentiment",
   "lib/sentiment-sources.ts:getFinnhubNewsSentiment",
-  "lib/serper-finance.ts:fetchSerperQuote",
-  "lib/serper-finance.ts:fetchSerperNews",
-  "lib/serper-finance.ts:isSerperAvailable",
   "lib/unified-ai-fallback.ts:fetchWithAIFallback",
   "lib/yoy.ts:monthsBack",
 ])
 
-const KNOWN_DEAD_BASELINE = 51
+const KNOWN_DEAD_BASELINE = 42
 
 check(
   `the known-dead list still holds ${KNOWN_DEAD_BASELINE} entries`,

@@ -7,63 +7,14 @@ import { calculateCCPI, countActiveWarnings, formatPillarContribution } from "./
 /**
  * Logs CCPI data load summary
  */
-export function logCCPIDataLoaded(data: CCPIData): void {
-  console.log("[v0] CCPI Data Loaded:", {
-    ccpi: data.ccpi,
-    certainty: data.certainty,
-    regime: data.regime.name,
-    pillars: data.pillars,
-    activeCanaries: countActiveWarnings(data.canaries),
-    // Was `|| 34`, a stale count from before the P3-19 indicator cull.
-    totalIndicators: data.totalIndicators ?? "unavailable",
-    crashAmplifiers: data.crashAmplifiers?.length || 0,
-    totalBonus: data.totalBonus || 0,
-  })
+// P7-9. Four exports deleted here on 2026-08-11 — logCCPIDataLoaded,
+// logPillarBreakdown, logCacheOperation and logExecutiveSummary. Each was a
+// console.log wrapper that no file outside this one called; the only live
+// export is logError, used by hooks/use-ccpi-data.ts. They were found by
+// scripts/check-dead-exports.ts, which is the point of writing that rule: a
+// logging helper nobody calls is not harmless, it is a place where a defect
+// waits without ever being read (P6-72, P6-81, P7-4 were all dormant).
 
-  console.log("[v0] CCPI: crashAmplifiers from API:", data.crashAmplifiers)
-  console.log("[v0] CCPI: totalBonus from API:", data.totalBonus)
-  console.log("[v0] CCPI: baseCCPI from API:", data.baseCCPI)
-}
-
-/**
- * Logs pillar breakdown with weighted contributions
- */
-export function logPillarBreakdown(data: CCPIData): void {
-  // formatPillarContribution is null-aware (a pillar is null when excluded for
-  // insufficient scored weight) and renormalizes like the scoring core.
-  console.log("Pillar Breakdown (weighted contribution to CCPI):")
-  console.log(formatPillarContribution(data.pillars))
-
-  const calculatedCCPI = calculateCCPI(data.pillars)
-  console.log(
-    "  Calculated CCPI:",
-    calculatedCCPI === null ? "n/a (no scoreable pillars)" : calculatedCCPI.toFixed(1),
-    "| API CCPI:",
-    data.ccpi,
-  )
-}
-
-/**
- * Logs cache operations
- */
-export function logCacheOperation(operation: "loaded" | "saved", timestamp?: string): void {
-  if (operation === "loaded") {
-    console.log("[v0] CCPI: Loaded from cache", timestamp)
-  } else {
-    console.log("[v0] CCPI data saved to cache")
-  }
-}
-
-/**
- * Logs executive summary generation
- */
-export function logExecutiveSummary(summary: string): void {
-  console.log("[v0] Grok executive summary generated:", summary)
-}
-
-/**
- * Logs errors
- */
 export function logError(context: string, error: unknown): void {
   console.error(`[v0] ${context}:`, error)
 }

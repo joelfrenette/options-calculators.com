@@ -34,9 +34,22 @@ import {
       const today = new Date()
       daysToEarnings = Math.floor((earnDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 
-      if (daysToEarnings >= 0 && daysToEarnings <= 30) {
-        expectedMove = currentPrice * (atrPercent / 100) * Math.sqrt(Math.max(daysToEarnings, 1) / 7) * 1.5
-      }
+      // S-10, closed 2026-08-11. This was
+      //   currentPrice × (atrPercent / 100) × √(daysToEarnings / 7) × 1.5
+      // — an ATR-based move with a `1.5` fudge factor that has no reference
+      // anywhere, presented in the table as an expected move. The standard
+      // form is S · σ · √T off IMPLIED volatility, and `expectedMove` in
+      // `lib/black-scholes.ts` has implemented it since Phase 1 — **its own
+      // docstring already claimed it "replaces the ad-hoc ATR × 1.5 fudge",
+      // and the call site was never changed.** A fix that exists, is tested,
+      // and is not wired is not a fix.
+      //
+      // The fundamental scan has no IV: the options chain is not fetched until
+      // enrichment. So this stage supplies the earnings DATE and leaves the
+      // move undefined; `enrichment.ts` fills it from the measured IV it just
+      // read. An unknown move stays undefined rather than falling back to a
+      // volatility proxy wearing the name of an implied one — the whole
+      // labelling problem this audit exists to remove.
     }
 
     return { earningsDate, daysToEarnings, expectedMove }
