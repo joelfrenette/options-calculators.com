@@ -51,7 +51,12 @@ export function LearnLEAPS() {
         "You have a strong 1-2 year bullish view on a stock or ETF.",
         "You want stock-like exposure with less cash tied up.",
         "Implied volatility is LOW (LEAPS are expensive when IV is high).",
-        "You want leverage without margin — a deep ITM LEAPS gives roughly 3-5× the exposure per dollar of owning shares, and cannot be margin-called.",
+        // The range has to be derived from the cost band stated in `steps`, not
+        // asserted separately: at 15-30% of share price the exposure per dollar
+        // is 1/0.30 to 1/0.15, i.e. ~3-7×. This line used to say "3-5×" while
+        // the worked example below runs at $1,800 for $12,000 of stock — 6.7×,
+        // outside the range the page itself taught.
+        "You want leverage without margin — a deep ITM LEAPS controls roughly 3-7× the stock exposure per dollar (the inverse of the 15-30% cost band above), and cannot be margin-called. The example below is at the cheap end of that band, so it runs near 7×.",
       ]}
       risks={[
         "Time decay (theta) is small day-to-day but real — your LEAPS slowly bleeds value if the stock doesn't move.",

@@ -26,7 +26,7 @@
 
 | Tab id | Label | Component | File | Lines | Internal APIs |
 |---|---|---|---|---|---|
-| `wheel-scanner` | Sell Put Scanner | `WheelScanner` | `components/wheel-scanner.tsx` | 387 | none (static) |
+| `wheel-scanner` | Sell Put Scanner | `WheelScanner` | `components/wheel-scanner.tsx` | 389 | none (static) |
 | `calendar-spread-scanner` | Calendar Spreads | `CalendarSpreadScanner` | `components/calendar-spread-scanner.tsx` | 571 | `/api/strategy-scanner` |
 | `credit-spread-scanner` | Credit Spreads | `CreditSpreadScanner` | `components/credit-spread-scanner.tsx` | 394 | `/api/strategy-scanner` |
 | `iron-condor-scanner` | Iron Condors | `IronCondorScanner` | `components/iron-condor-scanner.tsx` | 395 | `/api/strategy-scanner` |
@@ -55,7 +55,7 @@
 | `wheel-strategy` | The Wheel | `OptionsStrategyToolbox strategy="wheel-strategy"` | `components/options-strategy-toolbox.tsx` | 1040 | `/api/strategy-scanner` |
 | `learn-csp` | Cash-Secured Puts | `LearnCSP` | `components/learn-csp.tsx` | 98 | none (static) |
 | `learn-cc` | Covered Calls | `LearnCC` | `components/learn-cc.tsx` | 102 | none (static) |
-| `learn-leaps` | LEAPS | `LearnLEAPS` | `components/learn-leaps.tsx` | 95 | none (static) |
+| `learn-leaps` | LEAPS | `LearnLEAPS` | `components/learn-leaps.tsx` | 100 | none (static) |
 | `learn-pmcc` | PMCC | `LearnPMCC` | `components/learn-pmcc.tsx` | 124 | none (static) |
 | `credit-spreads` | Credit Spreads | `OptionsStrategyToolbox strategy="credit-spreads"` | `components/options-strategy-toolbox.tsx` | 1040 | `/api/strategy-scanner` |
 | `iron-condors` | Iron Condors | `OptionsStrategyToolbox strategy="iron-condors"` | `components/options-strategy-toolbox.tsx` | 1040 | `/api/strategy-scanner` |
@@ -64,10 +64,10 @@
 | `calendar-spreads` | Calendars | `OptionsStrategyToolbox strategy="calendar-spreads"` | `components/options-strategy-toolbox.tsx` | 1040 | `/api/strategy-scanner` |
 | `butterflies` | Butterflies | `OptionsStrategyToolbox strategy="butterflies"` | `components/options-strategy-toolbox.tsx` | 1040 | `/api/strategy-scanner` |
 | `collars` | Collars | `OptionsStrategyToolbox strategy="collars"` | `components/options-strategy-toolbox.tsx` | 1040 | `/api/strategy-scanner` |
-| `exit-rules` | Exit Rules | `ExitRulesDashboard` | `components/exit-rules-dashboard.tsx` | 558 | none (static) |
-| `earnings-iv-crusher` | Earnings EM | `EarningsVolatilityCalculator` | `components/earnings-volatility-calculator.tsx` | 533 | none (static) |
+| `exit-rules` | Exit Rules | `ExitRulesDashboard` | `components/exit-rules-dashboard.tsx` | 559 | none (static) |
+| `earnings-iv-crusher` | Earnings EM | `EarningsVolatilityCalculator` | `components/earnings-volatility-calculator.tsx` | 534 | none (static) |
 | `greeks` | Greeks Calc | `GreeksCalculator` | `components/greeks-calculator.tsx` | 487 | none (static) |
-| `risk-rewards` | ROI Calc | `RiskRewardCalculator` | `components/risk-reward-calculator.tsx` | 313 | none (static) |
+| `risk-rewards` | ROI Calc | `RiskRewardCalculator` | `components/risk-reward-calculator.tsx` | 314 | none (static) |
 
 ## 2. API DEPENDENCY GRAPH
 
@@ -243,6 +243,11 @@ _None._
 Hand-maintained. Legend: `data` live/labeled · `api` verified · `math` verified ·
 `fb` fallbacks fire · `copy` accurate · `err` handled · `mob` mobile · `size` ≤600 lines/module.
 
+Marks: ☑ verified · ☐ not yet verified · – no such surface on this tab.
+A static reference tab has no API, no fallbacks and no error paths, so it can never
+reach all-☑; without a third mark it would sit half-blank forever and read as
+unaudited. `–` says the column was considered and does not apply.
+
 Marks survive `pnpm inventory` — they are read back and merged by tab id.
 
 | Tab | data | api | math | fb | copy | err | mob | size |
@@ -257,7 +262,7 @@ Marks survive `pnpm inventory` — they are read back and merged by tab id.
 | `fomc-predictions` | ☑ | ☑ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
 | `cpi-inflation` | ☑ | ☑ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
 | `jobs` | ☑ | ☑ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
-| `wheel-scanner` | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| `wheel-scanner` | ☑ | ☐ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ |
 | `calendar-spread-scanner` | ☐ | ☑ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 | `credit-spread-scanner` | ☐ | ☑ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 | `iron-condor-scanner` | ☐ | ☑ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
@@ -272,12 +277,12 @@ Marks survive `pnpm inventory` — they are read back and merged by tab id.
 | `top-performers` | ☑ | ☑ | ☐ | ☐ | ☑ | ☑ | ☐ | ☐ |
 | `hedge-fund-13f` | ☑ | ☑ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
 | `smart-money-etfs` | ☑ | ☑ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
-| `federal-money` | ☑ | ☐ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
+| `federal-money` | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☐ | ☑ |
 | `wheel-strategy` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
-| `learn-csp` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
-| `learn-cc` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
-| `learn-leaps` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
-| `learn-pmcc` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
+| `learn-csp` | – | – | ☑ | – | ☑ | – | ☐ | ☑ |
+| `learn-cc` | – | – | ☑ | – | ☑ | – | ☐ | ☑ |
+| `learn-leaps` | – | – | ☑ | – | ☑ | – | ☐ | ☑ |
+| `learn-pmcc` | – | – | ☑ | – | ☑ | – | ☐ | ☑ |
 | `credit-spreads` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
 | `iron-condors` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
 | `straddles-strangles` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
@@ -285,7 +290,7 @@ Marks survive `pnpm inventory` — they are read back and merged by tab id.
 | `calendar-spreads` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
 | `butterflies` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
 | `collars` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
-| `exit-rules` | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| `exit-rules` | ☑ | – | – | – | ☑ | – | ☐ | ☑ |
 | `earnings-iv-crusher` | ☑ | ☐ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
 | `greeks` | ☐ | ☐ | ☑ | ☐ | ☑ | ☐ | ☐ | ☐ |
 | `risk-rewards` | ☑ | ☐ | ☐ | ☐ | ☑ | ☑ | ☐ | ☐ |

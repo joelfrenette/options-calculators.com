@@ -435,6 +435,11 @@ function render(): string {
   out.push("Hand-maintained. Legend: `data` live/labeled · `api` verified · `math` verified ·")
   out.push("`fb` fallbacks fire · `copy` accurate · `err` handled · `mob` mobile · `size` ≤600 lines/module.")
   out.push("")
+  out.push("Marks: ☑ verified · ☐ not yet verified · – no such surface on this tab.")
+  out.push("A static reference tab has no API, no fallbacks and no error paths, so it can never")
+  out.push("reach all-☑; without a third mark it would sit half-blank forever and read as")
+  out.push("unaudited. `–` says the column was considered and does not apply.")
+  out.push("")
   out.push("Marks survive `pnpm inventory` — they are read back and merged by tab id.")
   out.push("")
   out.push(

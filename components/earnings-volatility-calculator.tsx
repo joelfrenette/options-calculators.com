@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { AlertTriangle, TrendingUp, Info } from "lucide-react"
-import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
@@ -124,8 +123,10 @@ export function EarningsVolatilityCalculator() {
               <InfoTooltip content="This calculator helps you understand how much a stock might move around earnings and whether options are overpriced. It shows the 'expected move' (how far the market thinks the stock will go) and 'IV crush risk' (how much option value you might lose after the announcement)." />
             </div>
             <div className="flex items-center gap-2">
+              {/* No Refresh control: every number on this page is computed from
+                  the form below, so there is nothing to re-fetch. The header
+                  used to render an enabled Refresh with no handler at all. */}
               <TooltipsToggle enabled={tooltipsEnabled} onToggle={() => setTooltipsEnabled(!tooltipsEnabled)} />
-              <RefreshButton />
             </div>
           </CardHeader>
           <CardContent className="pt-4">

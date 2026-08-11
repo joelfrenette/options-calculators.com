@@ -11,7 +11,6 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { TrendingUp, Info, Loader2, BarChart3, Filter, AlertCircle } from "lucide-react"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { useWheelScanner } from "@/components/scanner/use-wheel-scanner"
 import { Step1DollarFilterCard } from "@/components/scanner/step1-dollar-filter-card"
@@ -95,9 +94,12 @@ export function WheelScanner() {
             </CardTitle>
 
             <div className="flex items-center gap-2">
-              {/* CHANGE: Use TooltipsToggle and RefreshButton components */}
+              {/* No Refresh control here on purpose. This scanner has no single
+                  thing to refresh — the pipeline is four explicit user-run steps
+                  with their own buttons. The header used to carry a Refresh
+                  wired to `onClick={() => {}}`, which looked wired and did
+                  nothing. */}
               <TooltipsToggle enabled={tooltipsEnabled} onChange={setTooltipsEnabled} />
-              <RefreshButton onClick={() => {}} />
             </div>
           </div>
         </CardHeader>

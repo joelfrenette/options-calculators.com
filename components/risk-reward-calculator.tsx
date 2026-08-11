@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { DollarSign, Calendar, TrendingUp, BarChart3, Info } from "lucide-react"
-import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 
@@ -74,8 +73,10 @@ export function RiskRewardCalculator() {
             </CardTitle>
             {/* Header Actions */}
             <div className="flex gap-2">
+              {/* No Refresh control: every number on this page is computed from
+                  the form below, so there is nothing to re-fetch. The header
+                  used to render an enabled Refresh with no handler at all. */}
               <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
-              <RefreshButton />
             </div>
           </CardHeader>
           <CardContent className="pt-4">

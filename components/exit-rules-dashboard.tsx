@@ -21,9 +21,8 @@ import {
   Info,
   Calculator,
   BarChart3,
-  Sparkles,
+  Brain,
 } from "lucide-react"
-import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 
 // Exit rule types
@@ -224,15 +223,18 @@ export function ExitRulesDashboard() {
             <div className="flex items-center gap-3 mb-2">
               <Target className="h-8 w-8 text-emerald-400" />
               <h1 className="text-2xl font-bold">Exit Rules & Profit-Taking Triggers</h1>
-              <InfoTooltip content="This dashboard teaches you WHEN to close your options trades. Most traders lose money not because of bad entries, but because of poor exits. These rules help you lock in profits and cut losses before they become disasters." />
+              <InfoTooltip content="This dashboard teaches you WHEN to close your options trades. Entries get most of the attention, but exits are where a plan is usually kept or broken. These rules help you lock in profits and cut losses before they become disasters." />
             </div>
             <div className="flex items-center gap-2">
               <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
-              <RefreshButton />
             </div>
           </div>
           <p className="text-slate-300 max-w-2xl">
             Systematic exit rules remove emotion from trading decisions. Define your exits before entering any trade.
+          </p>
+          <p className="text-xs text-slate-400 mt-3">
+            Reference material — every number on this page is a fixed convention, not a live reading, and nothing here
+            updates with the market.
           </p>
         </div>
 
@@ -243,7 +245,7 @@ export function ExitRulesDashboard() {
               <CardTitle className="text-lg flex items-center gap-2 text-green-700">
                 <TrendingUp className="h-5 w-5" />
                 Profit Target
-                <InfoTooltip content="The price point where you close a winning trade to lock in gains. Taking profits at 50% of max profit has been shown to increase long-term win rates because you avoid giving back gains when the trade reverses." />
+                <InfoTooltip content="The price point where you close a winning trade to lock in gains. Closing at 50% of max profit is the standard convention among premium sellers: it caps how long you stay exposed and avoids giving back gains when the trade reverses. It is a rule of thumb, not a result this site has measured." />
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -420,9 +422,9 @@ export function ExitRulesDashboard() {
                 <CardTitle className="flex items-center gap-2">
                   <Calculator className="h-5 w-5 text-purple-600" />
                   Exit Rules by Strategy
-                  <InfoTooltip content="Different strategies have different optimal exit points. These guidelines are based on backtested research showing the profit/loss targets that maximize long-term returns for each strategy type." />
+                  <InfoTooltip content="Different strategies have different customary exit points. These are widely used conventions from options-selling practice — this site has not backtested them, so treat them as starting points to measure your own results against, not as proven optima." />
                 </CardTitle>
-                <CardDescription>Strategy-specific exit guidelines</CardDescription>
+                <CardDescription>Strategy-specific exit conventions — not backtested here</CardDescription>
               </CardHeader>
               <CardContent>
                 {/* Strategy Selector */}
@@ -496,21 +498,20 @@ export function ExitRulesDashboard() {
           </TabsContent>
         </Tabs>
 
-        {/* AI Insights */}
+        {/* Editorial background — written copy, not model output. The section
+            used to be headed "AI Insights" with the site's Sparkles marker while
+            its content was hardcoded below, which is the one thing this audit
+            exists to remove: a label asserting something the code does not do. */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-teal-600" />
-              AI Insights: Exit Strategy Psychology
-              <InfoTooltip content="Understanding the psychological aspects of exiting trades is just as important as the mechanical rules. These insights help you overcome common mental barriers to proper trade management." />
+              <Brain className="h-5 w-5 text-teal-600" />
+              Exit Strategy Psychology
+              <InfoTooltip content="Understanding the psychological side of exiting trades matters as much as the mechanical rules. This is written background material, not generated analysis of your positions." />
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Accordion
-              type="multiple"
-              defaultValue={["psychology", "scaling", "automation", "options-specific"]}
-              className="w-full"
-            >
+            <Accordion type="multiple" defaultValue={["psychology", "scaling"]} className="w-full">
               <AccordionItem value="psychology">
                 <AccordionTrigger className="text-left">Why Traders Fail to Exit Properly</AccordionTrigger>
                 <AccordionContent className="space-y-3 text-sm text-muted-foreground">
