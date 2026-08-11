@@ -5,7 +5,20 @@
 // env-var spelling. To stop features from silently failing when only one
 // spelling is set, every key is resolved through its full alias list.
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "default-32-char-encryption-key!" // 32 chars
+// A module-level `ENCRYPTION_KEY = process.env.ENCRYPTION_KEY ||
+// "default-32-char-encryption-key!"` was deleted here. Nothing in this file
+// ever read it — one occurrence, the declaration itself.
+//
+// It was never a live vulnerability: `lib/key-store.ts`, which actually
+// encrypts admin-pasted credentials, reads `process.env.ENCRYPTION_KEY`
+// directly and returns null below 16 characters, and `lib/auth.ts` throws
+// rather than signing sessions with a default. **Both of those guards were
+// written specifically to avoid this constant** — key-store's comment says so.
+//
+// Which is the point. A previous pass found the hazard, routed around it, and
+// left it sitting in a file named `api-keys.ts` for the next person to reach
+// for. That is P6-72's lesson on a credential: **a decision enforced where the
+// defect was found is not enforced where the defect lives.**
 
 // Canonical key name -> all accepted env-var spellings (checked in order).
 export const API_KEY_ALIASES: Record<string, string[]> = {

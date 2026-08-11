@@ -58,9 +58,13 @@ function fromHex(hex: string): Uint8Array | null {
 /** The configured secret, or null when this deployment cannot store keys. */
 function secretValue(): string | null {
   const secret = process.env.ENCRYPTION_KEY
-  // No fallback to the hardcoded default in lib/api-keys.ts. Encrypting real
-  // credentials with a value committed to the repo would be worse than not
-  // offering the feature at all.
+  // Read from the environment and nowhere else. Encrypting real credentials
+  // with any value committed to the repo would be worse than not offering the
+  // feature at all.
+  //
+  // This used to read "No fallback to the hardcoded default in
+  // lib/api-keys.ts" — that default has since been deleted (P6-88), because
+  // routing around a hazard leaves it in place for the next reader.
   if (!secret || secret.length < 16) return null
   return secret
 }
