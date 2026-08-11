@@ -10,6 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
+import { PANIC_EUPHORIA_ALLOCATION, bandForScore } from "@/lib/allocation"
+import { AllocationBar } from "@/components/allocation-bar"
 import {
   Activity,
   TrendingUp,
@@ -215,11 +217,6 @@ export function PanicEuphoria() {
           "Keep 10-15% cash reserve for potential further drops",
           "Focus on stocks you want to own long-term at these prices",
         ],
-        allocation: {
-          stocks: "60-70%",
-          options: "20-30%",
-          cash: "10-15%",
-        },
         coachTips:
           "EXTREME PANIC DETECTED - History shows these signals are rare and incredibly profitable. Last extreme readings: 2009 (Financial Crisis), 2020 (COVID Crash). Official Citi data: >95% probability of positive returns within 1 year from extreme panic levels.",
       }
@@ -243,11 +240,6 @@ export function PanicEuphoria() {
           "Signals can be early - market may continue down 1-3 months",
           "Build positions gradually over 4-8 weeks",
         ],
-        allocation: {
-          stocks: "50-60%",
-          options: "25-35%",
-          cash: "15-20%",
-        },
         coachTips:
           "Market showing panic while long-term trend remains intact. Historical avg returns: 6mo: +8.2%, 12mo: +15.7%. Be patient - best opportunities may be 4-6 weeks away.",
       }
@@ -271,11 +263,6 @@ export function PanicEuphoria() {
           "Reduce position sizes and exposure",
           "Build cash reserves for future opportunities",
         ],
-        allocation: {
-          stocks: "35-45%",
-          options: "10-15%",
-          cash: "40-55%",
-        },
         coachTips: "Neutral conditions - no compelling signal. Wait for panic (buy signal) or euphoria (avoid risk).",
       }
     }
@@ -297,11 +284,6 @@ export function PanicEuphoria() {
           "Consider building cash reserves",
           "Be prepared for increased volatility",
         ],
-        allocation: {
-          stocks: "30-40%",
-          options: "5-10%",
-          cash: "50-65%",
-        },
         coachTips: "Euphoria detected. Market is elevated; consider reducing risk and building cash.",
       }
     }
@@ -323,11 +305,6 @@ export function PanicEuphoria() {
         "Build maximum cash reserves",
         "Prepare for significant volatility",
       ],
-      allocation: {
-        stocks: "10-20%",
-        options: "0-5%",
-        cash: "75-90%",
-      },
       coachTips:
         "EXTREME EUPHORIA WARNING - Market exuberance suggests sharp correction ahead. Historical pattern: >80% chance of lower prices within 1 year from extreme euphoria levels (official Citi data).",
     }
@@ -390,6 +367,8 @@ export function PanicEuphoria() {
   }
 
   const recommendations = getTradeRecommendations(data.overallScore, data.aboveMA)
+  // null when the score is missing — never falls back to a benign band.
+  const allocationBand = bandForScore(PANIC_EUPHORIA_ALLOCATION.bands, data.overallScore)
   const allLevelGuidance = getAllLevelGuidance()
 
   const ConditionalTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => {
@@ -934,24 +913,21 @@ export function PanicEuphoria() {
                           <DollarSign className="h-5 w-5 text-purple-600" />
                           <h3 className="font-bold text-gray-900">Recommended Allocation</h3>
                         </div>
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                            <span className="text-sm font-medium text-gray-700">Stocks/ETFs</span>
-                            <span className="text-sm font-bold text-purple-600">
-                              {recommendations.allocation.stocks}
-                            </span>
+                        {/*
+                          From lib/allocation.ts, where cash is the only stored figure
+                          and stocks is its complement. The three columns this replaced
+                          summed to between 90 and 115.
+                        */}
+                        {allocationBand ? (
+                          <div className="space-y-3">
+                            <AllocationBar band={allocationBand} />
+                            <p className="text-sm text-gray-600 italic">{allocationBand.stance}</p>
                           </div>
-                          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                            <span className="text-sm font-medium text-gray-700">Options Strategies</span>
-                            <span className="text-sm font-bold text-purple-600">
-                              {recommendations.allocation.options}
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                            <span className="text-sm font-medium text-gray-700">Cash Reserve</span>
-                            <span className="text-sm font-bold text-purple-600">{recommendations.allocation.cash}</span>
-                          </div>
-                        </div>
+                        ) : (
+                          <p className="text-sm text-gray-500 italic">
+                            No panic/euphoria reading — allocation not shown.
+                          </p>
+                        )}
                       </div>
 
                       {/* Recommended Strategies */}
@@ -1074,22 +1050,14 @@ export function PanicEuphoria() {
                             <p className="text-sm text-gray-600 italic">{item.description}</p>
                           </div>
 
-                          <div className="grid grid-cols-3 gap-3 mb-3">
-                            <div className="p-3 bg-green-50 rounded border border-green-300">
-                              <div className="text-xs font-semibold text-green-900 uppercase mb-1">Stocks</div>
-                              <div className="text-lg font-bold text-green-900">{item.guidance.allocation.stocks}</div>
-                            </div>
-                            <div className="p-3 bg-purple-50 rounded border border-purple-200">
-                              <div className="text-xs font-semibold text-purple-900 uppercase mb-1">Options</div>
-                              <div className="text-lg font-bold text-purple-900">
-                                {item.guidance.allocation.options}
-                              </div>
-                            </div>
-                            <div className="p-3 bg-gray-50 rounded border border-gray-300">
-                              <div className="text-xs font-semibold text-gray-900 uppercase mb-1">Cash</div>
-                              <div className="text-lg font-bold text-gray-900">{item.guidance.allocation.cash}</div>
-                            </div>
-                          </div>
+                          {(() => {
+                            // Matched on the level the row already names, so this list and
+                            // the live card above can never show different splits.
+                            const rowBand = PANIC_EUPHORIA_ALLOCATION.bands.find(
+                              (b) => b.level === item.guidance.level,
+                            )
+                            return rowBand ? <AllocationBar band={rowBand} className="mb-3" /> : null
+                          })()}
 
                           <div className="mb-3">
                             <div className="text-xs font-bold text-gray-900 uppercase mb-2">Top Strategies</div>

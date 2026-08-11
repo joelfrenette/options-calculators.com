@@ -24,6 +24,7 @@
 
 import {
   CCPI_ALLOCATION,
+  PANIC_EUPHORIA_ALLOCATION,
   SENTIMENT_ALLOCATION,
   type AllocationScale,
   bandForScore,
@@ -44,6 +45,7 @@ function check(name: string, passed: boolean, detail = "") {
 const SCALES: ReadonlyArray<[string, AllocationScale]> = [
   ["CCPI", CCPI_ALLOCATION],
   ["Sentiment", SENTIMENT_ALLOCATION],
+  ["Panic/Euphoria", PANIC_EUPHORIA_ALLOCATION],
 ]
 
 // ---------------------------------------------------------------------------
@@ -84,29 +86,54 @@ for (const [label, scale] of SCALES) {
 }
 
 // ---------------------------------------------------------------------------
-// 4. Bands must tile their scale with no gap and no overlap. A gap means some
-//    score silently renders no allocation at all.
+// 4. Bands must tile their whole domain with no gap. A gap means some score
+//    silently renders no allocation at all — and the domains differ, so this
+//    is checked against each scale's own bounds rather than an assumed 0-100.
 // ---------------------------------------------------------------------------
+const SWEEP_STEPS = 2000
 for (const [label, scale] of SCALES) {
   const bands = scale.bands
-  check(`${label} first band starts at 0`, bands[0].min === 0, `${bands[0].min}`)
-  check(`${label} last band ends at 100`, bands[bands.length - 1].max === 100, `${bands[bands.length - 1].max}`)
+  const { min, max } = scale.domain
 
-  let contiguous = true
-  for (let i = 1; i < bands.length; i++) {
-    if (bands[i].min !== bands[i - 1].max + 1) contiguous = false
-  }
-  check(`${label} bands are contiguous`, contiguous)
-
-  let everyScoreMapped = true
-  for (let score = 0; score <= 100; score++) {
-    if (bandForScore(bands, score) === null) everyScoreMapped = false
-  }
-  check(`${label} every score 0-100 maps to exactly one band`, everyScoreMapped)
+  check(`${label} first band starts at the domain floor`, bands[0].min === min, `${bands[0].min} vs ${min}`)
+  check(
+    `${label} last band ends at the domain ceiling`,
+    bands[bands.length - 1].max === max,
+    `${bands[bands.length - 1].max} vs ${max}`,
+  )
 
   check(
-    `${label} each band's displayed range matches its bounds`,
-    bands.every((b) => b.range === `${b.min}-${b.max}`),
+    `${label} every band is well-formed (min <= max)`,
+    bands.every((b) => b.min <= b.max),
+  )
+
+  // Ascending with no true overlap. Bands may SHARE an endpoint — bandForScore
+  // takes the first match, so a boundary score resolves to the lower band —
+  // but one band must never start before the previous one ends.
+  let ordered = true
+  for (let i = 1; i < bands.length; i++) {
+    if (bands[i].min < bands[i - 1].max) ordered = false
+  }
+  check(`${label} bands ascend without overlapping`, ordered)
+
+  // The real gap test: sweep the domain and confirm nothing falls through.
+  let unmapped: number | null = null
+  for (let i = 0; i <= SWEEP_STEPS; i++) {
+    const score = min + ((max - min) * i) / SWEEP_STEPS
+    if (bandForScore(bands, score) === null) {
+      unmapped = score
+      break
+    }
+  }
+  check(
+    `${label} every score across its domain maps to a band`,
+    unmapped === null,
+    unmapped === null ? `swept ${SWEEP_STEPS + 1} points in [${min}, ${max}]` : `${unmapped} maps to nothing`,
+  )
+
+  check(
+    `${label} every band carries a displayed range`,
+    bands.every((b) => b.range.trim().length > 0),
   )
 }
 
@@ -118,6 +145,10 @@ check("an undefined score yields no band", bandForScore(CCPI_ALLOCATION.bands, u
 check("NaN yields no band", bandForScore(CCPI_ALLOCATION.bands, Number.NaN) === null)
 check("Infinity yields no band", bandForScore(CCPI_ALLOCATION.bands, Number.POSITIVE_INFINITY) === null)
 check("an out-of-range score yields no band", bandForScore(CCPI_ALLOCATION.bands, 101) === null)
+check("a score below the domain floor yields no band", bandForScore(CCPI_ALLOCATION.bands, -1) === null)
+// The gap this suite found: "0-19" beside "20-39" left 19.4 matching neither.
+check("a fractional score between displayed bands still maps", bandForScore(CCPI_ALLOCATION.bands, 19.4)?.level === "Low Risk")
+check("a fractional score just below a boundary maps low", bandForScore(CCPI_ALLOCATION.bands, 39.9)?.level === "Normal")
 
 // ---------------------------------------------------------------------------
 // 6. The two scales are distinct questions, and each says so.
@@ -139,6 +170,24 @@ check("CCPI 34 is Normal at 20% cash", bandForScore(CCPI_ALLOCATION.bands, 34)?.
 check("CCPI 95 is Crash Watch at 75% cash", bandForScore(CCPI_ALLOCATION.bands, 95)?.cash === 75)
 check("Sentiment 87 is Extreme Greed at 70% cash", bandForScore(SENTIMENT_ALLOCATION.bands, 87)?.cash === 70)
 check("formatPct renders a whole percent", formatPct(65) === "65%")
+
+// Panic/euphoria thresholds, locked against the if-chain they replaced.
+const pe = (score: number) => bandForScore(PANIC_EUPHORIA_ALLOCATION.bands, score)?.level
+check("panic −0.60 is Extreme Panic", pe(-0.6) === "Extreme Panic")
+check("panic −0.45 belongs to the band starting there (Panic)", pe(-0.45) === "Panic")
+check("panic −0.30 is Panic", pe(-0.3) === "Panic")
+check("panic −0.17 belongs to the band starting there (Neutral)", pe(-0.17) === "Neutral/Complacent")
+check("panic 0.00 is Neutral/Complacent", pe(0) === "Neutral/Complacent")
+check("panic 0.41 is Euphoria, as the old if-chain had it", pe(0.41) === "Euphoria")
+check("panic 0.55 is Euphoria", pe(0.55) === "Euphoria")
+check("panic 0.70 is Extreme Euphoria, as the old if-chain had it", pe(0.7) === "Extreme Euphoria")
+check("panic 0.85 is Extreme Euphoria", pe(0.85) === "Extreme Euphoria")
+check(
+  "panic is the most-deployed state on any scale",
+  stocksFor(PANIC_EUPHORIA_ALLOCATION.bands[0]) === 85,
+  `${stocksFor(PANIC_EUPHORIA_ALLOCATION.bands[0])}% stocks at extreme panic`,
+)
+check("a score outside [−1, 1] yields no band", bandForScore(PANIC_EUPHORIA_ALLOCATION.bands, 1.5) === null)
 
 console.log(failures === 0 ? "\nAll allocation checks passed." : `\n${failures} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)

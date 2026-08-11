@@ -16,7 +16,7 @@
 | `trend-analysis` | Index Trend Analysis | `TrendAnalysis` | `components/trend-analysis.tsx` | 1173 | `/api/trend-analysis` |
 | `risk-management` | CBOE VIX Volatility Index | `RiskCalculator` | `components/risk-calculator.tsx` | 845 | `/api/vix`<br>`/api/vix-history` |
 | `market-sentiment` | CNN's Fear & Greed | `MarketSentiment` | `components/market-sentiment.tsx` | 1543 | `/api/market-sentiment`<br>`/api/sentiment-heatmap` |
-| `panic-euphoria` | Citibank's Panic & Euphoria Index | `PanicEuphoria` | `components/panic-euphoria.tsx` | 1157 | `/api/panic-euphoria` |
+| `panic-euphoria` | Citibank's Panic & Euphoria Index | `PanicEuphoria` | `components/panic-euphoria.tsx` | 1125 | `/api/panic-euphoria` |
 | `social-sentiment` | Social Sentiment Index | `SocialSentiment` | `components/social-sentiment.tsx` | 745 | `/api/social-sentiment` |
 | `fomc-predictions` | FOMC Fed Rate Forecaster | `FomcPredictions` | `components/fomc-predictions.tsx` | 1439 | `/api/fomc-predictions` |
 | `cpi-inflation` | BLS CPI Inflation Forecaster | `CpiInflationAnalysis` | `components/cpi-inflation-analysis.tsx` | 669 | `/api/cpi-inflation` |
@@ -80,7 +80,7 @@ Every route: HTTP verbs, segment config, upstream hosts, env keys, timeout wirin
 | `/api/admin/api-status` | GET | dynamic="force-dynamic"<br>maxDuration=60 | api.anthropic.com<br>api.apify.com<br>api.groq.com<br>api.openai.com<br>api.perplexity.ai<br>api.polygon.io<br>api.resend.com<br>api.stlouisfed.org<br>api.twelvedata.com<br>api.x.ai<br>app.scrapingbee.com<br>financialmodelingprep.com<br>finnhub.io<br>generativelanguage.googleapis.com<br>google.serper.dev<br>openrouter.ai<br>production.dataviz.cnn.io<br>www.alphavantage.co | — | yes | `app/admin/page.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/admin/backup` | GET | — | vercel.com | — | **no** | `app/admin/page.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/admin/budget-guard` | GET, POST | dynamic="force-dynamic" | — | — | **no** | `components/admin/budget-guard-panel.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
-| `/api/admin/ccpi-backtest` | GET | dynamic="force-dynamic"<br>maxDuration=120 | — | — | **no** | `lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
+| `/api/admin/ccpi-backtest` | GET | dynamic="force-dynamic"<br>maxDuration=120 | — | — | **no** | `lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts`<br>`app/api/ccpi-signals/route.ts` |
 | `/api/admin/run-health-checks` | GET | dynamic="force-dynamic"<br>maxDuration=300 | — | ADMIN_PASSWORD<br>ADMIN_PASSWORD_HASH<br>CRON_SECRET<br>ENCRYPTION_KEY<br>NEXT_PUBLIC_BASE_URL<br>VERCEL_AUTOMATION_BYPASS_SECRET<br>VERCEL_URL | yes | `components/admin/health-check-panel.tsx`<br>`lib/api-contracts.ts` |
 | `/api/admin/usage` | GET | — | — | — | **no** | `components/api-keys-manager.tsx`<br>`components/costs-usage-admin.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/ai-status` | GET | dynamic="force-dynamic" | — | — | **no** | `components/ai-status-admin.tsx`<br>`lib/api-contracts.ts`<br>`lib/remediation.ts`<br>`app/api/admin/run-health-checks/route.ts` |
@@ -224,8 +224,8 @@ _None._
 | `components/market-sentiment.tsx` | 1543 | 943 |
 | `components/fomc-predictions.tsx` | 1439 | 839 |
 | `components/trend-analysis.tsx` | 1173 | 573 |
-| `components/panic-euphoria.tsx` | 1157 | 557 |
 | `components/ccpi-dashboard.tsx` | 1142 | 542 |
+| `components/panic-euphoria.tsx` | 1125 | 525 |
 | `components/options-strategy-toolbox.tsx` | 1040 | 440 |
 | `components/insider-trading-dashboard.tsx` | 961 | 361 |
 | `components/trade-walkthrough-modal.tsx` | 866 | 266 |

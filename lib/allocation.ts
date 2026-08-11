@@ -23,7 +23,7 @@
  * 4. market sentiment's `getPortfolioAllocation`, a three-way split summing to
  *    between 85 and 110 that **was never rendered** — dead code contradicting
  *    (3) in the same component, and
- * 5. `components/panic-euphoria.tsx`, still outstanding at the time of writing.
+ * 5. `components/panic-euphoria.tsx`'s three-column split, running 90 to 115.
  *
  * The pattern is the same every time: **both halves of a complementary pair
  * were stored, so they were free to drift, and they did.** The fix is
@@ -45,12 +45,14 @@
  * - `SENTIMENT_ALLOCATION` — keyed to fear and greed, 0 extreme fear to 100
  *   extreme greed. Cash rises with *greed* here, which is why its calmest band
  *   still holds more cash than the CCPI calmest band does.
+ * - `PANIC_EUPHORIA_ALLOCATION` — keyed to panic and euphoria, −1 to +1. Panic
+ *   is a *buy* signal, so this scale's low end is its most deployed state.
  *
  * Dependency-free so check scripts can load it directly.
  */
 
 export interface AllocationBand {
-  /** Inclusive score range, as displayed. */
+  /** The score range as displayed. Free text, because the scales are not all 0-100. */
   range: string
   min: number
   max: number
@@ -64,6 +66,8 @@ export interface AllocationBand {
 export interface AllocationScale {
   /** What the score means, so a reader is never comparing two unlike "cash %" figures. */
   question: string
+  /** Inclusive domain of the underlying gauge. Not every scale runs 0-100. */
+  domain: { min: number; max: number }
   bands: readonly AllocationBand[]
 }
 
@@ -113,6 +117,7 @@ export const CCPI_ALLOCATION_BANDS: readonly AllocationBand[] = [
 
 export const CCPI_ALLOCATION: AllocationScale = {
   question: "How much crash risk is the CCPI reading right now?",
+  domain: { min: 0, max: 100 },
   bands: CCPI_ALLOCATION_BANDS,
 }
 
@@ -162,7 +167,73 @@ export const SENTIMENT_ALLOCATION_BANDS: readonly AllocationBand[] = [
 
 export const SENTIMENT_ALLOCATION: AllocationScale = {
   question: "How greedy or fearful is the market right now?",
+  domain: { min: 0, max: 100 },
   bands: SENTIMENT_ALLOCATION_BANDS,
+}
+
+/**
+ * Panic / euphoria: −1 is extreme panic, +1 is extreme euphoria. Cash rises
+ * with euphoria, and panic is the *buy* signal, so the low end holds the least
+ * cash of any scale on the site.
+ *
+ * Cash figures are the midpoints of the ranges this replaced, rounded to the
+ * nearest 5 — the same rule the other two scales were converted under.
+ *
+ * **A boundary score belongs to the band that starts there** — see
+ * `bandForScore`. The if-chain this replaced mixed `<=` and `<` between
+ * branches, so two boundary values change hands: exactly −0.45 now reads Panic
+ * rather than Extreme Panic, and exactly −0.17 reads Neutral rather than Panic.
+ * Both are measure-zero on a continuous score, and one stated rule is worth
+ * more than three unstated ones — but it is a change, so it is written down
+ * rather than discovered later.
+ */
+export const PANIC_EUPHORIA_ALLOCATION_BANDS: readonly AllocationBand[] = [
+  {
+    range: "−1.00 to −0.45",
+    min: -1,
+    max: -0.45,
+    level: "Extreme Panic",
+    cash: 15,
+    stance: "Rare and historically profitable. Deploy into quality, keep a working reserve.",
+  },
+  {
+    range: "−0.45 to −0.17",
+    min: -0.45,
+    max: -0.17,
+    level: "Panic",
+    cash: 20,
+    stance: "Long-term trend intact while the tape panics. Build positions gradually.",
+  },
+  {
+    range: "−0.17 to 0.41",
+    min: -0.17,
+    max: 0.41,
+    level: "Neutral/Complacent",
+    cash: 50,
+    stance: "No edge either way. Hold a real reserve and wait for a signal.",
+  },
+  {
+    range: "0.41 to 0.70",
+    min: 0.41,
+    max: 0.7,
+    level: "Euphoria",
+    cash: 60,
+    stance: "Trim winners and take profits early. The crowd is leaning one way.",
+  },
+  {
+    range: "0.70 to 1.00",
+    min: 0.7,
+    max: 1,
+    level: "Extreme Euphoria",
+    cash: 85,
+    stance: "Maximum defence. Close what is profitable and prepare for volatility.",
+  },
+]
+
+export const PANIC_EUPHORIA_ALLOCATION: AllocationScale = {
+  question: "Is the market panicking or euphoric right now?",
+  domain: { min: -1, max: 1 },
+  bands: PANIC_EUPHORIA_ALLOCATION_BANDS,
 }
 
 /** Stocks is always the complement of cash — never stored, so it cannot drift. */
@@ -177,13 +248,34 @@ export function formatPct(value: number): string {
 /**
  * The band a score falls in, or `null` when there is no score.
  *
+ * **Bands are selected by their lower edge: the answer is the last band whose
+ * `min` the score has reached.** This matters more than it looks. Matching on
+ * `min <= score <= max` instead leaves gaps wherever a scale is written the way
+ * humans read it — CCPI bands display as "0-19" and "20-39", so a score of 19.4
+ * satisfied neither and silently rendered no allocation at all. The check suite
+ * sweeps each domain and caught exactly that.
+ *
+ * A consequence worth stating: a score sitting exactly on a boundary belongs to
+ * the band that *starts* there, which is how the displayed ranges read. For the
+ * panic/euphoria scale that differs from the mixed `<=`/`<` if-chain it
+ * replaced at two measure-zero points — exactly −0.45 now reads Panic rather
+ * than Extreme Panic, and exactly −0.17 reads Neutral rather than Panic.
+ *
  * Never defaults to a band. A missing score is not "Low Risk" — that is the
- * P6-30 defect (a dead feed rendering as a benign state) in allocation form.
+ * P6-30 defect (a dead feed rendering as a benign state) in allocation form,
+ * and a score outside the scale's domain is missing data too.
  */
 export function bandForScore(
   bands: readonly AllocationBand[],
   score: number | null | undefined,
 ): AllocationBand | null {
   if (score === null || score === undefined || !Number.isFinite(score)) return null
-  return bands.find((b) => score >= b.min && score <= b.max) ?? null
+  if (bands.length === 0) return null
+  if (score > bands[bands.length - 1].max) return null
+
+  let match: AllocationBand | null = null
+  for (const band of bands) {
+    if (score >= band.min) match = band
+  }
+  return match
 }
