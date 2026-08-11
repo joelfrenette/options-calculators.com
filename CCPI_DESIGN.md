@@ -406,6 +406,42 @@ and its 25 checks, the reference drawdowns, `/api/admin/ccpi-backtest`, and a pe
 coverage readout. Phase 2 is the **only** phase that changes what a visitor sees, and it changes
 it before a single weight exists. That ordering is deliberate — see "why unscored first" below.
 
+#### AMENDED 2026-08-10 after UAT — the sections stayed, the grouping did not
+
+Phase 2 shipped exactly as specified below and was reviewed on staging the same day.
+**The owner rejected the three-section grouping and kept the pillar numbering.** The page
+order is now:
+
+1. the CCPI score card, with the crash amplifiers and Active Warning Signals attached to it,
+2. **TRIGGER**,
+3. **Pillar 1 Momentum**, 4. **Pillar 2 Risk Appetite**, 5. **Pillar 3 Valuation**, 6. **Pillar 4 Macro**.
+
+**What was actually being protected here was the labelling, not the layout, and the labelling
+survived intact.** Grouping Momentum under a "Coincident" header and Valuation under a
+"Vulnerability" header was one way to tell the reader that the first confirms rather than
+predicts and the second says how far rather than when. It is not the only way. Those two
+statements now ride on the pillars themselves: `PillarMomentum` and `PillarValuation` each
+take a `badge` (a short role label, rendered in the accordion trigger so it is visible while
+the section is collapsed) and a `caveat` (the full sentence, rendered when it is open).
+A reader still cannot expand Momentum without being told it does not predict.
+
+**Do not "restore" the grouped layout.** It was seen, considered and replaced by the owner,
+and reverting it would trade a working page order for a header arrangement that carried no
+information the badges do not carry. Everything in "What Phase 2 must NOT do" below still
+binds — no score, no gauge, no row without its record, no `NO DATA` rendered as `QUIET`, no
+reordering rows by importance.
+
+*One further UAT change, recorded here because it touched the same commit:* the five-column
+portfolio allocation table was replaced by a single cash-vs-stocks ratio per regime, now
+living in `lib/ccpi/allocation.ts`. That consolidation exposed a defect worth naming — the
+old five columns never summed to 100, and the options-strategy card separately claimed
+"cash 5-10%" beside "exposure 90-100%", which sums to 110. **Cash is now the only stored
+figure and stocks is computed as its complement**, so the two halves cannot disagree again.
+`bandForScore` returns `null` for a missing score rather than defaulting to the benign first
+band, which is the P6-30 rule applied to allocation.
+
+*The original specification follows, and is otherwise unchanged.*
+
 #### Three sections, in this order
 
 **1. TRIGGER** — the actionable one, at the top.
@@ -468,10 +504,12 @@ anyone having to defend a number that was never justified.
 
 #### Definition of done for Phase 2
 
-The page shows three sections; every Trigger row shows state, reading, date, meaning and record;
-no number anywhere claims to aggregate them; the Coincident section is labelled as
-non-predictive; and a reader who knows nothing about the redesign can tell, from the page alone,
-which signals are measured, which are untested, and which have no data at all.
+Trigger appears as its own section with every row showing state, reading, date, meaning and
+record; no number anywhere claims to aggregate them; the coincident and vulnerability roles
+are stated on screen wherever those indicators appear (as section headers in the original
+specification, as pillar badges after the UAT amendment above); and a reader who knows nothing
+about the redesign can tell, from the page alone, which signals are measured, which are
+untested, and which have no data at all.
 
 ---
 
