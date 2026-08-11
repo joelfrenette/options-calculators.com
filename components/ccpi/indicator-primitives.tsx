@@ -152,7 +152,14 @@ CCPIIndicator.displayName = "CCPIIndicator"
 export interface CCPIBooleanIndicatorProps {
   label: string
   value: boolean
-  proximity?: number
+  /**
+   * Null/undefined when the proximity could not be measured. It must NOT fall
+   * back to 0: this bar's own scale labels 0 as "Safe: 0% (far above)", so a
+   * default renders absence as reassurance — the same shape as P6-31's
+   * `buffettIndicator || 180`, except that one fired a false warning and this
+   * one suppresses a real concern, which is the more dangerous direction.
+   */
+  proximity?: number | null
   additionalInfo?: string
   thresholds: CCPIIndicatorThresholds
   tooltipContent?: React.ReactNode
@@ -163,7 +170,7 @@ export const CCPIBooleanIndicator = React.memo(
   ({
     label,
     value,
-    proximity = 0,
+    proximity = null,
     additionalInfo,
     thresholds,
     tooltipContent,
@@ -189,7 +196,13 @@ export const CCPIBooleanIndicator = React.memo(
           </span>
         </div>
 
-        <CCPIGradientBar value={proximity} min={0} max={100} reverse={false} />
+        {proximity === null ? (
+          <div className="h-2 w-full rounded-full bg-gray-200 flex items-center justify-center">
+            <span className="text-[10px] text-gray-500">proximity not measured</span>
+          </div>
+        ) : (
+          <CCPIGradientBar value={proximity} min={0} max={100} reverse={false} />
+        )}
 
         <div className="flex justify-between text-xs text-gray-600">
           <span>{thresholds.low.label}</span>

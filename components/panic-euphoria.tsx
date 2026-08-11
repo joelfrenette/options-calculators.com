@@ -82,7 +82,13 @@ function PanicIndicator({
   max = 1,
 }: {
   label: string
-  value: number
+  // Null when the component has no score yet — the percentile-scored series
+  // withhold theirs until 8 days of history accumulate. `?? 0` at the call
+  // sites parked the bar on the exact midpoint of a -1..+1 scale, which is a
+  // NEUTRAL reading, not an absent one. The tooltips even documented the
+  // behaviour ("the score bar reads 0.00 until 8 days accumulate") — a label
+  // describing an arithmetic problem rather than fixing it.
+  value: number | null
   rawValue: string
   tooltip: string
   min?: number
@@ -107,15 +113,20 @@ function PanicIndicator({
         <div className="flex items-center gap-3">
           <span className="text-xs text-gray-500">{rawValue}</span>
           <Badge
-            variant={value <= -0.5 ? "default" : value >= 0.5 ? "destructive" : "secondary"}
+            variant={value === null ? "outline" : value <= -0.5 ? "default" : value >= 0.5 ? "destructive" : "secondary"}
             className="min-w-[60px] justify-center"
           >
-            {value >= 0 ? "+" : ""}
-            {value.toFixed(2)}
+            {value === null ? "no score" : `${value >= 0 ? "+" : ""}${value.toFixed(2)}`}
           </Badge>
         </div>
       </div>
-      <PanicGradientBar value={value} min={min} max={max} />
+      {value === null ? (
+        <div className="h-2 w-full rounded-full bg-gray-200 flex items-center justify-center">
+          <span className="text-[10px] text-gray-500">not scored yet — needs more stored history</span>
+        </div>
+      ) : (
+        <PanicGradientBar value={value} min={min} max={max} />
+      )}
     </div>
   )
 }
@@ -530,7 +541,7 @@ export function PanicEuphoria() {
               <>
                 <PanicIndicator
                   label="Off-Exchange Short Volume %"
-                  value={data.componentScores?.shortInterest ?? 0}
+                  value={data.componentScores?.shortInterest ?? null}
                   rawValue={data.nyseShortInterest !== null ? `${data.nyseShortInterest}%` : "—"}
                   tooltip={
                     tooltipsEnabled
@@ -580,7 +591,7 @@ export function PanicEuphoria() {
                 />
                 <PanicIndicator
                   label="Money Market Funds"
-                  value={data.componentScores?.moneyMarketFunds ?? 0}
+                  value={data.componentScores?.moneyMarketFunds ?? null}
                   rawValue={data.moneyMarketFunds !== null ? `${data.moneyMarketFunds}T` : "—"}
                   tooltip={
                     tooltipsEnabled

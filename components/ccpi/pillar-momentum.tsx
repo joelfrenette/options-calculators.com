@@ -185,7 +185,7 @@ export function PillarMomentum({
             <CCPIBooleanIndicator
               label="QQQ Below 20-Day SMA"
               value={indicators.qqqBelowSMA20}
-              proximity={indicators.qqqSMA20Proximity || 0}
+              proximity={indicators.qqqSMA20Proximity ?? null}
               additionalInfo={
                 indicators.qqqSMA20Proximity !== undefined
                   ? `${indicators.qqqSMA20Proximity.toFixed(0)}% proximity`
@@ -217,7 +217,7 @@ export function PillarMomentum({
             <CCPIBooleanIndicator
               label="QQQ Below 50-Day SMA"
               value={indicators.qqqBelowSMA50}
-              proximity={indicators.qqqSMA50Proximity || 0}
+              proximity={indicators.qqqSMA50Proximity ?? null}
               additionalInfo={
                 indicators.qqqSMA50Proximity !== undefined
                   ? `${indicators.qqqSMA50Proximity.toFixed(0)}% proximity`
@@ -249,7 +249,7 @@ export function PillarMomentum({
             <CCPIBooleanIndicator
               label="QQQ Below 200-Day SMA"
               value={indicators.qqqBelowSMA200}
-              proximity={indicators.qqqSMA200Proximity || 0}
+              proximity={indicators.qqqSMA200Proximity ?? null}
               additionalInfo={
                 indicators.qqqSMA200Proximity !== undefined
                   ? `${indicators.qqqSMA200Proximity.toFixed(0)}% proximity`

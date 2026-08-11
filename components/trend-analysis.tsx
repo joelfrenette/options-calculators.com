@@ -201,43 +201,43 @@ export function TrendAnalysis() {
       SPY: {
         bullish: {
           name: "SPY Bull Call Spread",
-          description: `SPY is the most liquid options market. With ${(item.trendConfidence ?? 0).toFixed(0)}% bullish confidence, consider buying ATM calls at $${(item.currentPrice ?? 0).toFixed(2)} and selling OTM calls at $${(item.resistance ?? 0).toFixed(2)}. Target 30-45 DTE for optimal theta decay balance.`,
+          description: `SPY is the most liquid options market. With ${item.trendConfidence.toFixed(0)}% bullish confidence, consider buying ATM calls at $${item.currentPrice.toFixed(2)} and selling OTM calls at $${item.resistance.toFixed(2)}. Target 30-45 DTE for optimal theta decay balance.`,
         },
         bearish: {
           name: "SPY Bear Put Spread",
-          description: `SPY's high liquidity makes it ideal for put spreads. With ${(item.trendConfidence ?? 0).toFixed(0)}% bearish confidence, buy ATM puts at $${(item.currentPrice ?? 0).toFixed(2)} and sell OTM puts at $${(item.support ?? 0).toFixed(2)}. Consider weekly options for faster profits.`,
+          description: `SPY's high liquidity makes it ideal for put spreads. With ${item.trendConfidence.toFixed(0)}% bearish confidence, buy ATM puts at $${item.currentPrice.toFixed(2)} and sell OTM puts at $${item.support.toFixed(2)}. Consider weekly options for faster profits.`,
         },
         neutral: {
           name: "SPY Iron Condor",
-          description: `SPY's tight bid-ask spreads are perfect for iron condors. Sell call spreads above $${(item.resistance ?? 0).toFixed(2)} and put spreads below $${(item.support ?? 0).toFixed(2)}. Target 30-45 DTE with 1 standard deviation wings.`,
+          description: `SPY's tight bid-ask spreads are perfect for iron condors. Sell call spreads above $${item.resistance.toFixed(2)} and put spreads below $${item.support.toFixed(2)}. Target 30-45 DTE with 1 standard deviation wings.`,
         },
       },
       SPX: {
         bullish: {
           name: "SPX Bull Call Spread (Cash-Settled)",
-          description: `SPX offers cash-settled, European-style options with tax advantages (60/40 treatment). With ${(item.trendConfidence ?? 0).toFixed(0)}% bullish confidence, buy calls at $${(item.currentPrice ?? 0).toFixed(2)} and sell at $${(item.resistance ?? 0).toFixed(2)}. No assignment risk - perfect for larger accounts.`,
+          description: `SPX offers cash-settled, European-style options with tax advantages (60/40 treatment). With ${item.trendConfidence.toFixed(0)}% bullish confidence, buy calls at $${item.currentPrice.toFixed(2)} and sell at $${item.resistance.toFixed(2)}. No assignment risk - perfect for larger accounts.`,
         },
         bearish: {
           name: "SPX Bear Put Spread (Cash-Settled)",
-          description: `SPX's cash settlement eliminates assignment risk. With ${(item.trendConfidence ?? 0).toFixed(0)}% bearish confidence, structure put spreads at $${(item.currentPrice ?? 0).toFixed(2)}/$${(item.support ?? 0).toFixed(2)}. Enjoy favorable tax treatment on gains.`,
+          description: `SPX's cash settlement eliminates assignment risk. With ${item.trendConfidence.toFixed(0)}% bearish confidence, structure put spreads at $${item.currentPrice.toFixed(2)}/$${item.support.toFixed(2)}. Enjoy favorable tax treatment on gains.`,
         },
         neutral: {
           name: "SPX Iron Condor (Tax-Advantaged)",
-          description: `SPX iron condors offer 60/40 tax treatment and no assignment risk. Sell premium outside support ($${(item.support ?? 0).toFixed(2)}) and resistance ($${(item.resistance ?? 0).toFixed(2)}). Ideal for consistent income with tax benefits.`,
+          description: `SPX iron condors offer 60/40 tax treatment and no assignment risk. Sell premium outside support ($${item.support.toFixed(2)}) and resistance ($${item.resistance.toFixed(2)}). Ideal for consistent income with tax benefits.`,
         },
       },
       QQQ: {
         bullish: {
           name: "QQQ Bull Call Spread (Tech Focus)",
-          description: `QQQ tracks Nasdaq-100 with heavy tech exposure. With ${(item.trendConfidence ?? 0).toFixed(0)}% bullish confidence, buy calls at $${(item.currentPrice ?? 0).toFixed(2)} and sell at $${(item.resistance ?? 0).toFixed(2)}. Higher volatility means larger premiums - perfect for tech rallies.`,
+          description: `QQQ tracks Nasdaq-100 with heavy tech exposure. With ${item.trendConfidence.toFixed(0)}% bullish confidence, buy calls at $${item.currentPrice.toFixed(2)} and sell at $${item.resistance.toFixed(2)}. Higher volatility means larger premiums - perfect for tech rallies.`,
         },
         bearish: {
           name: "QQQ Bear Put Spread (Tech Hedge)",
-          description: `QQQ's tech concentration makes it volatile during selloffs. With ${(item.trendConfidence ?? 0).toFixed(0)}% bearish confidence, structure put spreads at $${(item.currentPrice ?? 0).toFixed(2)}/$${(item.support ?? 0).toFixed(2)}. Great for hedging tech-heavy portfolios.`,
+          description: `QQQ's tech concentration makes it volatile during selloffs. With ${item.trendConfidence.toFixed(0)}% bearish confidence, structure put spreads at $${item.currentPrice.toFixed(2)}/$${item.support.toFixed(2)}. Great for hedging tech-heavy portfolios.`,
         },
         neutral: {
           name: "QQQ Iron Condor (High Premium)",
-          description: `QQQ's higher IV means bigger premiums for iron condors. Sell call spreads above $${(item.resistance ?? 0).toFixed(2)} and put spreads below $${(item.support ?? 0).toFixed(2)}. Wider wings recommended due to tech volatility.`,
+          description: `QQQ's higher IV means bigger premiums for iron condors. Sell call spreads above $${item.resistance.toFixed(2)} and put spreads below $${item.support.toFixed(2)}. Wider wings recommended due to tech volatility.`,
         },
       },
     }
@@ -395,12 +395,18 @@ export function TrendAnalysis() {
             <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
                 <p className="text-xs font-semibold text-gray-600 mb-1">Current Reading</p>
-                <p className="text-lg font-bold text-gray-900">{(selectedItem.momentumStrength ?? 0).toFixed(0)}/100</p>
+                {/* Missed by the P6-68 pass, which fixed the gauge and the tile
+                    and left this one. `?? 0` on a nullable momentum renders
+                    "0/100" — the bottom of the scale, Extreme Bearish, from an
+                    absent reading. */}
+                <p className="text-lg font-bold text-gray-900">
+                  {selectedItem.momentumStrength === null ? "—" : `${selectedItem.momentumStrength.toFixed(0)}/100`}
+                </p>
                 <p className="text-xs text-gray-600 mt-1">Momentum strength indicator</p>
               </div>
               <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
                 <p className="text-xs font-semibold text-gray-600 mb-1">Trend Confidence</p>
-                <p className="text-lg font-bold text-gray-900">{(selectedItem.trendConfidence ?? 0).toFixed(0)}%</p>
+                <p className="text-lg font-bold text-gray-900">{selectedItem.trendConfidence.toFixed(0)}%</p>
                 <p className="text-xs text-gray-600 mt-1">Signal reliability</p>
               </div>
               <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
@@ -717,17 +723,17 @@ export function TrendAnalysis() {
                     <h3 className="font-semibold text-blue-900">1-Month Target</h3>
                   </div>
                   <p className="text-2xl font-bold text-blue-700">
-                    ${(selectedItem.priceTarget1Month ?? 0).toFixed(2)}
+                    ${selectedItem.priceTarget1Month.toFixed(2)}
                   </p>
                   <p className="text-sm text-blue-600 mt-1">
-                    {(((selectedItem.priceTarget1Month ?? 0) - (selectedItem.currentPrice ?? 0)) /
+                    {((selectedItem.priceTarget1Month - selectedItem.currentPrice) /
                       (selectedItem.currentPrice ?? 1)) *
                       100 >=
                     0
                       ? "+"
                       : ""}
                     {(
-                      (((selectedItem.priceTarget1Month ?? 0) - (selectedItem.currentPrice ?? 0)) /
+                      ((selectedItem.priceTarget1Month - selectedItem.currentPrice) /
                         (selectedItem.currentPrice ?? 1)) *
                       100
                     ).toFixed(2)}
@@ -740,10 +746,10 @@ export function TrendAnalysis() {
                     <Shield className="h-5 w-5 text-red-600" />
                     <h3 className="font-semibold text-red-900">Stop Loss</h3>
                   </div>
-                  <p className="text-2xl font-bold text-red-700">${(selectedItem.stopLoss ?? 0).toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-red-700">${selectedItem.stopLoss.toFixed(2)}</p>
                   <p className="text-sm text-red-600 mt-1">
                     {(
-                      (((selectedItem.stopLoss ?? 0) - (selectedItem.currentPrice ?? 0)) /
+                      ((selectedItem.stopLoss - selectedItem.currentPrice) /
                         (selectedItem.currentPrice ?? 1)) *
                       100
                     ).toFixed(2)}
@@ -755,26 +761,26 @@ export function TrendAnalysis() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                   <p className="text-sm text-gray-600 mb-1">Support Level</p>
-                  <p className="text-xl font-bold text-gray-900">${(selectedItem.support ?? 0).toFixed(2)}</p>
+                  <p className="text-xl font-bold text-gray-900">${selectedItem.support.toFixed(2)}</p>
                   <p className="text-xs text-gray-500 mt-1">Key buying zone</p>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                   <p className="text-sm text-gray-600 mb-1">Resistance Level</p>
-                  <p className="text-xl font-bold text-gray-900">${(selectedItem.resistance ?? 0).toFixed(2)}</p>
+                  <p className="text-xl font-bold text-gray-900">${selectedItem.resistance.toFixed(2)}</p>
                   <p className="text-xs text-gray-500 mt-1">Key selling zone</p>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                   <p className="text-sm text-gray-600 mb-1">Volatility (ATR)</p>
-                  <p className="text-xl font-bold text-gray-900">${(selectedItem.atr ?? 0).toFixed(2)}</p>
+                  <p className="text-xl font-bold text-gray-900">${selectedItem.atr.toFixed(2)}</p>
                   <p className="text-xs text-gray-500 mt-1">Daily range</p>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                   <p className="text-sm text-gray-600 mb-1">RSI</p>
-                  <p className="text-xl font-bold text-gray-900">{(selectedItem.rsi ?? 0).toFixed(0)}</p>
+                  <p className="text-xl font-bold text-gray-900">{selectedItem.rsi.toFixed(0)}</p>
                   <p className="text-xs text-gray-500 mt-1">
-                    {(selectedItem.rsi ?? 0) > 70
+                    {selectedItem.rsi > 70
                       ? "Overbought"
-                      : (selectedItem.rsi ?? 0) < 30
+                      : selectedItem.rsi < 30
                         ? "Oversold"
                         : "Neutral"}
                   </p>
@@ -799,21 +805,21 @@ export function TrendAnalysis() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                   <p className="text-sm text-gray-600 mb-1">Primary Support</p>
-                  <p className="text-xl font-bold text-gray-900">${(selectedItem.support ?? 0).toFixed(2)}</p>
+                  <p className="text-xl font-bold text-gray-900">${selectedItem.support.toFixed(2)}</p>
                   <p className="text-xs text-gray-500 mt-1">
                     Crucial level for maintaining bullish sentiment. A break below may signal further downside.
                   </p>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                   <p className="text-sm text-gray-600 mb-1">Primary Resistance</p>
-                  <p className="text-xl font-bold text-gray-900">${(selectedItem.resistance ?? 0).toFixed(2)}</p>
+                  <p className="text-xl font-bold text-gray-900">${selectedItem.resistance.toFixed(2)}</p>
                   <p className="text-xs text-gray-500 mt-1">
                     Key level where selling pressure may increase. A decisive break above could fuel a rally.
                   </p>
                 </div>
                 <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
                   <p className="text-sm font-semibold text-orange-700 mb-1">Potential Volatility Spike</p>
-                  <p className="text-xl font-bold text-orange-700">${(selectedItem.atr ?? 0).toFixed(2)}</p>
+                  <p className="text-xl font-bold text-orange-700">${selectedItem.atr.toFixed(2)}</p>
                   <p className="text-xs text-orange-600 mt-1">
                     Average True Range (ATR) indicates typical daily price movement. Higher ATR suggests higher
                     volatility.
@@ -1099,15 +1105,15 @@ export function TrendAnalysis() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
                     <div className="bg-white/50 p-3 rounded border">
                       <p className="font-semibold text-gray-700 mb-1">Entry Point</p>
-                      <p className="text-gray-900">${(selectedItem.currentPrice ?? 0).toFixed(2)}</p>
+                      <p className="text-gray-900">${selectedItem.currentPrice.toFixed(2)}</p>
                     </div>
                     <div className="bg-white/50 p-3 rounded border">
                       <p className="font-semibold text-gray-700 mb-1">Target Exit</p>
-                      <p className="text-gray-900">${(selectedItem.priceTarget1Month ?? 0).toFixed(2)}</p>
+                      <p className="text-gray-900">${selectedItem.priceTarget1Month.toFixed(2)}</p>
                     </div>
                     <div className="bg-white/50 p-3 rounded border">
                       <p className="font-semibold text-gray-700 mb-1">Stop Loss</p>
-                      <p className="text-gray-900">${(selectedItem.stopLoss ?? 0).toFixed(2)}</p>
+                      <p className="text-gray-900">${selectedItem.stopLoss.toFixed(2)}</p>
                     </div>
                   </div>
                 </div>
@@ -1118,12 +1124,12 @@ export function TrendAnalysis() {
                     Risk Management for {selectedItem.name}
                   </h4>
                   <ul className="text-orange-800 text-sm space-y-1 leading-relaxed">
-                    <li>• Set stop loss at ${(selectedItem.stopLoss ?? 0).toFixed(2)} to limit downside risk</li>
+                    <li>• Set stop loss at ${selectedItem.stopLoss.toFixed(2)} to limit downside risk</li>
                     <li>
-                      • Monitor momentum strength (currently ${(selectedItem.momentumStrength ?? 0).toFixed(0)}/100)
+                      • Monitor momentum strength (currently ${selectedItem.momentumStrength === null ? "no reading" : `${selectedItem.momentumStrength.toFixed(0)}/100`})
                     </li>
                     <li>
-                      • Watch for volume changes - current ratio is {(selectedItem.volumeRatio ?? 0).toFixed(2)}x
+                      • Watch for volume changes - current ratio is {selectedItem.volumeRatio.toFixed(2)}x
                       average
                     </li>
                     <li>• Adjust position if trend confidence drops below 60%</li>

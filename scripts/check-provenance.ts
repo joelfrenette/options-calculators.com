@@ -602,5 +602,45 @@ check(
   silentClamps.length ? silentClamps.join(", ") : `${CRON_FILES.length} cron route(s) checked`,
 )
 
+// ---------------------------------------------------------------------------
+// 12. A component does not default a measurement to a number.
+// ---------------------------------------------------------------------------
+//
+// P6-68 and P6-71. Every `|| <const>` sweep this audit ran — P6-18, P6-20,
+// P6-32 — stopped at the API boundary, so the component side had never been
+// looked at. It held the same defect in a different idiom: `momentumStrength ??
+// 50` parked a gauge on "Neutral", `priceTarget1Week ?? 0` printed a **$0.00
+// price target** in the same green as a real one, and a CCPI proximity bar
+// defaulted to 0 — which its own scale labels "Safe: 0% (far above)", so
+// absence rendered as reassurance.
+//
+// The rule targets the unambiguous case: a numeric default feeding something
+// FORMATTED as a measurement — `?? 0).toFixed(`, `|| 50).toFixed(`. Layout
+// arithmetic (widths, indexes, `.length ?? 0`) is untouched, and so is the
+// house-correct `?? "—"` / `?? "N/A"`, which is what a missing value SHOULD
+// render as.
+//
+// Removing a default from a non-nullable field is not busywork: it is what
+// turns a future null into a type error instead of a silent zero. That is
+// exactly how P6-68 became live — `?? 50` was harmless when written and became
+// a defect the moment the route learned to return null.
+
+const numericDefaults: string[] = []
+for (const f of UI_FILES) {
+  const src = code(f)
+  src.split("\n").forEach((line, i) => {
+    if (/(?:\?\?|\|\|)\s*-?\d+(?:\.\d+)?\s*\)\s*\.toFixed\(/.test(line)) {
+      numericDefaults.push(`${rel(f)}:${i + 1}`)
+    }
+  })
+}
+check(
+  "no component formats a defaulted number as a measurement",
+  numericDefaults.length === 0,
+  numericDefaults.length
+    ? numericDefaults.join(", ")
+    : `${UI_FILES.length} components checked — missing values render "—", not 0`,
+)
+
 console.log(failures === 0 ? "\nAll provenance checks passed." : `\n${failures} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)
