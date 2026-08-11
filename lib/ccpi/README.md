@@ -8,6 +8,10 @@ This directory contains the foundational utilities, types, and constants for the
 - **`constants.ts`** - Thresholds, weights, color mappings, and configuration
 - **`calculations.ts`** - Pure calculation and utility functions
 - **`cache.ts`** - LocalStorage caching utilities
+- **`allocation.ts`** - Cash vs stocks by CCPI regime. **Cash is the only stored figure**;
+  stocks is computed as its complement, so the two halves cannot drift apart. Replaced two
+  disagreeing tables in the dashboard (a five-way split whose columns did not sum to 100,
+  and a cash/exposure pair that summed to 110).
 
 ## Usage
 

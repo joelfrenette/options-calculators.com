@@ -15,6 +15,7 @@ import type { CCPIData, HistoricalData } from "@/lib/ccpi/types"
 import { getReadableColor, getRegimeZone, sortCanaries, countActiveWarnings } from "@/lib/ccpi/calculations"
 import { saveCCPIToCache, loadCCPIFromCache, saveHistoryToCache } from "@/lib/ccpi/cache"
 import { REFRESH_STATUS_MESSAGES } from "@/lib/ccpi/constants"
+import { ALLOCATION_BANDS, bandForScore, formatRange, stocksRange } from "@/lib/ccpi/allocation"
 import { CCPIChatModal } from "./ccpi-chat-modal"
 import { RefreshButton } from "./ui/refresh-button" // Assuming RefreshButton is in ui/refresh-button.tsx
 import { DataLoadGate } from "@/components/data-load-gate"
@@ -239,6 +240,8 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
   }
   // Narrowed once so indicator blocks don't each re-check for undefined.
   const indicators: Record<string, any> = data.indicators ?? {}
+  // null when the score is missing — never falls back to the benign first band.
+  const currentBand = bandForScore(ccpiScore)
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -293,41 +296,6 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
             </div>
             <RefreshButton onClick={fetchCCPIData} isLoading={isRefreshing} />
           </div>
-        </div>
-
-        {/* Phase 2 (CCPI_DESIGN §7a): Trigger / Vulnerability / Coincident, in this order. */}
-        <TriggerSection />
-
-        {/* VULNERABILITY — context, visually quieter, explicitly not a timing signal. */}
-        <div className="space-y-2">
-          <h3 className="text-lg font-semibold text-gray-700">Vulnerability — context, not a timing signal</h3>
-          <p className="text-xs text-gray-500 italic">
-            This has been elevated since 2017. It describes how far a fall could go, not when.
-          </p>
-          <Accordion type="multiple" defaultValue={["pillar3"]} className="space-y-4">
-            <PillarValuation
-              score={pillarScores.valuation}
-              prov={data.provenance?.valuation}
-              indicators={indicators}
-              tooltipsEnabled={tooltipsEnabled}
-            />
-          </Accordion>
-        </div>
-
-        {/* COINCIDENT — collapsed by default, clearly labelled non-predictive. */}
-        <div className="space-y-2">
-          <h3 className="text-lg font-semibold text-gray-500">Coincident indicators</h3>
-          <p className="text-xs text-gray-500 italic">
-            These confirm a decline that has started. They do not predict one.
-          </p>
-          <Accordion type="multiple" className="space-y-4">
-            <PillarMomentum
-              score={pillarScores.momentum}
-              prov={data.provenance?.momentum}
-              indicators={indicators}
-              tooltipsEnabled={tooltipsEnabled}
-            />
-          </Accordion>
         </div>
 
         {/* Main CCPI Score Card */}
@@ -764,12 +732,44 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
           </CardContent>
         </Card>
 
-        <Accordion type="multiple" defaultValue={["pillar2", "pillar4"]} className="space-y-4">
+        {/*
+          Leading signals (CCPI_DESIGN §7a), directly below the score card.
+          Its own section rather than a pillar: nothing here is scored, and §7a
+          forbids aggregating these rows into any number.
+        */}
+        <TriggerSection />
+
+        {/*
+          The four pillars in numeric order. §7a's Vulnerability and Coincident
+          roles ride on the pillars themselves as badge + caveat rather than as
+          grouping headers — the reader still learns that valuation says how far
+          and not when, and that momentum confirms rather than predicts, without
+          the pillar numbering being reshuffled to say it.
+        */}
+        <Accordion type="multiple" defaultValue={["pillar2", "pillar3", "pillar4"]} className="space-y-4">
+          <PillarMomentum
+            score={pillarScores.momentum}
+            prov={data.provenance?.momentum}
+            indicators={indicators}
+            tooltipsEnabled={tooltipsEnabled}
+            badge="Coincident"
+            caveat="These confirm a decline that has already started. They do not predict one."
+          />
+
           <PillarRiskAppetite
             score={pillarScores.riskAppetite}
             prov={data.provenance?.riskAppetite}
             indicators={indicators}
             tooltipsEnabled={tooltipsEnabled}
+          />
+
+          <PillarValuation
+            score={pillarScores.valuation}
+            prov={data.provenance?.valuation}
+            indicators={indicators}
+            tooltipsEnabled={tooltipsEnabled}
+            badge="Vulnerability"
+            caveat="Context, not a timing signal. This has been elevated since 2017 — it describes how far a fall could go, not when."
           />
 
           <PillarMacro
@@ -820,185 +820,57 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
               <AccordionTrigger className="hover:no-underline px-6 py-0">
                 <CardHeader className="bg-gray-50 border-b border-gray-200 w-full py-3">
                   <CardTitle className="text-lg font-bold text-gray-900 text-left">
-                    Portfolio Allocation by CCPI Crash Risk Level
+                    Cash vs Stocks by CCPI Crash Risk Level
                   </CardTitle>
                   <p className="text-sm text-gray-600 mt-1 text-left">
-                    Recommended cash vs. deployed positioning across crash risk regimes — diversification via sectors and indexes
+                    One ratio per regime. "Stocks" is everything deployed — shares, ETFs, LEAPS and options
                   </p>
                 </CardHeader>
               </AccordionTrigger>
               <AccordionContent>
                 <CardContent className="pt-4 pb-4">
                   <div className="space-y-2">
-                    {[
-                      {
-                        range: "0-19",
-                        level: "Low Risk",
-                        data: {
-                          stocks: "55-65%",
-                          leaps: "10-15%",
-                          shortOptions: "15-20%",
-                          hedges: "0-5%",
-                          cash: "5-10%",
-                          description: "Aggressive growth allocation with maximum deployment",
-                          rationale: [
-                            "Deploy capital aggressively into quality growth stocks and broad indexes (SPY/QQQ)",
-                            "Sell cash-secured puts and covered calls (15-20%) for income and discounted entries",
-                            "Hold 10-15% in deep ITM LEAPS for leveraged upside on conviction names",
-                            "Minimal cash reserves needed in low-risk environment",
-                            "Diversify across sectors — tech, financials, industrials — rather than one theme",
-                          ],
-                        },
-                      },
-                      {
-                        range: "20-39",
-                        level: "Normal",
-                        data: {
-                          stocks: "45-55%",
-                          leaps: "8-12%",
-                          shortOptions: "12-15%",
-                          hedges: "3-5%",
-                          cash: "15-25%",
-                          description: "Balanced allocation with standard risk management",
-                          rationale: [
-                            "Core equity exposure via diversified sector ETFs and blue chips",
-                            "Use short options (CSPs/CCs) for income generation and tactical entries",
-                            "Trim LEAPS to 8-12% and keep strikes conservative",
-                            "Balance growth sectors with defensive sector weight (XLU/XLP) for diversification",
-                            "Build cash reserves to 15-25% for opportunities",
-                          ],
-                        },
-                      },
-                      {
-                        range: "40-59",
-                        level: "Caution",
-                        data: {
-                          stocks: "30-40%",
-                          leaps: "3-5%",
-                          shortOptions: "5-10%",
-                          hedges: "8-12%",
-                          cash: "30-40%",
-                          description: "Defensive tilt with elevated cash and hedges",
-                          rationale: [
-                            "Reduce equity exposure to highest-quality names; tilt toward defensive sectors (XLU/XLP)",
-                            "Shift the options book toward hedges and put spreads",
-                            "Cut LEAPS to a 3-5% core and stop adding leverage",
-                            "Add gold-industry names (GDX) and defensive index weight instead of chasing growth",
-                            "Build substantial cash position (30-40%) for volatility",
-                          ],
-                        },
-                      },
-                      {
-                        range: "60-79",
-                        level: "High Alert",
-                        data: {
-                          stocks: "15-25%",
-                          leaps: "0-2%",
-                          shortOptions: "0-5%",
-                          hedges: "10-15%",
-                          cash: "50-60%",
-                          description: "Capital preservation mode with heavy defensive positioning",
-                          rationale: [
-                            "Minimal equity exposure - only defensive sectors (utilities, staples) and gold-industry names (GDX)",
-                            "Options portfolio entirely hedges and volatility plays",
-                            "No new LEAPS; close or roll existing short premium down and out",
-                            "Express the defensive tilt through sector choice and cash percentage, not new asset classes",
-                            "Hold 50-60% cash to deploy after market correction",
-                          ],
-                        },
-                      },
-                      {
-                        range: "80-100",
-                        level: "Crash Watch",
-                        data: {
-                          stocks: "5-10%",
-                          leaps: "0%",
-                          shortOptions: "0%",
-                          hedges: "10-15%",
-                          cash: "70-80%",
-                          description: "Maximum defense - cash-heavy with tail hedges",
-                          rationale: [
-                            "Liquidate nearly all equity exposure immediately; keep only defensive sector remnants (XLU/XLP, GDX)",
-                            "Options used exclusively for tail risk hedges and put spreads",
-                            "Zero LEAPS and zero new short premium until the regime downgrades",
-                            "Hold 70-80% cash reserves to deploy after crash",
-                          ],
-                        },
-                      },
-                    ].map((item, index) => {
-                      const isCurrent =
-                        ccpiScore >= Number.parseInt(item.range.split("-")[0]) &&
-                        ccpiScore <= Number.parseInt(item.range.split("-")[1])
+                    {ALLOCATION_BANDS.map((band) => {
+                      const stocks = stocksRange(band)
+                      const isCurrent = currentBand?.range === band.range
 
                       return (
                         <div
-                          key={index}
+                          key={band.range}
                           className={`p-4 rounded-lg border transition-colors ${
                             isCurrent
                               ? "border-green-500 bg-green-100 shadow-md ring-2 ring-green-300"
                               : "border-gray-200 bg-white hover:bg-gray-50"
                           }`}
                         >
-                          <div className="mb-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <div>
-                                <span className="font-mono text-sm font-bold text-gray-900">CCPI {item.range}</span>
-                                <span
-                                  className={`ml-3 font-bold text-sm ${
-                                    index === 0
-                                      ? "text-green-600"
-                                      : index === 1
-                                        ? "text-lime-600"
-                                        : index === 2
-                                          ? "text-yellow-600"
-                                          : index === 3
-                                            ? "text-orange-600"
-                                            : "text-red-600"
-                                  }`}
-                                >
-                                  {item.level}
-                                </span>
-                              </div>
-                              {isCurrent && (
-                                <span className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-full">
-                                  CURRENT
-                                </span>
-                              )}
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <span className="font-mono text-sm font-bold text-gray-900">CCPI {band.range}</span>
+                              <span className="ml-3 font-bold text-sm text-gray-700">{band.level}</span>
                             </div>
-                            <p className="text-sm text-gray-600 italic">{item.data.description}</p>
+                            {isCurrent && (
+                              <span className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-full">
+                                CURRENT
+                              </span>
+                            )}
                           </div>
 
-                          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
+                          <div className="grid grid-cols-2 gap-3">
                             <div className="p-3 bg-blue-50 rounded border border-blue-200">
-                              <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Shares/ETFs</div>
-                              <div className="text-lg font-bold text-blue-900">{item.data.stocks}</div>
-                            </div>
-                            <div className="p-3 bg-purple-50 rounded border border-purple-200">
-                              <div className="text-xs font-semibold text-purple-900 uppercase mb-1">LEAPS</div>
-                              <div className="text-lg font-bold text-purple-900">{item.data.leaps}</div>
-                            </div>
-                            <div className="p-3 bg-orange-50 rounded border border-orange-200">
-                              <div className="text-xs font-semibold text-orange-900 uppercase mb-1">Short Options (CSP/CC)</div>
-                              <div className="text-lg font-bold text-orange-900">{item.data.shortOptions}</div>
-                            </div>
-                            <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
-                              <div className="text-xs font-semibold text-yellow-900 uppercase mb-1">Hedges/Puts</div>
-                              <div className="text-lg font-bold text-yellow-900">{item.data.hedges}</div>
+                              <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Stocks</div>
+                              <div className="text-2xl font-bold text-blue-900">
+                                {formatRange(stocks.min, stocks.max)}
+                              </div>
                             </div>
                             <div className="p-3 bg-gray-50 rounded border border-gray-300">
-                              <div className="text-xs font-semibold text-gray-900 uppercase mb-1">Cash Reserve</div>
-                              <div className="text-lg font-bold text-gray-900">{item.data.cash}</div>
+                              <div className="text-xs font-semibold text-gray-900 uppercase mb-1">Cash</div>
+                              <div className="text-2xl font-bold text-gray-900">
+                                {formatRange(band.cashMin, band.cashMax)}
+                              </div>
                             </div>
                           </div>
 
-                          <div className="space-y-2">
-                            {item.data.rationale.map((point, idx) => (
-                              <div key={idx} className="flex items-start gap-2 text-sm text-gray-700">
-                                <span className="text-primary mt-1 flex-shrink-0">•</span>
-                                <span>{point}</span>
-                              </div>
-                            ))}
-                          </div>
+                          <p className="text-sm text-gray-600 italic mt-3">{band.stance}</p>
                         </div>
                       )
                     })}
@@ -1006,10 +878,10 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
 
                   <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
                     <p className="text-sm text-blue-800 leading-relaxed">
-                      <strong>Note:</strong> These allocations represent baseline guidelines for crash risk management.
-                      Always adjust based on your personal risk tolerance, time horizon, and financial goals. CCPI
-                      levels above 60 warrant significant defensive positioning regardless of individual circumstances.
-                      Consult with a financial advisor for personalized advice.
+                      <strong>Note:</strong> Stocks and cash are complements — the stocks figure is computed as 100%
+                      minus cash, so the two halves cannot disagree. Diversify within the stocks half through sectors
+                      and indexes (GDX, XLU, SPY) rather than by adding asset classes. Baseline guidelines only, not
+                      personal advice — consult a financial advisor.
                     </p>
                   </div>
                 </CardContent>
@@ -1041,8 +913,6 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                         description:
                           "Market shows minimal crash signals. Safe to deploy capital with aggressive strategies.",
                         guidance: {
-                          cashAllocation: "5-10%",
-                          marketExposure: "90-100%",
                           positionSize: "Large (5-10%)",
                           strategies: [
                             "Sell cash-secured puts on quality names at 30-delta",
@@ -1060,8 +930,6 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                         description:
                           "Standard market conditions. Deploy capital with normal risk management protocols.",
                         guidance: {
-                          cashAllocation: "15-25%",
-                          marketExposure: "70-85%",
                           positionSize: "Medium (3-5%)",
                           strategies: [
                             "Balanced put selling at 20-30 delta on SPY/QQQ",
@@ -1078,8 +946,6 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                         signal: "HOLD",
                         description: "Mixed signals appearing. Reduce exposure and focus on defensive positioning.",
                         guidance: {
-                          cashAllocation: "30-40%",
-                          marketExposure: "50-70%",
                           positionSize: "Small (1-3%)",
                           strategies: [
                             "Shift to defined-risk strategies only (spreads, iron condors)",
@@ -1097,8 +963,6 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                         description:
                           "Multiple crash signals active. Preserve capital and prepare for volatility expansion.",
                         guidance: {
-                          cashAllocation: "50-60%",
-                          marketExposure: "30-50%",
                           positionSize: "Very Small (0.5-1%)",
                           strategies: [
                             "Buy VIX calls for crash insurance (60-90 DTE)",
@@ -1115,8 +979,6 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                         description:
                           "Extreme crash risk. Full defensive positioning required. Prioritize capital preservation.",
                         guidance: {
-                          cashAllocation: "70-80%",
-                          marketExposure: "10-30%",
                           positionSize: "Minimal (0.25-0.5%)",
                           strategies: [
                             "Aggressive long puts on SPY/QQQ (30-60 DTE)",
@@ -1131,6 +993,7 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                       const isCurrent =
                         ccpiScore >= Number.parseInt(item.range.split("-")[0]) &&
                         ccpiScore <= Number.parseInt(item.range.split("-")[1])
+                      const band = ALLOCATION_BANDS.find((b) => b.range === item.range) ?? null
 
                       return (
                         <div
@@ -1187,18 +1050,27 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
                             <p className="text-sm text-gray-600 italic">{item.description}</p>
                           </div>
 
+                          {/*
+                            Same cash/stocks pair as the allocation section above, read from
+                            ALLOCATION_BANDS rather than restated here. The old card carried its
+                            own "cash 5-10% + exposure 90-100%" pair, which summed to 110.
+                          */}
                           <div className="grid grid-cols-3 gap-3 mb-3">
                             <div className="p-3 bg-blue-50 rounded border border-blue-200">
-                              <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Cash</div>
-                              <div className="text-lg font-bold text-blue-900">{item.guidance.cashAllocation}</div>
-                            </div>
-                            <div className="p-3 bg-purple-50 rounded border border-purple-200">
-                              <div className="text-xs font-semibold text-purple-900 uppercase mb-1">Exposure</div>
-                              <div className="text-lg font-bold text-purple-900">{item.guidance.marketExposure}</div>
+                              <div className="text-xs font-semibold text-blue-900 uppercase mb-1">Stocks</div>
+                              <div className="text-lg font-bold text-blue-900">
+                                {band ? formatRange(stocksRange(band).min, stocksRange(band).max) : "—"}
+                              </div>
                             </div>
                             <div className="p-3 bg-gray-50 rounded border border-gray-300">
-                              <div className="text-xs font-semibold text-gray-900 uppercase mb-1">Position Size</div>
-                              <div className="text-sm font-bold text-gray-900">{item.guidance.positionSize}</div>
+                              <div className="text-xs font-semibold text-gray-900 uppercase mb-1">Cash</div>
+                              <div className="text-lg font-bold text-gray-900">
+                                {band ? formatRange(band.cashMin, band.cashMax) : "—"}
+                              </div>
+                            </div>
+                            <div className="p-3 bg-purple-50 rounded border border-purple-200">
+                              <div className="text-xs font-semibold text-purple-900 uppercase mb-1">Position Size</div>
+                              <div className="text-sm font-bold text-purple-900">{item.guidance.positionSize}</div>
                             </div>
                           </div>
 

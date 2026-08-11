@@ -20,11 +20,17 @@ export function PillarValuation({
   prov,
   indicators,
   tooltipsEnabled,
+  badge,
+  caveat,
 }: {
   score: number | null
   prov?: CCPIPillarProvenance
   indicators: Record<string, any>
   tooltipsEnabled: boolean
+  /** Short role label shown beside the title, visible while collapsed. */
+  badge?: string
+  /** Longer caveat shown when the section is open. */
+  caveat?: string
 }) {
   return (
     <AccordionItem value="pillar3" className="border rounded-lg px-4">
@@ -34,12 +40,18 @@ export function PillarValuation({
             <DollarSign className="h-5 w-5 text-green-600" />
             <span className="text-lg font-semibold">Pillar 3 - Valuation & Market Structure</span>
             <span className="text-sm text-gray-600">Weight: 15% | 7 indicators</span>
+            {badge && (
+              <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded border border-gray-300 text-gray-600">
+                {badge}
+              </span>
+            )}
           </div>
           <PillarScore score={score} />
         </div>
       </AccordionTrigger>
       <AccordionContent>
         <div className="space-y-6 pt-4">
+          {caveat && <p className="text-xs text-gray-500 italic">{caveat}</p>}
           <PillarProvenanceLine prov={prov} />
           {score === null && (
             <p className="text-sm text-gray-600 italic">
