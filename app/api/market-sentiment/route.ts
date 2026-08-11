@@ -113,52 +113,26 @@ async function fetchYahooData(symbol: string, range = "1mo", timeout = 10000) {
  * 56-74: Greed (CENTER-LEFT, LIGHT GREEN zone)
  * 75-100: Extreme Greed (LEFT side of gradient bar, GREEN zone)
  */
-function calculateScoreFromData(
-  vix: number,
-  vix50DayMA: number,
-  currentSpy: number,
-  spy125DayMA: number,
-  spyPrices: number[],
-  nyseLows = 100,
-  nyseHighs = 50,
-): number {
-  // 1. Market Volatility (VIX) - Lower VIX = Greed, Higher VIX = Fear
-  // Scale: VIX 10 = 100 (extreme greed), VIX 40+ = 0 (extreme fear)
-  const vixScore = Math.max(0, Math.min(100, 100 - ((vix - 10) / 30) * 100))
 
-  // 2. Stock Price Momentum - Above 125-day MA = Greed
-  const momentumPercent = ((currentSpy - spy125DayMA) / spy125DayMA) * 100
-  const momentumScore = Math.max(0, Math.min(100, 50 + momentumPercent * 5))
-
-  // 3. Stock Price Strength - More highs = Greed
-  const strengthRatio = nyseHighs / (nyseHighs + nyseLows)
-  const strengthScore = strengthRatio * 100
-
-  // 4. Stock Price Breadth - More advancing volume = Greed
-  const spyReturns = []
-  for (let i = 1; i < Math.min(spyPrices.length, 20); i++) {
-    spyReturns.push(
-      (spyPrices[spyPrices.length - i] - spyPrices[spyPrices.length - i - 1]) / spyPrices[spyPrices.length - i - 1],
-    )
-  }
-  const positiveReturns = spyReturns.filter((r) => r > 0).length
-  const breadthScore = (positiveReturns / spyReturns.length) * 100
-
-  // 5. Put/Call Ratio - Lower ratio = Greed (approximated from VIX term structure)
-  const putCallScore = vixScore // Correlated
-
-  // 6. Junk Bond Demand - Lower spread = Greed (approximated from VIX)
-  const junkBondScore = Math.max(0, Math.min(100, vixScore * 0.9))
-
-  // 7. Safe Haven Demand - Stock outperformance = Greed
-  const safeHavenScore = Math.max(0, Math.min(100, momentumScore))
-
-  // Equal weighting as per CNN methodology
-  const overallScore =
-    (vixScore + momentumScore + strengthScore + breadthScore + putCallScore + junkBondScore + safeHavenScore) / 7
-
-  return Math.round(overallScore)
-}
+// `calculateScoreFromData()` was deleted here. It was a SECOND seven-component
+// Fear & Greed implementation, never called by anything, and it held the worst
+// version of the defect P6-58/P6-61 describe. Of its seven "equal-weighted"
+// components:
+//
+//   const putCallScore  = vixScore          // literally the same variable
+//   const junkBondScore = vixScore * 0.9    // a scalar multiple of it
+//   const safeHavenScore = momentumScore    // literally the same variable
+//
+// so vixScore was counted three times and momentumScore twice — **two
+// instruments wearing seven names** — under the comment "Equal weighting as per
+// CNN methodology". Its `nyseLows = 100, nyseHighs = 50` parameter defaults
+// scored 33, a Fear reading, from no data at all.
+//
+// Deleted rather than fixed, following P6-34's precedent with the dead AI
+// getters: a dormant function is where a defect waits for someone to wire it
+// up. It is also the P6-72 lesson a second time in one file — the live sibling
+// `calculateFallbackIndex` was repaired earlier today while this one sat
+// untouched ten lines away.
 
 const DATA_SOURCES = {
   primary: {
@@ -253,9 +227,27 @@ function calculatePutCallRatio(vixCurrent: number, vix50DayMA: number): number {
   return Math.max(0, Math.min(100, score))
 }
 
-function calculateMarketVolatility(vixCurrent: number, vix50DayMA: number): number {
-  const percentAboveMA = ((vixCurrent - vix50DayMA) / vix50DayMA) * 100
-  // Mapping: VIX +50% above MA = 0 (extreme fear), VIX -50% below MA = 100 (extreme greed)
+/**
+ * Market Volatility, mapped from the VIX LEVEL: 10 → 100 (calm/greed),
+ * 40 → 0 (stressed/fear), clamped.
+ *
+ * This function used to take a `vix50DayMA` parameter, compute
+ * `percentAboveMA` from it, never use the result, and carry the comment
+ * "Mapping: VIX +50% above MA = 0 ... VIX -50% below MA = 100" — describing a
+ * VIX-versus-its-average calculation the body does not perform. Three ways of
+ * saying the same thing: a dead parameter, a dead variable, and a comment
+ * documenting the intent rather than the code.
+ *
+ * **The comment was describing CNN's actual method.** CNN's Market Volatility
+ * component compares VIX to its 50-day moving average; this maps the raw level,
+ * so a persistently high-VIX regime reads as fear here and as neutral for CNN
+ * once the average catches up. The level map is KEPT — changing a live score
+ * needs evidence that the alternative is better, not just that a stale comment
+ * preferred it — and the divergence is disclosed with the rest of the
+ * CNN-methodology caveats (P6-59). Deleting the parameter is what stops the
+ * next reader believing the average is involved.
+ */
+function calculateMarketVolatility(vixCurrent: number): number {
   const score = 100 - ((vixCurrent - 10) / 30) * 100
   return Math.max(0, Math.min(100, score))
 }
@@ -387,7 +379,7 @@ async function calculateFallbackIndex() {
       nyseHighs !== null && nyseLows !== null ? calculateStockStrength(nyseHighs, nyseLows) : null
     const i3_stockBreadth = priceChanges.length > 0 ? calculateStockBreadth(volumeRatios, priceChanges) : null
     const i4_putCallRatio = vix50DayMANullable !== null ? calculatePutCallRatio(currentVix, vix50DayMA) : null
-    const i5_marketVolatility = calculateMarketVolatility(currentVix, vix50DayMA)
+    const i5_marketVolatility = calculateMarketVolatility(currentVix)
     const i6_safeHavenDemand = calculateSafeHavenDemand(spy20DayReturn, tlt20DayReturn)
     const i7_junkBondDemand = calculateJunkBondDemand(hyg20DayReturn, tlt20DayReturn)
 
@@ -463,8 +455,8 @@ async function calculateFallbackIndex() {
       weekAgoData.indicators.quote[0].close.filter((p: number) => p !== null)[Math.max(0, vixHistorical.length - 7)] ||
       currentVix
 
-    const yesterdayScore = calculateMarketVolatility(vixYesterday, vix50DayMA)
-    const weekAgoScore = calculateMarketVolatility(vixWeekAgo, vix50DayMA)
+    const yesterdayScore = calculateMarketVolatility(vixYesterday)
+    const weekAgoScore = calculateMarketVolatility(vixWeekAgo)
 
     console.log("[v0] ===== CALCULATION COMPLETE =====")
     console.log("[v0] All values are REAL and LIVE")
@@ -1023,8 +1015,8 @@ export async function GET(request: Request) {
       weekAgoData.indicators.quote[0].close.filter((p: number) => p !== null)[Math.max(0, vixHistorical.length - 7)] ||
       0
 
-    const yesterdayScore = calculateMarketVolatility(vixYesterday, 0)
-    const lastWeekScore = calculateMarketVolatility(vixWeekAgo, 0)
+    const yesterdayScore = calculateMarketVolatility(vixYesterday)
+    const lastWeekScore = calculateMarketVolatility(vixWeekAgo)
 
     const yesterdayChange = isFinite(cnnScore - yesterdayScore) ? cnnScore - yesterdayScore : 0
     const lastWeekChange = isFinite(cnnScore - lastWeekScore) ? cnnScore - lastWeekScore : 0
