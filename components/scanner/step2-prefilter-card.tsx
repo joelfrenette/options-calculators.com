@@ -59,9 +59,16 @@ export function Step2PreFilterCard({
                 <Info className="h-5 w-5 text-blue-700 flex-shrink-0 mt-0.5" />
                 <div>
                   <h3 className="font-bold text-gray-900 text-base">Smart Pre-Filtering (Step 2)</h3>
+                  {/* Used to read "All stocks are pre-qualified for active options
+                      markets." Nothing in /api/polygon-tickers checks that — the
+                      universe is filtered on size, liquidity, price and range only,
+                      and the single mention of options in that route is a comment.
+                      A ticker with no chain gets carried to Step 4 and dropped
+                      there, which is fine, but it is not what the sentence promised
+                      on a put-selling scanner. */}
                   <p className="text-xs text-gray-600 mt-1">
-                    Customize your starting universe with advanced filters. All stocks are pre-qualified for active
-                    options markets.
+                    Customize your starting universe with advanced filters — size, liquidity, price and daily range.
+                    Options availability is <strong>not</strong> checked here; Step 4 is where a missing chain shows up.
                   </p>
                 </div>
               </div>
@@ -74,9 +81,15 @@ export function Step2PreFilterCard({
                   <strong>Liquidity:</strong> Minimum recent daily trading volume - uses most recent trading day data,
                   not 30-day average (adjustable below)
                 </li>
+                {/* The S&P 500 / Nasdaq-100 / Dow wording described the FALLBACK
+                    path only — `MAJOR_INDEX_TICKERS`, a hardcoded 100-name list
+                    the route uses when FMP and grouped bars are both unavailable.
+                    The path that normally runs is FMP's screener across NYSE and
+                    Nasdaq, which is a different and much larger universe. */}
                 <li>
-                  <strong>Top By Market Cap:</strong> Largest companies by market capitalization from S&P 500,
-                  Nasdaq-100, Dow indices (adjustable below)
+                  <strong>Top By Market Cap:</strong> Largest companies by market capitalization, ranked across NYSE
+                  and Nasdaq. If that screener is unavailable the scan falls back to a fixed list of ~100 large-cap
+                  index names (adjustable below)
                 </li>
                 <li>
                   <strong>Min Volatility:</strong> Minimum daily price range — volatile stocks carry richer option

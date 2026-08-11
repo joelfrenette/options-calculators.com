@@ -38,7 +38,7 @@
 
 | Tab id | Label | Component | File | Lines | Internal APIs |
 |---|---|---|---|---|---|
-| `insiders` | Insider Activity | `InsiderTradingDashboard` | `components/insider-trading-dashboard.tsx` | 961 | `/api/insider-trading`<br>`/api/insider-trading/ai-insights` |
+| `insiders` | Insider Activity | `InsiderTradingDashboard` | `components/insider-trading-dashboard.tsx` | 830 | `/api/insider-trading`<br>`/api/insider-trading/ai-insights` |
 | `insider-clusters` | Cluster Buys | `InsiderClusters` | `components/insider-clusters.tsx` | 243 | `/api/insider-clusters` |
 | `form-144` | Form 144 Watch | `Form144Watch` | `components/form-144-watch.tsx` | 187 | `/api/form-144` |
 | `congress-feed` | Congress Trade Feed | `CongressTradeFeed` | `components/congress-trade-feed.tsx` | 456 | `/api/congress-trades` |
@@ -226,10 +226,10 @@ _None._
 | `components/trend-analysis.tsx` | 1173 | 573 |
 | `components/panic-euphoria.tsx` | 1139 | 539 |
 | `components/options-strategy-toolbox.tsx` | 1040 | 440 |
-| `components/insider-trading-dashboard.tsx` | 961 | 361 |
 | `components/ccpi-dashboard.tsx` | 933 | 333 |
 | `components/trade-walkthrough-modal.tsx` | 866 | 266 |
 | `components/risk-calculator.tsx` | 845 | 245 |
+| `components/insider-trading-dashboard.tsx` | 830 | 230 |
 | `lib/ccpi/scoring.ts` | 805 | 205 |
 | `lib/remediation.ts` | 748 | 148 |
 | `components/jobs-report-dashboard.tsx` | 745 | 145 |
@@ -262,7 +262,7 @@ Marks survive `pnpm inventory` — they are read back and merged by tab id.
 | `fomc-predictions` | ☑ | ☑ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
 | `cpi-inflation` | ☑ | ☑ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
 | `jobs` | ☑ | ☑ | ☐ | ☐ | ☐ | ☑ | ☐ | ☐ |
-| `wheel-scanner` | ☑ | ☐ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ |
+| `wheel-scanner` | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☐ | ☑ |
 | `calendar-spread-scanner` | ☐ | ☑ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 | `credit-spread-scanner` | ☐ | ☑ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 | `iron-condor-scanner` | ☐ | ☑ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |

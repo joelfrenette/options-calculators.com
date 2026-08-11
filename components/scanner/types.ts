@@ -25,6 +25,11 @@ export interface QualifyingStock {
   yield: number // This will be updated with real option yield
   delta: number
   deltaSource?: "polygon" | "calculated" | "estimated" // Track source of delta
+  // Where premium/bid/ask actually came from. `synthesized` means no quote was
+  // available and the numbers were computed from a fixed 35% IV assumption —
+  // the tables MUST show that, because a synthesized yield looks exactly like a
+  // measured one and the default sort is by yield.
+  priceSource?: "last_quote" | "last_trade" | "day_data" | "synthesized"
   // Billions. Null when shares outstanding and a complete TTM are both
   // missing — never 0, which rendered as a confident "$0.0B".
   marketCap: number | null

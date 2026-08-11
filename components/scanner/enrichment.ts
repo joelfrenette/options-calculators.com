@@ -284,7 +284,9 @@ import type { QualifyingStock } from "./types"
             let ask: number | undefined
             let premium: number | undefined
             let iv: number | undefined
-            let priceSource = ""
+            // This used to be a plain string that went nowhere but a console.log,
+            // so the table could not tell a real quote from a synthesized one.
+            let priceSource: QualifyingStock["priceSource"] | undefined
 
             if (useEstimatedGreeks) {
               // Delta estimation based on moneyness (strike / stock price)
@@ -304,7 +306,12 @@ import type { QualifyingStock } from "./types"
               premium = stock.currentPrice * atmPremiumPercent * otmDiscount
               bid = premium * 0.95
               ask = premium * 1.05
-              priceSource = "estimated (market closed)"
+              // Was labelled "estimated (market closed)", which named only one
+              // of the triggers. `useEstimatedGreeks` is set whenever the
+              // snapshot endpoint fails or returns nothing — a rate limit, a
+              // plan restriction and an outage all land here too, and on a
+              // trading day that reads as live.
+              priceSource = "synthesized"
 
               console.log(
                 `[v0] ${stock.ticker} - Estimated: Strike=$${strikePrice.toFixed(2)}, Delta=${delta.toFixed(3)}, Premium=$${premium.toFixed(2)}`,
@@ -382,6 +389,8 @@ import type { QualifyingStock } from "./types"
               bidPrice: bid,
               askPrice: ask,
               iv,
+              priceSource,
+              deltaSource: useEstimatedGreeks ? ("estimated" as const) : ("polygon" as const),
             })
           }
 

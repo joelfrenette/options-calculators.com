@@ -58,6 +58,10 @@ export function StrictResultsTable({
         })
       : [] // Initialize as empty array if no technical results
 
+  // A synthesized row's premium/delta/yields come from a fixed 35% IV, not a
+  // quote. Counted here so the header can say how much of the table is that.
+  const synthesizedCount = sortedTechnicalStocks.filter((s) => s.priceSource === "synthesized").length
+
   return (
         <Card className="bg-white mt-8 w-full max-w-7xl mx-auto shadow-xl border-2 border-green-500">
           <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-200">
@@ -76,6 +80,17 @@ export function StrictResultsTable({
             <p className="text-sm text-green-700 mt-2">
               🎉 Congratulations! These stocks passed ALL technical criteria - premium put-selling opportunities!
             </p>
+            {synthesizedCount > 0 && (
+              <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+                <strong>
+                  {synthesizedCount} of {sortedTechnicalStocks.length} rows carry no live option quote.
+                </strong>{" "}
+                Polygon&apos;s chain snapshot returned nothing for those contracts — the market is closed, or the feed
+                is rate-limited or down. Their premium, delta and both yield columns are computed from a fixed 35%
+                implied-volatility assumption, not from anything anyone traded, and are marked <em>est.</em> below.
+                Sorting by yield will rank them against real quotes, so read the marker before comparing.
+              </div>
+            )}
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -216,6 +231,7 @@ export function StrictResultsTable({
                   {sortedTechnicalStocks.map((stock, idx) => {
                     // Evaluate criteria for each stock to show which filters passed/failed
                     const criteria = evaluateCriteria(stock, technicalFilterSettings)
+                    const isSynthesized = stock.priceSource === "synthesized"
                     return (
                       <tr
                         key={`${stock.ticker}-${stock.expiryDate}-${idx}`}
@@ -236,19 +252,45 @@ export function StrictResultsTable({
                         <td className="text-center p-3">{stock.daysToExpiry ?? "N/A"}</td>
                         <td className="text-center p-3">{stock.expiryDate ?? "N/A"}</td>
                         <td className="text-center p-3">${stock.putStrike.toFixed(2)}</td>
-                        <td className="text-right p-3 font-semibold text-green-700">
+                        {/* The four columns below are all downstream of `premium`.
+                            When there is no quote they are one assumption wearing
+                            four hats, so each says so rather than only the first. */}
+                        <td
+                          className={`text-right p-3 font-semibold ${
+                            isSynthesized ? "text-amber-700" : "text-green-700"
+                          }`}
+                        >
                           ${stock.premium !== undefined ? stock.premium.toFixed(2) : "N/A"}
+                          {isSynthesized && (
+                            <span
+                              className="ml-1 text-[10px] font-normal text-amber-700"
+                              title="No live quote — computed from a fixed 35% IV assumption"
+                            >
+                              est.
+                            </span>
+                          )}
                         </td>
-                        <td className={`text-center p-3 ${stock.delta < -0.2 ? "text-green-700" : ""}`}>
+                        <td
+                          className={`text-center p-3 ${
+                            isSynthesized ? "text-amber-700" : stock.delta < -0.2 ? "text-green-700" : ""
+                          }`}
+                        >
                           {stock.delta.toFixed(3)}
+                          {isSynthesized && <span className="ml-1 text-[10px]">est.</span>}
                         </td>
                         <td className="text-right p-3">
-                          <span className="font-bold text-green-800">{stock.yield.toFixed(2)}%</span>
+                          <span className={`font-bold ${isSynthesized ? "text-amber-700" : "text-green-800"}`}>
+                            {stock.yield.toFixed(2)}%
+                          </span>
+                          {isSynthesized && <span className="ml-1 text-[10px] text-amber-700">est.</span>}
                         </td>
-                        <td className="text-right p-3">
+                        <td className={`text-right p-3 ${isSynthesized ? "text-amber-700" : ""}`}>
                           {stock.annualizedYield !== undefined && stock.annualizedYield > 0
                             ? stock.annualizedYield.toFixed(1) + "%"
                             : "N/A"}
+                          {isSynthesized && stock.annualizedYield !== undefined && stock.annualizedYield > 0 && (
+                            <span className="ml-1 text-[10px]">est.</span>
+                          )}
                         </td>
                         <td
                           className={`text-right p-3 font-semibold ${

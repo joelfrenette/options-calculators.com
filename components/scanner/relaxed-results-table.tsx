@@ -390,6 +390,9 @@ export function RelaxedResultsTable({
                     const criteria = evaluateCriteria(stock, technicalFilterSettings)
                     const passedCount = Object.values(criteria).filter(Boolean).length
                     const totalCriteria = Object.values(criteria).length
+                    // Same enrichment path as the strict table: no quote means
+                    // premium/delta/both yields came from a fixed 35% IV.
+                    const isSynthesized = stock.priceSource === "synthesized"
 
                     return (
                       <tr
@@ -410,19 +413,42 @@ export function RelaxedResultsTable({
                         <td className="text-center p-3">{stock.daysToExpiry ?? "N/A"}</td>
                         <td className="text-center p-3">{stock.expiryDate ?? "N/A"}</td>
                         <td className="text-center p-3">${stock.putStrike.toFixed(2)}</td>
-                        <td className="text-right p-3 font-semibold text-purple-700">
+                        <td
+                          className={`text-right p-3 font-semibold ${
+                            isSynthesized ? "text-amber-700" : "text-purple-700"
+                          }`}
+                        >
                           ${stock.premium !== undefined ? stock.premium.toFixed(2) : "N/A"}
+                          {isSynthesized && (
+                            <span
+                              className="ml-1 text-[10px] font-normal text-amber-700"
+                              title="No live quote — computed from a fixed 35% IV assumption"
+                            >
+                              est.
+                            </span>
+                          )}
                         </td>
-                        <td className={`text-center p-3 ${stock.delta < -0.2 ? "text-purple-700" : ""}`}>
+                        <td
+                          className={`text-center p-3 ${
+                            isSynthesized ? "text-amber-700" : stock.delta < -0.2 ? "text-purple-700" : ""
+                          }`}
+                        >
                           {stock.delta.toFixed(3)}
+                          {isSynthesized && <span className="ml-1 text-[10px]">est.</span>}
                         </td>
                         <td className="text-right p-3">
-                          <span className="font-bold text-purple-800">{stock.yield.toFixed(2)}%</span>
+                          <span className={`font-bold ${isSynthesized ? "text-amber-700" : "text-purple-800"}`}>
+                            {stock.yield.toFixed(2)}%
+                          </span>
+                          {isSynthesized && <span className="ml-1 text-[10px] text-amber-700">est.</span>}
                         </td>
-                        <td className="text-right p-3">
+                        <td className={`text-right p-3 ${isSynthesized ? "text-amber-700" : ""}`}>
                           {stock.annualizedYield !== undefined && stock.annualizedYield > 0
                             ? stock.annualizedYield.toFixed(1) + "%"
                             : "N/A"}
+                          {isSynthesized && stock.annualizedYield !== undefined && stock.annualizedYield > 0 && (
+                            <span className="ml-1 text-[10px]">est.</span>
+                          )}
                         </td>
                         <td
                           className={`text-right p-3 font-semibold ${
