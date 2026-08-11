@@ -372,9 +372,16 @@ would have happened.
 ### What is still open, in priority order
 
 1. **Breadth divergence.** Logic built and proven (`breadthDivergence` in
-   `lib/ccpi/signals.ts`, 5 checks), **not wired**. Needs stored closes plus
-   `breadth_daily` rather than FRED, and ~2 years of breadth accumulation before
-   it can say anything. The only candidate with prior support never tested here.
+   `lib/ccpi/signals.ts`, 5 checks). **WIRED 2026-08-10** — it is scored in
+   `/api/admin/ccpi-backtest` and now appears as a live Trigger row from
+   `/api/ccpi-signals`. Needs stored closes plus `breadth_daily` rather than
+   FRED, which is why it is handled separately from the signal registry in both
+   places. **It will read `NO DATA` for some time and that is correct, not a
+   defect:** breadth spends ~280 calendar days of closes computing its first
+   200-day average, and the signal needs 60 more days of *overlap* with stored
+   SPY closes on top. The row states the shortfall in its own words — "needs 61
+   overlapping days, have N" — so the clock is visible rather than inferred.
+   The only candidate with prior support never tested here.
 2. **Credit with real history.** The ICE licence cap (§5) made the
    best-documented precursor untestable. A paid source reaching 1996 is the only
    way to answer it, and it is now the single budget question worth asking.

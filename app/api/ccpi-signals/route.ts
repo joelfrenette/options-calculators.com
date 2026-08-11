@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { getSeriesHistory } from "@/lib/market-series"
-import { SIGNALS, evaluableSignals, type SeriesPoint } from "@/lib/ccpi/signals"
+import { getBreadthHistory, getCloseHistory, getSeriesHistory } from "@/lib/market-series"
+import { SIGNALS, breadthDivergence, evaluableSignals, type SeriesPoint } from "@/lib/ccpi/signals"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -25,6 +25,110 @@ export const maxDuration = 60
  *   no-data  — not measured. NEVER reported as quiet (P6-30: a dead feed
  *              rendering as "Neutral" is what this redesign exists to undo).
  */
+/**
+ * One Trigger row (CCPI_DESIGN §7a).
+ *
+ * Stated explicitly rather than inferred so the FRED rows and the breadth row
+ * are provably the same shape — and so `state` can never widen to `string`,
+ * which is what lets a `no-data` row be mistaken for a quiet one downstream.
+ */
+interface TriggerRow {
+  id: string
+  label: string
+  meaning: string
+  state: "firing" | "quiet" | "no-data"
+  reading: number | null
+  readingSeries: string | null
+  asOf: string | null
+  detail: string | null
+  record: string
+}
+
+/** The signal's own lookback, from `breadthDivergence`'s default. */
+const BREADTH_LOOKBACK_DAYS = 60
+/** Enough tail for the lookback plus non-trading days and the odd gap. */
+const BREADTH_TAIL_DAYS = 400
+
+/**
+ * Breadth divergence as a Trigger row.
+ *
+ * The only candidate in CCPI_DESIGN §6b with prior support that the 2026-08-10
+ * run could not test, because it is not a FRED signal: the index comes from
+ * stored SPY closes and breadth from `breadth_daily`. It is scored separately
+ * in `/api/admin/ccpi-backtest` for the same reason, and this is the live half.
+ *
+ * **`no-data` is the expected answer for a while and is not a bug.** Breadth
+ * spends roughly 280 calendar days of closes computing its first 200-day
+ * average before it produces a single point, and this signal then needs 60 more
+ * days of overlap on top. Reporting `no-data` truthfully is the whole point —
+ * §7a forbids a signal without a reading rendering as `quiet`, which is the
+ * P6-30 defect (a dead feed showing as "Neutral").
+ */
+async function breadthDivergenceRow(): Promise<TriggerRow> {
+  const base = {
+    id: "breadth-divergence",
+    label: "Breadth divergence",
+    meaning: "The index is near its high while fewer members hold above their 200-day average.",
+    readingSeries: "breadth_daily.pct",
+    record: "untested",
+  }
+
+  const [spy, breadth] = await Promise.all([
+    getCloseHistory("SPY", BREADTH_TAIL_DAYS),
+    getBreadthHistory(BREADTH_TAIL_DAYS),
+  ])
+
+  const haveSpy = spy?.length ?? 0
+  const haveBreadth = breadth?.length ?? 0
+  // The signal compares same-day points only (mismatched dates produced the
+  // S-11 defect), so the usable history is the overlap, not either length.
+  const asc = (rows: { day: string; value: number }[] | null) =>
+    rows ? [...rows].sort((a, b) => (a.day < b.day ? -1 : 1)) : []
+  const spyAsc = asc(spy)
+  const breadthAsc = asc(breadth)
+  const breadthDays = new Set(breadthAsc.map((p) => p.day))
+  const overlap = spyAsc.filter((p) => breadthDays.has(p.day)).length
+
+  const latestBreadth = breadthAsc.length > 0 ? breadthAsc[breadthAsc.length - 1] : null
+
+  if (overlap <= BREADTH_LOOKBACK_DAYS) {
+    return {
+      ...base,
+      state: "no-data" as const,
+      reading: null,
+      asOf: null,
+      detail:
+        `needs ${BREADTH_LOOKBACK_DAYS + 1} overlapping days of SPY closes and breadth; ` +
+        `have ${overlap} (SPY ${haveSpy}, breadth ${haveBreadth})`,
+    }
+  }
+
+  const obs = breadthDivergence(spyAsc, breadthAsc, { lookbackDays: BREADTH_LOOKBACK_DAYS })
+  // Trailing nulls are days the signal could not evaluate; the last DECIDED day
+  // is the current state. Reading the final element regardless would report
+  // no-data on any day SPY and breadth happened not to align.
+  const lastDecided = [...obs].reverse().find((o) => o.firing !== null) ?? null
+
+  if (lastDecided === null) {
+    return {
+      ...base,
+      state: "no-data" as const,
+      reading: latestBreadth ? latestBreadth.value : null,
+      asOf: latestBreadth ? latestBreadth.day : null,
+      detail: `${overlap} overlapping days stored, but no day yet satisfies the ${BREADTH_LOOKBACK_DAYS}-day window`,
+    }
+  }
+
+  const readingAt = breadthAsc.find((p) => p.day === lastDecided.day) ?? latestBreadth
+  return {
+    ...base,
+    state: lastDecided.firing ? ("firing" as const) : ("quiet" as const),
+    reading: readingAt ? readingAt.value : null,
+    asOf: readingAt ? readingAt.day : lastDecided.day,
+    detail: null,
+  }
+}
+
 export async function GET() {
   const seriesNeeded = [...new Set(SIGNALS.flatMap((s) => s.requires))]
 
@@ -43,7 +147,7 @@ export async function GET() {
 
   const evaluable = new Set(evaluableSignals(available).map((s) => s.id))
 
-  const rows = SIGNALS.map((sig) => {
+  const rows: TriggerRow[] = SIGNALS.map((sig): TriggerRow => {
     if (!evaluable.has(sig.id)) {
       return {
         id: sig.id,
@@ -78,6 +182,8 @@ export async function GET() {
       record: "untested",
     }
   })
+
+  rows.push(await breadthDivergenceRow())
 
   const firing = rows.filter((r) => r.state === "firing").length
   const measured = rows.filter((r) => r.state !== "no-data").length
