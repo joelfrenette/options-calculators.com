@@ -401,11 +401,12 @@ recomputes it.
 | P7-25 | P3 | fixed | Both classes are now rules. Building the prompt guard exposed two silent under-coverages in it — it reported 5 prompts where there are 11, covering none of the files it existed for. |
 | P7-26 | P2 | fixed | **Original finding was half wrong.** The six "silent" scanners read a field P1-10 deleted; the real defect was three OTHER tabs that render it and labelled every fresh scan "Cached". market-sentiment dated. |
 | P7-27 | P2 | fixed | Four components (1,548 lines) were imported by nothing and tree-shaken out of the production bundle — three of them the "public tabs" P7-26 was written about. check-dead-exports scopes to lib/, so nothing could see them. Owner chose retire: all four deleted, ratchet down to 2. |
+| P7-28 | P2 | fixed | Fifteen components hand-built the Yahoo ticker URL in three spellings; only one normalised `.` to `-`, so class shares linked to a 404 from fourteen tabs. One library now owns it, pointing at the advanced chart per the owner's request, with a check. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-230 findings recorded · **184 fixed · 8 wontfix · 0 verified-ok · 38 open.**
+231 findings recorded · **185 fixed · 8 wontfix · 0 verified-ok · 38 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -2931,3 +2932,49 @@ Deleting the four produced no new dead `lib/` export — `check-dead-exports` st
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-27 | P2 | components / tooling | Four components totalling 1,548 lines were imported by nothing and absent from the deployed bundle, including three that P7-26 described as public tabs. `check-dead-exports` scopes to `lib/`, so no check could see them. All four deleted; ratchet added at the remaining two. |
+
+---
+
+## Phase 7.7 (twentieth pass) — ticker links point at the advanced chart (2026-08-12)
+
+Owner request: every hyperlink on a ticker should open Yahoo's advanced chart,
+`https://finance.yahoo.com/chart/<TICKER>`. Scanning for them found the request was also
+a bug report.
+
+### P7-28 — one URL, fifteen copies, three spellings
+
+Fifteen components hand-built the destination, and they had already diverged:
+
+- twelve wrote `https://finance.yahoo.com/quote/${ticker}` raw;
+- `smart-money-etfs.tsx` wrote `${etf.ticker.replace(".", "-")}` — Yahoo's spelling for
+  class shares, where `BRK.B` 404s and `BRK-B` resolves — and **no other site did**, so
+  the same symbol linked correctly from one tab and to a dead page from fourteen others.
+  Its own version also used a non-global `replace`, so only the first dot converted;
+- `scanner/fundamental-results-table.tsx` wrote a third form, `/quote/${ticker}/chart`.
+
+`lib/ticker-links.ts` now owns it: `yahooChartUrl(ticker)` returns the `/chart/` URL with
+every dot converted and the rest percent-encoded (so `^SPX` is path-safe), **or `null`
+when there is no ticker** — a bare `/chart/` is a live page showing an unrelated default
+symbol, so a blank ticker must not produce a link at all. All fifteen sites call it.
+
+`scripts/check-ticker-links.ts` enforces three things, and the third is the one worth
+naming: rule 1 ("no hand-built `finance.yahoo.com` page URL outside the library") is
+satisfied *perfectly* by a codebase with every ticker link deleted, so the call sites are
+counted against a floor as well. That is the P6-77 shape — a check that stops covering
+prints the same PASS line as one that passes.
+
+**What building the check found.** Its first form matched the bare host and failed on
+`app/api/yahoo-proxy/route.ts`, where `Referer: "https://finance.yahoo.com/"` and
+`Origin: "https://finance.yahoo.com"` are outbound request headers impersonating a
+browser — not links, and load-bearing for the proxy. Requiring at least one character of
+path separates "a page a user is sent to" from "a host named in a header". The residual
+blind spot is stated in the file rather than pretended away: a link assembled from a
+bare-host constant plus a symbol appended elsewhere would pass.
+
+Negative-tested in three forms — a hand-built URL reappearing in a component, the library
+reverting from `/chart/` to `/quote/`, and a call site being deleted — each failing as
+designed.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-28 | P2 | site-wide UI | Fifteen components hand-built the Yahoo ticker URL in three different spellings; only one normalised `.` to `-`, so class-share tickers linked to a 404 from fourteen tabs. Now one library (`lib/ticker-links.ts`), pointing at the advanced chart per the owner, with a check. |

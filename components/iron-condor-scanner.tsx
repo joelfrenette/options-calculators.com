@@ -11,6 +11,7 @@ import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { Layers, Zap, Filter, ArrowUpRight, AlertTriangle, CheckCircle2, Info, Wifi, WifiOff } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { yahooChartUrl } from "@/lib/ticker-links"
 
 interface CondorSetup {
   ticker: string
@@ -268,7 +269,7 @@ export function IronCondorScanner() {
                       </div>
                       <div className="text-left">
                         <a
-                          href={`https://finance.yahoo.com/quote/${setup.ticker}`}
+                          href={yahooChartUrl(setup.ticker) ?? undefined}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="font-semibold text-teal-600 hover:text-teal-700 hover:underline"

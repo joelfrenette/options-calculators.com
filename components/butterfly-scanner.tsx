@@ -12,6 +12,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
+import { yahooChartUrl } from "@/lib/ticker-links"
 
 interface ButterflySetup {
   ticker: string
@@ -198,7 +199,7 @@ export function ButterflyScanner() {
           <div>
             <div className="flex items-center gap-2">
               <a
-                href={`https://finance.yahoo.com/quote/${setup.ticker}`}
+                href={yahooChartUrl(setup.ticker) ?? undefined}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-bold text-lg text-teal-600 hover:text-teal-700 hover:underline"

@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { DataLoadGate } from "@/components/data-load-gate"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
+import { yahooChartUrl } from "@/lib/ticker-links"
 
 interface Buyer {
   name: string
@@ -201,7 +202,7 @@ export function InsiderClusters() {
                         {expanded.has(c.ticker) ? "Hide" : "Show"} buyers
                       </button>
                       <a
-                        href={`https://finance.yahoo.com/quote/${c.ticker}`}
+                        href={yahooChartUrl(c.ticker) ?? undefined}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 text-emerald-700 hover:underline"

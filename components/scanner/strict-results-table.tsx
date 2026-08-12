@@ -9,6 +9,7 @@ import { TrendingUp } from "lucide-react"
 import type { QualifyingStock } from "./types"
 import { evaluateCriteria, type TechnicalFilterSettings } from "./technical-criteria"
 import { stepLabel } from "./steps"
+import { yahooChartUrl } from "@/lib/ticker-links"
 
 interface StrictResultsTableProps {
   technicalResults: QualifyingStock[]
@@ -246,7 +247,7 @@ export function StrictResultsTable({
                       >
                         <td className="p-3 font-semibold text-green-700">
                           <a
-                            href={`https://finance.yahoo.com/quote/${stock.ticker}`}
+                            href={yahooChartUrl(stock.ticker) ?? undefined}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="hover:underline"

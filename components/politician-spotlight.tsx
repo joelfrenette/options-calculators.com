@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { DataLoadGate } from "@/components/data-load-gate"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
+import { yahooChartUrl } from "@/lib/ticker-links"
 
 interface Trade {
   date: string
@@ -243,7 +244,7 @@ export function PoliticianSpotlight() {
                               </span>
                             )}
                             <a
-                              href={`https://finance.yahoo.com/quote/${t.ticker}`}
+                              href={yahooChartUrl(t.ticker) ?? undefined}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-emerald-700 hover:underline shrink-0"

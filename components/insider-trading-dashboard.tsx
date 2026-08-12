@@ -28,6 +28,7 @@ import {
 } from "lucide-react"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { DataLoadGate } from "@/components/data-load-gate"
+import { yahooChartUrl } from "@/lib/ticker-links"
 
 // Threshold for the "Big moves only" toggle ($500K+)
 const BIG_MOVE_THRESHOLD = 500_000
@@ -676,7 +677,7 @@ const InsiderTradingDashboard = () => {
                         </td>
                         <td className="py-3 px-2">
                           <a
-                            href={`https://finance.yahoo.com/quote/${trade.ticker}`}
+                            href={yahooChartUrl(trade.ticker) ?? undefined}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-sm font-bold text-teal-600 hover:text-teal-700 hover:underline"

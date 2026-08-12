@@ -11,6 +11,7 @@ import { DollarAmountFilter } from "@/components/dollar-amount-filter"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
+import { yahooChartUrl } from "@/lib/ticker-links"
 
 interface SpreadSetup {
   ticker: string
@@ -272,7 +273,7 @@ export function CreditSpreadScanner() {
                     </div>
                     <div className="text-left">
                       <a
-                        href={`https://finance.yahoo.com/quote/${setup.ticker}`}
+                        href={yahooChartUrl(setup.ticker) ?? undefined}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="font-semibold text-teal-600 hover:text-teal-700 hover:underline"

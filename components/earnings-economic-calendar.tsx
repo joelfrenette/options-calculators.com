@@ -12,6 +12,7 @@ import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DataLoadGate } from "@/components/data-load-gate"
+import { yahooChartUrl } from "@/lib/ticker-links"
 
 // Types for dynamic data
 interface EarningsEvent {
@@ -437,7 +438,7 @@ export function EarningsEconomicCalendar() {
                           </td>
                           <td className="px-4 py-3">
                             <a
-                              href={`https://finance.yahoo.com/quote/${item.ticker}`}
+                              href={yahooChartUrl(item.ticker) ?? undefined}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-sm font-bold text-teal-600 hover:text-teal-700 hover:underline"

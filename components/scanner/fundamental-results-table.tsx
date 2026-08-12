@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { BarChart3 } from "lucide-react"
 import type { QualifyingStock } from "./types"
 import { stepTitled, SCANNER_STEPS } from "./steps"
+import { yahooChartUrl } from "@/lib/ticker-links"
 
 interface FundamentalResultsTableProps {
   fundamentalResults: QualifyingStock[]
@@ -213,7 +214,7 @@ export function FundamentalResultsTable({
                 </thead>
                 <tbody>
                   {(showAllFundamentals ? sortedFundamentalResults : sortedFundamentalResults.slice(0, 10)).map((stock, index) => {
-                    const yahooChartLink = `https://finance.yahoo.com/quote/${stock.ticker}/chart`
+                    const yahooChartLink = yahooChartUrl(stock.ticker) ?? undefined
                     return (
                       <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="py-2 px-3">

@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { DataLoadGate } from "@/components/data-load-gate"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
+import { yahooChartUrl } from "@/lib/ticker-links"
 
 interface ETF {
   ticker: string
@@ -168,7 +169,7 @@ export function SmartMoneyEtfs() {
                     <div className="mt-2 flex items-center justify-between">
                       {etf.asOf && <span className="text-[10px] text-slate-400">Close {etf.asOf}</span>}
                       <a
-                        href={`https://finance.yahoo.com/quote/${etf.ticker.replace(".", "-")}`}
+                        href={yahooChartUrl(etf.ticker) ?? undefined}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 text-xs text-emerald-700 hover:underline"
