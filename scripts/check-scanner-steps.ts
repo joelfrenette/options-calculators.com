@@ -1,0 +1,133 @@
+/**
+ * The scanner's step numbers come from one place.
+ *
+ * Run: node scripts/check-scanner-steps.ts
+ *
+ * WHY THIS FILE EXISTS (AUDIT_BACKLOG S-18). The four scanner steps were
+ * written as literal "Step N" strings in roughly ninety places, and they had
+ * drifted. The instance that reached a user: `loadPreFilteredTickers` is the
+ * handler behind the button reading **"Scan for Potential Stocks (Step 2)"**,
+ * and on failure it set the error **"Step 1 failed"**. The technical-analysis
+ * handler logged itself as "Step 3" against its own Step 4 button, and a
+ * comment called the fundamental scan "Step 2".
+ *
+ * Nothing breaks when a number is off by one, which is precisely why they
+ * drifted and why only a check will hold them.
+ *
+ * WHAT IS IN SCOPE, AND WHAT IS DELIBERATELY NOT. This is the honest part.
+ *
+ *   IN: the DECLARATION sites — the four step cards' headings, the buttons that
+ *   run each step, and every `setError` in the scanner. Those are what a user
+ *   reads, and they are what must not disagree.
+ *
+ *   OUT: comments and `console.log` strings. There are still dozens of literal
+ *   "Step N" mentions in scanner internals. They are developer-facing, several
+ *   are prose about the pipeline rather than labels ("Step 4 is where a missing
+ *   chain shows up"), and converting them would trade readable comments for
+ *   interpolation with no reader-visible gain. **S-18 stays open for them**,
+ *   measured rather than declared finished.
+ *
+ *   OUT: `components/wheel-strategy-planner.tsx` and
+ *   `components/options-strategy-toolbox.tsx`. Those number steps 1-4 as well —
+ *   Sell Cash-Secured Puts, Get Assigned, Sell Covered Calls, Repeat — which is
+ *   the wheel STRATEGY lifecycle, a different sequence sharing the phrasing.
+ *   Folding them in would force "Step 3" to mean both "Fundamental Criteria"
+ *   and "Sell Covered Calls".
+ *
+ * SCOPE IS STRUCTURAL (P6-75) and asserted (P6-77): the guarded file list is
+ * explicit and its size is checked, so a file cannot drop out of coverage
+ * without the count moving.
+ */
+
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
+import { fileURLToPath } from "node:url"
+
+const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..")
+
+let failures = 0
+function check(name: string, passed: boolean, detail = ""): void {
+  console.log(`${passed ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`)
+  if (!passed) failures++
+}
+
+/** Files whose USER-VISIBLE step labels must come from components/scanner/steps.ts. */
+const GUARDED = [
+  "components/scanner/step1-dollar-filter-card.tsx",
+  "components/scanner/step2-prefilter-card.tsx",
+  "components/scanner/step3-fundamentals-card.tsx",
+  "components/scanner/step4-technical-card.tsx",
+  "components/wheel-scanner.tsx",
+  "components/scanner/use-wheel-scanner.ts",
+]
+const EXPECTED_GUARDED = 6
+
+check(
+  `scope: ${GUARDED.length} file(s) guarded`,
+  GUARDED.length === EXPECTED_GUARDED,
+  `${GUARDED.length}, expected ${EXPECTED_GUARDED} — removing a file from this list must be deliberate`,
+)
+
+const stripComments = (src: string): string =>
+  src
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => " " + "\n".repeat((m.match(/\n/g) || []).length))
+    .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "")
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1")
+
+/** A literal step number inside a setError(...) call, anywhere in the scanner. */
+const SET_ERROR_STEP = /setError\((?:[^)]*?)Step\s+\d/
+
+let sources = 0
+for (const relPath of GUARDED) {
+  let src: string
+  try {
+    src = readFileSync(join(ROOT, relPath), "utf8")
+  } catch {
+    check(`${relPath}: readable`, false, "file missing — was it renamed?")
+    continue
+  }
+  sources++
+  const code = stripComments(src)
+
+  // 1. No hardcoded step number in an error a user can see.
+  check(
+    `${relPath}: no literal step number in setError`,
+    !SET_ERROR_STEP.test(code),
+    SET_ERROR_STEP.exec(code)?.[0] ?? "none",
+  )
+
+  // 2. No literal step number in JSX text.
+  //
+  //    Only `.tsx` files are scanned, and that is structural rather than a
+  //    convenience: JSX cannot exist in a `.ts` file, so a rendered label
+  //    cannot either. The first draft scanned every guarded file and filtered
+  //    `console.` line by line, which flagged three MULTI-LINE console.log
+  //    calls in use-wheel-scanner.ts — their continuation lines carry the step
+  //    number but not the `console.` token. A line-based filter cannot see a
+  //    call that spans lines; a file-extension rule does not have to.
+  //    `.ts` files remain covered by the setError assertion above.
+  if (relPath.endsWith(".tsx")) {
+    const jsxLiterals = code
+      .split("\n")
+      .map((line, i) => ({ line: line.trim(), n: i + 1 }))
+      .filter(({ line }) => /Step\s+\d/.test(line) && !/console\.\w+\(/.test(line))
+    check(
+      `${relPath}: no literal step number in a rendered label`,
+      jsxLiterals.length === 0,
+      jsxLiterals.length ? jsxLiterals.map((l) => `${l.n}: ${l.line.slice(0, 60)}`).join(" | ") : "none",
+    )
+  }
+}
+
+check(`scope: all ${EXPECTED_GUARDED} guarded file(s) were read`, sources === EXPECTED_GUARDED, `${sources}`)
+
+/** The single source itself must still declare all four steps. */
+const stepsSrc = readFileSync(join(ROOT, "components", "scanner", "steps.ts"), "utf8")
+for (const key of ["dollarFilter", "preFilter", "fundamentals", "technical"]) {
+  check(`steps.ts declares ${key}`, new RegExp(`\\b${key}:\\s*\\{`).test(stepsSrc))
+}
+
+if (failures > 0) {
+  console.error(`\n${failures} scanner-step check(s) failed.`)
+  process.exit(1)
+}

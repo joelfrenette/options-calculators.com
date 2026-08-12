@@ -10,6 +10,7 @@ import { Slider } from "@/components/ui/slider"
 import { Info, BarChart3 } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { PRE_FILTER_MARKET_CAP_TIERS } from "./constants"
+import { stepTitled, stepLabel } from "./steps"
 
 interface Step3FundamentalsCardProps {
   maxDebtToEquity: number[]
@@ -39,7 +40,7 @@ export function Step3FundamentalsCard({
           <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b-2 border-blue-200">
             <div className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-blue-700" />
-              <CardTitle className="text-xl font-bold">FUNDAMENTAL CRITERIA (Step 3)</CardTitle>
+              <CardTitle className="text-xl font-bold">{stepTitled("fundamentals", "FUNDAMENTAL CRITERIA")}</CardTitle>
             </div>
             <CardDescription>
               Using Polygon quarterly filings for real fundamental metrics. All slider filters are applied with live
@@ -227,10 +228,10 @@ export function Step3FundamentalsCard({
                         <Info className="h-4 w-4 text-muted-foreground cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs bg-green-50 border-green-200 text-gray-900">
-                        <p className="font-semibold mb-1">Market Cap Floor (Step 3)</p>
+                        <p className="font-semibold mb-1">Market Cap Floor ({stepLabel("fundamentals")})</p>
                         <p className="text-xs mb-2">
                           <strong>What:</strong> Rejects companies below this total value (price × shares) using live
-                          Polygon data, independent of the Step 2 universe filter.
+                          Polygon data, independent of the {stepLabel("preFilter")} universe filter.
                         </p>
                         <p className="text-xs mb-2">
                           <strong>Why Important:</strong> Smaller companies carry richer premiums but bigger gap risk.

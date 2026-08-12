@@ -21,6 +21,7 @@ import {
   type TechnicalFilterSettings,
 } from "./technical-criteria"
 import { useLandmines } from "./use-landmines"
+import { stepLabel, stepTitled } from "./steps"
 
 export function useWheelScanner() {
   const [tickersToScan, setTickersToScan] = useState<string>("")
@@ -140,7 +141,7 @@ export function useWheelScanner() {
   // Step 1: Dollar Amount Filtering
   const [maxStockPrice, setMaxStockPrice] = useState([500]) // Default $500 → $50,000 total cash ($1-$1000)
 
-  const isScanning = loading // `loading` is for Step 2 (Fundamental Scan)
+  const isScanning = loading // `loading` is for Step 3 (Fundamental Scan) — was mislabelled Step 2 (S-18)
   // const isScanningTechnicals = technicalLoading // This is the correct state for technical scanning
 
   const { fetchLandmines, getLandminesForRow, resetLandmines } = useLandmines()
@@ -283,12 +284,12 @@ export function useWheelScanner() {
     setStep(3)
     setHasAttemptedTechnicalScan(true)
 
-    console.log("[v0] 🟢 Run Technical Analysis (Step 3) button clicked")
+    console.log(`[v0] 🟢 ${stepTitled("technical")} button clicked`)
     console.log("[v0] fundamentalResults.length:", fundamentalResults.length)
     console.log("[v0] Current technicalResults.length:", technicalResults.length)
 
     if (fundamentalResults.length === 0) {
-        setError("Please complete Step 3 first (Scan Fundamentals)")
+        setError(`Please complete ${stepTitled("fundamentals")} first`)
       setStep(2)
       return
     }
@@ -306,7 +307,7 @@ export function useWheelScanner() {
     console.log("[v0] Technical scan cache check:", technicalCacheKey)
     const cached = loadFromCache(technicalCacheKey)
     if (cached) {
-      console.log("[v0] ✅ Step 3: Using cached technical analysis results (same filters, same day)")
+      console.log(`[v0] ✅ ${stepLabel("technical")}: Using cached technical analysis results (same filters, same day)`)
       console.log("[v0] Cached results count:", cached.length)
       setTechnicalResults(cached)
       setCacheStatus("Technical analysis completed and cached (parameters match, valid until tomorrow 9:30 AM ET)")
@@ -326,7 +327,7 @@ export function useWheelScanner() {
 
     try {
       console.log(
-        `[v0] Step 3: Fetching real options premium data and filtering by slider criteria for ${fundamentalResults.length} stocks`,
+        `[v0] ${stepLabel("technical")}: Fetching real options premium data and filtering by slider criteria for ${fundamentalResults.length} stocks`,
       )
 
       const enrichedStocks = await enrichWithOptionsData(fundamentalResults, (current, total, ticker) => {
@@ -356,14 +357,14 @@ export function useWheelScanner() {
       fetchLandmines(filteredStocks)
 
       console.log(
-        `[v0] ✅ Step 3 Complete: ${filteredStocks.length} stocks passed technical filters (and enriched with options data)`,
+        `[v0] ✅ ${stepLabel("technical")} Complete: ${filteredStocks.length} stocks passed technical filters (and enriched with options data)`,
       )
 
       saveToCache(technicalCacheKey, filteredStocks)
       setCacheStatus(`Technical analysis completed and cached (valid until tomorrow 9:30 AM ET)`)
 
       setIsScanningTechnicals(false)
-      console.log(`[v0] 📊 Step 3 Complete! ${filteredStocks.length} stocks passed technical analysis`)
+      console.log(`[v0] 📊 ${stepLabel("technical")} Complete! ${filteredStocks.length} stocks passed technical analysis`)
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred during technical analysis")
       console.error("[v0] Technical analysis error:", err)
@@ -377,7 +378,7 @@ export function useWheelScanner() {
   }
 
   const loadPreFilteredTickers = async () => {
-    console.log("[v0] 🟢 Scan for Potential Stocks (Step 1) button clicked")
+    console.log(`[v0] 🟢 ${stepTitled("preFilter")} button clicked`)
     setIsLoadingPreFilter(true) // Renamed from preFilterLoading
 
     setPreFilterProgress(0)
@@ -391,7 +392,7 @@ export function useWheelScanner() {
       const topRankedLimit = getTopRankedValue(preFilterTopRanked[0])
       const volTier = PRE_FILTER_VOLATILITY_TIERS[preFilterVolatility[0]] ?? PRE_FILTER_VOLATILITY_TIERS[0]
 
-      console.log("[v0] Step 1 Filter Parameters:")
+      console.log(`[v0] ${stepLabel("preFilter")} Filter Parameters:`)
       console.log(`  - Market Cap: ${tier.label} (${marketCapThreshold.toLocaleString()})`)
       console.log(`  - Min Daily Range (volatility): ${volTier.label}`)
       console.log(`  - Min Volume: ${(minVolumeValue / 1000000).toFixed(1)}M`)
@@ -428,7 +429,7 @@ export function useWheelScanner() {
         setPreFilterCount(tickers.length)
         setPreFilterProgress(100)
         setPreFilterCurrentTicker("")
-        console.log(`[v0] ✅ Step 1 Complete: Loaded ${tickers.length} tickers`)
+        console.log(`[v0] ✅ ${stepLabel("preFilter")} Complete: Loaded ${tickers.length} tickers`)
         console.log(`[v0] Tickers: ${tickers.slice(0, 10).join(", ")}${tickers.length > 10 ? "..." : ""}`)
         // Set step to 2 after step 1 completes
         setStep(2)
@@ -436,8 +437,8 @@ export function useWheelScanner() {
         throw new Error("No tickers returned from API")
       }
     } catch (err: any) {
-      console.error("[v0] Step 1 Error:", err)
-      setError(`Step 1 failed: ${err.message}`)
+      console.error(`[v0] ${stepLabel("preFilter")} Error:`, err)
+      setError(`${stepLabel("preFilter")} failed: ${err.message}`)
       setPreFilterProgress(0)
       setPreFilterCurrentTicker("")
     } finally {

@@ -189,7 +189,7 @@ recomputes it.
 | S-15 | P2 | fixed | Closed by P6-26 — thin financials yield null, not 0. |
 | S-16 | P3 | open | `scan-cache.ts` still removes only the key it just missed on; `v1`/`v2` keys persist (verified 2026-08-11). |
 | S-17 | P3 | open | Redundant earnings-date extraction still at `fundamental-scan.ts:290` (verified 2026-08-11). |
-| S-18 | P2 | open | **Worse than recorded: 90 literal "Step N" strings across the scanner, not 40** (verified 2026-08-11). Still no shared constant. |
+| S-18 | P2 | open | **Drift fixed and guarded; the literal sweep stays open.** The UI agreed with itself — the handler did not: the Step 2 button set the error "Step 1 failed". Comments and console logs deliberately not converted. |
 | S-19 | P1 | fixed | `lib/metered-fetch.ts` — real per-call metering. |
 | S-20 | P3 | fixed | Both TwelveData proxies retired. |
 | P0-1 | P3 | open | 15 orphan routes → **6 remain**: `yahoo-proxy`, `apify-proxy`, `google-trends`, `serper-finance`, `macro-indicators`, `scraping-bee/diagnostics` (verified 2026-08-11). Each still needs a keep-or-delete verdict. |
@@ -2383,3 +2383,86 @@ figure that needs updating.
 | ID | Sev | Tab / area | Finding |
 |---|---|---|---|
 | P7-22 | P2 | tooling / docs | **Phase 7.5's standing guard: `scripts/check-doc-figures.ts`, wired into `check:formulas`.** CLAUDE.md's "count the PASS lines" rule carried `formulas 514` against a suite at 581 — **the stale figure was inside the rule about staleness**, so following it exactly could not distinguish a suite that grew from one that broke. Two figures are DERIVED (route count from disk, contract count from `lib/api-contracts.ts`, plus a parity assertion between them) and three are PINNED to a constant, with the difference stated rather than smoothed over. A figure vanishing from the prose fails rather than skipping. **The parity assertion caught the check's own first-draft undercount (51 vs 60) before it shipped.** |
+
+---
+
+## Phase 7.4 (eighteenth pass) — S-18: the step numbers, and what the drift actually was (2026-08-11)
+
+The row said "buttons, card headings and error strings disagree about which step is
+which," measured at 90 literal `Step N` strings across nine files. Both halves needed
+checking before anything was changed, and both turned out to be **partly** right.
+
+### The canonical order was never in doubt
+
+`step1-dollar-filter-card.tsx` … `step4-technical-card.tsx` declare it, and their
+headings agree with the buttons and the notices:
+
+| Step | Card heading | Action |
+|---|---|---|
+| 1 | Dollar Amount Filtering | the price-ceiling slider — a filter, not a click |
+| 2 | Smart Pre-Filtering | Scan for Potential Stocks |
+| 3 | Fundamental Criteria | Scan Fundamentals |
+| 4 | Technical Criteria | Run Technical Analysis, incl. the relaxed flow |
+
+### The drift was real, and one instance reached a user
+
+`loadPreFilteredTickers` is the handler behind the button reading **"Scan for Potential
+Stocks (Step 2)"**. On failure it did:
+
+```
+setError(`Step 1 failed: ${err.message}`)
+```
+
+**A user clicks the Step 2 button, it fails, and the error names Step 1.** Its two console
+logs said Step 1 as well.
+
+Alongside that, in the same file: the technical-analysis handler logged itself as
+`Step 3` five times against its own Step 4 button and card, and a comment called the
+fundamental scan `Step 2`. So within one file the fundamental scan was called Step 2 and
+Step 3, and technical analysis was called Step 3 and Step 4.
+
+**But the claim about card headings was not true today.** The four headings, the buttons
+and `scanner-notices.tsx` all agreed with each other and with the canonical order. The
+disagreement was between the UI and the handler behind it — which is harder to notice,
+because the two are never read side by side.
+
+### What was changed, and what was left
+
+`components/scanner/steps.ts` is now the single declaration, and the twelve label sites
+in the hook plus the headings, buttons and explanatory copy in the five UI files are
+derived from it. **Every rendered string was diffed against its original before and
+after** — all identical, except the two that were wrong:
+
+- `Step 1 failed:` → `Step 2 failed:`
+- `Please complete Step 3 first (Scan Fundamentals)` → `Please complete Scan Fundamentals
+  (Step 3) first` (same number; reworded so the label comes from one place)
+
+`scripts/check-scanner-steps.ts` holds it: no literal step number in a `setError` anywhere
+in the guarded set, and none in a rendered label in the `.tsx` files.
+
+**Left alone, deliberately, and the check says so rather than implying completeness:**
+
+- **Comments and `console.log` strings.** Dozens remain in scanner internals. Several are
+  prose about the pipeline rather than labels — "Step 4 is where a missing chain shows
+  up" — and converting them would trade a readable comment for an interpolation with no
+  reader-visible gain. **S-18 stays open for these**, measured rather than declared done.
+- **`wheel-strategy-planner.tsx` and `options-strategy-toolbox.tsx`.** These number steps
+  1-4 too: Sell Cash-Secured Puts, Get Assigned, Sell Covered Calls, Repeat. That is the
+  wheel STRATEGY lifecycle — a different sequence that happens to share the phrasing.
+  Folding it into one registry would force "Step 3" to mean both "Fundamental Criteria"
+  and "Sell Covered Calls", which is worse than the duplication it removes.
+
+### The check caught its own false positive
+
+The first draft filtered `console.` line by line and flagged three multi-line
+`console.log` calls in `use-wheel-scanner.ts` — their continuation lines carry the step
+number but not the `console.` token. A line-based filter cannot see a call that spans
+lines.
+
+The fix is structural rather than a better filter: the rendered-label assertion runs only
+on `.tsx` files, because **JSX cannot exist in a `.ts` file, so a rendered label cannot
+either**. `.ts` files stay covered by the `setError` assertion. Formulas 590 → 607.
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| S-18 | P2 | SCAN → scanner | **Drift fixed and guarded; the literal sweep stays open.** The claim about card headings did not hold — headings, buttons and notices all agreed. The real disagreement was between the UI and its own handler: `loadPreFilteredTickers` sits behind the "Scan for Potential Stocks (Step 2)" button and set the error **"Step 1 failed"**, while the technical handler logged "Step 3" against its Step 4 button and a comment called the fundamental scan "Step 2". `components/scanner/steps.ts` is now the single source for every rendered label and every `setError`, enforced by `scripts/check-scanner-steps.ts`; each converted string was diffed against its original and only the two wrong ones changed. **Still open:** dozens of `Step N` mentions in comments and console logs, deliberately not converted, and the wheel-STRATEGY lifecycle (Sell Puts / Get Assigned / Sell Calls / Repeat), which is a different sequence and must not share the registry. |

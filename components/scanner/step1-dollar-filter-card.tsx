@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Info } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { stepTitled } from "./steps"
 
 interface Step1DollarFilterCardProps {
   maxStockPrice: number[]
@@ -20,7 +21,7 @@ export function Step1DollarFilterCard({ maxStockPrice, setMaxStockPrice, tooltip
               <div className="flex items-start gap-2 mb-3">
                 <Info className="h-5 w-5 text-emerald-700 flex-shrink-0 mt-0.5" />
                 <div>
-                  <h3 className="font-bold text-gray-900 text-base">Dollar Amount Filtering (Step 1)</h3>
+                  <h3 className="font-bold text-gray-900 text-base">{stepTitled("dollarFilter", "Dollar Amount Filtering")}</h3>
                   <p className="text-xs text-gray-600 mt-1">
                     Set the maximum stock price you are willing to trade. Selling a put requires 100 shares of cash
                     collateral — the total cash needed is shown instantly below.

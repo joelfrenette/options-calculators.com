@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Info, TrendingUp, CheckCircle2 } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { stepTitled } from "./steps"
 
 interface Step4TechnicalCardProps {
   maxRSI: number[]
@@ -62,7 +63,7 @@ export function Step4TechnicalCard({
           <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-200">
             <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-blue-600" />
-              TECHNICAL CRITERIA (Step 4)
+              {stepTitled("technical", "TECHNICAL CRITERIA")}
             </CardTitle>
             <CardDescription>
               Adjust technical thresholds to relax or tighten entry criteria for optimal put-selling setups.
@@ -82,7 +83,7 @@ export function Step4TechnicalCard({
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
               <div className="flex items-center gap-2 mb-2">
                 <CheckCircle2 className="h-4 w-4 text-blue-600" />
-                <span className="font-semibold text-sm text-gray-900">TECHNICAL CRITERIA (Step 4)</span>
+                <span className="font-semibold text-sm text-gray-900">{stepTitled("technical", "TECHNICAL CRITERIA")}</span>
               </div>
               <ul className="text-xs text-gray-700 space-y-1 list-disc list-inside">
                 <li>

@@ -21,6 +21,7 @@ import { FundamentalResultsTable } from "@/components/scanner/fundamental-result
 import { StrictResultsTable } from "@/components/scanner/strict-results-table"
 import { RelaxedResultsTable } from "@/components/scanner/relaxed-results-table"
 import {
+import { stepTitled, SCANNER_STEPS } from "./scanner/steps"
   RejectionSummaryCard,
   NoTechnicalPassCard,
   NoRelaxedResultsCard,
@@ -154,7 +155,7 @@ export function WheelScanner() {
             <Textarea
               value={tickersToScan}
               onChange={(e) => setTickersToScan(e.target.value)}
-              placeholder="Enter ticker symbols separated by commas (e.g., AAPL, MSFT, GOOGL) or use Step 2 above to load automatically"
+              placeholder="Enter ticker symbols separated by commas (e.g., AAPL, MSFT, GOOGL) or use Step ${SCANNER_STEPS.preFilter.n} above to load automatically"
               className="h-32 font-mono text-sm"
             />
           </CardContent>
@@ -191,7 +192,7 @@ export function WheelScanner() {
           ) : (
             <>
               <BarChart3 className="mr-2 h-5 w-5" />
-                Scan Fundamentals (Step 3)
+                {stepTitled("fundamentals")}
             </>
           )}
         </Button>
@@ -272,7 +273,7 @@ export function WheelScanner() {
           ) : (
             <>
               <TrendingUp className="mr-2 h-5 w-5" />
-                Run Technical Analysis (Step 4)
+                {stepTitled("technical")}
             </>
           )}
         </Button>
@@ -314,7 +315,7 @@ export function WheelScanner() {
           disabled={isEnrichingRelaxed}
         >
           <Filter className="mr-2 h-5 w-5" />
-          View Relaxed Criteria Results (Step 4)
+          {stepTitled("technical", "View Relaxed Criteria Results")}
         </Button>
       )}
 
@@ -329,7 +330,7 @@ export function WheelScanner() {
           disabled={isEnrichingRelaxed}
         >
           <Filter className="mr-2 h-5 w-5" />
-          View Relaxed Criteria Results (Step 4)
+          {stepTitled("technical", "View Relaxed Criteria Results")}
         </Button>
       )}
 

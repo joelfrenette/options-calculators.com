@@ -10,6 +10,7 @@ import { Slider } from "@/components/ui/slider"
 import { Info, Loader2, Filter } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
+import { stepTitled, stepLabel } from "./steps"
   PRE_FILTER_MARKET_CAP_TIERS,
   PRE_FILTER_VOLATILITY_TIERS,
   getTopRankedLabel,
@@ -58,17 +59,17 @@ export function Step2PreFilterCard({
               <div className="flex items-start gap-2 mb-3">
                 <Info className="h-5 w-5 text-blue-700 flex-shrink-0 mt-0.5" />
                 <div>
-                  <h3 className="font-bold text-gray-900 text-base">Smart Pre-Filtering (Step 2)</h3>
+                  <h3 className="font-bold text-gray-900 text-base">{stepTitled("preFilter", "Smart Pre-Filtering")}</h3>
                   {/* Used to read "All stocks are pre-qualified for active options
                       markets." Nothing in /api/polygon-tickers checks that — the
                       universe is filtered on size, liquidity, price and range only,
                       and the single mention of options in that route is a comment.
-                      A ticker with no chain gets carried to Step 4 and dropped
+                      A ticker with no chain gets carried to {stepLabel("technical")} and dropped
                       there, which is fine, but it is not what the sentence promised
                       on a put-selling scanner. */}
                   <p className="text-xs text-gray-600 mt-1">
                     Customize your starting universe with advanced filters — size, liquidity, price and daily range.
-                    Options availability is <strong>not</strong> checked here; Step 4 is where a missing chain shows up.
+                    Options availability is <strong>not</strong> checked here; {stepLabel("technical")} is where a missing chain shows up.
                   </p>
                 </div>
               </div>
@@ -308,7 +309,7 @@ export function Step2PreFilterCard({
             ) : (
               <>
                 <Filter className="mr-2 h-5 w-5" />
-                Scan for Potential Stocks (Step 2)
+                {stepTitled("preFilter")}
               </>
             )}
           </Button>
@@ -330,7 +331,7 @@ export function Step2PreFilterCard({
 
           {preFilterCount > 0 && (
             <p className="text-sm text-green-700 font-semibold mt-2 text-center">
-              ✅ {preFilterCount} tickers loaded and ready for Step 3 scan
+              ✅ {preFilterCount} tickers loaded and ready for {stepLabel("fundamentals")} scan
             </p>
           )}
     </>
