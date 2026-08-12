@@ -398,12 +398,13 @@ recomputes it.
 | P7-22 | P2 | fixed | Phase 7.5 standing guard: check-doc-figures.ts. CLAUDE.md carried "formulas 514" against a suite at 581 — the stale figure was inside the rule about staleness. |
 | P7-23 | P2 | fixed | The P7-10/P7-17/P7-18 class had no standing guard — re-verification put tedSpread ?? 0.25 back and the whole suite passed. check-ccpi-defaults.ts closes it, negative-tested in all three forms. |
 | P7-24 | P2 | fixed | check-house-libs.ts added — CLAUDE.md's "never re-implement locally" rule had no enforcement. Building it exposed a stripComments bug that hid ~70 lines of wheel-scanner.tsx from four checks. |
-| P7-25 | P3 | open | Two fix classes remain unguarded, verified by reverting each and watching the suite pass: a fabricated value in an AI prompt (P7-20) and state written but never read (P7-16). |
+| P7-25 | P3 | fixed | Both classes are now rules. Building the prompt guard exposed two silent under-coverages in it — it reported 5 prompts where there are 11, covering none of the files it existed for. |
+| P7-26 | P1 | open | **Six scanner tabs know whether their data is live and never say so** (isLiveData set, never rendered). market-sentiment.tsx carries P7-16 trio verbatim. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-228 findings recorded · **181 fixed · 8 wontfix · 0 verified-ok · 39 open.**
+229 findings recorded · **182 fixed · 8 wontfix · 0 verified-ok · 39 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -2697,3 +2698,73 @@ finding.
 |---|---|---|---|
 | P7-24 | P2 | tooling | **`scripts/check-house-libs.ts` added: CLAUDE.md's "never re-implement locally" rule had no enforcement**, and had been broken twice (P7-12, P7-13). Reads the two libraries' 21 exported names and fails on any declaration of one elsewhere, distinguishing a re-implementation from correct usage by declaration form. **Building it exposed a bug in the shared `stripComments` helper: a `/*` inside a LINE comment (a glob path, `components/scanner/*.`) was read as a block-comment opener and swallowed ~70 lines of `components/wheel-scanner.tsx` from four checks' scans — they reported PASS on a file they could not see.** Fixed in all four; found only because an injected violation failed to fail. |
 | P7-25 | P3 | tooling | **Two fix classes from this session remain unguarded, verified by reverting each and watching the suite pass:** a fabricated value interpolated into an AI prompt (P7-20's `ccpi ?? 0`), and component state written but never read (P7-16's cache-age header). Two apparent catches were incidental — `SITE_MAP.md is up to date` firing on moved line counts, which `pnpm inventory` clears. **OPEN**, and deliberately not half-built. |
+
+---
+
+## Phase 7.4 (twenty-second pass) — P7-25's two guards, and six tabs that never say whether their data is live (2026-08-12)
+
+The two classes P7-25 recorded as unguarded. Both are now rules; building them found a
+new provenance family and two more bugs in my own matchers.
+
+### P7-25a — no fabricated value reaches a prompt
+
+`scripts/check-prompt-inputs.ts`. In any file that reaches a model, a variable declared
+with a literal `??`/`||` fallback must not be interpolated into a prompt template.
+
+**This class is worse than a fabricated number on screen.** A wrong figure in the UI is at
+least inspectable. A wrong figure in a prompt is *reasoned over*, and what reaches the
+user is prose that no longer contains the number — nothing downstream can recover the
+fact that the input was invented. P7-20's `?? 0` became "markets healthy" in an executive
+summary.
+
+**Two bugs in the rule, both found by injecting the verbatim P7-20 defect and watching
+nothing happen:**
+
+1. Prompt bodies were extracted with `indexOf("`")` on the assumption that these templates
+   contain no nested backticks. **They do** — inside their own `${…}` expressions. The
+   body was truncated at the first inner tick, well before the interesting line. Replaced
+   with a nesting-aware scan that tracks `${…}` depth.
+2. The prompt-name pattern was `[A-Za-z_$][\w$]*[Pp]rompt`, which requires a PREFIX
+   before "prompt". It matched `systemPrompt` and `userPrompt` and **never matched a bare
+   `const prompt`** — which is precisely where P7-20 lived. The rule reported "5 prompt
+   templates found", passed, and covered none of the files that mattered. Fixed:
+   **11 prompts**, more than double.
+
+Both were silent under-coverage that a PASS line hid, which is the failure this phase
+keeps re-finding. Neither would have surfaced without the injection test.
+
+### P7-25b — component state written and never read
+
+`scripts/check-write-only-state.ts`. For every `const [x, setX] = useState(…)`, `x` must
+appear somewhere other than its own declaration. **Calling `setX` is writing, not
+reading.**
+
+346 pairs examined, **14 write-only**, and the distribution is the finding: the values
+that go unread are disproportionately the ones describing *where the data came from and
+how old it is*.
+
+**Six scanners set `isLiveData` from real payload data and render it nowhere** —
+butterfly, calendar-spread, credit-spread, iron-condor, leaps and zebra. Each one knows
+whether its numbers are live and does not say. `leaps-scanner.tsx` is representative:
+`setIsLiveData(data.isLive || false)` at line 140, no read anywhere. The component
+computes its own honesty and discards it.
+
+**`components/market-sentiment.tsx` carries the P7-16 trio verbatim** — `lastUpdated`,
+`fromCache`, `cacheTimestamp`, all written, none read. That is the same defect fixed in
+`ccpi-dashboard.tsx` this session, still live in a second component. Fixing one instance
+of a pattern is not fixing the pattern.
+
+Ratcheted at 14 rather than swept, each entry annotated with what it actually is — the
+`check-dead-exports` precedent. One is explicitly *not* a concealment:
+`insider-trading-dashboard.tsx:dataSource` is redundant, because that dashboard renders
+provenance from `data.dataSources` instead. Three more are not yet individually diagnosed
+and say so.
+
+**Neither guard's findings are fixed here.** Rendering a live/cached badge on six scanner
+tabs and a timestamp on market-sentiment is user-visible copy that needs
+`check-provenance` review and UAT — a change, not a cleanup.
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| P7-25 | P3 | tooling | **FIXED.** Both classes are now rules: `check-prompt-inputs.ts` (no defaulted value interpolated into a prompt — the P7-20 class, where a fabrication is reasoned over and disappears into prose) and `check-write-only-state.ts` (346 `useState` pairs, 14 write-only, ratcheted). **Building the first exposed two silent under-coverages in it**: prompt bodies truncated at a nested backtick, and a name pattern requiring a prefix that never matched a bare `const prompt` — the rule reported 5 prompts where there are 11, and covered none of the files it existed for. Both found only by injecting the verbatim P7-20 defect. |
+| P7-26 | **P1** | SCAN → six scanners, ANALYZE → Market Sentiment | **Six scanner tabs know whether their data is live and never say so.** `isLiveData` is set from real payload data in butterfly, calendar-spread, credit-spread, iron-condor, leaps and zebra, and rendered in none of them — so a user cannot tell a live scan from a stale or synthesized one on any of them. Separately, **`market-sentiment.tsx` carries P7-16's `lastUpdated`/`fromCache`/`cacheTimestamp` trio verbatim**, written and never read, so that tab can show a cached snapshot of any age with nothing on screen dating it. Found by `check-write-only-state.ts`; ratcheted, not swept. **OPEN** — the fix is user-visible copy on seven tabs and needs provenance review and UAT. |
