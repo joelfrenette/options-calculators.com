@@ -1060,9 +1060,31 @@ export function MarketSentiment() {
 
   const safeSentimentData = Array.isArray(sentimentData) ? sentimentData : []
 
+  /**
+   * When this reading was taken, and whether it came from localStorage.
+   *
+   * P7-26, and the same defect as P7-16 in the CCPI dashboard: `lastUpdated`,
+   * `fromCache` and `cacheTimestamp` were all WRITTEN on the cache-load path
+   * (and nowhere read), so this tab restored a snapshot of any age and said
+   * nothing about it. The component knew and did not tell.
+   *
+   * Fixing one instance of a pattern is not fixing the pattern — the CCPI fix
+   * landed earlier the same day and this second copy went unnoticed until
+   * `check-write-only-state.ts` listed it.
+   */
+  const readingTaken = cacheTimestamp ?? lastUpdated?.toISOString() ?? null
+  const readingWhen = readingTaken && !Number.isNaN(new Date(readingTaken).getTime())
+    ? new Date(readingTaken).toLocaleString()
+    : null
+
   return (
     <TooltipProvider>
       <div className="space-y-6">
+        {readingWhen && (
+          <p className="text-xs text-muted-foreground">
+            {fromCache ? "Cached reading from" : "Updated"} {readingWhen}
+          </p>
+        )}
         {marketData?.usingFallback && (
           <Card className="shadow-sm border-yellow-200 bg-yellow-50">
             <CardContent className="pt-4">

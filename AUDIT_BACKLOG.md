@@ -399,12 +399,12 @@ recomputes it.
 | P7-23 | P2 | fixed | The P7-10/P7-17/P7-18 class had no standing guard — re-verification put tedSpread ?? 0.25 back and the whole suite passed. check-ccpi-defaults.ts closes it, negative-tested in all three forms. |
 | P7-24 | P2 | fixed | check-house-libs.ts added — CLAUDE.md's "never re-implement locally" rule had no enforcement. Building it exposed a stripComments bug that hid ~70 lines of wheel-scanner.tsx from four checks. |
 | P7-25 | P3 | fixed | Both classes are now rules. Building the prompt guard exposed two silent under-coverages in it — it reported 5 prompts where there are 11, covering none of the files it existed for. |
-| P7-26 | P1 | open | **Six scanner tabs know whether their data is live and never say so** (isLiveData set, never rendered). market-sentiment.tsx carries P7-16 trio verbatim. |
+| P7-26 | P2 | fixed | **Original finding was half wrong.** The six "silent" scanners read a field P1-10 deleted; the real defect was three OTHER tabs that render it and labelled every fresh scan "Cached". market-sentiment dated. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-229 findings recorded · **182 fixed · 8 wontfix · 0 verified-ok · 39 open.**
+229 findings recorded · **183 fixed · 8 wontfix · 0 verified-ok · 38 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -2768,3 +2768,66 @@ tabs and a timestamp on market-sentiment is user-visible copy that needs
 |---|---|---|---|
 | P7-25 | P3 | tooling | **FIXED.** Both classes are now rules: `check-prompt-inputs.ts` (no defaulted value interpolated into a prompt — the P7-20 class, where a fabrication is reasoned over and disappears into prose) and `check-write-only-state.ts` (346 `useState` pairs, 14 write-only, ratcheted). **Building the first exposed two silent under-coverages in it**: prompt bodies truncated at a nested backtick, and a name pattern requiring a prefix that never matched a bare `const prompt` — the rule reported 5 prompts where there are 11, and covered none of the files it existed for. Both found only by injecting the verbatim P7-20 defect. |
 | P7-26 | **P1** | SCAN → six scanners, ANALYZE → Market Sentiment | **Six scanner tabs know whether their data is live and never say so.** `isLiveData` is set from real payload data in butterfly, calendar-spread, credit-spread, iron-condor, leaps and zebra, and rendered in none of them — so a user cannot tell a live scan from a stale or synthesized one on any of them. Separately, **`market-sentiment.tsx` carries P7-16's `lastUpdated`/`fromCache`/`cacheTimestamp` trio verbatim**, written and never read, so that tab can show a cached snapshot of any age with nothing on screen dating it. Found by `check-write-only-state.ts`; ratcheted, not swept. **OPEN** — the fix is user-visible copy on seven tabs and needs provenance review and UAT. |
+
+---
+
+## Phase 7.4 (twenty-third pass) — P7-26 fixed, and half of it was my own mistake (2026-08-12)
+
+P7-26 was recorded as "six scanner tabs know whether their data is live and never say
+so." **That framing was wrong, and going to fix it as written would have re-introduced a
+P1.**
+
+### What `isLiveData` actually was
+
+`/api/strategy-scanner` does not emit `isLive`. **P1-10 removed it** — the boolean meant
+"a Polygon key is configured" and was drawn as a green LIVE badge over numbers the route
+itself describes as *"black-scholes model output (derived, not a tradeable quote)"*. The
+success payload now carries `provenance`, `assumptions` and `dataSource` instead.
+
+So `data.isLive` has been `undefined` on every successful response since, and
+`setIsLiveData(data.isLive || false)` wrote `false` forever.
+
+**The six scanners were not concealing a signal. They were reading a field that no longer
+exists**, and all six already disclose provenance through the shared
+`<PricingProvenance />` component. Had the finding been fixed as written — "render the
+flag" — the result would have been a badge asserting liveness over model output, which is
+precisely the claim P1-10 deleted. The fix is deletion.
+
+### What the check actually found, which was worse
+
+Three components were NOT in the write-only list, because they *do* read the flag —
+`earnings-plays-scanner`, `high-iv-watchlist`, `wheel-strategy-screener`. They render:
+
+```
+isLiveData ? <green "LIVE"> : rows.length > 0 ? <yellow "Cached"> : null
+```
+
+With `isLiveData` permanently false, **every freshly-fetched scan was labelled "Cached"**
+— a false provenance claim in the opposite direction, on three public tabs, and none of
+these three renders `<PricingProvenance />` to offset it.
+
+The badge now states what the component genuinely knows: whether the rows on screen came
+from `localStorage` or from a fetch in this session. It does not say "live".
+
+**A second bug, mine, caught before commit.** The first rewrite was
+`{!fromCache ? (Fetched) : rows.length > 0 ? (Cached) : null}` — which renders "Fetched
+this session" on first mount with zero rows, before anything has been fetched. The
+original guarded its Cached branch on row count and its LIVE branch on a flag that
+implied rows existed; dropping the flag lost that implication. Restructured so the badge
+appears only when there are rows.
+
+### The genuine half
+
+`components/market-sentiment.tsx` carried P7-16's trio verbatim — `lastUpdated`,
+`fromCache`, `cacheTimestamp`, written on the cache-load path and read nowhere — so that
+tab restored a snapshot of any age and said nothing. Now dated, and marked "Cached
+reading from …" when restored. **Fixing one instance of a pattern is not fixing the
+pattern:** the CCPI fix landed hours earlier and this copy went unnoticed until
+`check-write-only-state.ts` listed it.
+
+Write-only ratchet **14 → 5**. The remaining five are annotated: one redundant rather than
+concealing, four not yet individually diagnosed.
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| P7-26 | P2 | SCAN → nine scanners, ANALYZE → Market Sentiment | **FIXED, and the original finding was half wrong — corrected rather than quietly reworded.** The six "silent" scanners were not concealing anything: `isLive` was removed from `/api/strategy-scanner` by **P1-10**, so the flag was permanently false vestige, and all six already disclose provenance via `<PricingProvenance />`. Rendering it, as the finding proposed, would have re-asserted the exact claim P1-10 deleted. **The real defect was in three OTHER components that do render the flag** — earnings-plays, high-iv-watchlist, wheel-strategy-screener — where the permanently-false branch labelled **every freshly-fetched scan "Cached"**, and none of the three shows `PricingProvenance`. Badges now report cache provenance, which is what the component actually knows. Separately, `market-sentiment.tsx` carried P7-16's trio verbatim and is now dated. Write-only ratchet 14 → 5. |

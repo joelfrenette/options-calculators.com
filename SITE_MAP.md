@@ -15,7 +15,7 @@
 | `earnings-calendar` | Earnings & Economic Calendar | `EarningsEconomicCalendar` | `components/earnings-economic-calendar.tsx` | 603 | `/api/earnings-calendar/insights`<br>`/api/earnings-calendar` |
 | `trend-analysis` | Index Trend Analysis | `TrendAnalysis` | `components/trend-analysis.tsx` | 1169 | `/api/trend-analysis` |
 | `risk-management` | CBOE VIX Volatility Index | `RiskCalculator` | `components/risk-calculator.tsx` | 845 | `/api/vix`<br>`/api/vix-history` |
-| `market-sentiment` | CNN's Fear & Greed | `MarketSentiment` | `components/market-sentiment.tsx` | 1594 | `/api/market-sentiment`<br>`/api/sentiment-heatmap` |
+| `market-sentiment` | CNN's Fear & Greed | `MarketSentiment` | `components/market-sentiment.tsx` | 1616 | `/api/market-sentiment`<br>`/api/sentiment-heatmap` |
 | `panic-euphoria` | Citibank's Panic & Euphoria Index | `PanicEuphoria` | `components/panic-euphoria.tsx` | 1150 | `/api/panic-euphoria` |
 | `social-sentiment` | Social Sentiment Index | `SocialSentiment` | `components/social-sentiment.tsx` | 758 | `/api/social-sentiment` |
 | `fomc-predictions` | FOMC Fed Rate Forecaster | `FomcPredictions` | `components/fomc-predictions.tsx` | 1461 | `/api/fomc-predictions` |
@@ -27,12 +27,12 @@
 | Tab id | Label | Component | File | Lines | Internal APIs |
 |---|---|---|---|---|---|
 | `wheel-scanner` | Sell Put Scanner | `WheelScanner` | `components/wheel-scanner.tsx` | 390 | none (static) |
-| `calendar-spread-scanner` | Calendar Spreads | `CalendarSpreadScanner` | `components/calendar-spread-scanner.tsx` | 556 | `/api/strategy-scanner` |
-| `credit-spread-scanner` | Credit Spreads | `CreditSpreadScanner` | `components/credit-spread-scanner.tsx` | 394 | `/api/strategy-scanner` |
-| `iron-condor-scanner` | Iron Condors | `IronCondorScanner` | `components/iron-condor-scanner.tsx` | 395 | `/api/strategy-scanner` |
-| `butterfly-scanner` | Butterflies | `ButterflyScanner` | `components/butterfly-scanner.tsx` | 546 | `/api/strategy-scanner` |
-| `leaps-scanner` | LEAPS | `LEAPSScanner` | `components/leaps-scanner.tsx` | 539 | `/api/strategy-scanner` |
-| `zebra-scanner` | ZEBRA | `ZEBRAScanner` | `components/zebra-scanner.tsx` | 509 | `/api/strategy-scanner` |
+| `calendar-spread-scanner` | Calendar Spreads | `CalendarSpreadScanner` | `components/calendar-spread-scanner.tsx` | 561 | `/api/strategy-scanner` |
+| `credit-spread-scanner` | Credit Spreads | `CreditSpreadScanner` | `components/credit-spread-scanner.tsx` | 399 | `/api/strategy-scanner` |
+| `iron-condor-scanner` | Iron Condors | `IronCondorScanner` | `components/iron-condor-scanner.tsx` | 400 | `/api/strategy-scanner` |
+| `butterfly-scanner` | Butterflies | `ButterflyScanner` | `components/butterfly-scanner.tsx` | 551 | `/api/strategy-scanner` |
+| `leaps-scanner` | LEAPS | `LEAPSScanner` | `components/leaps-scanner.tsx` | 544 | `/api/strategy-scanner` |
+| `zebra-scanner` | ZEBRA | `ZEBRAScanner` | `components/zebra-scanner.tsx` | 514 | `/api/strategy-scanner` |
 
 ### FIND — nav: COPY (9 tabs)
 
@@ -218,7 +218,7 @@ _None._
 | File | Lines | Over by |
 |---|---|---|
 | `components/ccpi-audit-admin.tsx` | 1637 | 1037 |
-| `components/market-sentiment.tsx` | 1594 | 994 |
+| `components/market-sentiment.tsx` | 1616 | 1016 |
 | `components/fomc-predictions.tsx` | 1461 | 861 |
 | `components/trend-analysis.tsx` | 1169 | 569 |
 | `components/panic-euphoria.tsx` | 1150 | 550 |

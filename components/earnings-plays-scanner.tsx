@@ -49,7 +49,21 @@ export function EarningsPlaysScanner() {
   const [timeframe, setTimeframe] = useState<"week" | "2weeks" | "month">("2weeks")
   const [isLoading, setIsLoading] = useState(false)
   const [plays, setPlays] = useState<EarningsPlay[]>([])
-  const [isLiveData, setIsLiveData] = useState(false)
+  // P7-26. Was `isLiveData`, set from `data.isLive` — a field **P1-10 removed
+  // from /api/strategy-scanner**, because it meant "a Polygon key is
+  // configured" and was drawn as a green LIVE badge over model-derived numbers.
+  // Since that removal the field is undefined on every response, so
+  // `data.isLive === true` was permanently false and the badge fell through to
+  // its "Cached" branch — **labelling every freshly-fetched scan as cached.**
+  // A false claim in the opposite direction, which is why deleting the flag was
+  // not enough here: these three tabs RENDER it.
+  //
+  // The badge now states what this component actually knows — whether the rows
+  // on screen came from localStorage or from a fetch in this session. It does
+  // not say "live": the route is explicit that premiums, greeks and
+  // probabilities are "black-scholes model output (derived, not a tradeable
+  // quote)", and re-asserting liveness over them is the P1-10 defect.
+  const [fromCache, setFromCache] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
@@ -58,10 +72,10 @@ export function EarningsPlaysScanner() {
     const cached = localStorage.getItem("earnings-plays-scanner-cache")
     if (cached) {
       try {
-        const { data, timestamp, isLive } = JSON.parse(cached)
+        const { data, timestamp } = JSON.parse(cached)
         setPlays(data)
         setLastUpdated(timestamp)
-        setIsLiveData(isLive)
+        setFromCache(true)
       } catch {
         // Invalid cache
       }
@@ -91,15 +105,14 @@ export function EarningsPlaysScanner() {
 
       if (data.earningsPlays && data.earningsPlays.length > 0) {
         setPlays(data.earningsPlays)
-        setIsLiveData(data.isLive === true)
+        setFromCache(false)
         setLastUpdated(new Date().toISOString())
 
         localStorage.setItem(
           "earnings-plays-scanner-cache",
           JSON.stringify({
             data: data.earningsPlays,
-            timestamp: new Date().toISOString(),
-            isLive: data.isLive === true,
+            timestamp: new Date().toISOString()
           }),
         )
       } else {
@@ -200,17 +213,17 @@ export function EarningsPlaysScanner() {
                 <Calendar className="w-5 h-5 text-blue-500" />
                 Earnings Plays Scanner
                 <InfoTooltip content="Earnings plays capitalize on the increased implied volatility (IV) around earnings announcements. Strategies include straddles/strangles (betting on big moves), iron condors (betting stock stays in range), and 0DTE plays (same-day expiration for maximum gamma)." />
-                {isLiveData ? (
-                  <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-300">
-                    <Wifi className="w-3 h-3 mr-1" />
-                    LIVE
-                  </Badge>
-                ) : plays.length > 0 ? (
+                {plays.length > 0 ? (fromCache ? (
                   <Badge variant="outline" className="ml-2 bg-yellow-50 text-yellow-700 border-yellow-300">
                     <WifiOff className="w-3 h-3 mr-1" />
                     Cached
                   </Badge>
-                ) : null}
+                ) : (
+                  <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-300">
+                    <Wifi className="w-3 h-3 mr-1" />
+                    Fetched this session
+                  </Badge>
+                )) : null}
               </CardTitle>
               <CardDescription>
                 Options strategies for upcoming earnings announcements

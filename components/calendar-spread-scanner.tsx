@@ -68,17 +68,23 @@ export function CalendarSpreadScanner() {
   const [maxBeta, setMaxBeta] = useState(1.0)
   const [maxDebit, setMaxDebit] = useState(1000) // Step 1 dollar filter: max net debit per spread ($)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
-  const [isLiveData, setIsLiveData] = useState(false)
+  // P7-26. `isLiveData` deleted here. It was set from `data.isLive`, a field
+  // **P1-10 removed from /api/strategy-scanner** — the route now states
+  // provenance per field and renders it through <PricingProvenance />, because
+  // the old boolean meant "a Polygon key is configured" and was drawn as a
+  // green "Live Data" badge over model-derived numbers. So `data.isLive` has
+  // been `undefined` on every successful response since, `|| false` made the
+  // flag permanently false, and nothing read it. Vestige, not a signal —
+  // rendering it would have re-asserted the claim P1-10 deleted.
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
 
   useEffect(() => {
     const cached = localStorage.getItem("calendar-spread-scanner-cache")
     if (cached) {
       try {
-        const { data, timestamp, isLive } = JSON.parse(cached)
+        const { data, timestamp } = JSON.parse(cached)
         setSpreads(data)
         setLastUpdated(timestamp)
-        setIsLiveData(isLive)
       } catch {
         // Invalid cache
       }
@@ -131,7 +137,6 @@ export function CalendarSpreadScanner() {
 
       if (data.calendarSpreads && Array.isArray(data.calendarSpreads)) {
         setSpreads(data.calendarSpreads)
-        setIsLiveData(data.isLive || false)
         const timestamp = new Date().toISOString()
         setLastUpdated(timestamp)
 

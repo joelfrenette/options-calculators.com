@@ -89,17 +89,6 @@ check(`scope: ${FILES.length} .tsx file(s)`, FILES.length >= MIN_FILES, `${FILES
  * fixed in ccpi-dashboard, still present in a second component.
  */
 const KNOWN: ReadonlySet<string> = new Set([
-  // Provenance the user never sees — set from real data, rendered nowhere.
-  "components/butterfly-scanner.tsx:isLiveData",
-  "components/calendar-spread-scanner.tsx:isLiveData",
-  "components/credit-spread-scanner.tsx:isLiveData",
-  "components/iron-condor-scanner.tsx:isLiveData",
-  "components/leaps-scanner.tsx:isLiveData",
-  "components/zebra-scanner.tsx:isLiveData",
-  // P7-16's trio, unfixed in this component.
-  "components/market-sentiment.tsx:lastUpdated",
-  "components/market-sentiment.tsx:fromCache",
-  "components/market-sentiment.tsx:cacheTimestamp",
   // Redundant rather than concealing: this dashboard renders provenance from
   // `data.dataSources` instead, so the state is dead weight, not a silence.
   "components/insider-trading-dashboard.tsx:dataSource",
@@ -109,7 +98,7 @@ const KNOWN: ReadonlySet<string> = new Set([
   "components/social-sentiment.tsx:loadingSource",
   "components/zebra-scanner.tsx:trendFilter",
 ])
-const KNOWN_BASELINE = 14
+const KNOWN_BASELINE = 5
 
 check(
   `the known write-only list still holds ${KNOWN_BASELINE} entries`,

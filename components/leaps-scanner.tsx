@@ -80,7 +80,14 @@ export function LEAPSScanner() {
   const [maxDebtEquity, setMaxDebtEquity] = useState(1.5)
   const [minDelta, setMinDelta] = useState(0.7)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
-  const [isLiveData, setIsLiveData] = useState(false)
+  // P7-26. `isLiveData` deleted here. It was set from `data.isLive`, a field
+  // **P1-10 removed from /api/strategy-scanner** — the route now states
+  // provenance per field and renders it through <PricingProvenance />, because
+  // the old boolean meant "a Polygon key is configured" and was drawn as a
+  // green "Live Data" badge over model-derived numbers. So `data.isLive` has
+  // been `undefined` on every successful response since, `|| false` made the
+  // flag permanently false, and nothing read it. Vestige, not a signal —
+  // rendering it would have re-asserted the claim P1-10 deleted.
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
   const [maxDebit, setMaxDebit] = useState(1000) // Step 1 dollar filter: max premium / capital at risk per contract ($)
 
@@ -88,10 +95,9 @@ export function LEAPSScanner() {
     const cached = localStorage.getItem("leaps-scanner-cache")
     if (cached) {
       try {
-        const { data, timestamp, isLive } = JSON.parse(cached)
+        const { data, timestamp } = JSON.parse(cached)
         setSetups(data)
         setLastUpdated(timestamp)
-        setIsLiveData(isLive)
       } catch {
         // Invalid cache
       }
@@ -137,13 +143,12 @@ export function LEAPSScanner() {
 
       if (data.leaps && data.leaps.length > 0) {
         setSetups(data.leaps)
-        setIsLiveData(data.isLive || false)
         const timestamp = new Date().toLocaleString()
         setLastUpdated(timestamp)
 
         localStorage.setItem(
           "leaps-scanner-cache",
-          JSON.stringify({ data: data.leaps, timestamp, isLive: data.isLive }),
+          JSON.stringify({ data: data.leaps, timestamp }),
         )
       } else {
         setError("No LEAPS setups found. Try adjusting filters.")

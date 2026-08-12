@@ -75,7 +75,14 @@ export function ZEBRAScanner() {
   const [minDTE, setMinDTE] = useState(60)
   const [maxBreakevenDistance, setMaxBreakevenDistance] = useState(5)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
-  const [isLiveData, setIsLiveData] = useState(false)
+  // P7-26. `isLiveData` deleted here. It was set from `data.isLive`, a field
+  // **P1-10 removed from /api/strategy-scanner** — the route now states
+  // provenance per field and renders it through <PricingProvenance />, because
+  // the old boolean meant "a Polygon key is configured" and was drawn as a
+  // green "Live Data" badge over model-derived numbers. So `data.isLive` has
+  // been `undefined` on every successful response since, `|| false` made the
+  // flag permanently false, and nothing read it. Vestige, not a signal —
+  // rendering it would have re-asserted the claim P1-10 deleted.
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
   const [maxDebit, setMaxDebit] = useState(1000) // Step 1 dollar filter: max net debit per spread ($)
 
@@ -83,10 +90,9 @@ export function ZEBRAScanner() {
     const cached = localStorage.getItem("zebra-scanner-cache")
     if (cached) {
       try {
-        const { data, timestamp, isLive } = JSON.parse(cached)
+        const { data, timestamp } = JSON.parse(cached)
         setSetups(data)
         setLastUpdated(timestamp)
-        setIsLiveData(isLive)
       } catch {
         // Invalid cache
       }
@@ -127,13 +133,12 @@ export function ZEBRAScanner() {
 
       if (data.zebra && data.zebra.length > 0) {
         setSetups(data.zebra)
-        setIsLiveData(data.isLive || false)
         const timestamp = new Date().toLocaleString()
         setLastUpdated(timestamp)
 
         localStorage.setItem(
           "zebra-scanner-cache",
-          JSON.stringify({ data: data.zebra, timestamp, isLive: data.isLive }),
+          JSON.stringify({ data: data.zebra, timestamp }),
         )
       } else {
         setError("No ZEBRA setups found. Try adjusting filters.")

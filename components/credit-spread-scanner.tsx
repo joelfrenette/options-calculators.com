@@ -42,7 +42,14 @@ export function CreditSpreadScanner() {
   const [maxDte, setMaxDte] = useState([45])
   const [isLoading, setIsLoading] = useState(false)
   const [setups, setSetups] = useState<SpreadSetup[]>([])
-  const [isLiveData, setIsLiveData] = useState(false)
+  // P7-26. `isLiveData` deleted here. It was set from `data.isLive`, a field
+  // **P1-10 removed from /api/strategy-scanner** — the route now states
+  // provenance per field and renders it through <PricingProvenance />, because
+  // the old boolean meant "a Polygon key is configured" and was drawn as a
+  // green "Live Data" badge over model-derived numbers. So `data.isLive` has
+  // been `undefined` on every successful response since, `|| false` made the
+  // flag permanently false, and nothing read it. Vestige, not a signal —
+  // rendering it would have re-asserted the claim P1-10 deleted.
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
@@ -52,10 +59,9 @@ export function CreditSpreadScanner() {
     const cached = localStorage.getItem("credit-spread-scanner-cache")
     if (cached) {
       try {
-        const { data, timestamp, isLive } = JSON.parse(cached)
+        const { data, timestamp } = JSON.parse(cached)
         setSetups(data)
         setLastUpdated(timestamp)
-        setIsLiveData(isLive)
       } catch {
         // Invalid cache, will fetch fresh
       }
@@ -96,7 +102,6 @@ export function CreditSpreadScanner() {
 
       if (data.creditSpreads && data.creditSpreads.length > 0) {
         setSetups(data.creditSpreads)
-        setIsLiveData(data.isLive === true)
         setLastUpdated(new Date().toISOString())
 
         localStorage.setItem(
@@ -104,7 +109,7 @@ export function CreditSpreadScanner() {
           JSON.stringify({
             data: data.creditSpreads,
             timestamp: new Date().toISOString(),
-            isLive: data.isLive === true,
+
           }),
         )
       } else {

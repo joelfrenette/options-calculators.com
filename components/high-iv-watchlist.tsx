@@ -34,7 +34,21 @@ export function HighIVWatchlist() {
   const [showOnly, setShowOnly] = useState<"all" | "sell" | "buy">("all")
   const [isLoading, setIsLoading] = useState(false)
   const [candidates, setCandidates] = useState<IVCandidate[]>([])
-  const [isLiveData, setIsLiveData] = useState(false)
+  // P7-26. Was `isLiveData`, set from `data.isLive` — a field **P1-10 removed
+  // from /api/strategy-scanner**, because it meant "a Polygon key is
+  // configured" and was drawn as a green LIVE badge over model-derived numbers.
+  // Since that removal the field is undefined on every response, so
+  // `data.isLive === true` was permanently false and the badge fell through to
+  // its "Cached" branch — **labelling every freshly-fetched scan as cached.**
+  // A false claim in the opposite direction, which is why deleting the flag was
+  // not enough here: these three tabs RENDER it.
+  //
+  // The badge now states what this component actually knows — whether the rows
+  // on screen came from localStorage or from a fetch in this session. It does
+  // not say "live": the route is explicit that premiums, greeks and
+  // probabilities are "black-scholes model output (derived, not a tradeable
+  // quote)", and re-asserting liveness over them is the P1-10 defect.
+  const [fromCache, setFromCache] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
@@ -43,10 +57,10 @@ export function HighIVWatchlist() {
     const cached = localStorage.getItem("high-iv-watchlist-cache")
     if (cached) {
       try {
-        const { data, timestamp, isLive } = JSON.parse(cached)
+        const { data, timestamp } = JSON.parse(cached)
         setCandidates(data)
         setLastUpdated(timestamp)
-        setIsLiveData(isLive)
+        setFromCache(true)
       } catch {
         // Invalid cache
       }
@@ -81,15 +95,14 @@ export function HighIVWatchlist() {
 
       if (data.highIV && data.highIV.length > 0) {
         setCandidates(data.highIV)
-        setIsLiveData(data.isLive === true)
+        setFromCache(false)
         setLastUpdated(new Date().toISOString())
 
         localStorage.setItem(
           "high-iv-watchlist-cache",
           JSON.stringify({
             data: data.highIV,
-            timestamp: new Date().toISOString(),
-            isLive: data.isLive === true,
+            timestamp: new Date().toISOString()
           }),
         )
       } else {
@@ -146,17 +159,17 @@ export function HighIVWatchlist() {
               <CardTitle className="flex items-center gap-2">
                 <Flame className="w-5 h-5 text-orange-500" />
                 High IV Watchlist
-                {isLiveData ? (
-                  <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-300">
-                    <Wifi className="w-3 h-3 mr-1" />
-                    LIVE
-                  </Badge>
-                ) : candidates.length > 0 ? (
+                {candidates.length > 0 ? (fromCache ? (
                   <Badge variant="outline" className="ml-2 bg-yellow-50 text-yellow-700 border-yellow-300">
                     <WifiOff className="w-3 h-3 mr-1" />
                     Cached
                   </Badge>
-                ) : null}
+                ) : (
+                  <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-300">
+                    <Wifi className="w-3 h-3 mr-1" />
+                    Fetched this session
+                  </Badge>
+                )) : null}
               </CardTitle>
               <CardDescription>
                 Stocks with elevated implied volatility for premium selling
