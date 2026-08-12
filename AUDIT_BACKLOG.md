@@ -2831,3 +2831,32 @@ concealing, four not yet individually diagnosed.
 | ID | Sev | Tab / area | Finding |
 |---|---|---|---|
 | P7-26 | P2 | SCAN → nine scanners, ANALYZE → Market Sentiment | **FIXED, and the original finding was half wrong — corrected rather than quietly reworded.** The six "silent" scanners were not concealing anything: `isLive` was removed from `/api/strategy-scanner` by **P1-10**, so the flag was permanently false vestige, and all six already disclose provenance via `<PricingProvenance />`. Rendering it, as the finding proposed, would have re-asserted the exact claim P1-10 deleted. **The real defect was in three OTHER components that do render the flag** — earnings-plays, high-iv-watchlist, wheel-strategy-screener — where the permanently-false branch labelled **every freshly-fetched scan "Cached"**, and none of the three shows `PricingProvenance`. Badges now report cache provenance, which is what the component actually knows. Separately, `market-sentiment.tsx` carried P7-16's trio verbatim and is now dated. Write-only ratchet 14 → 5. |
+
+---
+
+## FOURTH PRODUCTION MERGE — 2026-08-12
+
+**`21be470` → `b9d1e05`, 17 commits, fast-forward.** `main` and `audit-preview` are
+identical.
+
+Checks at merge, run individually: typecheck **10 known** · formulas **635** ·
+contracts **60 routes / 60 contracts** · remediation **31**.
+
+**Merged on the owner's explicit instruction, without a reported UAT.** That is the
+owner's call, and it is recorded here rather than left implicit: nothing in this batch was
+confirmed on a rendered page before shipping, and `next build` runs on neither bundler
+locally (P7-7), so the Vercel build was the only build gate and it was not observed. www
+and staging both answered HTTP 200 immediately after the push — which establishes that the
+site is up, not that the changed tabs render correctly.
+
+**The user-visible changes in this batch**, i.e. what to look at first if something is
+wrong on production: the CCPI tab (a `.toFixed()` render crash fixed; many cards now
+withhold instead of showing `0.25%` / `103.0` / `5.33%`), the Greeks tab (panel hides when
+IV is cleared), market-sentiment (now dates its reading), three scanner tabs' badges
+(earnings-plays, high-IV, wheel-screener), and the scanner's Step 1-4 labels.
+
+Ships Phase 7 steps **7.1–7.5 complete** — P7-9 (dead exports 51 → 0), the P1 pair
+P7-17/P7-18 (22 fabricated constants and twelve `.toFixed()` crash sites; an unavailable
+QQQ had been scoring 41 of the momentum pillar as "no risk detected"), P7-20 (an
+unscoreable CCPI narrated to the model as "0/100 = markets healthy"), P7-26, S-18, and
+**eleven guard scripts** now running in `check:formulas`.
