@@ -397,11 +397,13 @@ recomputes it.
 | P7-21 | P2 | open | Two of four groups fixed (trend-analysis price, polygon-tickers filter zeros). Still open: sentiment-heatmap 50/50 (blocked on P6-11) and strategy-scanner static betas — both need a decision, not code. |
 | P7-22 | P2 | fixed | Phase 7.5 standing guard: check-doc-figures.ts. CLAUDE.md carried "formulas 514" against a suite at 581 — the stale figure was inside the rule about staleness. |
 | P7-23 | P2 | fixed | The P7-10/P7-17/P7-18 class had no standing guard — re-verification put tedSpread ?? 0.25 back and the whole suite passed. check-ccpi-defaults.ts closes it, negative-tested in all three forms. |
+| P7-24 | P2 | fixed | check-house-libs.ts added — CLAUDE.md's "never re-implement locally" rule had no enforcement. Building it exposed a stripComments bug that hid ~70 lines of wheel-scanner.tsx from four checks. |
+| P7-25 | P3 | open | Two fix classes remain unguarded, verified by reverting each and watching the suite pass: a fabricated value in an AI prompt (P7-20) and state written but never read (P7-16). |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-226 findings recorded · **180 fixed · 8 wontfix · 0 verified-ok · 38 open.**
+228 findings recorded · **181 fixed · 8 wontfix · 0 verified-ok · 39 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -2615,3 +2617,83 @@ Negative-tested in all three forms the removed defaults actually took — `?? 0.
 | ID | Sev | Tab / area | Finding |
 |---|---|---|---|
 | P7-23 | P2 | tooling | **The P7-10/P7-17/P7-18 class had no standing guard.** Re-verification put `tedSpread ?? 0.25` back into `/api/ccpi` and the whole suite passed: the scoring tests see a number and cannot know it was invented upstream, `check-provenance` reads UI copy, and the tier correctly says "baseline" while the display reads the raw value — **the defect lives in the gap between them.** `scripts/check-ccpi-defaults.ts` closes it, with the field list derived from the WEIGHTS tables and negative-tested against all three default forms. A ratchet over an enumerated set, not the discovery sweep AUDIT_PLAN 7.4 warns against. |
+
+---
+
+## Phase 7.4 (twenty-first pass) — hunting unguarded classes, and a bug in the checks themselves (2026-08-11)
+
+P7-23 came from asking "what would catch this if it came back?" This pass asked it of
+every other fix closed today.
+
+### Three classes were unguarded; the evidence is a passing suite
+
+Each fix was reverted in place and the full suite run:
+
+| Reintroduced defect | Caught by |
+|---|---|
+| `body.ccpi ?? 0` in the executive-summary prompt (P7-20) | **nothing** |
+| a local `normalCDF` in the Greeks calculator (P7-12) | **nothing** |
+| deleting the cache-age header render (P7-16) | **nothing** |
+
+The last two appeared to fail at first — one FAIL each — but the failing line was
+`SITE_MAP.md is up to date`, triggered by the line counts moving. **Incidental, not
+detection:** run `pnpm inventory` as the workflow already requires and both pass. Worth
+recording because "the suite went red" is exactly the kind of evidence that looks
+sufficient and is not.
+
+### P7-24 — the house rule that had no check
+
+CLAUDE.md says: *"Indicators come from `lib/indicators.ts`; option math from
+`lib/black-scholes.ts` — never re-implement locally."* Nothing enforced it, and it had
+been broken twice — P7-12's local `normalCDF`/`normalPDF`/`calculateGreeks`, and P7-13's
+inline expected-move formula. **A house rule with no check is a suggestion.**
+
+`scripts/check-house-libs.ts` reads the two libraries' own exports (21 names) and fails on
+any *declaration* of one of those names elsewhere. The discrimination that matters:
+`const rsi = calcRSI(prices)` is correct usage and must pass, while `const rsi = (…) => …`
+and `function rsi(…)` are re-implementations. Keying on the declaration FORM separates
+them — which is also why `check-dead-exports`' long-standing NOTE listing `rsi`, `macd`
+and `atr` as collisions was correctly a non-finding.
+
+Its limit is stated in the file: P7-13's `price * ivData.atmIV * Math.sqrt(1/365)` has no
+name to match, so nothing structural can see it.
+
+### The part that matters most: the checks were scanning a truncated file
+
+The arrow-function negative test **did not fail when it should have.** Chasing that found
+a bug in the `stripComments` helper shared by four checks.
+
+Line 5 of `components/wheel-scanner.tsx` reads:
+
+```
+// results tables live in components/scanner/*. This file only composes them —
+```
+
+The `/*` in that glob path was treated as a **block-comment opener**. The stripper ran
+block comments first, so it consumed everything from there to the next `*/` — about
+seventy lines of that file — and every check using the helper scanned the remainder while
+reporting **PASS on a file it could not see**.
+
+`check-scanner-steps` guards that exact file. `check-null-guards` and `check-house-libs`
+scan it. Their green was partly hollow.
+
+The fix is one pass with alternation, so whichever comment form appears first in the text
+wins — at a `//` the line form matches, at a `/*` the block form does. Applied to all four
+copies. The blast radius was measured rather than assumed: one file today, and it would
+have silently grown with any future `/*` inside a line comment.
+
+**This was only found by deliberately injecting a violation and noticing it was not
+caught.** A check that has never failed is indistinguishable from one that cannot fail —
+and here, one of them genuinely could not, for one file, invisibly.
+
+### Still unguarded, and recorded as such
+
+P7-20's class (a fabricated value interpolated into an AI prompt) and P7-16's class (state
+written and never read) have no rule. Both are checkable in principle; neither is
+attempted here rather than shipped half-built, which is the failure mode this phase keeps
+finding.
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| P7-24 | P2 | tooling | **`scripts/check-house-libs.ts` added: CLAUDE.md's "never re-implement locally" rule had no enforcement**, and had been broken twice (P7-12, P7-13). Reads the two libraries' 21 exported names and fails on any declaration of one elsewhere, distinguishing a re-implementation from correct usage by declaration form. **Building it exposed a bug in the shared `stripComments` helper: a `/*` inside a LINE comment (a glob path, `components/scanner/*.`) was read as a block-comment opener and swallowed ~70 lines of `components/wheel-scanner.tsx` from four checks' scans — they reported PASS on a file they could not see.** Fixed in all four; found only because an injected violation failed to fail. |
+| P7-25 | P3 | tooling | **Two fix classes from this session remain unguarded, verified by reverting each and watching the suite pass:** a fabricated value interpolated into an AI prompt (P7-20's `ccpi ?? 0`), and component state written but never read (P7-16's cache-age header). Two apparent catches were incidental — `SITE_MAP.md is up to date` firing on moved line counts, which `pnpm inventory` clears. **OPEN**, and deliberately not half-built. |

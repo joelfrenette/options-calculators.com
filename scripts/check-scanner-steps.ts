@@ -82,10 +82,22 @@ check(
 )
 
 const stripComments = (src: string): string =>
-  src
-    .replace(/\/\*[\s\S]*?\*\//g, (m) => " " + "\n".repeat((m.match(/\n/g) || []).length))
-    .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "")
-    .replace(/(^|[^:])\/\/[^\n]*/g, "$1")
+  // ONE pass, alternation ordered by position — NOT block-then-line.
+  //
+  // Block-first was wrong and silently ate code: a LINE comment containing a
+  // glob path (`// results tables live in components/scanner/*.`) has a `/*`
+  // in it, which the block pattern happily treated as an opener and consumed
+  // everything up to the next `*/` — 70+ lines of components/wheel-scanner.tsx
+  // vanished from every scan that used this helper, and the checks reported
+  // PASS on a file they could not see. Found by injecting a violation that
+  // should have failed and did not.
+  //
+  // Alternation scans left to right, so at a `//` the line form matches first
+  // and at a `/*` the block form does. The `[^:]` guard keeps `https://` from
+  // reading as a comment.
+  src.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/[^\n]*/g, (m, pre) =>
+    m.startsWith("/*") ? " " + "\n".repeat((m.match(/\n/g) || []).length) : (pre ?? ""),
+  )
 
 /** A literal step number inside a setError(...) call, anywhere in the scanner. */
 const SET_ERROR_STEP = /setError\((?:[^)]*?)Step\s+\d/
