@@ -394,7 +394,7 @@ recomputes it.
 | P7-18 | P1 | fixed | The four QQQ pairs defaulted to false/0, and smaPoints(false, 0) returns 0 risk points — the score a calm market earns. An unavailable QQQ counted 41 of the momentum pillar as a measured all-clear. |
 | P7-19 | P2 | fixed | check-null-guards.ts added: no formatter may be guarded only by !== undefined, the idiom behind P7-17. The four sites it found were conformance, not crashes. |
 | P7-20 | P1 | fixed | /api/ccpi/executive-summary narrated an unscoreable composite to the model as "CCPI Score: 0/100" under its own "0-19: Low Risk" legend. Three layers produced the zero. |
-| P7-21 | P2 | open | The default survey across the other 59 routes: 25 sites in 10 routes, four groups real — sentiment-heatmap 50/50, trend-analysis price 0, strategy-scanner betas, polygon-tickers zeros. |
+| P7-21 | P2 | open | Two of four groups fixed (trend-analysis price, polygon-tickers filter zeros). Still open: sentiment-heatmap 50/50 (blocked on P6-11) and strategy-scanner static betas — both need a decision, not code. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
@@ -2244,3 +2244,72 @@ needs its own display-path verification and one of them sits under an open owner
 | P7-19 | P2 | tooling | **`scripts/check-null-guards.ts` added and wired into `check:formulas`.** No formatter call may be guarded only by `!== undefined`, the idiom behind P7-17's twelve TypeErrors. A uniformity rule by design: `!= null` is never wrong and `!== undefined` sometimes is, so no reader must know which fields are nullable today. **The four sites it found were conformance, not crashes** — all `?: number` — and saying otherwise would be inventing a result. |
 | P7-20 | **P1** | ANALYZE → CCPI | **FIXED.** `/api/ccpi/executive-summary` narrated an unscoreable composite to the model as `CCPI Score: 0/100`, under its own legend reading "0-19: Low Risk (markets healthy)" — the absence presented as the strongest all-clear, in the text a user reads as the summary. P6-19 fixed the pillars and left the composite. **Three layers produced the zero**, and the client's `Math.round(null)` made the route's guard unreachable, so both ends are fixed together. Also: `${certainty}%` would have printed "null%", and the `certainty >= 70` / `>= 50` branches both being false made an absent certainty read as "low signal consistency". |
 | P7-21 | P2 | site-wide | **The `??`/`\|\|` default survey across the other 59 routes: 25 sites in 10 routes, of which four groups are real.** `/api/sentiment-heatmap` returns a fabricated 50/50 neutral on three separate failure paths (touches open P6-11); `/api/trend-analysis` defaults price, change and volume to 0 and feeds the indicator maths; `/api/strategy-scanner` carries ~25 sourceless hardcoded betas plus `\|\| 0.7`; `/api/polygon-tickers` zeroes price, volume and market cap. The rest are sort comparators and accumulator seeds and stay. **OPEN** — each needs its own display-path check, and one is blocked on an owner decision. |
+
+---
+
+## Phase 7.4 (seventeenth pass) — P7-21's two unblocked routes (2026-08-11)
+
+The two of P7-21's four groups that need no owner decision. Both turned out to be
+**different failures wearing the same `|| 0`**, which is the reason they were worth
+reading individually rather than sweeping.
+
+### `/api/trend-analysis` — one of the five defaults mattered
+
+`meta.regularMarketPrice || 0`, `regularMarketChange || 0`,
+`regularMarketChangePercent || 0`, and two volume fields.
+
+**Only the price was a defect, and the rest are left deliberately.**
+
+- The **volumes** are recovered downstream: about forty lines on, the caller replaces a
+  zero `currentVolume` from the last ten historical bars and computes `avgVolume` from
+  history when it is zero. There, 0 is a handled sentinel with a recovery path, not a
+  reading. Nulling it would have broken working code to satisfy a pattern.
+- The **change** fields have their own recovery immediately below: `if (change === 0 &&
+  currentPrice > 0)` derives the move from `previousClose`, then from the last two
+  historical closes.
+- The **price** has no recovery, and worse, it *suppresses* one. The caller reads
+  `quote ? quote.regularMarketPrice : lastBar.price` — so a quote object that merely
+  CONTAINS a zero takes the stored-bar fallback off the table. The zero then reaches both
+  the indicator maths and the display.
+
+`fetchYahooQuote` now returns `null` when the price is not a usable positive number, which
+routes the symbol to `lastBar.price` — the path the code already wanted. The function's
+contract already included null (two other branches return it), so no caller changed.
+
+### `/api/polygon-tickers` — the default was making a filter decision
+
+`prevDay?.v || day?.v || 0`, `prevDay?.c || day?.c || 0`, and
+`results?.market_cap || 0`.
+
+Not a display defect. These feed filters — and that is worse in a specific way, because a
+0 did **two contradictory things at once**:
+
+- compared against `minVolume` and `minMarketCap`, an unmeasured ticker was **silently
+  dropped** whenever those minimums are above zero;
+- compared against `maxPrice`, the same unmeasured ticker **passed**, because `0 <=
+  maxPrice` is true.
+
+So "we have no reading for this ticker" was resolved as a rejection by one filter and an
+acceptance by another, in the same loop, and then shipped in the response as `price: 0`
+for whatever survived.
+
+Neither outcome is a filter decision anyone made. Unknown snapshots are now skipped
+explicitly and **counted**, and the count ships as `unmeasuredSnapshots` on the response —
+P6-32's rule, the one that gave the CCPI its `suppressedCanaries` list: *a short list and
+a short list with N inputs suppressed are very different states, and they used to produce
+the identical response.*
+
+Dropping an unmeasured ticker is very likely the right call for a screener. The point is
+that it is now a stated rule with a visible count, rather than an emergent property of
+`|| 0`.
+
+### Still open under P7-21
+
+`/api/sentiment-heatmap`'s three fabricated 50/50 returns — blocked on **P6-11**, an open
+owner decision — and `/api/strategy-scanner`'s ~25 sourceless hardcoded betas plus
+`|| 0.7`, which needs a decision (fetch beta, or label the table static) rather than a
+null-through.
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| P7-21 | P2 | site-wide | **Two of four groups fixed; two remain, both needing a decision rather than code.** `/api/trend-analysis`: of five `\|\| 0` defaults only the PRICE was a defect — the volumes and change fields have real recovery paths a few lines down, while a zero price suppressed the `lastBar.price` fallback the caller already had and fed the indicator maths. Now returns null. `/api/polygon-tickers`: the zeros were filter inputs, and one unmeasured ticker was **dropped by the volume/market-cap minimums and simultaneously passed by the max-price test** — then shipped as `price: 0`. Unknown snapshots are skipped and counted, with `unmeasuredSnapshots` on the response (P6-32). **STILL OPEN:** sentiment-heatmap's 50/50 (blocked on P6-11) and strategy-scanner's static beta table. |

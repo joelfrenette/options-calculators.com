@@ -558,6 +558,10 @@ export async function GET(request: NextRequest) {
 
     const tickersWithData: TickerData[] = []
 
+    /** Snapshots skipped because Polygon returned no usable price or volume (P7-21). */
+    let unmeasuredSnapshots = 0
+    const usableNumber = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n) && n > 0
+
     // Fetch data for all major index tickers in batches
     const batchSize = 100
     for (let i = 0; i < MAJOR_INDEX_TICKERS.length; i += batchSize) {
@@ -573,8 +577,25 @@ export async function GET(request: NextRequest) {
           const snapshots = snapshotData.tickers || []
 
           for (const snapshot of snapshots) {
-            const volume = snapshot.prevDay?.v || snapshot.day?.v || 0
-            const price = snapshot.prevDay?.c || snapshot.day?.c || 0
+            // P7-21. These were `|| 0`, and a 0 here did two wrong things at
+            // once: it was compared against `minVolume` / `maxPrice` as though
+            // it were a reading — so an unmeasured ticker was DROPPED silently
+            // when the minimums are above zero, and PASSED the max-price test
+            // when they are not — and it was then written into
+            // `tickersWithData` and shipped in the response as `price: 0`.
+            //
+            // Neither behaviour is a filter decision anyone made. Unknown is
+            // now skipped explicitly and counted, so a short universe can be
+            // told apart from a filtered one — the P6-32 rule that gave the
+            // CCPI its `suppressedCanaries` list.
+            const rawVolume = snapshot.prevDay?.v ?? snapshot.day?.v
+            const rawPrice = snapshot.prevDay?.c ?? snapshot.day?.c
+            if (!usableNumber(rawVolume) || !usableNumber(rawPrice)) {
+              unmeasuredSnapshots++
+              continue
+            }
+            const volume = rawVolume
+            const price = rawPrice
 
             console.log(`[v0] ${snapshot.ticker}: price=$${price.toFixed(2)} volume=${(volume / 1e6).toFixed(1)}M`)
 
@@ -617,7 +638,19 @@ export async function GET(request: NextRequest) {
         if (detailsResponse?.ok) {
           try {
             const detailsData = await detailsResponse.json()
-            const marketCap = detailsData.results?.market_cap || 0
+            // P7-21. `|| 0` here meant "Polygon has no market cap on file" and
+            // "this company is worth nothing" were the same input to the filter
+            // below. With any `minMarketCap` above zero the ticker is dropped —
+            // which may well be the right call, but it was being made by a
+            // default rather than by a rule, and counted as a pass/fail rather
+            // than as a missing input. It is now counted with the other
+            // unmeasured snapshots.
+            const rawMarketCap = detailsData.results?.market_cap
+            if (!usableNumber(rawMarketCap)) {
+              unmeasuredSnapshots++
+              continue
+            }
+            const marketCap = rawMarketCap
 
             // Apply market cap filter
             if (marketCap >= minMarketCap) {
@@ -690,6 +723,10 @@ export async function GET(request: NextRequest) {
       count: finalTickers.length,
       source: "polygon-hardcoded-fallback",
       universe,
+      // P6-32's rule applied here (P7-21): a short universe and a short
+      // universe with N tickers dropped for having no reading are very
+      // different states, and they used to produce the identical response.
+      unmeasuredSnapshots,
     })
   } catch (error) {
     console.error("[v0] Error in polygon-tickers API:", error)

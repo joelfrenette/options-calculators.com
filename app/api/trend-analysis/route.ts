@@ -26,7 +26,25 @@ async function fetchYahooQuote(symbol: string): Promise<YahooQuote | null> {
 
     if (data.chart?.result?.[0]?.meta) {
       const meta = data.chart.result[0].meta
-      const currentPrice = meta.regularMarketPrice || 0
+
+      // P7-21. `meta.regularMarketPrice || 0` used to stand here, and a price
+      // of 0 is not a price. It is also not caught downstream: the caller reads
+      // `quote ? quote.regularMarketPrice : lastBar.price`, so a quote object
+      // that merely CONTAINS a zero suppresses the stored-bar fallback that
+      // exists for exactly this case — and the zero then reaches both the
+      // indicator maths and the display.
+      //
+      // The volume defaults below are a different matter and stay: the caller
+      // recovers a 0 volume from recent historical bars a few lines later, so
+      // there 0 is a handled sentinel rather than a reading. Returning null
+      // here routes this symbol to `lastBar.price`, which is what the code
+      // already wanted to do.
+      const currentPrice = meta.regularMarketPrice
+      if (typeof currentPrice !== "number" || !Number.isFinite(currentPrice) || currentPrice <= 0) {
+        console.log(`[v0] ${symbol} - no usable regularMarketPrice; falling back to stored bars`)
+        return null
+      }
+
       let change = meta.regularMarketChange || 0
       let changePercent = meta.regularMarketChangePercent || 0
 
