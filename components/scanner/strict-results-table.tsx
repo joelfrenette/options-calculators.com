@@ -266,7 +266,7 @@ export function StrictResultsTable({
                             isSynthesized ? "text-amber-700" : "text-green-700"
                           }`}
                         >
-                          ${stock.premium !== undefined ? stock.premium.toFixed(2) : "N/A"}
+                          ${stock.premium != null ? stock.premium.toFixed(2) : "N/A"}
                           {isSynthesized && (
                             <span
                               className="ml-1 text-[10px] font-normal text-amber-700"
@@ -291,23 +291,23 @@ export function StrictResultsTable({
                           {isSynthesized && <span className="ml-1 text-[10px] text-amber-700">est.</span>}
                         </td>
                         <td className={`text-right p-3 ${isSynthesized ? "text-amber-700" : ""}`}>
-                          {stock.annualizedYield !== undefined && stock.annualizedYield > 0
+                          {stock.annualizedYield != null && stock.annualizedYield > 0
                             ? stock.annualizedYield.toFixed(1) + "%"
                             : "N/A"}
-                          {isSynthesized && stock.annualizedYield !== undefined && stock.annualizedYield > 0 && (
+                          {isSynthesized && stock.annualizedYield != null && stock.annualizedYield > 0 && (
                             <span className="ml-1 text-[10px]">est.</span>
                           )}
                         </td>
                         <td
                           className={`text-right p-3 font-semibold ${
-                            stock.iv !== undefined && stock.iv >= 50
+                            stock.iv != null && stock.iv >= 50
                               ? "text-purple-700"
-                              : stock.iv !== undefined && stock.iv >= 35
+                              : stock.iv != null && stock.iv >= 35
                                 ? "text-purple-500"
                                 : "text-gray-600"
                           }`}
                         >
-                          {stock.iv !== undefined && stock.iv > 0 ? `${stock.iv.toFixed(0)}%` : "-"}
+                          {stock.iv != null && stock.iv > 0 ? `${stock.iv.toFixed(0)}%` : "-"}
                         </td>
                         <td className="text-center p-3">
                           {(() => {

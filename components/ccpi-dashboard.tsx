@@ -94,8 +94,15 @@ export function CcpiDashboard({ symbol = "SPY" }: { symbol?: string }) {
       setSummaryLoading(true)
 
       const summaryPayload = {
-        ccpi: Math.round(ccpiData.ccpi),
-        certainty: ccpiData.certainty || 0,
+        // P7-19. `Math.round(ccpiData.ccpi)` and `certainty || 0`.
+        // **`Math.round(null)` is 0**, so an unscoreable composite left here as
+        // a hard zero — and the summary route's prompt tells the model
+        // "0-19: Low Risk (markets healthy)". The absence was narrated as the
+        // strongest possible all-clear, by the one field the whole summary is
+        // about. P6-19 fixed the PILLARS in this same payload and left the
+        // composite, which is why `pillars` two lines down is already careful.
+        ccpi: typeof ccpiData.ccpi === "number" ? Math.round(ccpiData.ccpi) : null,
+        certainty: typeof ccpiData.certainty === "number" ? ccpiData.certainty : null,
         activeCanaries: ccpiData.canaries ? countActiveWarnings(ccpiData.canaries) : 0,
         // The payload's scored-indicator count, not the canary-array length —
         // "3 of 12" was being narrated against a 29-indicator index.

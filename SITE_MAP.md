@@ -11,7 +11,7 @@
 
 | Tab id | Label | Component | File | Lines | Internal APIs |
 |---|---|---|---|---|---|
-| `ccpi` ★ | Crash & Corrections Prediction Index | `CcpiDashboard` | `components/ccpi-dashboard.tsx` | 986 | `/api/ccpi/executive-summary`<br>`/api/ccpi`<br>`/api/ccpi/history` |
+| `ccpi` ★ | Crash & Corrections Prediction Index | `CcpiDashboard` | `components/ccpi-dashboard.tsx` | 993 | `/api/ccpi/executive-summary`<br>`/api/ccpi`<br>`/api/ccpi/history` |
 | `earnings-calendar` | Earnings & Economic Calendar | `EarningsEconomicCalendar` | `components/earnings-economic-calendar.tsx` | 603 | `/api/earnings-calendar/insights`<br>`/api/earnings-calendar` |
 | `trend-analysis` | Index Trend Analysis | `TrendAnalysis` | `components/trend-analysis.tsx` | 1169 | `/api/trend-analysis` |
 | `risk-management` | CBOE VIX Volatility Index | `RiskCalculator` | `components/risk-calculator.tsx` | 845 | `/api/vix`<br>`/api/vix-history` |
@@ -223,7 +223,7 @@ _None._
 | `components/trend-analysis.tsx` | 1169 | 569 |
 | `components/panic-euphoria.tsx` | 1150 | 550 |
 | `components/options-strategy-toolbox.tsx` | 1027 | 427 |
-| `components/ccpi-dashboard.tsx` | 986 | 386 |
+| `components/ccpi-dashboard.tsx` | 993 | 393 |
 | `components/trade-walkthrough-modal.tsx` | 866 | 266 |
 | `components/insider-trading-dashboard.tsx` | 859 | 259 |
 | `lib/ccpi/scoring.ts` | 850 | 250 |

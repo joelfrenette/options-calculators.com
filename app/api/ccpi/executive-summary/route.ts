@@ -68,8 +68,22 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
 
-    const ccpi = body.ccpi ?? 0
-    const certainty = body.certainty ?? body.confidence ?? 0
+    // P7-19. These were `?? 0`, and the prompt below renders them as
+    // "CCPI Score: ${ccpi}/100" directly under a legend that reads
+    // "0-19: Low Risk (markets healthy)". So a composite that could not be
+    // scored was narrated to the model as the strongest all-clear on the
+    // scale, and the model's answer is what the user reads as the executive
+    // summary.
+    //
+    // P6-19 fixed the PILLARS for exactly this reason — see `pillarLine`
+    // below, which prints "insufficient data" rather than a number — and left
+    // the composite the pillars roll up into. The client defaulted it too
+    // (`Math.round(null)` is 0), so this guard never even fired; both are
+    // fixed together, because either one alone leaves the other free to
+    // reintroduce the zero.
+    const ccpi = typeof body.ccpi === "number" ? body.ccpi : null
+    const rawCertainty = body.certainty ?? body.confidence
+    const certainty = typeof rawCertainty === "number" ? rawCertainty : null
     const activeCanaries =
       body.activeCanaries ?? (body.canaries ? body.canaries.filter((c: any) => c.active).length : 0)
     // The canary-array length is NOT the indicator count — that substitution is
@@ -105,14 +119,14 @@ The final CCPI score is calculated as: Σ(Pillar Score × Weight), ranging from 
 - 80-100: Crash Watch (imminent correction likely)
 
 ## CERTAINTY SCORE METHODOLOGY:
-The ${certainty}% certainty score measures signal consistency and alignment:
+The certainty score measures signal consistency and alignment:
 - It calculates how many indicators agree directionally within each pillar
 - Higher certainty = more indicators pointing in the same direction = higher confidence in the CCPI reading
 - Lower certainty = mixed signals = less confidence, more uncertainty in market direction
 
 ## CURRENT MARKET DATA:
-- CCPI Score: ${ccpi}/100
-- Certainty Score: ${certainty}%
+- CCPI Score: ${ccpi === null ? "NOT SCOREABLE — too little of the index was backed by live data to compute a composite. Do NOT infer a level, a regime, or a direction from its absence, and do not treat it as low risk." : `${ccpi}/100`}
+- Certainty Score: ${certainty === null ? "unavailable" : `${certainty}%`}
 - Active Warning Signals: ${activeCanaries} of ${totalIndicators} indicators triggered
 - Market Regime: ${regime.name} (${regime.description})
 - Pillar Scores:
@@ -128,8 +142,20 @@ ${pillarLine("Macro", pillars.macro, "20%")}${
 
 ## YOUR TASK:
 Write a comprehensive 2-3 sentence executive summary that:
-1. States the CCPI score and what risk zone it falls in (Low Risk/Normal/Caution/High Alert/Crash Watch)
-2. Explains the ${certainty}% certainty score means ${certainty >= 70 ? "high signal agreement - strong confidence in the reading" : certainty >= 50 ? "moderate signal alignment - reasonable confidence but some mixed signals" : "low signal consistency - significant uncertainty, mixed market signals"}
+1. ${
+      ccpi === null
+        ? "States plainly that the CCPI could not be scored for this reading and says which pillars were missing. Do NOT name a risk zone — there is no score to place in one."
+        : "States the CCPI score and what risk zone it falls in (Low Risk/Normal/Caution/High Alert/Crash Watch)"
+    }
+2. ${
+      // `null >= 70` and `null >= 50` are both false, so an absent certainty
+      // used to fall through to "low signal consistency" — an assertion about
+      // signal agreement that nothing measured, stated with the same confidence
+      // as a real reading (P7-19).
+      certainty === null
+        ? "Does not discuss the certainty score: it was not available for this reading. Say so in one clause rather than characterising it."
+        : `Explains the ${certainty}% certainty score means ${certainty >= 70 ? "high signal agreement - strong confidence in the reading" : certainty >= 50 ? "moderate signal alignment - reasonable confidence but some mixed signals" : "low signal consistency - significant uncertainty, mixed market signals"}`
+    }
 3. Identifies which pillar(s) are driving the score (highest scoring pillars = most concerning)
 4. Provides specific, actionable guidance for options traders based on this data
 

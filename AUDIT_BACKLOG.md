@@ -392,11 +392,14 @@ recomputes it.
 | P7-16 | P2 | fixed | The header now dates every reading, marks a cached one as cached, and flags it stale past the shared threshold. The date line had been wired to a field /api/ccpi never returns. |
 | P7-17 | P1 | fixed | Thirteen more assembly-layer defaults on displayed CCPI inputs, plus twelve render sites calling .toFixed() on a nullable value behind a !== undefined guard — a TypeError, armed by P6-34. |
 | P7-18 | P1 | fixed | The four QQQ pairs defaulted to false/0, and smaPoints(false, 0) returns 0 risk points — the score a calm market earns. An unavailable QQQ counted 41 of the momentum pillar as a measured all-clear. |
+| P7-19 | P2 | fixed | check-null-guards.ts added: no formatter may be guarded only by !== undefined, the idiom behind P7-17. The four sites it found were conformance, not crashes. |
+| P7-20 | P1 | fixed | /api/ccpi/executive-summary narrated an unscoreable composite to the model as "CCPI Score: 0/100" under its own "0-19: Low Risk" legend. Three layers produced the zero. |
+| P7-21 | P2 | open | The default survey across the other 59 routes: 25 sites in 10 routes, four groups real — sentiment-heatmap 50/50, trend-analysis price 0, strategy-scanner betas, polygon-tickers zeros. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-221 findings recorded · **175 fixed · 8 wontfix · 0 verified-ok · 38 open.**
+224 findings recorded · **177 fixed · 8 wontfix · 0 verified-ok · 39 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -2138,3 +2141,106 @@ exclude when null** — 25 field-level cases plus 4 pair cases, 29 of 29 weights
 | ID | Sev | Tab / area | Finding |
 |---|---|---|---|
 | P7-18 | **P1** | ANALYZE → CCPI | **FIXED.** The four QQQ moving-average/band weights filled both halves of their input pair with `\|\| false` and `\|\| 0`, and `smaPoints(false, 0, …)` returns 0 risk points — **the same score a calm market earns.** An unavailable QQQ therefore contributed 41 of the momentum pillar's 100 weight as a measured all-clear, rather than being excluded and renormalized. Worse than the invented numbers of P7-10/P7-17: this absence *scored*, invisibly, toward reassurance. Both halves are nullable and either one missing makes the pair unscoreable, because `proximity` alone decides two of `smaPoints`' three branches. `AmplifierInputs` in the same module already modelled these as nullable with the reason written out. 14 checks; all 29 scored weights are now asserted to exclude on null. |
+
+---
+
+## Phase 7.4 (sixteenth pass) — the crash class becomes a rule, and the sweep leaves /api/ccpi (2026-08-11)
+
+Two jobs: make P7-17's crash impossible to rewrite, then run the same lens over the other
+59 routes.
+
+### P7-19 — `scripts/check-null-guards.ts`
+
+The rule: **no formatter call is guarded only by `!== undefined`.**
+
+It matches `X.toFixed(` / `toPrecision` / `toLocaleString` / `toExponential` on a member
+expression, then asks whether that same expression is anywhere null-tested in the file. A
+`!== undefined` guard with no null test is a failure.
+
+It is deliberately a **uniformity rule, not a bug detector**. `!= null` is never wrong;
+`!== undefined` is sometimes catastrophically wrong. Requiring the former everywhere means
+no reader — and no future edit — has to know which fields are nullable *today*. The
+alternative needs type information to decide, which is a rule nobody can apply while
+writing the code.
+
+**What it found on introduction, stated honestly: four sites, none of them a crash.**
+`data.latestCitiReading` in panic-euphoria and `stock.premium` / `stock.annualizedYield` /
+`stock.iv` in the strict scanner table are all declared `?: number` — genuinely optional,
+never null — so `!== undefined` was the correct test on the day each was written. They
+were converted for conformance. Reporting them as four more defects would be inventing a
+result.
+
+That is the argument for turning it on now: the twelve real crashes were fixed by hand in
+P7-17, and this exists so the thirteenth cannot be written. **A rule introduced while it
+still finds live bugs is a rule introduced too late.**
+
+Limits are in the file header rather than implied: it cannot follow a value passed into a
+child component and formatted there, nor one reached through a local alias. It catches the
+idiom this codebase writes — guard and format in one JSX block. Scope is structural (95
+`.tsx` files under `components/` and `app/`), and both the file count and the number of
+formatter calls examined are asserted, so a matcher that stops matching fails instead of
+reporting a clean sweep.
+
+### P7-20 — the absence was narrated to the model as an all-clear
+
+The survey's first hit was not a display defect. `/api/ccpi/executive-summary` built its
+prompt with `const ccpi = body.ccpi ?? 0`, and rendered it as:
+
+```
+- CCPI Score: ${ccpi}/100
+```
+
+directly beneath its own legend:
+
+```
+- 0-19: Low Risk (markets healthy)
+```
+
+So a composite that **could not be scored** — which, after P7-17 and P7-18, is exactly
+what a data outage now produces — was handed to the model as the strongest all-clear the
+scale has. The model's answer is what the user reads as the executive summary. This is
+P6-19's defect one level up: that fix taught `pillarLine` to print "insufficient data"
+instead of a number, and left the composite the pillars roll up into.
+
+**Three layers all produced the zero, and the outermost made the others unreachable.**
+`components/ccpi-dashboard.tsx` sent `ccpi: Math.round(ccpiData.ccpi)` — and
+`Math.round(null)` is `0`, so the route's `?? 0` never fired and would not have mattered
+if it had. `certainty || 0` did the same. Fixing only the route would have changed
+nothing, which is the P7-10 lesson exactly: a default at the source outlives every guard
+at the sink.
+
+Both ends now pass null through, and the prompt states the absence in terms the model
+cannot round off:
+
+> **NOT SCOREABLE** — too little of the index was backed by live data to compute a
+> composite. Do NOT infer a level, a regime, or a direction from its absence, and do not
+> treat it as low risk.
+
+Two smaller instances went with it. `${certainty}%` appeared three times and would have
+rendered "null%". And the task instruction branched on `certainty >= 70` / `>= 50` — both
+false for null — so an absent certainty fell through to "low signal consistency —
+significant uncertainty", an assertion about signal agreement that nothing measured, in
+the same voice as a real reading. Both branches now say the score was unavailable instead
+of characterising it.
+
+### P7-21 — what the survey found in the other 59 routes
+
+Sixty route files, 25 numeric-default sites across 10 of them. Most are benign and stay:
+sort comparators (`(b.marketCap ?? 0) - (a.marketCap ?? 0)` is a tie-break, not a
+reading), accumulator seeds, and a wing-width floor.
+
+Four groups are the P7-10 shape and are **recorded rather than changed**, because each
+needs its own display-path verification and one of them sits under an open owner decision:
+
+| Route | Sites | Why it matters |
+|---|---|---|
+| `/api/sentiment-heatmap` | `bullishScore \|\| 50`, `bearishScore \|\| 50`, plus **three whole-object returns of `{bullishScore: 50, bearishScore: 50, netSentiment: 0}`** on AI failure, unparseable JSON, and exception | A fabricated neutral sentiment on a 0-100 scale. Touches **P6-11**, which is an open owner decision, so it is not rewritten here. |
+| `/api/trend-analysis` | `regularMarketPrice \|\| 0`, `regularMarketChange \|\| 0`, `regularMarketChangePercent \|\| 0`, two volume fields | **A price of 0 is not a price.** It also feeds the indicator maths, so the consequence is not confined to the display. |
+| `/api/strategy-scanner` | `STOCK_BETAS[ticker] \|\| 0.7` | The table itself is ~25 hardcoded betas with no source and no date — a P3-19-class static input to risk math — and unknown tickers get 0.7. Needs a decision (fetch beta, or label the table static), not a null-through. |
+| `/api/polygon-tickers` | `prevDay?.v \|\| snapshot.day?.v \|\| 0`, price `\|\| 0`, `market_cap \|\| 0` | Same "0 is not a measurement" question, on the ticker universe the scanners filter from. |
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| P7-19 | P2 | tooling | **`scripts/check-null-guards.ts` added and wired into `check:formulas`.** No formatter call may be guarded only by `!== undefined`, the idiom behind P7-17's twelve TypeErrors. A uniformity rule by design: `!= null` is never wrong and `!== undefined` sometimes is, so no reader must know which fields are nullable today. **The four sites it found were conformance, not crashes** — all `?: number` — and saying otherwise would be inventing a result. |
+| P7-20 | **P1** | ANALYZE → CCPI | **FIXED.** `/api/ccpi/executive-summary` narrated an unscoreable composite to the model as `CCPI Score: 0/100`, under its own legend reading "0-19: Low Risk (markets healthy)" — the absence presented as the strongest all-clear, in the text a user reads as the summary. P6-19 fixed the pillars and left the composite. **Three layers produced the zero**, and the client's `Math.round(null)` made the route's guard unreachable, so both ends are fixed together. Also: `${certainty}%` would have printed "null%", and the `certainty >= 70` / `>= 50` branches both being false made an absent certainty read as "low signal consistency". |
+| P7-21 | P2 | site-wide | **The `??`/`\|\|` default survey across the other 59 routes: 25 sites in 10 routes, of which four groups are real.** `/api/sentiment-heatmap` returns a fabricated 50/50 neutral on three separate failure paths (touches open P6-11); `/api/trend-analysis` defaults price, change and volume to 0 and feeds the indicator maths; `/api/strategy-scanner` carries ~25 sourceless hardcoded betas plus `\|\| 0.7`; `/api/polygon-tickers` zeroes price, volume and market cap. The rest are sort comparators and accumulator seeds and stay. **OPEN** — each needs its own display-path check, and one is blocked on an owner decision. |

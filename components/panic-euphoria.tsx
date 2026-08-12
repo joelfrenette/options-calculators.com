@@ -644,7 +644,7 @@ export function PanicEuphoria() {
                   <div className="p-3 bg-white rounded-lg border border-blue-200">
                     <div className="text-xs font-semibold text-gray-600 mb-1">Latest Official Citi Reading</div>
                     <div className="text-2xl font-bold text-blue-900">
-                      {data.latestCitiReading !== undefined
+                      {data.latestCitiReading != null
                         ? `${data.latestCitiReading >= 0 ? "+" : ""}${data.latestCitiReading.toFixed(2)}`
                         : "—"}
                     </div>
