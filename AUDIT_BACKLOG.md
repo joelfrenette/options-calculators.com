@@ -400,11 +400,12 @@ recomputes it.
 | P7-24 | P2 | fixed | check-house-libs.ts added — CLAUDE.md's "never re-implement locally" rule had no enforcement. Building it exposed a stripComments bug that hid ~70 lines of wheel-scanner.tsx from four checks. |
 | P7-25 | P3 | fixed | Both classes are now rules. Building the prompt guard exposed two silent under-coverages in it — it reported 5 prompts where there are 11, covering none of the files it existed for. |
 | P7-26 | P2 | fixed | **Original finding was half wrong.** The six "silent" scanners read a field P1-10 deleted; the real defect was three OTHER tabs that render it and labelled every fresh scan "Cached". market-sentiment dated. |
+| P7-27 | P2 | open | Four components (1,548 lines) are imported by nothing and tree-shaken out of the production bundle — three of them the "public tabs" P7-26 was written about. check-dead-exports scopes to lib/, so nothing could see them. Ratchet added; wire-up-or-delete is the owner's. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-229 findings recorded · **183 fixed · 8 wontfix · 0 verified-ok · 38 open.**
+230 findings recorded · **183 fixed · 8 wontfix · 0 verified-ok · 39 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -2860,3 +2861,66 @@ P7-17/P7-18 (22 fabricated constants and twelve `.toFixed()` crash sites; an una
 QQQ had been scoring 41 of the momentum pillar as "no risk detected"), P7-20 (an
 unscoreable CCPI narrated to the model as "0/100 = markets healthy"), P7-26, S-18, and
 **eleven guard scripts** now running in `check:formulas`.
+
+---
+
+## Phase 7.6 (nineteenth pass) — production verification of the fourth merge (2026-08-12)
+
+The fourth merge shipped without a UAT, so this pass verified production directly rather
+than trusting the push. **Production is healthy**, and the verification found one thing
+nobody was looking for.
+
+### What production actually serves
+
+`www.options-calculators.com` is at `d09d767`. Probed live:
+
+- `/api/ccpi` — HTTP 200 in 1.4s. `pillars: {momentum: 13, riskAppetite: null,
+  valuation: null, macro: 24}`, `amplifierInputsUnavailable: ["putCallRatio"]`,
+  `certainty: 56`. **Two pillars are null and the composite is renormalised around them**
+  — P7-17/P7-18's fix is live and behaving. None of `5.33`, `103.0`, `0.25` or `123`
+  appears anywhere in the payload.
+- `/api/market-sentiment` — HTTP 200, `lastUpdated` present and current.
+- `/api/strategy-scanner?strategy=wheel` — HTTP 200 in 7.0s, 90KB, leading with
+  `provenance` and `dataSource`.
+- The deployed client bundle contains `"Cached reading from …"` (market-sentiment's new
+  dating) and the scanner's Step 1-4 card titles; it does **not** contain `"Step 1 failed"`.
+- The Greeks fix (`251b408`) is an ancestor of `origin/main`.
+
+### P7-27 — three of the "three public tabs" are not tabs
+
+**`components/earnings-plays-scanner.tsx`, `components/high-iv-watchlist.tsx` and
+`components/wheel-strategy-screener.tsx` are imported by nothing.** They have no case in
+`app/page.tsx`'s tab switch, no nav entry, and no referrer anywhere in `app/`,
+`components/`, `lib/`, `hooks/` or `scripts/`. A fourth,
+`components/wheel-strategy-planner.tsx`, is in the same state. Four files, **1,548 lines**.
+
+The deployed bundle confirms it from the other direction: `page-*.js` on production
+carries `"Cached reading from"` — the market-sentiment half of P7-26 — and does **not**
+carry `"Fetched this session"`, the badge the same commit added to those three scanners.
+The build tree-shook them out because nothing imports them.
+
+So P7-26's commit message is wrong where it says the "Cached" defect was live "on three
+public tabs, and none of the three renders PricingProvenance to offset it". The source
+change is correct and the reasoning about the badge is correct; the claim about user
+impact is not. **That is the second wrong premise in that one finding** — it was first
+recorded as six scanners hiding a live flag, corrected to three tabs rendering a false
+one, and the corrected version was also wrong about who could see it.
+
+Why nothing caught it: `check-dead-exports.ts` scopes to `walk(lib/)` and treats
+`components/` only as a *referrer* set, so an unreachable component is outside every check
+in the suite. The provenance rules read a component's labels without asking whether a user
+can reach the component, and the PASS count is identical either way. This is the P6-77
+shape again — a check that stops covering looks exactly like one that passes — except here
+the coverage was never there.
+
+**Not fixed, because the fix is a decision.** Wiring the four up or deleting them is
+rebuild-or-retire and belongs to the owner. What ships is
+`scripts/check-dead-components.ts`, a ratchet against the measured six (the four features
+plus `theme-provider.tsx` and `ui/progress.tsx`, both scaffolding): the debt can shrink
+but not grow. Negative-tested in three forms — a new unreferenced file, an existing live
+component unwired from `app/page.tsx`, and a basename collision — each failing as
+designed.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-27 | P2 | components / tooling | Four components totalling 1,548 lines are imported by nothing and absent from the deployed bundle, including three that P7-26 described as public tabs. `check-dead-exports` scopes to `lib/`, so no check could see them. Ratchet added; wire-up-or-delete is the owner's call. |
