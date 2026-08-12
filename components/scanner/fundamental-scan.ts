@@ -5,7 +5,7 @@
 // else (including every console.log) is unchanged.
 
 import type { QualifyingStock } from "./types"
-import { PRE_FILTER_MARKET_CAP_TIERS } from "./constants"
+import { BENCHMARK_TICKER, PRE_FILTER_MARKET_CAP_TIERS } from "./constants"
 import { delay, fetchWithRetry } from "./enrichment"
 import {
   sma,
@@ -15,6 +15,15 @@ import {
   stochasticK as calcStochastic,
   atr as calcATR,
 } from "@/lib/indicators"
+import {
+  SESSIONS_PER_MONTH,
+  isStage4Decline,
+  momentum12m1,
+  moveInAtrUnits,
+  relativeReturnPoints,
+  sessionMovePercent,
+  trailingReturnPercent,
+} from "@/lib/trend-filters"
 import { stepLabel } from "./steps"
 
   // Technical indicators (SMA/RSI/Bollinger/MACD/Stochastic/ATR) now come from
@@ -113,6 +122,38 @@ export const runFundamentalScan = async ({
       const batchSize = 2 // Reduced from 5 to 2 for better rate limit compliance
       const batchDelay = 2000 // Increased from 1000ms to 2000ms between batches
       const apiDelay = 300 // Increased from 100ms to 300ms between API calls
+
+      // The benchmark's own trailing year, fetched ONCE for the whole scan
+      // rather than per ticker — it is the same number for every row, and the
+      // scan is already batched at two tickers per two seconds to stay inside
+      // the rate limit. One extra call, not N.
+      //
+      // Null on any failure, and null propagates: a relative-strength gate with
+      // no benchmark cannot be evaluated, so it fails safe like every other
+      // null indicator here rather than silently comparing against zero. The
+      // notice text says the benchmark is missing so the empty result is
+      // explicable.
+      let benchmarkReturn12m: number | null = null
+      try {
+        const benchRes = await fetchWithRetry(`/api/polygon-proxy?endpoint=aggregates&ticker=${BENCHMARK_TICKER}`)
+        if (benchRes.ok) {
+          const benchData = await benchRes.json()
+          const benchCloses = (benchData.results || [])
+            .map((bar: any) => bar.c)
+            .filter((c: number) => typeof c === "number")
+          benchmarkReturn12m = trailingReturnPercent(benchCloses)
+          console.log(
+            `[v0] Benchmark ${BENCHMARK_TICKER} trailing-year return: ${
+              benchmarkReturn12m === null ? "unavailable" : `${benchmarkReturn12m.toFixed(1)}%`
+            }`,
+          )
+        } else {
+          console.log(`[v0] ⚠️ Benchmark ${BENCHMARK_TICKER} aggregates failed (${benchRes.status}) — relative strength unavailable`)
+        }
+      } catch (e) {
+        console.log(`[v0] ⚠️ Benchmark ${BENCHMARK_TICKER} fetch threw — relative strength unavailable`)
+      }
+      await delay(apiDelay)
 
       for (let i = 0; i < tickers.length; i += batchSize) {
         const batch = tickers.slice(i, i + batchSize)
@@ -414,6 +455,41 @@ export const runFundamentalScan = async ({
             const atrPercent = atr !== null && atr > 0 ? (atr / currentPrice) * 100 : 2.5
             const redDay = closes.length >= 2 && closes[closes.length - 1] < closes[closes.length - 2]
 
+            // --- CSP entry filters (lib/trend-filters.ts) -----------------
+            //
+            // THE SESSION MOVE, AND WHY IT HAS A SOURCE FIELD. `day` is the
+            // live session and is empty outside market hours; `prevDay` is the
+            // last close. Taking `day.c || prevDay.c` — which is what
+            // currentPrice above does — and differencing it against prevDay
+            // would yield exactly 0% whenever the market is shut, which reads
+            // as "no big move" for a stock that gapped 12% at yesterday's open.
+            // So: today when today exists, otherwise the last COMPLETED
+            // session from the daily bars, and the row says which.
+            const hasLiveSession = typeof day.c === "number" && day.c > 0 && typeof prevDay.c === "number" && prevDay.c > 0
+            const dayMovePercent = hasLiveSession
+              ? sessionMovePercent(day.c, prevDay.c)
+              : closes.length >= 2
+                ? sessionMovePercent(closes[closes.length - 1], closes[closes.length - 2])
+                : null
+            const dayMoveSource: "today" | "last_session" | "unknown" =
+              dayMovePercent === null ? "unknown" : hasLiveSession ? "today" : "last_session"
+            const dayMoveAtrMultiple = moveInAtrUnits(dayMovePercent, currentPrice, atr)
+
+            // The trailing year. `closes` is oldest-first (the proxy requests
+            // sort=asc over 365 calendar days, limit=300 — ~252 sessions, so
+            // the window is not truncated by the limit).
+            const return12m = trailingReturnPercent(closes)
+            const momentum = momentum12m1(closes)
+
+            // Stage 4 needs the 150-session average AND the same average a
+            // month ago, so the slope can be read. Both come from the house
+            // `sma()` — this file must not compute an average of its own.
+            const sma150 = sma(closes, 150)
+            const sma150Prior = closes.length > SESSIONS_PER_MONTH ? sma(closes.slice(0, -SESSIONS_PER_MONTH), 150) : null
+            const stage4Decline = isStage4Decline(currentPrice, sma150, sma150Prior)
+
+            const relativeReturn12m = relativeReturnPoints(return12m, benchmarkReturn12m)
+
             const {
               earningsDate: finalEarningsDate,
               daysToEarnings: finalDaysToEarnings,
@@ -489,6 +565,15 @@ export const runFundamentalScan = async ({
               // How many of the four TTM quarters actually reported, so the UI
               // can say why a fundamental is "—" rather than leaving it blank.
               ttmQuarters,
+              // CSP entry filters. Every one may be null — see types.ts.
+              dayMovePercent: dayMovePercent === null ? null : Number(dayMovePercent.toFixed(2)),
+              dayMoveSource,
+              dayMoveAtrMultiple: dayMoveAtrMultiple === null ? null : Number(dayMoveAtrMultiple.toFixed(2)),
+              return12m: return12m === null ? null : Number(return12m.toFixed(1)),
+              benchmarkReturn12m: benchmarkReturn12m === null ? null : Number(benchmarkReturn12m.toFixed(1)),
+              relativeReturn12m: relativeReturn12m === null ? null : Number(relativeReturn12m.toFixed(1)),
+              momentum12m1: momentum === null ? null : Number(momentum.toFixed(1)),
+              stage4Decline,
             }
           } catch (err) {
             console.log(`[v0] Error processing ${ticker}:`, err)

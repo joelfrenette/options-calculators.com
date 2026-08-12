@@ -403,11 +403,12 @@ recomputes it.
 | P7-27 | P2 | fixed | Four components (1,548 lines) were imported by nothing and tree-shaken out of the production bundle — three of them the "public tabs" P7-26 was written about. check-dead-exports scopes to lib/, so nothing could see them. Owner chose retire: all four deleted, ratchet down to 2. |
 | P7-28 | P2 | fixed | Fifteen components hand-built the Yahoo ticker URL in three spellings; only one normalised `.` to `-`, so class shares linked to a 404 from fourteen tabs. One library now owns it, pointing at the advanced chart per the owner's request, with a check. |
 | P7-29 | P3 | verified-ok | Swept the other 6 outbound-link families after P7-28: no duplication, no hand-built interpolation, `rel="noopener noreferrer"` on all 21 `target="_blank"` sites. Recorded so the sweep is not repeated. |
+| P7-30 | — | fixed | Owner feature: four CSP entry exclusions in Step 4 (big up day, down on the year, trailed SPY, Weinstein Stage 4), all defaulting on, applied before options enrichment so an excluded stock reaches neither results table. Built, checked with 29 assertions, negative-tested four ways. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-232 findings recorded · **185 fixed · 8 wontfix · 1 verified-ok · 38 open.**
+233 findings recorded · **186 fixed · 8 wontfix · 1 verified-ok · 38 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -3009,3 +3010,79 @@ The one duplicated-URL family in this codebase was the ticker link, and P7-28 cl
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-29 | P3 | site-wide UI | Swept the other 6 outbound-link families after P7-28. No duplication, no hand-built interpolation, and `rel="noopener noreferrer"` on all 21 `target="_blank"` sites. Not a defect — recorded so the sweep is not repeated. |
+
+---
+
+## Phase 7.8 (twenty-first pass) — CSP entry exclusions (2026-08-12)
+
+Owner request, not a defect: the Sell Put scanner must not show a stock that just ripped,
+and must not show one that has fallen for a year while the market rose. Built in **Step 4
+(Technical Criteria)**, computed from bars the Step-3 scan already fetches.
+
+### Why Step 4 and not Step 2
+
+Step 2 is a universe list — FMP's screener or Polygon's reference tickers, returning
+symbol, market cap, price and volume. **It has no price history at all.** A 12-month
+return or a 150-session average there would mean pulling a year of daily bars for up to
+1,000 symbols before any other filter has narrowed the list, against a flat $79/mo API
+budget. Step 3 already fetches 365 calendar days per surviving ticker (`limit=300`,
+~252 sessions, so the window is not truncated), which is exactly the input these gates
+need. Step 3 itself is fundamentals — ROE, EPS, debt, market cap — and a price-trend test
+filed there would make its rejection buckets describe the wrong kind of filter.
+
+So: computed during the Step-3 fetch, gated in Step 4, alongside RSI/SMA/MACD which work
+the same way.
+
+### P7-30 — the four gates
+
+`lib/trend-filters.ts` (import-free, so `check-trend-filters.ts` can load it):
+
+| Gate | Rule | Standard it comes from |
+|---|---|---|
+| Big up day | session move ≥ 10% (slider 3–25) | The owner's number. No industry constant exists; the ATR multiple is shown beside it because a 10% day in a 1%-ATR name and an 8%-ATR name are different events. |
+| Down on the year | trailing 252-session return < 0 | Plain 12-month total return. |
+| Trailed SPY | 12-month return < SPY's | The simple form of IBD's RS Rating and Mansfield's Relative Performance. |
+| Stage 4 | price < SMA150 **and** SMA150 falling | Weinstein. The slope is the load-bearing half — price below a *rising* 150 is a pullback inside an advance, which is the setup a put seller wants. |
+
+12-1 momentum (Jegadeesh–Titman, skipping the most recent month) is computed and shown
+but does not gate; it disagrees with the plain 12-month return exactly when a falling
+stock has begun to turn, which is the case worth seeing rather than acting on blind.
+
+**All four default ON**, a deliberate break from the Step 4 toggles above them, which
+default off because stacking them empties the strict table. These can empty it too, and
+that is the intended answer: "nothing qualifies today" is a result.
+
+### Three things the build got right only because they were checked
+
+1. **Exclusions are not criteria.** The first cut folded the gates into the criteria
+   object. That was wrong: Step 4's relaxed table shows rows passing SOME criteria, so a
+   stock that gapped 12% would have reappeared there as a near miss — the exact row the
+   request was about. They are now a hard partition applied BEFORE options enrichment, so
+   an excluded stock reaches neither table and costs no options-snapshot call.
+2. **The redundancy claim was backwards.** A comment asserted that with "down on the year"
+   on, the laggard gate could never reject anything new. The opposite is true when the
+   benchmark's year is positive: `return < benchmark` rejects everything `return < 0`
+   does **plus** every stock that rose by less than the market — a stock up 7.5% against
+   SPY up 8% passes the first and fails the second. The subsumption assertion in the check
+   found it before it shipped. Both gates ship because when the market itself fell they
+   genuinely disagree, and which reading should exclude is the owner's call.
+3. **A closed market is not a 0% move.** `snapshot.day` is empty outside market hours, and
+   `day.c || prevDay.c` differenced against `prevDay.c` is exactly zero — which reads as
+   "no big move" for a stock that gapped 12% at yesterday's open. The gate uses today when
+   today exists, the last completed session otherwise, and the row carries which
+   (`dayMoveSource`).
+
+Every field is null when the history cannot support it, and every gate fails safe on null
+— a newly-listed ticker with no year behind it cannot qualify, which is the convention
+`technical-criteria.ts` already used for RSI and the SMAs. The on-screen
+`EntryExclusionCard` names what was dropped and why, because a scanner that silently
+returns fewer rows is indistinguishable from a market with fewer candidates.
+
+`scripts/check-trend-filters.ts` — 29 assertions with worked numbers, negative-tested in
+four forms: a window that falls back to the first available bar (it reported **251% under
+a 12-month label**), Stage 4 without its slope test, a session move that loses its sign,
+and 12-1 momentum that forgets to skip the month.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-30 | — | SCAN / wheel-scanner | Owner feature, not a defect: four CSP entry exclusions (big up day, down on the year, trailed SPY, Weinstein Stage 4) in Step 4, all defaulting on, applied before options enrichment so an excluded stock reaches neither results table. `lib/trend-filters.ts` + 29 assertions. |

@@ -138,6 +138,13 @@
 | Congress amount parsing | app/api/congress-trades/route.ts:14-31 | STOCK Act bucket midpoint | CORRECT | ok | "$1,001 - $15,000"→8001 ✓; "$50,000,000+"→50M ✓ | Amount fallback labels a low-end as midpoint (P3) |
 | Top-performers range parse | app/api/top-performers/route.ts:38-47 | same | DEVIATION | P3 | No single-value fallback → "$50,000,000+" → $0 → the **largest** trades drop out of dollar-weighted XR | Copy the fallback from congress-trades |
 | Top-performers return math | top-performers/route.ts:182-185 | avg + $-weighted XR | CORRECT | ok | Arithmetic verified | — |
+| Session move % | lib/trend-filters.ts:sessionMovePercent | (last−prior)/prior×100 | CORRECT | ok | Signed, so a −12% day is never read as a +12% day; non-positive prior → null rather than Infinity. 6 assertions | — |
+| Move in ATR units | lib/trend-filters.ts:moveInAtrUnits | \|move\| ÷ ATR(14) | CORRECT | ok | Display-only context for the fixed % gate: 10% on a $10 stock is 4 ATRs at ATR 0.25, 1 ATR at ATR 1.00. 4 assertions | — |
+| Trailing 12-month return | lib/trend-filters.ts:trailingReturnPercent | close vs close 252 sessions back | CORRECT | ok | Baseline is the bar 252 back, never "first available" — one bar short returns null, not a 251-session change under a 12-month label. 5 assertions | — |
+| 12-1 momentum | lib/trend-filters.ts:momentum12m1 | t−12mo → t−1mo | CORRECT | ok | Jegadeesh–Titman skip-a-month; asserted to differ from the plain 12-month return (231 vs 252 on a 1/session ramp). 2 assertions | — |
+| Weinstein Stage 4 | lib/trend-filters.ts:isStage4Decline | price < SMA150 **and** SMA150 falling | CORRECT | ok | The slope is the load-bearing half: price below a *rising* 150 is a pullback and returns false. SMA150 comes from lib/indicators.ts at the call site, never recomputed. 5 assertions | — |
+| Relative return vs SPY | lib/trend-filters.ts:relativeReturnPoints | stock% − benchmark% | CORRECT | ok | −5% against a market at −20% is **+15 points of outperformance**; null benchmark declines rather than comparing against 0. 4 assertions | — |
+| CSP entry exclusions | components/scanner/technical-criteria.ts:cspEntryGates | hard filter, not a criterion | CORRECT | ok | Applied before options enrichment so an excluded stock reaches neither the strict nor the relaxed table; every gate fails safe on null. With a positive benchmark year the laggard gate is strictly STRONGER than the down-year gate — asserted, after the first draft of that comment claimed the reverse | — |
 
 ## 5. Systemic patterns (cross-cutting)
 

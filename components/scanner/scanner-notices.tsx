@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { AlertCircle, Filter } from "lucide-react"
 import type { QualifyingStock, RejectionSummary } from "./types"
+import type { EntryExclusion } from "./technical-criteria"
 import { stepLabel } from "./steps"
 
 interface RejectionSummaryCardProps {
@@ -150,5 +151,52 @@ export function NoRelaxedResultsCard({ fundamentalCount }: NoRelaxedResultsCardP
             </ul>
           </CardContent>
         </Card>
+  )
+}
+
+interface EntryExclusionCardProps {
+  excluded: EntryExclusion[]
+}
+
+/**
+ * What the entry exclusions removed, and why.
+ *
+ * This card exists because the alternative is a scanner that quietly returns
+ * fewer rows, which is indistinguishable from a market with fewer candidates.
+ * The exclusions default ON, so without this the user is looking at a filtered
+ * list and a filter they never set — the same shape as the hidden yield/volume
+ * gates recorded under S-8, and the reason those got a paragraph of their own.
+ *
+ * Renders nothing when nothing was excluded: an empty card asserting "0
+ * excluded" is noise on every clean run.
+ */
+export function EntryExclusionCard({ excluded }: EntryExclusionCardProps) {
+  if (excluded.length === 0) return null
+  return (
+    <Card className="mt-6 w-full max-w-7xl mx-auto border-amber-200">
+      <CardHeader className="bg-amber-50 border-b border-amber-200">
+        <CardTitle className="text-base font-bold text-amber-900 flex items-center gap-2">
+          <Filter className="h-4 w-4" />
+          {excluded.length} candidate{excluded.length === 1 ? "" : "s"} excluded before pricing
+        </CardTitle>
+        <CardDescription className="text-amber-800">
+          Removed by the entry exclusions in {stepLabel("technical")}, not by the sliders. They are not in the strict
+          or the relaxed table. A stock whose history is too short to measure is excluded by the filter that needs it.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="pt-4">
+        <div className="flex flex-wrap gap-2">
+          {excluded.map((e) => (
+            <span
+              key={e.ticker}
+              className="inline-flex items-center gap-1 rounded border border-amber-300 bg-white px-2 py-1 text-xs"
+            >
+              <span className="font-semibold text-gray-900">{e.ticker}</span>
+              <span className="text-gray-600">{e.reasons.join(" · ")}</span>
+            </span>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   )
 }

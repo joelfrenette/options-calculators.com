@@ -70,6 +70,33 @@ export interface QualifyingStock {
   // Consecutive profitable quarters (net income > 0) counted from the most
   // recent quarterly filing backwards, out of up to 12 fetched.
   profitableQuarters?: number
+
+  // --- CSP entry filters (lib/trend-filters.ts) --------------------------
+  // Every one is null when the history cannot support it. Null NEVER becomes 0:
+  // on a return series 0 means "flat over the year", a real and different
+  // reading, and on a session move it means "unchanged" rather than "unknown".
+
+  /** Percent move of the measured session. */
+  dayMovePercent: number | null
+  /**
+   * WHICH session `dayMovePercent` measures. The snapshot's `day` block is
+   * empty outside market hours, and reading that as a 0% move would let a
+   * stock that gapped 12% yesterday pass a "no big up day" gate. When today is
+   * unavailable the last COMPLETED session is used and labelled as such.
+   */
+  dayMoveSource: "today" | "last_session" | "unknown"
+  /** The same move in ATR(14) units — context for the fixed percentage gate. */
+  dayMoveAtrMultiple: number | null
+  /** Trailing 252-session total return, percent. */
+  return12m: number | null
+  /** Trailing 252-session return of the benchmark (SPY) over the same window. */
+  benchmarkReturn12m: number | null
+  /** `return12m − benchmarkReturn12m`, in percentage points. */
+  relativeReturn12m: number | null
+  /** 12-1 momentum: the trailing-year return that stops one month back. */
+  momentum12m1: number | null
+  /** Weinstein Stage 4 — price below a FALLING 150-session average. */
+  stage4Decline: boolean | null
 }
 
 // Step 3 fundamental-scan rejection diagnostics shown when 0 stocks pass.

@@ -57,3 +57,14 @@ export const PRE_FILTER_VOLATILITY_TIERS = [
   { value: 7, label: "7%+" },
   { value: 10, label: "10%+" },
 ] as const
+
+/**
+ * The benchmark the relative-strength gate compares against.
+ *
+ * SPY rather than ^GSPC because Polygon's aggregates endpoint covers the ETF
+ * and not the index (the same reason lib/market-closes.ts keeps `^SPX` on a
+ * live feed), and because the scanner's universe is US common stock, which is
+ * what SPY tracks. One symbol, named once, so a future change to QQQ or IWM is
+ * one edit rather than a search.
+ */
+export const BENCHMARK_TICKER = "SPY"

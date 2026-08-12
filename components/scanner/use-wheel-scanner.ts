@@ -18,6 +18,8 @@ import { runFundamentalScan } from "./fundamental-scan"
 import { enrichWithOptionsData } from "./enrichment"
 import {
   checkTechnicalCriteria as checkCriteriaWithSettings,
+  partitionByEntryExclusions,
+  type EntryExclusion,
   type TechnicalFilterSettings,
 } from "./technical-criteria"
 import { useLandmines } from "./use-landmines"
@@ -110,6 +112,24 @@ export function useWheelScanner() {
   const [requireMACDBullish, setRequireMACDBullish] = useState(false) // MACD Bullish Signal
   const [requireRedDay, setRequireRedDay] = useState(false) // Red Day Preferred
 
+  // CSP entry filters (lib/trend-filters.ts). ALL FOUR DEFAULT ON, at the
+  // owner's instruction: these are not stricter-entry preferences like the
+  // toggles above, they are the two things he does not want to sell a put
+  // into — a stock that just ripped, and a stock that has fallen for a year.
+  //
+  // Defaulting a gate ON is a deliberate break from the pattern above, where
+  // MACD/red-day/Bollinger default OFF because stacking them empties strict
+  // Step 4. These can empty it too, on a weak tape, and that is the intended
+  // answer rather than a bug: "nothing qualifies today" is a result.
+  const [excludeBigUpDay, setExcludeBigUpDay] = useState(true) // no puts into a spike
+  const [maxDayMove, setMaxDayMove] = useState([10]) // percent — the owner's number
+  const [excludeDownYear, setExcludeDownYear] = useState(true) // trailing year negative
+  const [excludeBenchmarkLaggard, setExcludeBenchmarkLaggard] = useState(true) // trailed SPY
+  const [excludeStage4, setExcludeStage4] = useState(true) // below a FALLING 150-day MA
+  // What the exclusions removed, with reasons, so an empty Step 4 is explicable
+  // rather than just empty.
+  const [entryExclusionSummary, setEntryExclusionSummary] = useState<EntryExclusion[]>([])
+
   const [cacheStatus, setCacheStatus] = useState<string>("")
 
   // S-8. **These two are HIDDEN GATES: they filter Step 3 results and no UI
@@ -173,6 +193,11 @@ export function useWheelScanner() {
     requireRedDay,
     minYield: minYield[0],
     minVolumeTechnicals: minVolumeTechnicals[0],
+    excludeBigUpDay,
+    maxDayMove: maxDayMove[0],
+    excludeDownYear,
+    excludeBenchmarkLaggard,
+    excludeStage4,
   }
 
   const checkTechnicalCriteria = (stock: QualifyingStock) => checkCriteriaWithSettings(stock, technicalFilterSettings)
@@ -299,7 +324,7 @@ export function useWheelScanner() {
     setTechnicalCurrentTicker("")
     setError(null)
 
-    const technicalCacheKey = `technical_scan_${CACHE_VERSION}_${maxRSI[0]}_${maxStochastic[0]}_${minATR[0]}_${maxATR[0]}_${requireBollingerBands}_${requireAbove200SMA}_${requireAbove50SMA}_${requireGoldenCross}_${requireMACDBullish}_${requireRedDay}_${minYield[0]}_${minVolumeTechnicals[0]}_${fundamentalResults
+    const technicalCacheKey = `technical_scan_${CACHE_VERSION}_${maxRSI[0]}_${maxStochastic[0]}_${minATR[0]}_${maxATR[0]}_${requireBollingerBands}_${requireAbove200SMA}_${requireAbove50SMA}_${requireGoldenCross}_${requireMACDBullish}_${requireRedDay}_${minYield[0]}_${minVolumeTechnicals[0]}_${excludeBigUpDay}_${maxDayMove[0]}_${excludeDownYear}_${excludeBenchmarkLaggard}_${excludeStage4}_${fundamentalResults
       .map((s) => s.ticker)
       .join(",")
       .substring(0, 100)}`
@@ -326,11 +351,32 @@ export function useWheelScanner() {
     setTechnicalCurrentTicker("")
 
     try {
+      // ENTRY EXCLUSIONS RUN FIRST, before options enrichment.
+      //
+      // Two reasons, and the second is the one that matters. Enrichment is the
+      // expensive part — an options-snapshot call per ticker — so screening
+      // first saves calls on stocks that were never going to be shown. And
+      // filtering here, rather than after the split, is what makes "excluded"
+      // mean excluded: the relaxed table further down shows rows that pass
+      // SOME criteria, so anything still in the list at that point can surface
+      // as a near miss. A stock that gapped 12% must not appear as a near miss.
+      const { kept: eligibleFundamentals, excluded: entryExcluded } = partitionByEntryExclusions(
+        fundamentalResults,
+        technicalFilterSettings,
+      )
+      setEntryExclusionSummary(entryExcluded)
+      if (entryExcluded.length > 0) {
+        console.log(
+          `[v0] ${stepLabel("technical")}: ${entryExcluded.length} excluded before enrichment — ` +
+            entryExcluded.map((e) => `${e.ticker}(${e.reasons.join("+")})`).join(", "),
+        )
+      }
+
       console.log(
-        `[v0] ${stepLabel("technical")}: Fetching real options premium data and filtering by slider criteria for ${fundamentalResults.length} stocks`,
+        `[v0] ${stepLabel("technical")}: Fetching real options premium data and filtering by slider criteria for ${eligibleFundamentals.length} stocks`,
       )
 
-      const enrichedStocks = await enrichWithOptionsData(fundamentalResults, (current, total, ticker) => {
+      const enrichedStocks = await enrichWithOptionsData(eligibleFundamentals, (current, total, ticker) => {
         setTechnicalProgress(Math.round((current / total) * 100))
         setTechnicalCurrentTicker(ticker)
       })
@@ -495,7 +541,14 @@ export function useWheelScanner() {
       setStep4CurrentTicker("")
       setRelaxedResults([]) // Clear previous relaxed results
 
-      enrichWithOptionsData(fundamentalResults, (current, total, ticker) => {
+      // The SAME exclusion pass as the strict path above. This is the copy that
+      // actually protects the owner's rule: the relaxed table is the one that
+      // shows near misses, so an exclusion applied only to the strict path
+      // would hide a gapped-up stock from the table nobody was worried about
+      // and leave it in the table they were.
+      const { kept: eligibleForRelaxed } = partitionByEntryExclusions(fundamentalResults, technicalFilterSettings)
+
+      enrichWithOptionsData(eligibleForRelaxed, (current, total, ticker) => {
         setStep4Progress(Math.round((current / total) * 100))
         setStep4CurrentTicker(ticker)
       })
@@ -579,6 +632,13 @@ export function useWheelScanner() {
     requireGoldenCross, setRequireGoldenCross,
     requireMACDBullish, setRequireMACDBullish,
     requireRedDay, setRequireRedDay,
+    // CSP entry filters
+    excludeBigUpDay, setExcludeBigUpDay,
+    maxDayMove, setMaxDayMove,
+    excludeDownYear, setExcludeDownYear,
+    excludeBenchmarkLaggard, setExcludeBenchmarkLaggard,
+    excludeStage4, setExcludeStage4,
+    entryExclusionSummary,
     technicalFilterSettings,
     scanTechnicals,
     // Pipeline state

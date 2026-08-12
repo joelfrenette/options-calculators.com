@@ -24,6 +24,7 @@ import {
   RejectionSummaryCard,
   NoTechnicalPassCard,
   NoRelaxedResultsCard,
+  EntryExclusionCard,
 } from "@/components/scanner/scanner-notices"
 import { stepTitled, SCANNER_STEPS } from "./scanner/steps"
 
@@ -52,6 +53,12 @@ export function WheelScanner() {
     requireGoldenCross, setRequireGoldenCross,
     requireMACDBullish, setRequireMACDBullish,
     requireRedDay, setRequireRedDay,
+    excludeBigUpDay, setExcludeBigUpDay,
+    maxDayMove, setMaxDayMove,
+    excludeDownYear, setExcludeDownYear,
+    excludeBenchmarkLaggard, setExcludeBenchmarkLaggard,
+    excludeStage4, setExcludeStage4,
+    entryExclusionSummary,
     technicalFilterSettings,
     scanTechnicals,
     step, loading, isScanning, isScanningTechnicals, error, cacheStatus,
@@ -255,6 +262,16 @@ export function WheelScanner() {
           setRequireMACDBullish={setRequireMACDBullish}
           requireRedDay={requireRedDay}
           setRequireRedDay={setRequireRedDay}
+          excludeBigUpDay={excludeBigUpDay}
+          setExcludeBigUpDay={setExcludeBigUpDay}
+          maxDayMove={maxDayMove}
+          setMaxDayMove={setMaxDayMove}
+          excludeDownYear={excludeDownYear}
+          setExcludeDownYear={setExcludeDownYear}
+          excludeBenchmarkLaggard={excludeBenchmarkLaggard}
+          setExcludeBenchmarkLaggard={setExcludeBenchmarkLaggard}
+          excludeStage4={excludeStage4}
+          setExcludeStage4={setExcludeStage4}
           tooltipsEnabled={tooltipsEnabled}
         />
       )}
@@ -318,6 +335,11 @@ export function WheelScanner() {
           {stepTitled("technical", "View Relaxed Criteria Results")}
         </Button>
       )}
+
+      {/* Shown whenever the exclusions removed anything, not only on an empty
+          result — a user with three rows on screen still needs to know that
+          five others were dropped before pricing. */}
+      {step >= 3 && !isScanningTechnicals && <EntryExclusionCard excluded={entryExclusionSummary} />}
 
       {step >= 3 && !isScanningTechnicals && technicalResults.length === 0 && fundamentalResults.length > 0 && (
         <NoTechnicalPassCard fundamentalCount={fundamentalResults.length} maxRSI={technicalFilterSettings.maxRSI} />
