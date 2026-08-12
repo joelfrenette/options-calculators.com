@@ -235,6 +235,116 @@ check(
   `50 ⇒ ${nvFifty.scoredMax}, null ⇒ ${nvNull.scoredMax}`,
 )
 
+
+// ---------------------------------------------------------------------------
+// P7-17. Every nullable pillar input, one at a time: a null must be EXCLUDED
+// and renormalized, never scored as a reading.
+//
+// Written as a loop over the weight tables rather than as one assertion per
+// field, and that is the point. The defect this closes was a set of inputs the
+// P6-34 nullability sweep did not reach — the ones whose absence was papered
+// over by a constant in the route, so they never looked absent. A hand-written
+// list of fields to test would have had exactly the same blind spot as the
+// hand-written sweep: it can only cover what its author remembered.
+//
+// Deriving the field list from WEIGHTS means a new indicator is in scope the
+// moment it is given a weight, and `EXPECTED_NULLABLE` below asserts the SIZE
+// of that list so a shrinking scope fails loudly rather than passing quietly
+// (P6-75, P6-77).
+//
+// Tiers are "live" throughout, deliberately. The tier gate already excludes a
+// baseline input, so testing under baseline tiers would prove nothing about the
+// value path — it would re-test the gate. A null arriving on a LIVE tier is the
+// case that matters: the tier says where a reading came from, the value says
+// whether there is one, and only one of those two was ever checked.
+// ---------------------------------------------------------------------------
+
+type NullableCase = {
+  pillar: string
+  key: string
+  max: number
+  run: (nulled: string) => { scoredMax: number; excluded: string[]; score: number | null }
+}
+
+/**
+ * Scope is STRUCTURAL: a weight is covered when its key is an actual field of
+ * the pillar's input object.
+ *
+ * Four momentum weights are not — `qqqSMA20`, `qqqSMA50`, `qqqSMA200` and
+ * `qqqBollinger` each score a PAIR of inputs (`qqqBelowSMA20` +
+ * `qqqSMA20Proximity`), so the weight key names a concept rather than a field
+ * and there is nothing to set null. Those four are the boolean group recorded
+ * as P7-18: "not below the 20-day SMA" and "we could not fetch QQQ" are still
+ * the same `false`, which is a modelling question rather than a mechanical
+ * null-through, and it is not answered here.
+ *
+ * Deriving the skip list by `key in fixture` rather than writing it out means a
+ * field that gets renamed drops into the skip list instead of silently passing,
+ * and BOTH counts are asserted so neither list can drift unnoticed.
+ */
+const inFixture = (fixture: object, key: string) => Object.prototype.hasOwnProperty.call(fixture, key)
+
+const nullableCases: NullableCase[] = [
+  ...MOMENTUM_WEIGHTS.filter((w) => inFixture(maxRiskMomentum, w.key)).map((w) => ({
+    pillar: "momentum",
+    key: w.key as string,
+    max: w.max,
+    run: (k: string) => computeMomentumPillar({ ...maxRiskMomentum, [k]: null } as MomentumInputs, liveMomentum),
+  })),
+  ...RISK_APPETITE_WEIGHTS.filter((w) => inFixture(maxRiskRisk, w.key)).map((w) => ({
+    pillar: "riskAppetite",
+    key: w.key as string,
+    max: w.max,
+    run: (k: string) =>
+      computeRiskAppetitePillar({ ...maxRiskRisk, [k]: null } as RiskAppetiteInputs, liveRisk),
+  })),
+  ...VALUATION_WEIGHTS.filter((w) => inFixture(maxRiskValuation, w.key)).map((w) => ({
+    pillar: "valuation",
+    key: w.key as string,
+    max: w.max,
+    run: (k: string) => computeValuationPillar({ ...maxRiskValuation, [k]: null } as ValuationInputs, liveValuation),
+  })),
+  ...MACRO_WEIGHTS.filter((w) => inFixture(maxRiskMacro, w.key)).map((w) => ({
+    pillar: "macro",
+    key: w.key as string,
+    max: w.max,
+    run: (k: string) => computeMacroPillar({ ...maxRiskMacro, [k]: null } as MacroInputs, liveMacro),
+  })),
+]
+
+const skipped = [
+  ...MOMENTUM_WEIGHTS.filter((w) => !inFixture(maxRiskMomentum, w.key)),
+  ...RISK_APPETITE_WEIGHTS.filter((w) => !inFixture(maxRiskRisk, w.key)),
+  ...VALUATION_WEIGHTS.filter((w) => !inFixture(maxRiskValuation, w.key)),
+  ...MACRO_WEIGHTS.filter((w) => !inFixture(maxRiskMacro, w.key)),
+]
+
+// 6 momentum + 4 risk-appetite + 7 valuation + 8 macro.
+const EXPECTED_NULLABLE = 25
+check(
+  `scope: ${nullableCases.length} scored inputs are covered by the null sweep`,
+  nullableCases.length === EXPECTED_NULLABLE,
+  `${nullableCases.length}, expected ${EXPECTED_NULLABLE} — a weight was added or removed; update this number deliberately`,
+)
+// The skipped set is asserted too. A weight quietly falling out of the covered
+// list would otherwise land here and lower the coverage with no failing line —
+// the P6-77 shape, where a check that stops covering reads exactly like one
+// that passes.
+check(
+  `scope: exactly 4 weights score input PAIRS and are covered by P7-18 instead`,
+  skipped.length === 4 && skipped.every((w) => w.key.startsWith("qqq")),
+  skipped.map((w) => w.key).join(", ") || "(none)",
+)
+
+for (const c of nullableCases) {
+  const r = c.run(c.key)
+  check(
+    `null ${c.pillar}.${c.key} is excluded and renormalized`,
+    r.scoredMax === 100 - c.max && r.excluded.includes(c.key),
+    `scoredMax ${r.scoredMax} (want ${100 - c.max}), excluded [${r.excluded.join(", ")}]`,
+  )
+}
+
 // ---------------------------------------------------------------------------
 // 5. Certainty decreases live → ai-estimate → baseline, canaries play no part
 // ---------------------------------------------------------------------------

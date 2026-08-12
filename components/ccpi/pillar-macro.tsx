@@ -48,7 +48,7 @@ export function PillarMacro({
             </p>
           )}
           {/* TED Spread */}
-          {indicators.tedSpread !== undefined && (
+          {indicators.tedSpread != null && (
             <div className="space-y-2">
               {/* Added tooltip to TED Spread indicator */}
               <div className="flex items-center justify-between text-sm">
@@ -104,7 +104,7 @@ export function PillarMacro({
           )}
 
           {/* US Dollar Index (DXY) */}
-          {indicators.dxyIndex !== undefined && (
+          {indicators.dxyIndex != null && (
             <div className="space-y-2">
               {/* Added tooltip to DXY Index */}
               <div className="flex items-center justify-between text-sm">
@@ -157,7 +157,7 @@ export function PillarMacro({
           )}
 
           {/* ISM Manufacturing PMI */}
-          {indicators.ismPMI !== undefined && (
+          {indicators.ismPMI != null && (
             <div className="space-y-2">
               {/* Added tooltip to ISM Manufacturing PMI */}
               <div className="flex items-center justify-between text-sm">
@@ -210,7 +210,7 @@ export function PillarMacro({
           )}
 
           {/* Fed Funds Rate */}
-          {indicators.fedFundsRate !== undefined && (
+          {indicators.fedFundsRate != null && (
             <div className="space-y-2">
               {/* Added tooltip to Fed Funds Rate */}
               <div className="flex items-center justify-between text-sm">
@@ -265,7 +265,7 @@ export function PillarMacro({
           )}
 
           {/* Fed Reverse Repo */}
-          {indicators.fedReverseRepo !== undefined && (
+          {indicators.fedReverseRepo != null && (
             <div className="space-y-2">
               {/* Added tooltip to Fed Reverse Repo */}
               <div className="flex items-center justify-between text-sm">
@@ -318,7 +318,7 @@ export function PillarMacro({
           )}
 
           {/* Junk Bond Spread - moved to Macro */}
-          {indicators.junkSpread !== undefined && (
+          {indicators.junkSpread != null && (
             <div className="space-y-2">
               {/* Added tooltip to Junk Bond Spread */}
               <div className="flex items-center justify-between text-sm">
@@ -373,7 +373,7 @@ export function PillarMacro({
           )}
 
           {/* US Debt-to-GDP */}
-          {indicators.debtToGDP !== undefined && (
+          {indicators.debtToGDP != null && (
             <div className="space-y-2">
               {/* Added tooltip to US Debt-to-GDP */}
               <div className="flex items-center justify-between text-sm">
@@ -426,7 +426,7 @@ export function PillarMacro({
           )}
 
           {/* Yield Curve — scored once, in Macro (P3-13) */}
-          {indicators.yieldCurve !== undefined && (
+          {indicators.yieldCurve != null && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium flex items-center gap-1">

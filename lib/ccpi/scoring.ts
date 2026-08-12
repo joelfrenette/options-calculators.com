@@ -256,8 +256,8 @@ export interface MomentumInputs {
    */
   nvidiaMomentum: number | null
   soxIndex: number | null // null when no source produced a reading (P6-34)
-  qqqDailyReturn: number // percent
-  qqqConsecDown: number
+  qqqDailyReturn: number | null // percent; null when no source produced a reading (P7-17)
+  qqqConsecDown: number | null // null when no source produced a reading (P7-17)
   qqqBelowSMA20: boolean
   qqqSMA20Proximity: number
   qqqBelowSMA50: boolean
@@ -268,7 +268,7 @@ export interface MomentumInputs {
   qqqBollingerProximity: number
   vix: number | null // null when no source produced a reading (P6-34)
   /** RATIO convention: VIX3M / spot VIX. <1 = backwardation. */
-  vixTermStructure: number
+  vixTermStructure: number | null // null when no source produced a reading (P7-17)
 }
 
 export type MomentumTiers = Record<MomentumKey, Tier>
@@ -302,6 +302,7 @@ export function computeMomentumPillar(d: MomentumInputs, tiers: MomentumTiers): 
       return 0
     })(),
     qqqDailyReturn: (() => {
+      if (d.qqqDailyReturn === null) return null // P7-17: no reading, no points
       if (d.qqqDailyReturn <= -6) return 12 // Crash day
       if (d.qqqDailyReturn <= -3) return 9
       if (d.qqqDailyReturn <= -1.5) return 6
@@ -309,6 +310,7 @@ export function computeMomentumPillar(d: MomentumInputs, tiers: MomentumTiers): 
       return 0
     })(),
     qqqConsecDown: (() => {
+      if (d.qqqConsecDown === null) return null // P7-17: no reading, no points
       if (d.qqqConsecDown >= 5) return 7
       if (d.qqqConsecDown >= 3) return 4
       if (d.qqqConsecDown >= 2) return 2
@@ -330,6 +332,7 @@ export function computeMomentumPillar(d: MomentumInputs, tiers: MomentumTiers): 
     // in normal contango (≈1.05-1.15) scores 0 — the old "spot<15 flags risk"
     // defect is structurally impossible here.
     vixTermStructure: (() => {
+      if (d.vixTermStructure === null) return null // P7-17: no reading, no points
       if (d.vixTermStructure < 0.95) return 9 // Severe backwardation
       if (d.vixTermStructure < 1.0) return 5 // Mild backwardation
       return 0 // Contango = normal
@@ -404,13 +407,13 @@ export function computeRiskAppetitePillar(d: RiskAppetiteInputs, tiers: RiskAppe
 // ---------------------------------------------------------------------------
 
 export interface ValuationInputs {
-  spxPE: number
-  spxPS: number
+  spxPE: number | null // null when no source produced a reading (P7-17)
+  spxPS: number | null // null when no source produced a reading (P7-17)
   buffettIndicator: number | null // null when no source produced a reading (P6-34)
   qqqPE: number | null // null when no source produced a reading (P6-34)
   mag7Concentration: number | null // null when no source produced a reading (P6-34)
   shillerCAPE: number | null // null when no source produced a reading (P6-34)
-  equityRiskPremium: number
+  equityRiskPremium: number | null // null when no source produced a reading (P7-17)
 }
 
 export type ValuationTiers = Record<ValuationKey, Tier>
@@ -418,6 +421,7 @@ export type ValuationTiers = Record<ValuationKey, Tier>
 export function computeValuationPillar(d: ValuationInputs, tiers: ValuationTiers): PillarResult {
   const points: Record<ValuationKey, number | null> = {
     spxPE: (() => {
+      if (d.spxPE === null) return null // P7-17: no reading, no points
       if (d.spxPE > 30) return 18 // Extreme overvaluation
       if (d.spxPE > 25) return 14
       if (d.spxPE > 22) return 10
@@ -425,6 +429,7 @@ export function computeValuationPillar(d: ValuationInputs, tiers: ValuationTiers
       return 2
     })(),
     spxPS: (() => {
+      if (d.spxPS === null) return null // P7-17: no reading, no points
       if (d.spxPS > 3.5) return 12
       if (d.spxPS > 3.0) return 10
       if (d.spxPS > 2.5) return 7
@@ -465,6 +470,7 @@ export function computeValuationPillar(d: ValuationInputs, tiers: ValuationTiers
       return 0
     })(),
     equityRiskPremium: (() => {
+      if (d.equityRiskPremium === null) return null // P7-17: no reading, no points
       if (d.equityRiskPremium < 1.5) return 10 // Severely overpriced vs bonds
       if (d.equityRiskPremium < 2.0) return 8
       if (d.equityRiskPremium < 3.0) return 5
@@ -480,15 +486,15 @@ export function computeValuationPillar(d: ValuationInputs, tiers: ValuationTiers
 // ---------------------------------------------------------------------------
 
 export interface MacroInputs {
-  tedSpread: number
-  dxyIndex: number
+  tedSpread: number | null // null when no source produced a reading (P7-17)
+  dxyIndex: number | null // null when no source produced a reading (P7-17)
   ismPMI: number | null // null when no source produced a reading (P6-34)
-  fedFundsRate: number
-  fedReverseRepo: number
-  junkSpread: number
-  debtToGDP: number
+  fedFundsRate: number | null // null when no source produced a reading (P7-17)
+  fedReverseRepo: number | null // null when no source produced a reading (P7-17)
+  junkSpread: number | null // null when no source produced a reading (P7-17)
+  debtToGDP: number | null // null when no source produced a reading (P7-17)
   /** 10Y-2Y spread in percentage points; negative = inverted */
-  yieldCurve: number
+  yieldCurve: number | null // null when no source produced a reading (P7-17)
 }
 
 export type MacroTiers = Record<MacroKey, Tier>
@@ -496,6 +502,7 @@ export type MacroTiers = Record<MacroKey, Tier>
 export function computeMacroPillar(d: MacroInputs, tiers: MacroTiers): PillarResult {
   const points: Record<MacroKey, number | null> = {
     tedSpread: (() => {
+      if (d.tedSpread === null) return null // P7-17: no reading, no points
       if (d.tedSpread > 1.0) return 13 // Extreme banking stress
       if (d.tedSpread > 0.75) return 10
       if (d.tedSpread > 0.5) return 8
@@ -503,6 +510,7 @@ export function computeMacroPillar(d: MacroInputs, tiers: MacroTiers): PillarRes
       return 0
     })(),
     dxyIndex: (() => {
+      if (d.dxyIndex === null) return null // P7-17: no reading, no points
       if (d.dxyIndex > 115) return 12 // Very strong dollar hurts tech
       if (d.dxyIndex > 110) return 9
       if (d.dxyIndex > 105) return 6
@@ -518,6 +526,7 @@ export function computeMacroPillar(d: MacroInputs, tiers: MacroTiers): PillarRes
       return 0
     })(),
     fedFundsRate: (() => {
+      if (d.fedFundsRate === null) return null // P7-17: no reading, no points
       if (d.fedFundsRate > 6.0) return 15 // Extremely restrictive
       if (d.fedFundsRate > 5.5) return 12
       if (d.fedFundsRate > 5.0) return 9
@@ -526,6 +535,7 @@ export function computeMacroPillar(d: MacroInputs, tiers: MacroTiers): PillarRes
       return 0
     })(),
     fedReverseRepo: (() => {
+      if (d.fedReverseRepo === null) return null // P7-17: no reading, no points
       if (d.fedReverseRepo > 2000) return 11 // Extreme liquidity drain
       if (d.fedReverseRepo > 1500) return 8
       if (d.fedReverseRepo > 1000) return 6
@@ -533,6 +543,7 @@ export function computeMacroPillar(d: MacroInputs, tiers: MacroTiers): PillarRes
       return 0
     })(),
     junkSpread: (() => {
+      if (d.junkSpread === null) return null // P7-17: no reading, no points
       if (d.junkSpread > 10) return 10 // Severe credit stress
       if (d.junkSpread > 8) return 8
       if (d.junkSpread > 6) return 6
@@ -541,6 +552,7 @@ export function computeMacroPillar(d: MacroInputs, tiers: MacroTiers): PillarRes
       return 0
     })(),
     debtToGDP: (() => {
+      if (d.debtToGDP === null) return null // P7-17: no reading, no points
       if (d.debtToGDP > 130) return 10 // Fiscal crisis risk
       if (d.debtToGDP > 120) return 8
       if (d.debtToGDP > 110) return 5
@@ -549,6 +561,7 @@ export function computeMacroPillar(d: MacroInputs, tiers: MacroTiers): PillarRes
     })(),
     // Scored ONCE, here (P3-13).
     yieldCurve: (() => {
+      if (d.yieldCurve === null) return null // P7-17: no reading, no points
       if (d.yieldCurve < -1.0) return 14 // Deep inversion
       if (d.yieldCurve < -0.5) return 11
       if (d.yieldCurve < -0.2) return 6

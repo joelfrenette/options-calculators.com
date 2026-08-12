@@ -390,11 +390,13 @@ recomputes it.
 | P7-13 | P3 | fixed | `expectedMove` recomputed inline in `/api/strategy-scanner` now calls `lib/black-scholes.ts` and skips the row when it returns null. |
 | P7-14 | P2 | fixed | The unreachable hook is deleted, with its cascade: two whole modules, two aliases and a second composite implementation. `lib/` 230 → 224 exports. The rule's one-hop limit is recorded, not half-fixed. |
 | P7-16 | P2 | fixed | The header now dates every reading, marks a cached one as cached, and flags it stale past the shared threshold. The date line had been wired to a field /api/ccpi never returns. |
+| P7-17 | P1 | fixed | Thirteen more assembly-layer defaults on displayed CCPI inputs, plus twelve render sites calling .toFixed() on a nullable value behind a !== undefined guard — a TypeError, armed by P6-34. |
+| P7-18 | P2 | open | The four QQQ boolean/proximity pairs still default to false/0, so "not below the SMA" and "could not fetch QQQ" read alike. A modelling decision, not a mechanical null-through. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-219 findings recorded · **173 fixed · 8 wontfix · 0 verified-ok · 38 open.**
+221 findings recorded · **174 fixed · 8 wontfix · 0 verified-ok · 39 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -1964,3 +1966,105 @@ phase.
 | ID | Sev | Tab / area | Finding |
 |---|---|---|---|
 | P7-10 | P2 | ANALYZE → CCPI | **FIXED, and the finding's own diagnosis corrected.** The `?? 50` named in the row was never reached: `fetchAlphaVantageIndicators` returns a `baselineValues` object rather than null on failure, and *that* object held the 50 — along with three more invented constants (`nvidiaPrice: 800`, `soxIndex: 5000`, `mag7Concentration: 55`) that no code reads. All null now. Scoring was already gated by the baseline tier; the **display** rendered "$X \| 50/100" whenever Alpha Vantage was down, because `nvidiaPrice` comes from a separate AI chain and stays defined. `MomentumInputs.nvidiaMomentum` is `number \| null` with four new checks, one asserting that a real 50 and an absence are distinguished by `scoredMax` rather than by `score` — they are identical in `score`. |
+
+---
+
+## Phase 7.4 (fourteenth pass) — P7-17: the rest of the defaults, and a crash the null fix had already armed (2026-08-11)
+
+P7-10 fixed one defaulted input and named the mechanism: **a default written at the
+source outlives every null-guard written at the call site.** This is the sweep for the
+rest of `/api/ccpi`. It found thirteen more of the same shape and, underneath them, a
+client-side crash that had been sitting armed since the P6-34 nullability work.
+
+### The thirteen
+
+Every one is an input whose tier already reads `baseline` when its source is missing — so
+scoring and the canaries excluded it correctly — while the **assembly layer substituted a
+constant for the value the UI renders**:
+
+| Pillar | Input | Was | Rendered as |
+|---|---|---|---|
+| Macro | `tedSpread` | `?? 0.25` | `0.25%` |
+| Macro | `dxyIndex` | `?? 103` | `103.0` |
+| Macro | `fedFundsRate` | `?? 5.33` | `5.33%` |
+| Macro | `fedReverseRepo` | `?? 450` | `$450B` |
+| Macro | `junkSpread` | `?? 3.5` | `3.50%` |
+| Macro | `debtToGDP` | `?? 123` | `123.0%` |
+| Macro | `yieldCurve` | `?? 0.25` | `0.25%` |
+| Valuation | `spxPE` | `\|\| 22.5` | `22.5` |
+| Valuation | `spxPS` | `\|\| 2.8` | `2.8` |
+| Valuation | `equityRiskPremium` | derived from two defaults | `x.xx%` |
+| Momentum | `vixTermStructure` | `?? 1.08` | `1.08` |
+| Momentum | `qqqDailyReturn` | `\|\| 0` | `0` |
+| Momentum | `qqqConsecDown` | `\|\| 0` | `0 days` |
+
+`equityRiskPremium` is the one worth singling out. It was computed from `spxPE || 22.5`
+and `yieldCurve10Y ?? 4.5`, so it could not fail to produce a number — **a derived
+fabrication, further from its sources than either input and correspondingly harder to
+recognise on screen as something nobody measured.** It is null-in/null-out now.
+
+The `?? 5.33`-style constants were not arbitrary; they were plausible mid-2024 readings.
+That is what makes them dangerous rather than obviously broken: a fed funds rate of 5.33%
+renders exactly like a measurement, to two decimal places, on a tab whose purpose is to
+tell you what the macro picture currently is.
+
+### The crash underneath
+
+Converting these to null meant re-reading the guards, and the guards were the finding.
+
+`components/ccpi/*.tsx` gated every indicator on `!== undefined`. **Ten of the fields
+behind those guards were already `number | null`** — `soxIndex`, `vix`, `ismPMI`,
+`putCallRatio`, `aaiiBullish`, `fearGreedIndex`, `buffettIndicator`, `qqqPE`,
+`mag7Concentration`, `shillerCAPE` — because P6-34 removed their baseline constants and
+made `fetchWithAIFallback` return `value: null` when no provider produced a reading.
+
+`null !== undefined` is **true**. So the guard passed, and the body ran
+`indicators.soxIndex.toFixed(0)`.
+
+That is a `TypeError`, not a wrong number. Twelve such sites. Whenever one of those
+sources returned null — which is exactly what P6-34 arranged for it to do — the CCPI tab
+would throw during render rather than withhold a card.
+
+**P6-34 was right and left the other half undone.** Removing a fabricated constant and
+introducing a null is only half a change; the second half is every guard and every
+formatter downstream of it. This is the same pairing P7-10 flagged one commit earlier —
+"a nullable value and a `!== undefined` check are not the same test" — found there on one
+field and here on twelve. All 21 guards across the four pillar components are now
+`!= null`, which is correct for both states.
+
+### Verified against a live run, not just types
+
+The local dev server has no API keys, so every source is unavailable — the exact
+condition these defaults used to paper over. `/api/ccpi` now logs all four pillars
+reporting `score: null` with complete exclusion lists (10 momentum, 4 risk-appetite, 7
+valuation, 8 macro). Before this change the same run would have produced numbers for
+`tedSpread`, `dxyIndex`, `fedFundsRate` and the rest and rendered them as readings.
+
+The route answers 503 in that state, and did so before this change too — checked by
+stashing the diff and re-requesting, so the status is pre-existing local behaviour and
+not something the sweep introduced.
+
+### The test is a loop, and that is the point
+
+25 new checks, one per scored input, plus two scope assertions (formulas 537 → 564).
+
+They are generated from the WEIGHTS tables rather than hand-written, because **a
+hand-written list of fields to test has exactly the same blind spot as the hand-written
+sweep that missed these**: it can only cover what its author remembered. Deriving from
+WEIGHTS puts a new indicator in scope the moment it is given a weight.
+
+Two details that make it a rule rather than a gesture:
+
+- **Tiers are `"live"` throughout.** The tier gate already excludes a baseline input, so
+  running the null test under baseline tiers would re-test the gate and prove nothing
+  about the value path. A null arriving on a *live* tier is the case that matters: the
+  tier says where a reading came from, the value says whether there is one.
+- **Both the covered count and the skipped count are asserted** (P6-75, P6-77). Scope is
+  structural — a weight is covered when its key is an actual field of the pillar's input
+  object — so a renamed field falls into the skip list and fails the size assertion
+  instead of quietly lowering coverage.
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| P7-17 | **P1** | ANALYZE → CCPI | **FIXED.** Thirteen more assembly-layer defaults on displayed CCPI inputs — the P7-10 shape across the macro, valuation and momentum pillars, including `equityRiskPremium`, which was *derived* from two defaults and so could never report an absence. All null now. **Underneath them: twelve render sites called `.toFixed()` on a `number \| null` behind a `!== undefined` guard, which is a TypeError rather than a wrong number** — armed by P6-34's nullability fix, which removed the constants and did not revisit the guards. All 21 pillar guards are `!= null`. 25 generated checks, scope asserted both ways. |
+| P7-18 | P2 | ANALYZE → CCPI | **The four QQQ boolean/proximity pairs still default: `qqqBelowSMA20 \|\| false` and `qqqSMA20Proximity \|\| 0`, ×4.** "QQQ is not below its 20-day SMA" and "we could not fetch QQQ" remain the same `false`. Deliberately out of P7-17's scope: these weights score a PAIR of inputs, so the fix is a modelling decision about how a half-known technical reads, not a mechanical null-through. **`AmplifierInputs` in `lib/ccpi/scoring.ts` already models them as nullable and says why** — "`qqqDailyReturn: 0` and `qqqBelowSMA50: false` are both assertions the data never made" — so the amplifier layer got this right and the pillar layer did not. **OPEN.** |

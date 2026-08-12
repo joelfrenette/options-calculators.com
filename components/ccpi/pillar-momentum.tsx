@@ -102,7 +102,7 @@ export function PillarMomentum({
           )}
 
           {/* SOX Semiconductor Index */}
-          {indicators.soxIndex !== undefined && (
+          {indicators.soxIndex != null && (
             <CCPIIndicator
               label="SOX Semiconductor Index (Chip Sector Health)"
               value={indicators.soxIndex.toFixed(0)}
@@ -131,7 +131,7 @@ export function PillarMomentum({
           )}
 
           {/* QQQ Daily Return */}
-          {indicators.qqqDailyReturn !== undefined && (
+          {indicators.qqqDailyReturn != null && (
             <CCPIIndicator
               label="QQQ Daily Return (5× downside amplifier)"
               value={indicators.qqqDailyReturn}
@@ -162,7 +162,7 @@ export function PillarMomentum({
           )}
 
           {/* Consecutive Down Days */}
-          {indicators.qqqConsecDown !== undefined && (
+          {indicators.qqqConsecDown != null && (
             <CCPIIndicator
               label="QQQ Consecutive Down Days"
               value={`${indicators.qqqConsecDown} days`}
@@ -190,13 +190,13 @@ export function PillarMomentum({
           )}
 
           {/* Below SMA20 */}
-          {indicators.qqqBelowSMA20 !== undefined && (
+          {indicators.qqqBelowSMA20 != null && (
             <CCPIBooleanIndicator
               label="QQQ Below 20-Day SMA"
               value={indicators.qqqBelowSMA20}
               proximity={indicators.qqqSMA20Proximity ?? null}
               additionalInfo={
-                indicators.qqqSMA20Proximity !== undefined
+                indicators.qqqSMA20Proximity != null
                   ? `${indicators.qqqSMA20Proximity.toFixed(0)}% proximity`
                   : undefined
               }
@@ -222,13 +222,13 @@ export function PillarMomentum({
           )}
 
           {/* Below SMA50 */}
-          {indicators.qqqBelowSMA50 !== undefined && (
+          {indicators.qqqBelowSMA50 != null && (
             <CCPIBooleanIndicator
               label="QQQ Below 50-Day SMA"
               value={indicators.qqqBelowSMA50}
               proximity={indicators.qqqSMA50Proximity ?? null}
               additionalInfo={
-                indicators.qqqSMA50Proximity !== undefined
+                indicators.qqqSMA50Proximity != null
                   ? `${indicators.qqqSMA50Proximity.toFixed(0)}% proximity`
                   : undefined
               }
@@ -254,13 +254,13 @@ export function PillarMomentum({
           )}
 
           {/* Below SMA200 */}
-          {indicators.qqqBelowSMA200 !== undefined && (
+          {indicators.qqqBelowSMA200 != null && (
             <CCPIBooleanIndicator
               label="QQQ Below 200-Day SMA"
               value={indicators.qqqBelowSMA200}
               proximity={indicators.qqqSMA200Proximity ?? null}
               additionalInfo={
-                indicators.qqqSMA200Proximity !== undefined
+                indicators.qqqSMA200Proximity != null
                   ? `${indicators.qqqSMA200Proximity.toFixed(0)}% proximity`
                   : undefined
               }
@@ -286,7 +286,7 @@ export function PillarMomentum({
           )}
 
           {/* Below Bollinger Band (Lower) */}
-          {indicators.qqqBelowBollinger !== undefined && (
+          {indicators.qqqBelowBollinger != null && (
             <div className="space-y-2">
               {/* Added tooltip to QQQ Below Bollinger Band indicator */}
               <div className="flex items-center justify-between text-sm">
@@ -322,7 +322,7 @@ export function PillarMomentum({
                   )}
                 </span>
                 <div className="flex items-center gap-2">
-                  {indicators.qqqBollingerProximity !== undefined && (
+                  {indicators.qqqBollingerProximity != null && (
                     <span className="text-xs font-semibold text-orange-600">
                       {indicators.qqqBollingerProximity.toFixed(0)}% proximity
                     </span>
@@ -360,7 +360,7 @@ export function PillarMomentum({
           )}
 
           {/* VIX */}
-          {indicators.vix !== undefined && (
+          {indicators.vix != null && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium flex items-center gap-1">
@@ -414,7 +414,7 @@ export function PillarMomentum({
           )}
 
           {/* VIX Term Structure — RATIO convention: VIX3M / spot VIX */}
-          {indicators.vixTermStructure !== undefined && (
+          {indicators.vixTermStructure != null && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium flex items-center gap-1">

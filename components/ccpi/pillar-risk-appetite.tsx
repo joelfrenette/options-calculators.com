@@ -48,7 +48,7 @@ export function PillarRiskAppetite({
             </p>
           )}
           {/* Put/Call Ratio */}
-          {indicators.putCallRatio !== undefined && (
+          {indicators.putCallRatio != null && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium flex items-center gap-1">
@@ -106,7 +106,7 @@ export function PillarRiskAppetite({
           )}
 
           {/* AAII Bullish Sentiment */}
-          {indicators.aaiiBullish !== undefined && (
+          {indicators.aaiiBullish != null && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium flex items-center gap-1">
@@ -160,7 +160,7 @@ export function PillarRiskAppetite({
           )}
 
           {/* AAII Bearish Sentiment */}
-          {indicators.aaiiBearish !== undefined && (
+          {indicators.aaiiBearish != null && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium flex items-center gap-1">
@@ -217,7 +217,7 @@ export function PillarRiskAppetite({
           )}
 
           {/* AAII Spread (Bull-Bear) */}
-          {indicators.aaiiSpread !== undefined && (
+          {indicators.aaiiSpread != null && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium flex items-center gap-1">
@@ -275,7 +275,7 @@ export function PillarRiskAppetite({
           )}
 
           {/* Fear & Greed Index */}
-          {indicators.fearGreedIndex !== undefined && (
+          {indicators.fearGreedIndex != null && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium flex items-center gap-1">
@@ -333,7 +333,7 @@ export function PillarRiskAppetite({
           )}
 
           {/* High Yield Spread */}
-          {indicators.highYieldSpread !== undefined && (
+          {indicators.highYieldSpread != null && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium flex items-center gap-1">

@@ -60,7 +60,7 @@ export function PillarValuation({
             </p>
           )}
           {/* S&P 500 P/E */}
-          {indicators.spxPE !== undefined && (
+          {indicators.spxPE != null && (
             <div className="space-y-2">
               {/* Added tooltip to S&P 500 P/E indicator */}
               <div className="flex items-center justify-between text-sm">
@@ -112,7 +112,7 @@ export function PillarValuation({
           )}
 
           {/* P/S Ratio */}
-          {indicators.spxPS !== undefined && (
+          {indicators.spxPS != null && (
             <div className="space-y-2">
               {/* Added tooltip to S&P 500 P/S indicator */}
               <div className="flex items-center justify-between text-sm">
@@ -164,7 +164,7 @@ export function PillarValuation({
           )}
 
           {/* Buffett Indicator */}
-          {indicators.buffettIndicator !== undefined && (
+          {indicators.buffettIndicator != null && (
             <div className="space-y-2">
               {/* Added tooltip to Buffett Indicator */}
               <div className="flex items-center justify-between text-sm">
@@ -220,7 +220,7 @@ export function PillarValuation({
             </div>
           )}
 
-          {indicators.qqqPE !== undefined && (
+          {indicators.qqqPE != null && (
             <div className="space-y-2">
               {/* Added tooltip to QQQ P/E indicator */}
               <div className="flex items-center justify-between text-sm">
@@ -275,7 +275,7 @@ export function PillarValuation({
             </div>
           )}
 
-          {indicators.mag7Concentration !== undefined && (
+          {indicators.mag7Concentration != null && (
             <div className="space-y-2">
               {/* Added tooltip to Magnificent 7 Concentration */}
               <div className="flex items-center justify-between text-sm">
@@ -329,7 +329,7 @@ export function PillarValuation({
             </div>
           )}
 
-          {indicators.shillerCAPE !== undefined && (
+          {indicators.shillerCAPE != null && (
             <div className="space-y-2">
               {/* Added tooltip to Shiller CAPE Ratio */}
               <div className="flex items-center justify-between text-sm">
@@ -384,7 +384,7 @@ export function PillarValuation({
             </div>
           )}
 
-          {indicators.equityRiskPremium !== undefined && (
+          {indicators.equityRiskPremium != null && (
             <div className="space-y-2">
               {/* Added tooltip to Equity Risk Premium */}
               <div className="flex items-center justify-between text-sm">

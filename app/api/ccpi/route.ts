@@ -514,11 +514,11 @@ async function fetchMarketData() {
   // AI fallback chain (the old `status === "live"` comparison could never be true).
   apiStatus.shortInterest = { live: false, source: shortInterestResult.source, lastUpdated: now() }
 
-  const spxPE = (apifyLive ? apifyRaw?.data?.forwardPE || apifyRaw?.data?.trailingPE : undefined) || fmpVal?.spxPE || 22.5
-  const spxPS = (apifyLive ? apifyRaw?.data?.priceToSales : undefined) || fmpVal?.spxPS || 2.8
+  const spxPE = (apifyLive ? apifyRaw?.data?.forwardPE || apifyRaw?.data?.trailingPE : undefined) || fmpVal?.spxPE || null
+  const spxPS = (apifyLive ? apifyRaw?.data?.priceToSales : undefined) || fmpVal?.spxPS || null
   const spxPETier: Tier = apifyLive || fmpVal?.spxPE !== undefined ? "live" : "baseline"
   const spxPSTier: Tier = (apifyLive && apifyRaw?.data?.priceToSales) || fmpVal?.spxPS !== undefined ? "live" : "baseline"
-  const yieldCurve10Y = fredData?.yieldCurve10Y ?? 4.5
+  const yieldCurve10Y = fredData?.yieldCurve10Y ?? null
   // Per-series, not blanket (P6-6): the 10Y is the only series ERP depends on.
   const fredTier: Tier = fredData?.yieldCurve10Y != null ? "live" : "baseline"
 
@@ -594,8 +594,8 @@ async function fetchMarketData() {
 
   return {
     // QQQ Technicals
-    qqqDailyReturn: qqqData?.dailyReturn || 0,
-    qqqConsecDown: qqqData?.consecutiveDaysDown || 0,
+    qqqDailyReturn: qqqData?.dailyReturn ?? null,
+    qqqConsecDown: qqqData?.consecutiveDaysDown ?? null,
     qqqBelowSMA20: qqqData?.belowSMA20 || false,
     qqqBelowSMA50: qqqData?.belowSMA50 || false,
     qqqBelowSMA200: qqqData?.belowSMA200 || false,
@@ -613,7 +613,7 @@ async function fetchMarketData() {
     // VIX>35 crash amplifier and the VIX canaries could never fire (P0).
     vix: (vixTermLive ? vixTermData?.spotVIX : undefined) ?? vixResult.value,
     // RATIO convention (P3-14): VIX3M / spot VIX; < 1 = backwardation.
-    vixTermStructure: vixTermData?.termStructure ?? 1.08,
+    vixTermStructure: vixTermData?.termStructure ?? null,
     vixTermInverted: vixTermData?.isInverted ?? false,
     // vxn / rvx / atr / ltv / spotVol / bullishPercent were unsourced baseline
     // constants scored as if they were data — deleted per AUDIT P3-19.
@@ -627,10 +627,10 @@ async function fetchMarketData() {
     equityRiskPremium: calculateEquityRiskPremium(spxPE, yieldCurve10Y),
 
     // Macro
-    fedFundsRate: fredData?.fedFundsRate ?? 5.33,
-    junkSpread: fredData?.junkSpread ?? 3.5,
-    yieldCurve: fredData?.yieldCurve ?? 0.25,
-    debtToGDP: fredData?.debtToGDP ?? 123,
+    fedFundsRate: fredData?.fedFundsRate ?? null,
+    junkSpread: fredData?.junkSpread ?? null,
+    yieldCurve: fredData?.yieldCurve ?? null,
+    debtToGDP: fredData?.debtToGDP ?? null,
 
     // Sentiment
     putCallRatio: putCallData.ratio,
@@ -670,17 +670,27 @@ async function fetchMarketData() {
     // and left this one.
     nvidiaMomentum: alphaVantageData?.nvidiaMomentum ?? null,
     soxIndex: soxIndexResult.value,
-    tedSpread: fredData?.tedSpread ?? 0.25,
-    dxyIndex: fredData?.dxyIndex ?? 103,
+    tedSpread: fredData?.tedSpread ?? null,
+    dxyIndex: fredData?.dxyIndex ?? null,
     ismPMI: ismPMIResult.value,
-    fedReverseRepo: fredData?.fedReverseRepo ?? 450,
+    fedReverseRepo: fredData?.fedReverseRepo ?? null,
 
     apiStatus,
     tiers,
   }
 }
 
-function calculateEquityRiskPremium(spxPE: number, treasury10Y: number): number {
+/**
+ * Equity risk premium = S&P earnings yield − the 10Y Treasury.
+ *
+ * P7-17: null in, null out. Both inputs used to arrive defaulted — `spxPE ||
+ * 22.5` and `yieldCurve10Y ?? 4.5` — so this function could not fail to produce
+ * a number, and a "premium" computed from two invented constants is a **derived
+ * fabrication**: further from its sources than either, and correspondingly
+ * harder to recognise on screen as something nobody measured.
+ */
+function calculateEquityRiskPremium(spxPE: number | null, treasury10Y: number | null): number | null {
+  if (spxPE === null || treasury10Y === null || spxPE === 0) return null
   const earningsYield = (1 / spxPE) * 100
   return earningsYield - treasury10Y
 }
