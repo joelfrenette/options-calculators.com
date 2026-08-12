@@ -331,9 +331,83 @@ check(
 // the P6-77 shape, where a check that stops covering reads exactly like one
 // that passes.
 check(
-  `scope: exactly 4 weights score input PAIRS and are covered by P7-18 instead`,
+  `scope: exactly 4 weights score input PAIRS and are covered by the pair sweep below`,
   skipped.length === 4 && skipped.every((w) => w.key.startsWith("qqq")),
   skipped.map((w) => w.key).join(", ") || "(none)",
+)
+
+// ---------------------------------------------------------------------------
+// P7-18. The four moving-average / band weights, whose inputs come in PAIRS:
+// a boolean ("below it") and a proximity ("by how much"). Covered here rather
+// than in the loop above because there is no single field to null.
+//
+// Three assertions per pair, and the two single-half cases are the substance:
+// `proximity` alone decides two of smaPoints' three branches, so a known
+// `below` with an unknown distance is not a partial answer — it is a guess
+// about which branch applies. Either half missing must make the pair
+// unscoreable, or the pillar reports a technical reading it did not measure.
+// ---------------------------------------------------------------------------
+const smaPairs: Array<{ key: string; max: number; below: string; prox: string }> = [
+  { key: "qqqSMA20", max: 7, below: "qqqBelowSMA20", prox: "qqqSMA20Proximity" },
+  { key: "qqqSMA50", max: 10, below: "qqqBelowSMA50", prox: "qqqSMA50Proximity" },
+  { key: "qqqSMA200", max: 15, below: "qqqBelowSMA200", prox: "qqqSMA200Proximity" },
+  { key: "qqqBollinger", max: 9, below: "qqqBelowBollinger", prox: "qqqBollingerProximity" },
+]
+
+check(
+  `scope: the pair sweep covers all ${skipped.length} pair weights`,
+  smaPairs.length === skipped.length && smaPairs.every((p) => skipped.some((w) => w.key === p.key)),
+  smaPairs.map((p) => p.key).join(", "),
+)
+
+for (const p of smaPairs) {
+  const both = computeMomentumPillar(
+    { ...maxRiskMomentum, [p.below]: null, [p.prox]: null } as MomentumInputs,
+    liveMomentum,
+  )
+  check(
+    `null ${p.key} pair (both halves) is excluded and renormalized`,
+    both.scoredMax === 100 - p.max && both.excluded.includes(p.key),
+    `scoredMax ${both.scoredMax} (want ${100 - p.max}), excluded [${both.excluded.join(", ")}]`,
+  )
+
+  const noProx = computeMomentumPillar({ ...maxRiskMomentum, [p.prox]: null } as MomentumInputs, liveMomentum)
+  check(
+    `${p.key}: known "below" with unknown distance is still excluded`,
+    noProx.scoredMax === 100 - p.max && noProx.excluded.includes(p.key),
+    `scoredMax ${noProx.scoredMax} (want ${100 - p.max})`,
+  )
+
+  const noBelow = computeMomentumPillar({ ...maxRiskMomentum, [p.below]: null } as MomentumInputs, liveMomentum)
+  check(
+    `${p.key}: known distance with unknown "below" is still excluded`,
+    noBelow.scoredMax === 100 - p.max && noBelow.excluded.includes(p.key),
+    `scoredMax ${noBelow.scoredMax} (want ${100 - p.max})`,
+  )
+}
+
+// The defect in one line: a fully-unavailable QQQ used to score 0 risk points
+// across all four pairs — 41 of the momentum pillar's 100 weight — and 0 points
+// is what a CALM market scores. "No data" and "everything is fine" produced the
+// same pillar contribution, which is the whole reason this file exists.
+const qqqDark = computeMomentumPillar(
+  {
+    ...maxRiskMomentum,
+    qqqBelowSMA20: null,
+    qqqSMA20Proximity: null,
+    qqqBelowSMA50: null,
+    qqqSMA50Proximity: null,
+    qqqBelowSMA200: null,
+    qqqSMA200Proximity: null,
+    qqqBelowBollinger: null,
+    qqqBollingerProximity: null,
+  } as MomentumInputs,
+  liveMomentum,
+)
+check(
+  "QQQ fully unavailable removes all 41 pair weight rather than scoring it calm",
+  qqqDark.scoredMax === 100 - 41,
+  `scoredMax ${qqqDark.scoredMax} (want 59)`,
 )
 
 for (const c of nullableCases) {

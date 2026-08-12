@@ -391,12 +391,12 @@ recomputes it.
 | P7-14 | P2 | fixed | The unreachable hook is deleted, with its cascade: two whole modules, two aliases and a second composite implementation. `lib/` 230 → 224 exports. The rule's one-hop limit is recorded, not half-fixed. |
 | P7-16 | P2 | fixed | The header now dates every reading, marks a cached one as cached, and flags it stale past the shared threshold. The date line had been wired to a field /api/ccpi never returns. |
 | P7-17 | P1 | fixed | Thirteen more assembly-layer defaults on displayed CCPI inputs, plus twelve render sites calling .toFixed() on a nullable value behind a !== undefined guard — a TypeError, armed by P6-34. |
-| P7-18 | P2 | open | The four QQQ boolean/proximity pairs still default to false/0, so "not below the SMA" and "could not fetch QQQ" read alike. A modelling decision, not a mechanical null-through. |
+| P7-18 | P1 | fixed | The four QQQ pairs defaulted to false/0, and smaPoints(false, 0) returns 0 risk points — the score a calm market earns. An unavailable QQQ counted 41 of the momentum pillar as a measured all-clear. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-221 findings recorded · **174 fixed · 8 wontfix · 0 verified-ok · 39 open.**
+221 findings recorded · **175 fixed · 8 wontfix · 0 verified-ok · 38 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -2068,3 +2068,73 @@ Two details that make it a rule rather than a gesture:
 |---|---|---|---|
 | P7-17 | **P1** | ANALYZE → CCPI | **FIXED.** Thirteen more assembly-layer defaults on displayed CCPI inputs — the P7-10 shape across the macro, valuation and momentum pillars, including `equityRiskPremium`, which was *derived* from two defaults and so could never report an absence. All null now. **Underneath them: twelve render sites called `.toFixed()` on a `number \| null` behind a `!== undefined` guard, which is a TypeError rather than a wrong number** — armed by P6-34's nullability fix, which removed the constants and did not revisit the guards. All 21 pillar guards are `!= null`. 25 generated checks, scope asserted both ways. |
 | P7-18 | P2 | ANALYZE → CCPI | **The four QQQ boolean/proximity pairs still default: `qqqBelowSMA20 \|\| false` and `qqqSMA20Proximity \|\| 0`, ×4.** "QQQ is not below its 20-day SMA" and "we could not fetch QQQ" remain the same `false`. Deliberately out of P7-17's scope: these weights score a PAIR of inputs, so the fix is a modelling decision about how a half-known technical reads, not a mechanical null-through. **`AmplifierInputs` in `lib/ccpi/scoring.ts` already models them as nullable and says why** — "`qqqDailyReturn: 0` and `qqqBelowSMA50: false` are both assertions the data never made" — so the amplifier layer got this right and the pillar layer did not. **OPEN.** |
+
+---
+
+## Phase 7.4 (fifteenth pass) — P7-18: "no data" and "everything is fine" were the same input (2026-08-11)
+
+The last defaulting group in `/api/ccpi`, and the one whose consequence was largest.
+
+Four momentum weights — `qqqSMA20` (7), `qqqSMA50` (10), `qqqSMA200` (15) and
+`qqqBollinger` (9) — score a **pair** of inputs each: a boolean "is QQQ below it" and a
+proximity "by how much". The route filled both halves on failure:
+
+```
+qqqBelowSMA20: qqqData?.belowSMA20 || false
+qqqSMA20Proximity: qqqData?.sma20Proximity || 0
+```
+
+`smaPoints(false, 0, …)` returns **0 risk points**, and 0 points is exactly what a calm,
+healthy market scores. So a completely unavailable QQQ contributed **41 of the momentum
+pillar's 100 weight as "no risk detected"** — not excluded, not renormalized, but counted
+as a measured all-clear on the pillar carrying 35% of the composite.
+
+That is a different and worse failure than the rest of this phase. P7-10 and P7-17
+substituted invented numbers that a reader could at least see on screen. This one made an
+absence *score*, silently, in the direction of reassurance.
+
+### The argument was already in the file
+
+`AmplifierInputs`, one screen below `smaPoints` in the same module, models these exact
+inputs as nullable and explains why:
+
+> the amplifiers sit OUTSIDE the pillar tier system, so a baseline-tier input reached
+> them as a real reading. `qqqDailyReturn: 0` and `qqqBelowSMA50: false` are both
+> assertions the data never made.
+
+**The amplifier layer got this right and the pillar layer did not**, in the same file,
+about the same underlying reading. This is the "a decision enforced in one module is not
+enforced" pattern for the sixth time this phase — and the first time both modules were
+close enough to read in one screen.
+
+### Why either half missing kills the pair
+
+`smaPoints` now returns null when `below` or `proximity` is null. Not just when both are.
+
+`proximity` alone decides two of the three branches (`>= 50` → near, `>= 25` → approach),
+and `below` only participates in the third. So a known `below` with an unknown distance is
+not a partial answer — it is a guess about which branch applies. Scoring it would mean
+picking a band from one bit of information.
+
+### Coverage
+
+Fourteen checks (formulas 564 → 578): three per pair — both halves null, boolean-only
+null, proximity-only null — plus a scope assertion that the pair sweep covers exactly the
+weights the field-level loop skips, so the two halves of the test file cannot both stop
+covering something.
+
+The last one states the defect directly rather than testing around it:
+
+> **QQQ fully unavailable removes all 41 pair weight rather than scoring it calm.**
+
+Verified live as well as in unit tests: on the local dev server, where no source is
+reachable, `/api/ccpi` now logs the momentum pillar excluding all ten of its inputs
+including the four pair keys. Before this change those four would have been absent from
+the excluded list and present in `scoredMax`.
+
+With P7-18 closed, **every scored CCPI input is nullable and every one is asserted to
+exclude when null** — 25 field-level cases plus 4 pair cases, 29 of 29 weights.
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| P7-18 | **P1** | ANALYZE → CCPI | **FIXED.** The four QQQ moving-average/band weights filled both halves of their input pair with `\|\| false` and `\|\| 0`, and `smaPoints(false, 0, …)` returns 0 risk points — **the same score a calm market earns.** An unavailable QQQ therefore contributed 41 of the momentum pillar's 100 weight as a measured all-clear, rather than being excluded and renormalized. Worse than the invented numbers of P7-10/P7-17: this absence *scored*, invisibly, toward reassurance. Both halves are nullable and either one missing makes the pair unscoreable, because `proximity` alone decides two of `smaPoints`' three branches. `AmplifierInputs` in the same module already modelled these as nullable with the reason written out. 14 checks; all 29 scored weights are now asserted to exclude on null. |

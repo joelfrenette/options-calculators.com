@@ -596,14 +596,14 @@ async function fetchMarketData() {
     // QQQ Technicals
     qqqDailyReturn: qqqData?.dailyReturn ?? null,
     qqqConsecDown: qqqData?.consecutiveDaysDown ?? null,
-    qqqBelowSMA20: qqqData?.belowSMA20 || false,
-    qqqBelowSMA50: qqqData?.belowSMA50 || false,
-    qqqBelowSMA200: qqqData?.belowSMA200 || false,
-    qqqBelowBollinger: qqqData?.belowBollingerBand || false,
-    qqqSMA20Proximity: qqqData?.sma20Proximity || 0,
-    qqqSMA50Proximity: qqqData?.sma50Proximity || 0,
-    qqqSMA200Proximity: qqqData?.sma200Proximity || 0,
-    qqqBollingerProximity: qqqData?.bollingerProximity || 0,
+    qqqBelowSMA20: qqqData?.belowSMA20 ?? null,
+    qqqBelowSMA50: qqqData?.belowSMA50 ?? null,
+    qqqBelowSMA200: qqqData?.belowSMA200 ?? null,
+    qqqBelowBollinger: qqqData?.belowBollingerBand ?? null,
+    qqqSMA20Proximity: qqqData?.sma20Proximity ?? null,
+    qqqSMA50Proximity: qqqData?.sma50Proximity ?? null,
+    qqqSMA200Proximity: qqqData?.sma200Proximity ?? null,
+    qqqBollingerProximity: qqqData?.bollingerProximity ?? null,
 
     // Volatility. Priority: real FRED spot VIX (VIXCLS, fetched by
     // fetchVIXTermStructure) → AI fallback → its baseline. Previously

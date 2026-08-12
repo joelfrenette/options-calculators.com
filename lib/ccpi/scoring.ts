@@ -258,14 +258,14 @@ export interface MomentumInputs {
   soxIndex: number | null // null when no source produced a reading (P6-34)
   qqqDailyReturn: number | null // percent; null when no source produced a reading (P7-17)
   qqqConsecDown: number | null // null when no source produced a reading (P7-17)
-  qqqBelowSMA20: boolean
-  qqqSMA20Proximity: number
-  qqqBelowSMA50: boolean
-  qqqSMA50Proximity: number
-  qqqBelowSMA200: boolean
-  qqqSMA200Proximity: number
-  qqqBelowBollinger: boolean
-  qqqBollingerProximity: number
+  qqqBelowSMA20: boolean | null // null when no source produced a reading (P7-18)
+  qqqSMA20Proximity: number | null // null when no source produced a reading (P7-18)
+  qqqBelowSMA50: boolean | null // null when no source produced a reading (P7-18)
+  qqqSMA50Proximity: number | null // null when no source produced a reading (P7-18)
+  qqqBelowSMA200: boolean | null // null when no source produced a reading (P7-18)
+  qqqSMA200Proximity: number | null // null when no source produced a reading (P7-18)
+  qqqBelowBollinger: boolean | null // null when no source produced a reading (P7-18)
+  qqqBollingerProximity: number | null // null when no source produced a reading (P7-18)
   vix: number | null // null when no source produced a reading (P6-34)
   /** RATIO convention: VIX3M / spot VIX. <1 = backwardation. */
   vixTermStructure: number | null // null when no source produced a reading (P7-17)
@@ -273,7 +273,32 @@ export interface MomentumInputs {
 
 export type MomentumTiers = Record<MomentumKey, Tier>
 
-function smaPoints(below: boolean, proximity: number, breach: number, near: number, approach: number): number {
+/**
+ * Points for one moving-average / band test, or null when the reading is absent.
+ *
+ * P7-18. Both halves used to be non-nullable, filled by the route with
+ * `|| false` and `|| 0`. That made **"QQQ is comfortably above its 20-day SMA"
+ * and "we could not fetch QQQ" the same input**, and the pair scored 0 points
+ * either way — a clean technical picture assembled out of nothing.
+ *
+ * The argument for nullability was already written down one screen below, in
+ * `AmplifierInputs`: "`qqqDailyReturn: 0` and `qqqBelowSMA50: false` are both
+ * assertions the data never made." The amplifier layer modelled these correctly
+ * from the start; the pillar layer did not, and the two disagreed about the same
+ * underlying reading.
+ *
+ * Either half being null makes the pair unscoreable. `proximity` alone decides
+ * two of the three branches, so a known `below` with an unknown distance is not
+ * a partial answer — it is a guess about which branch applies.
+ */
+function smaPoints(
+  below: boolean | null,
+  proximity: number | null,
+  breach: number,
+  near: number,
+  approach: number,
+): number | null {
+  if (below === null || proximity === null) return null
   if (below && proximity >= 100) return breach
   if (proximity >= 50) return near
   if (proximity >= 25) return approach
