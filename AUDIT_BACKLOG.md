@@ -396,11 +396,12 @@ recomputes it.
 | P7-20 | P1 | fixed | /api/ccpi/executive-summary narrated an unscoreable composite to the model as "CCPI Score: 0/100" under its own "0-19: Low Risk" legend. Three layers produced the zero. |
 | P7-21 | P2 | open | Two of four groups fixed (trend-analysis price, polygon-tickers filter zeros). Still open: sentiment-heatmap 50/50 (blocked on P6-11) and strategy-scanner static betas — both need a decision, not code. |
 | P7-22 | P2 | fixed | Phase 7.5 standing guard: check-doc-figures.ts. CLAUDE.md carried "formulas 514" against a suite at 581 — the stale figure was inside the rule about staleness. |
+| P7-23 | P2 | fixed | The P7-10/P7-17/P7-18 class had no standing guard — re-verification put tedSpread ?? 0.25 back and the whole suite passed. check-ccpi-defaults.ts closes it, negative-tested in all three forms. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-225 findings recorded · **179 fixed · 8 wontfix · 0 verified-ok · 38 open.**
+226 findings recorded · **180 fixed · 8 wontfix · 0 verified-ok · 38 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -2539,3 +2540,78 @@ re-run before pinning.
 | ID | Sev | Tab / area | Finding |
 |---|---|---|---|
 | S-18 | P2 | SCAN → scanner | **CLOSED.** Every step label a user or log reader sees now derives from `components/scanner/steps.ts`; the guard's scope is derived from the directory rather than hand-listed, which is what exposed the four unguarded files (`scanner-notices.tsx` alone carried eight rendered labels). **A second drifting file surfaced: `fundamental-scan.ts` logged itself as Step 2 under a header reading "Step 3 fundamental scan core".** Comments stay out of scope because a comment cannot interpolate a constant — each was instead verified by hand, and the one that looks contradictory (`minMarketCapCategory` as a "Step 3 floor" indexing the Step 2 ladder) is correct, because the ladder is shared. 17 files guarded, 32 assertions. |
+
+---
+
+## Phase 7.4 (twentieth pass) — re-verifying this session's closures, and the gap it found (2026-08-11)
+
+`fixed` in the ledger means the record says so, not that anyone re-read the code. So this
+pass re-read the code.
+
+### 68 claims, checked against the source rather than the record
+
+Every closure from this session — P7-9, P7-12, P7-14, P7-16, P7-17, P7-18, P7-20 — was
+re-asserted directly: that each of the 22 nulled inputs is actually `?? null` in the
+route, that each has a matching `=== null` branch in the scoring core, that `smaPoints`
+refuses either half, that the executive-summary prompt has no bare `${ccpi}/100`, that the
+Greeks component no longer declares its own `normalCDF`, that the deleted modules are gone
+and nothing still imports them.
+
+All 68 hold.
+
+**One reported a MISS and was my verifier's fault**, which is worth recording because it
+is the third instance of the same trap in one session: the assertion "the subtitle no
+longer claims real-time" matched the phrase inside the **JSX comment documenting its
+removal**. `check-dead-exports.ts` had to be excluded from its own scan for the same
+reason, and `check-scanner-steps.ts` needed the `.tsx`-only rule for a cousin of it. A
+check that names what it looks for will find its own name.
+
+### The guards were tested by breaking things on purpose
+
+A check that has never failed is indistinguishable from one that cannot fail. Each new
+rule was given a violation to catch, then reverted:
+
+| Injected | Caught by |
+|---|---|
+| literal `Step 4` back into a results-table title | `check-scanner-steps` |
+| one `!= null` guard reverted to `!== undefined` | `check-null-guards` |
+| CLAUDE.md's baseline set back to the stale 514 | `check-doc-figures` |
+| a live `lib/` export renamed so its caller breaks | `check-dead-exports` |
+
+All four failed as intended and went green on revert.
+
+### The one that nothing caught
+
+Then `tedSpread ?? 0.25` — the exact P7-17 defect — was put back into the route, and the
+**entire suite passed.**
+
+Not the scoring tests: they exercise `computeMacroPillar`, which is handed a number and
+cannot know it was invented one function earlier. Not `check-provenance`: it reads UI
+copy. The tier still says `baseline`, which correctly excludes the value from SCORING —
+and the display reads the raw value, which is where the fabrication lands. **The defect
+lives in the gap between the two, so nothing that inspects either end can see it.**
+
+Twenty-two instances fixed across three passes, and no guard against the twenty-third.
+That is precisely what re-verification is for, and it is a more useful result than
+confirming the fixes.
+
+### P7-23 — the ratchet that closes it
+
+`scripts/check-ccpi-defaults.ts`: no scored CCPI input may be assembled with a literal
+default. Field list **derived from the WEIGHTS tables** — the same tables the scoring core
+uses — so an indicator is guarded the moment it is given a weight; the four SMA/Bollinger
+pair weights are expanded to their eight real field names, and both counts are asserted.
+33 fields checked.
+
+**This is a ratchet, not the sweep AUDIT_PLAN warns against.** 7.4 says: *"Do not sweep
+for `|| <const>` — it found the early Phase 6 defects and missed every one of the
+fifty-one."* That is guidance about DISCOVERY, and it is correct — as a search this
+pattern is nearly worthless. Over a known, enumerated field set it is the opposite: it
+cannot find anything new, and it cannot let a fixed one come back.
+
+Negative-tested in all three forms the removed defaults actually took — `?? 0.25`,
+`?? 50`, `|| false` — each caught, each green on revert.
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| P7-23 | P2 | tooling | **The P7-10/P7-17/P7-18 class had no standing guard.** Re-verification put `tedSpread ?? 0.25` back into `/api/ccpi` and the whole suite passed: the scoring tests see a number and cannot know it was invented upstream, `check-provenance` reads UI copy, and the tier correctly says "baseline" while the display reads the raw value — **the defect lives in the gap between them.** `scripts/check-ccpi-defaults.ts` closes it, with the field list derived from the WEIGHTS tables and negative-tested against all three default forms. A ratchet over an enumerated set, not the discovery sweep AUDIT_PLAN 7.4 warns against. |
