@@ -88,8 +88,14 @@ down from 12 to 11.
 
 **Count the PASS lines — do not trust the exit code alone.** The suites chain with
 `&&`, so a script that stops *running* is indistinguishable from one that passes, and
-this has cost the project a commit twice. Current baselines: **formulas 514**,
+this has cost the project a commit twice. Current baselines: **formulas 590**,
 contracts 60 routes / 60 contracts, remediation 31.
+
+These four numbers are enforced by `scripts/check-doc-figures.ts` (Phase 7.5), because
+this sentence itself drifted: it read "formulas 514" while the suite had grown past it,
+so the rule that exists to catch silent breakage was teaching the reader to expect the
+wrong number. The route and contract counts are DERIVED from disk; the PASS baselines
+are PINNED to a constant in that script, so prose and constant must move together.
 
 **A finding's status lives in AUDIT_BACKLOG.md's §STATUS LEDGER and nowhere else.**
 Write the narrative in the finding row; write `open` / `fixed` / `wontfix` /

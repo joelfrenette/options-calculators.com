@@ -395,11 +395,12 @@ recomputes it.
 | P7-19 | P2 | fixed | check-null-guards.ts added: no formatter may be guarded only by !== undefined, the idiom behind P7-17. The four sites it found were conformance, not crashes. |
 | P7-20 | P1 | fixed | /api/ccpi/executive-summary narrated an unscoreable composite to the model as "CCPI Score: 0/100" under its own "0-19: Low Risk" legend. Three layers produced the zero. |
 | P7-21 | P2 | open | Two of four groups fixed (trend-analysis price, polygon-tickers filter zeros). Still open: sentiment-heatmap 50/50 (blocked on P6-11) and strategy-scanner static betas — both need a decision, not code. |
+| P7-22 | P2 | fixed | Phase 7.5 standing guard: check-doc-figures.ts. CLAUDE.md carried "formulas 514" against a suite at 581 — the stale figure was inside the rule about staleness. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-224 findings recorded · **177 fixed · 8 wontfix · 0 verified-ok · 39 open.**
+225 findings recorded · **178 fixed · 8 wontfix · 0 verified-ok · 39 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -2313,3 +2314,72 @@ null-through.
 | ID | Sev | Tab / area | Finding |
 |---|---|---|---|
 | P7-21 | P2 | site-wide | **Two of four groups fixed; two remain, both needing a decision rather than code.** `/api/trend-analysis`: of five `\|\| 0` defaults only the PRICE was a defect — the volumes and change fields have real recovery paths a few lines down, while a zero price suppressed the `lastBar.price` fallback the caller already had and fed the indicator maths. Now returns null. `/api/polygon-tickers`: the zeros were filter inputs, and one unmeasured ticker was **dropped by the volume/market-cap minimums and simultaneously passed by the max-price test** — then shipped as `price: 0`. Unknown snapshots are skipped and counted, with `unmeasuredSnapshots` on the response (P6-32). **STILL OPEN:** sentiment-heatmap's 50/50 (blocked on P6-11) and strategy-scanner's static beta table. |
+
+---
+
+## Phase 7.5 — the standing guard, and the rule that had drifted (2026-08-11)
+
+Step 7.5 asks for a standing regression guard and names the gap exactly:
+
+> Keep `pnpm check` green; monthly health review via the Admin page. Re-run the doc-figure
+> sweep whenever a weight table, a route count or a data path changes — the ceilings are
+> pinned (`scripts/ccpi-certainty-ceiling.ts`) but **prose figures elsewhere are not**.
+
+So the buildable part of 7.5 was the sweep the plan describes doing by hand, turned into
+`scripts/check-doc-figures.ts` and wired into `check:formulas`.
+
+### It was not hypothetical, and the stale figure was in the rule about staleness
+
+CLAUDE.md's verification section — the one that tells the next session to **count the PASS
+lines, because a script that stops running is indistinguishable from one that passes** —
+read `Current baselines: formulas 514`. The suite was at 581 by the time this session
+started closing P7-17 and P7-18.
+
+A rule that quotes a stale number teaches the reader to expect the wrong thing, and this
+is the rule whose whole job is catching silent breakage. Someone following it exactly
+would have seen 581, compared it to the documented 514, and had no way to tell a suite
+that grew from a suite that broke.
+
+### Derived vs pinned, and why the difference is stated rather than smoothed over
+
+Five figures are covered, and they are not equally trustworthy:
+
+- **Derived (2):** the route count is counted from `app/api` on disk; the contract count
+  from `lib/api-contracts.ts`. These are compared against reality, and a third assertion
+  requires them to agree with each other.
+- **Pinned (3):** `formulas`, `remediation` and `typecheckKnown` are PASS/error counts
+  that only a full run produces. This check cannot derive them without executing the
+  suite it is part of. So the doc figure must equal a constant in the script, and the two
+  have to move in the same commit.
+
+Pinning is weaker than deriving and the file says so instead of hiding it behind a
+variable name. It converts "the doc drifted and nobody noticed" into "the doc and the
+constant disagree, loudly" — the same trade `KNOWN_DEAD_BASELINE` makes, for the same
+reason.
+
+**A figure that disappears from the prose fails too.** If the pattern stops matching, that
+is a FAIL, not a silent skip: deleting the number is how a load-bearing rule stops being
+load-bearing, and it would otherwise be the easiest way to make this check green.
+
+### The check caught its own bug first
+
+The first version counted contracts with `/^\s*path:/gm` and reported **51 against the
+suite's authoritative 60**. Nine contracts are written inline — `{ path: "/api/x", method:
+… }` — with the key after the brace, so the line-anchored pattern missed them.
+
+That is worth recording rather than quietly fixing, because **a derivation that undercounts
+is worse than no derivation**: it asserts a wrong figure with a PASS beside it, which is
+the exact failure mode this audit exists to remove. What caught it was the parity
+assertion — routes on disk must equal contracts declared — which exists precisely so a
+count cannot be wrong on its own.
+
+### And it moved the number it pins
+
+Wiring the check in raised the formulas count from 581 to 590, because its own PASS lines
+are part of the suite it measures. That is not a quirk to engineer around; it is the
+guard working. Any future check will do the same, and the failure message will name the
+figure that needs updating.
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| P7-22 | P2 | tooling / docs | **Phase 7.5's standing guard: `scripts/check-doc-figures.ts`, wired into `check:formulas`.** CLAUDE.md's "count the PASS lines" rule carried `formulas 514` against a suite at 581 — **the stale figure was inside the rule about staleness**, so following it exactly could not distinguish a suite that grew from one that broke. Two figures are DERIVED (route count from disk, contract count from `lib/api-contracts.ts`, plus a parity assertion between them) and three are PINNED to a constant, with the difference stated rather than smoothed over. A figure vanishing from the prose fails rather than skipping. **The parity assertion caught the check's own first-draft undercount (51 vs 60) before it shipped.** |
