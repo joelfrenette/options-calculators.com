@@ -402,20 +402,23 @@ recomputes it.
 | P7-26 | P2 | fixed | **Original finding was half wrong.** The six "silent" scanners read a field P1-10 deleted; the real defect was three OTHER tabs that render it and labelled every fresh scan "Cached". market-sentiment dated. |
 | P7-27 | P2 | fixed | Four components (1,548 lines) were imported by nothing and tree-shaken out of the production bundle — three of them the "public tabs" P7-26 was written about. check-dead-exports scopes to lib/, so nothing could see them. Owner chose retire: all four deleted, ratchet down to 2. |
 | P7-28 | P2 | fixed | Fifteen components hand-built the Yahoo ticker URL in three spellings; only one normalised `.` to `-`, so class shares linked to a 404 from fourteen tabs. One library now owns it, pointing at the advanced chart per the owner's request, with a check. |
+| P7-29 | P3 | verified-ok | Swept the other 6 outbound-link families after P7-28: no duplication, no hand-built interpolation, `rel="noopener noreferrer"` on all 21 `target="_blank"` sites. Recorded so the sweep is not repeated. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-231 findings recorded · **185 fixed · 8 wontfix · 0 verified-ok · 38 open.**
+232 findings recorded · **185 fixed · 8 wontfix · 1 verified-ok · 38 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
 that finds nothing new is a rule that stopped looking.)_
 
-`verified-ok` is empty on purpose. The vocabulary allows it and nothing currently
-qualifies: every investigated-and-clean result on this project was recorded inside
-another finding's row (P6-67's two clean composites, P6-77's twelve clean check
-scripts) rather than as a finding of its own.
+`verified-ok` held nothing until P7-29, and the reason it was empty is worth keeping:
+every investigated-and-clean result before it was recorded inside another finding's row
+(P6-67's two clean composites, P6-77's twelve clean check scripts) rather than as a
+finding of its own. P7-29 is a sweep that stands alone — the outbound-link families P7-28
+did *not* touch — so it gets its own row, because an unrecorded clean sweep is one the
+next pass repeats.
 
 **P1 — 4.**
 `P3-16` — Panic/Euphoria; the same open remainder as `P6-8`, under two IDs.
@@ -2978,3 +2981,31 @@ designed.
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-28 | P2 | site-wide UI | Fifteen components hand-built the Yahoo ticker URL in three different spellings; only one normalised `.` to `-`, so class-share tickers linked to a 404 from fourteen tabs. Now one library (`lib/ticker-links.ts`), pointing at the advanced chart per the owner, with a check. |
+
+### P7-29 — the rest of the outbound links, swept and clean
+
+P7-28 fixed a family of duplicated links, so the obvious next question is whether any
+other family had drifted the same way. It had not, and that is worth recording rather than
+leaving as an unmarked gap — a sweep with no record gets re-run.
+
+**All 21 `target="_blank"` sites in `components/` and `app/`**, ticker links now excluded:
+
+- **2 EDGAR links** — `form-144-watch.tsx` (`f.url`) and `hedge-fund-13f.tsx`
+  (`f.latestFiling.holdingsUrl`) render URLs the server supplies, both guarded on
+  existence so a missing filing renders no link. The URLs are built in exactly one place,
+  `app/api/hedge-fund-13f/route.ts`, as a two-step fallback (the filing's archive
+  directory, else the company's 13F-HR search). No duplication.
+- **`remediation.links`** in `admin/remediation-card.tsx` is data from `lib/remediation.ts`
+  — one owner, already covered by `check-remediation`.
+- **4 fixed destinations**: the Vercel dashboard and env-vars page (admin, both
+  `window.open`), the BLS employment-situation release, and the Options Samurai ad.
+  Nothing interpolated, nothing to diverge.
+
+**Every one of the 21 carries `rel="noopener noreferrer"`.** Checked mechanically, not by
+eye.
+
+The one duplicated-URL family in this codebase was the ticker link, and P7-28 closed it.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-29 | P3 | site-wide UI | Swept the other 6 outbound-link families after P7-28. No duplication, no hand-built interpolation, and `rel="noopener noreferrer"` on all 21 `target="_blank"` sites. Not a defect — recorded so the sweep is not repeated. |
