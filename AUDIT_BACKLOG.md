@@ -400,12 +400,12 @@ recomputes it.
 | P7-24 | P2 | fixed | check-house-libs.ts added — CLAUDE.md's "never re-implement locally" rule had no enforcement. Building it exposed a stripComments bug that hid ~70 lines of wheel-scanner.tsx from four checks. |
 | P7-25 | P3 | fixed | Both classes are now rules. Building the prompt guard exposed two silent under-coverages in it — it reported 5 prompts where there are 11, covering none of the files it existed for. |
 | P7-26 | P2 | fixed | **Original finding was half wrong.** The six "silent" scanners read a field P1-10 deleted; the real defect was three OTHER tabs that render it and labelled every fresh scan "Cached". market-sentiment dated. |
-| P7-27 | P2 | open | Four components (1,548 lines) are imported by nothing and tree-shaken out of the production bundle — three of them the "public tabs" P7-26 was written about. check-dead-exports scopes to lib/, so nothing could see them. Ratchet added; wire-up-or-delete is the owner's. |
+| P7-27 | P2 | fixed | Four components (1,548 lines) were imported by nothing and tree-shaken out of the production bundle — three of them the "public tabs" P7-26 was written about. check-dead-exports scopes to lib/, so nothing could see them. Owner chose retire: all four deleted, ratchet down to 2. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-230 findings recorded · **183 fixed · 8 wontfix · 0 verified-ok · 39 open.**
+230 findings recorded · **184 fixed · 8 wontfix · 0 verified-ok · 38 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -2913,14 +2913,21 @@ can reach the component, and the PASS count is identical either way. This is the
 shape again — a check that stops covering looks exactly like one that passes — except here
 the coverage was never there.
 
-**Not fixed, because the fix is a decision.** Wiring the four up or deleting them is
-rebuild-or-retire and belongs to the owner. What ships is
-`scripts/check-dead-components.ts`, a ratchet against the measured six (the four features
-plus `theme-provider.tsx` and `ui/progress.tsx`, both scaffolding): the debt can shrink
-but not grow. Negative-tested in three forms — a new unreferenced file, an existing live
-component unwired from `app/page.tsx`, and a basename collision — each failing as
-designed.
+**The owner chose retire over rebuild, so all four are deleted** — 1,548 lines out. The
+alternative was wiring them into the tab switch, which would have added four public
+surfaces that no phase of this audit has ever reviewed as live: none has been through the
+provenance rules with a user in front of it, and P7-26 is the evidence for what that
+costs.
+
+What ships alongside the deletion is `scripts/check-dead-components.ts`, a ratchet — now
+against two, `theme-provider.tsx` and `ui/progress.tsx`, both scaffolding that renders no
+number and makes no claim. Negative-tested in three forms: a new unreferenced file, an
+existing live component unwired from `app/page.tsx`, and a basename collision (which would
+break the import matching without changing any other PASS line). Each failed as designed.
+
+Deleting the four produced no new dead `lib/` export — `check-dead-exports` still reports
+225 exports across 49 files, 0 dead.
 
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
-| P7-27 | P2 | components / tooling | Four components totalling 1,548 lines are imported by nothing and absent from the deployed bundle, including three that P7-26 described as public tabs. `check-dead-exports` scopes to `lib/`, so no check could see them. Ratchet added; wire-up-or-delete is the owner's call. |
+| P7-27 | P2 | components / tooling | Four components totalling 1,548 lines were imported by nothing and absent from the deployed bundle, including three that P7-26 described as public tabs. `check-dead-exports` scopes to `lib/`, so no check could see them. All four deleted; ratchet added at the remaining two. |

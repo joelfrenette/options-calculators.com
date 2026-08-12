@@ -74,7 +74,8 @@ block present, menu present, first options specific to this turn.
 
 ## Verification before any commit
 Run `pnpm check:formulas && pnpm check:contracts` (typecheck via `pnpm typecheck`;
-10 known errors remain, do not add new ones). Regenerate SITE_MAP.md with
+8 known errors remain, do not add new ones — it was 10 until P7-27 deleted two
+dead components that carried one each). Regenerate SITE_MAP.md with
 `pnpm inventory` when routes/components change — `check:formulas` now enforces this via
 `site-inventory.ts --check`, so a stale SITE_MAP fails the suite rather than going unnoticed.
 

@@ -77,7 +77,7 @@ function walk(dir: string, match: (p: string) => boolean): string[] {
 const BASELINES = {
   formulas: 640,
   remediation: 31,
-  typecheckKnown: 10,
+  typecheckKnown: 8,
 } as const
 
 // --------------------------------------------------------------- derived

@@ -11,14 +11,15 @@
  * without asking whether a user can reach the component, and the PASS count is
  * identical either way.
  *
- * P7-27 found four such files — 1,548 lines — by asking the question directly:
+ * P7-27 found four such files — 1,548 lines — by asking the question directly,
+ * and the owner chose to delete them:
  *
  *   - `components/earnings-plays-scanner.tsx` (410 lines)
  *   - `components/wheel-strategy-planner.tsx` (490 lines)
  *   - `components/wheel-strategy-screener.tsx` (325 lines)
  *   - `components/high-iv-watchlist.tsx` (323 lines)
  *
- * None of the four appears in `app/page.tsx`'s tab switch, in any nav list, or
+ * None of the four appeared in `app/page.tsx`'s tab switch, in any nav list, or
  * in any import anywhere. Three of them are the tabs P7-26 was written about,
  * and its commit message says the "Cached" badge defect was live "on three
  * public tabs". It was not on any tab. The fix was correct as a source change
@@ -213,20 +214,21 @@ for (const f of COMPONENT_FILES) {
 //
 // Keyed on path, never path:line.
 const KNOWN_DEAD: ReadonlySet<string> = new Set([
-  // Four feature components, no import and no tab-switch case (P7-27). Whether
-  // they are wired up or deleted is the owner's call; until then this records
-  // that they are unreachable rather than letting them read as shipped.
-  "components/earnings-plays-scanner.tsx",
-  "components/high-iv-watchlist.tsx",
-  "components/wheel-strategy-planner.tsx",
-  "components/wheel-strategy-screener.tsx",
-  // Two pieces of scaffolding, kept because removing generated UI primitives
-  // and a theme wrapper is unrelated churn on a branch awaiting UAT.
+  // Two pieces of scaffolding. `theme-provider.tsx` wraps next-themes and
+  // `ui/progress.tsx` is generated shadcn boilerplate — neither renders a
+  // number or makes a claim, which is why they are held rather than deleted
+  // with the four below.
   "components/theme-provider.tsx",
   "components/ui/progress.tsx",
 ])
 
-const KNOWN_DEAD_BASELINE = 6
+/**
+ * Was 6. The owner chose retire over rebuild for P7-27's four feature
+ * components — `earnings-plays-scanner`, `high-iv-watchlist`,
+ * `wheel-strategy-screener` and `wheel-strategy-planner`, 1,548 lines deleted
+ * in the commit that lowered this number.
+ */
+const KNOWN_DEAD_BASELINE = 2
 
 check(
   `the known-dead list still holds ${KNOWN_DEAD_BASELINE} entries`,
