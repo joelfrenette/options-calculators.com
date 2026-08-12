@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { AlertCircle, Filter } from "lucide-react"
 import type { QualifyingStock, RejectionSummary } from "./types"
+import { stepLabel } from "./steps"
 
 interface RejectionSummaryCardProps {
   rejectionSummary: RejectionSummary
@@ -27,11 +28,11 @@ export function RejectionSummaryCard({
           <CardHeader className="border-b border-amber-200">
             <CardTitle className="text-base font-bold text-amber-900 flex items-center gap-2">
               <AlertCircle className="h-5 w-5" />
-              Step 3 — No stocks passed the strict filters ({rejectionSummary.scanned} scanned)
+              {stepLabel("fundamentals")} — No stocks passed the strict filters ({rejectionSummary.scanned} scanned)
             </CardTitle>
             <CardDescription className="text-amber-800">
               {nearMissFundamentals.length > 0
-                ? `${nearMissFundamentals.length} stocks came within 1–2 filters of passing. Click below to proceed to Step 4 with the relaxed set, or loosen a slider and rescan.`
+                ? `${nearMissFundamentals.length} stocks came within 1–2 filters of passing. Click below to proceed to ${stepLabel("technical")} with the relaxed set, or loosen a slider and rescan.`
                 : "Breakdown of why every ticker was rejected. Loosen the slider next to the largest bucket to get results."}
             </CardDescription>
           </CardHeader>
@@ -42,7 +43,7 @@ export function RejectionSummaryCard({
                 className="w-full h-11 text-base font-semibold bg-purple-600 hover:bg-purple-700 text-white mb-2"
               >
                 <Filter className="mr-2 h-5 w-5" />
-                Use Relaxed Fundamentals ({nearMissFundamentals.length} stocks) → Step 4
+                Use Relaxed Fundamentals ({nearMissFundamentals.length} stocks) → {stepLabel("technical")}
               </Button>
             )}
             {(Object.entries(rejectionSummary.rejected) as [string, string[]][])
@@ -52,7 +53,7 @@ export function RejectionSummaryCard({
                 <div key={reason} className="flex flex-col gap-1 border-b border-amber-200 pb-2 last:border-0">
                   <div className="flex justify-between font-semibold text-amber-900">
                     <span>
-                      {reason === "priceCap" && "Above Max Stock Price (Step 1)"}
+                      {reason === "priceCap" && `Above Max Stock Price (${stepLabel("dollarFilter")})`}
                       {reason === "volume" && "Volume below Min Volume"}
                       {reason === "debtEquity" && "Debt/Equity above Max"}
                       {reason === "roe" && "ROE below Min ROE %"}
@@ -104,19 +105,19 @@ export function NoTechnicalPassCard({ fundamentalCount, maxRSI }: NoTechnicalPas
           <CardHeader className="bg-gradient-to-r from-yellow-50 to-amber-50">
             <div className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-yellow-600" />
-              <CardTitle className="text-yellow-900">Step 4: No Stocks Passed Technical Criteria</CardTitle>
+              <CardTitle className="text-yellow-900">{stepLabel("technical")}: No Stocks Passed Technical Criteria</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="p-6">
             <p className="text-gray-700 mb-4">
-              The current technical filters are very strict. None of the {fundamentalCount} stocks from Step 3
+              The current technical filters are very strict. None of the {fundamentalCount} stocks from {stepLabel("fundamentals")} 3
               passed all technical criteria.
             </p>
             <p className="text-gray-600 text-sm mb-4">Consider:</p>
             <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
               <li>Relaxing the RSI threshold (increase from {maxRSI})</li>
               <li>Disabling some optional filters (200-day SMA, Red Day preference)</li>
-              <li>Viewing Step 4 Relaxed Results for alternative opportunities</li>
+              <li>Viewing {stepLabel("technical")} Relaxed Results for alternative opportunities</li>
             </ul>
           </CardContent>
         </Card>
@@ -133,7 +134,7 @@ export function NoRelaxedResultsCard({ fundamentalCount }: NoRelaxedResultsCardP
           <CardHeader className="bg-gradient-to-r from-yellow-50 to-amber-50">
             <div className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-yellow-600" />
-              <CardTitle className="text-yellow-900">Step 4: No Relaxed Options Found</CardTitle>
+              <CardTitle className="text-yellow-900">{stepLabel("technical")}: No Relaxed Options Found</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="p-6">

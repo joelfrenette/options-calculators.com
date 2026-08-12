@@ -141,7 +141,7 @@ export function useWheelScanner() {
   // Step 1: Dollar Amount Filtering
   const [maxStockPrice, setMaxStockPrice] = useState([500]) // Default $500 → $50,000 total cash ($1-$1000)
 
-  const isScanning = loading // `loading` is for Step 3 (Fundamental Scan) — was mislabelled Step 2 (S-18)
+  const isScanning = loading // `loading` is for Step 3 (Fundamental Scan). Was mislabelled Step 2 (S-18).
   // const isScanningTechnicals = technicalLoading // This is the correct state for technical scanning
 
   const { fetchLandmines, getLandminesForRow, resetLandmines } = useLandmines()
@@ -500,7 +500,7 @@ export function useWheelScanner() {
         setStep4CurrentTicker(ticker)
       })
         .then((enrichedResults) => {
-          console.log(`[v0] Step 4: Enrichment complete with ${enrichedResults.length} total options`)
+          console.log(`[v0] ${stepLabel("technical")}: Enrichment complete with ${enrichedResults.length} total options`)
 
           // These are options that didn't make it to Step 3 strict results
           const relaxedOptions = enrichedResults.filter((stock) => {
@@ -512,7 +512,7 @@ export function useWheelScanner() {
             // Also include options that pass none but have valid data (exploratory)
             if (passesAll) {
               console.log(
-                `[v0] ${stock.ticker} $${stock.putStrike} - Passes ALL criteria (already in Step 3, excluding from Step 4)`,
+                `[v0] ${stock.ticker} $${stock.putStrike} - Passes ALL criteria (already in ${stepLabel("fundamentals")}, excluding from ${stepLabel("technical")})`,
               )
               return false
             }
@@ -528,7 +528,7 @@ export function useWheelScanner() {
           })
 
           console.log(
-            `[v0] Step 4: ${relaxedOptions.length} options meet relaxed criteria (out of ${enrichedResults.length} total)`,
+            `[v0] ${stepLabel("technical")}: ${relaxedOptions.length} options meet relaxed criteria (out of ${enrichedResults.length} total)`,
           )
           setRelaxedResults(relaxedOptions)
           setIsEnrichingRelaxed(false)
@@ -545,7 +545,7 @@ export function useWheelScanner() {
   // Verbatim from the Step-3 "no stocks passed" card's button (Phase 4 extraction).
   const promoteNearMissesToStep4 = () => {
     console.log(
-      `[v0] 🟣 Promoting ${nearMissFundamentals.length} near-miss stocks into Step 4 relaxed flow`,
+      `[v0] 🟣 Promoting ${nearMissFundamentals.length} near-miss stocks into ${stepLabel("technical")} relaxed flow`,
     )
     setFundamentalResults(nearMissFundamentals)
     setStep(2)

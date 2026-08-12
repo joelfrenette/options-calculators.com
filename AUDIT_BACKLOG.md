@@ -189,7 +189,7 @@ recomputes it.
 | S-15 | P2 | fixed | Closed by P6-26 — thin financials yield null, not 0. |
 | S-16 | P3 | open | `scan-cache.ts` still removes only the key it just missed on; `v1`/`v2` keys persist (verified 2026-08-11). |
 | S-17 | P3 | open | Redundant earnings-date extraction still at `fundamental-scan.ts:290` (verified 2026-08-11). |
-| S-18 | P2 | open | **Drift fixed and guarded; the literal sweep stays open.** The UI agreed with itself — the handler did not: the Step 2 button set the error "Step 1 failed". Comments and console logs deliberately not converted. |
+| S-18 | P2 | fixed | **CLOSED.** Every step label a user or log reader sees derives from components/scanner/steps.ts; the guard scope is derived, which exposed four unguarded files and a second drifting one. Comments verified by hand — a comment cannot interpolate a constant. |
 | S-19 | P1 | fixed | `lib/metered-fetch.ts` — real per-call metering. |
 | S-20 | P3 | fixed | Both TwelveData proxies retired. |
 | P0-1 | P3 | open | 15 orphan routes → **6 remain**: `yahoo-proxy`, `apify-proxy`, `google-trends`, `serper-finance`, `macro-indicators`, `scraping-bee/diagnostics` (verified 2026-08-11). Each still needs a keep-or-delete verdict. |
@@ -400,7 +400,7 @@ recomputes it.
 
 ### The open list, by severity
 
-225 findings recorded · **178 fixed · 8 wontfix · 0 verified-ok · 39 open.**
+225 findings recorded · **179 fixed · 8 wontfix · 0 verified-ok · 38 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -2466,3 +2466,76 @@ either**. `.ts` files stay covered by the `setError` assertion. Formulas 590 →
 | ID | Sev | Tab / area | Finding |
 |---|---|---|---|
 | S-18 | P2 | SCAN → scanner | **Drift fixed and guarded; the literal sweep stays open.** The claim about card headings did not hold — headings, buttons and notices all agreed. The real disagreement was between the UI and its own handler: `loadPreFilteredTickers` sits behind the "Scan for Potential Stocks (Step 2)" button and set the error **"Step 1 failed"**, while the technical handler logged "Step 3" against its Step 4 button and a comment called the fundamental scan "Step 2". `components/scanner/steps.ts` is now the single source for every rendered label and every `setError`, enforced by `scripts/check-scanner-steps.ts`; each converted string was diffed against its original and only the two wrong ones changed. **Still open:** dozens of `Step N` mentions in comments and console logs, deliberately not converted, and the wheel-STRATEGY lifecycle (Sell Puts / Get Assigned / Sell Calls / Repeat), which is a different sequence and must not share the registry. |
+
+---
+
+## Phase 7.4 (nineteenth pass) — S-18 closed, and the hand-written guard list was the bug (2026-08-11)
+
+The previous pass fixed the drift and guarded six files. Finishing the sweep found that
+**the guard itself had the weakness it was written to replace.**
+
+### A hand-written file list covers what its author remembered
+
+`GUARDED` was six paths, typed out. It therefore did not cover:
+
+- `scanner-notices.tsx` — **eight user-visible step labels**, including three card titles
+- `fundamental-results-table.tsx`, `relaxed-results-table.tsx`, `strict-results-table.tsx`
+  — four more rendered titles between them
+
+That is the same failure as the hand sweep the check replaced: a list can only contain
+what someone thought of. The scope is now **derived** — every `.tsx`/`.ts` under
+`components/scanner/` except `steps.ts` itself, plus `components/wheel-scanner.tsx` — so a
+new scanner file is in scope the moment it exists. Seventeen files, size asserted.
+
+### A second file was lying about which step it was
+
+`components/scanner/fundamental-scan.ts` opens with `// Step 3 fundamental scan core` and
+takes the fundamental filter parameters. It logged itself as **Step 2**, twice:
+
+```
+[v0] Step 2: Scanning ${tickers.length} stocks with Polygon API
+[v0] ✅ Step 2 Complete with REAL Polygon data: …
+```
+
+Same shape as the `Step 1 failed` defect from the previous pass, in a different file, and
+it would not have been found by looking at the UI — the file's header, its card and its
+logs each named a different step.
+
+### One that looks wrong and is right
+
+`use-wheel-scanner.ts` annotates `minMarketCapCategory` as the "Step 3 market-cap floor"
+while it indexes `PRE_FILTER_MARKET_CAP_TIERS`, which `constants.ts` calls "the Step 2
+pre-filter slider". Both comments are correct: **the ladder is shared** between a Step 2
+universe slider and a Step 3 fundamental floor, and the step 3 card renders "Market Cap
+Floor (Step 3)" alongside text explaining it is "independent of the Step 2 universe
+filter". Left exactly as it is. Rewriting it to look consistent would have made it wrong.
+
+### Comments are out of scope for a reason, not as a concession
+
+A comment cannot interpolate a constant — there is no expression to evaluate — so no
+check can source one, and rewriting prose into code would be worse for the only audience
+comments have. Instead **every remaining comment mention was read by hand against the
+canonical order.** Two were wrong and are corrected; one is the shared-ladder case above;
+the rest were already right.
+
+That is the honest end state: the machine holds every string a user or a log reader sees,
+and a human verified the prose once. Claiming a check covers comments would be claiming
+something no check can do.
+
+### Every converted string was diffed
+
+Twenty-three conversions across nine files, each rendered and compared to its original.
+All identical except the two `fundamental-scan.ts` logs, which correctly changed Step 2 →
+Step 3. Formulas 607 → 622.
+
+**A near-miss worth recording:** one `check:formulas` run reported **537** rather than 622
+— a transient, because the run overlapped an edit to `check-doc-figures.ts` and read the
+file mid-write. The number was about to be pinned as the new baseline. What caught it was
+that 537 is exactly the running total through `ccpi-certainty-ceiling`, which looks like a
+chain that halted rather than a suite that shrank. **The PASS count is the thing CLAUDE.md
+tells you to trust, and it can still lie if you measure it while the tree is moving** —
+re-run before pinning.
+
+| ID | Sev | Tab / area | Finding |
+|---|---|---|---|
+| S-18 | P2 | SCAN → scanner | **CLOSED.** Every step label a user or log reader sees now derives from `components/scanner/steps.ts`; the guard's scope is derived from the directory rather than hand-listed, which is what exposed the four unguarded files (`scanner-notices.tsx` alone carried eight rendered labels). **A second drifting file surfaced: `fundamental-scan.ts` logged itself as Step 2 under a header reading "Step 3 fundamental scan core".** Comments stay out of scope because a comment cannot interpolate a constant — each was instead verified by hand, and the one that looks contradictory (`minMarketCapCategory` as a "Step 3 floor" indexing the Step 2 ladder) is correct, because the ladder is shared. 17 files guarded, 32 assertions. |

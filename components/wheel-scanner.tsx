@@ -21,11 +21,11 @@ import { FundamentalResultsTable } from "@/components/scanner/fundamental-result
 import { StrictResultsTable } from "@/components/scanner/strict-results-table"
 import { RelaxedResultsTable } from "@/components/scanner/relaxed-results-table"
 import {
-import { stepTitled, SCANNER_STEPS } from "./scanner/steps"
   RejectionSummaryCard,
   NoTechnicalPassCard,
   NoRelaxedResultsCard,
 } from "@/components/scanner/scanner-notices"
+import { stepTitled, SCANNER_STEPS } from "./scanner/steps"
 
 export function WheelScanner() {
   const {

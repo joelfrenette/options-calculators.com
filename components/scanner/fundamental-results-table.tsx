@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { BarChart3 } from "lucide-react"
 import type { QualifyingStock } from "./types"
+import { stepTitled, SCANNER_STEPS } from "./steps"
 
 interface FundamentalResultsTableProps {
   fundamentalResults: QualifyingStock[]
@@ -98,7 +99,7 @@ export function FundamentalResultsTable({
               </span>
             </CardTitle>
             <CardDescription>
-              These stocks passed fundamental screening. Run Technical Analysis (Step 4) to find optimal entries.
+              These stocks passed fundamental screening. {stepTitled("technical")} to find optimal entries.
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-4">
@@ -199,7 +200,7 @@ export function FundamentalResultsTable({
                     <th
                       className="text-right py-2 px-3 font-semibold text-gray-900 cursor-pointer hover:bg-gray-50"
                       onClick={() => handleFundamentalSort("yield")}
-                      title="Estimated weekly put premium yield from volatility — real quotes come in Step 4"
+                      title="Estimated weekly put premium yield from volatility — real quotes come in Step ${SCANNER_STEPS.technical.n}"
                     >
                       <div className="flex items-center justify-end gap-1">
                         Est. Yield %

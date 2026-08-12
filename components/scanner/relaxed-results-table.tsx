@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Filter } from "lucide-react"
 import type { QualifyingStock, RelaxedFilters } from "./types"
 import { evaluateCriteria, type TechnicalFilterSettings } from "./technical-criteria"
+import { stepLabel } from "./steps"
 
 interface RelaxedResultsTableProps {
   relaxedResults: QualifyingStock[]
@@ -108,7 +109,7 @@ export function RelaxedResultsTable({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Filter className="h-5 w-5 text-purple-600" />
-                <CardTitle className="text-purple-900">Step 4: Relaxed Criteria Results</CardTitle>
+                <CardTitle className="text-purple-900">{stepLabel("technical")}: Relaxed Criteria Results</CardTitle>
               </div>
               <span className="text-sm font-semibold text-purple-700 bg-purple-100 px-3 py-1 rounded-full">
                 {relaxedResults.length} {relaxedResults.length === 1 ? "option meets" : "options meet"} the relaxed

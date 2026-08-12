@@ -16,16 +16,22 @@
  *
  * WHAT IS IN SCOPE, AND WHAT IS DELIBERATELY NOT. This is the honest part.
  *
- *   IN: the DECLARATION sites — the four step cards' headings, the buttons that
- *   run each step, and every `setError` in the scanner. Those are what a user
- *   reads, and they are what must not disagree.
+ *   IN: every string a user or a log reader sees — card headings, buttons,
+ *   `setError` text, notice cards, results-table titles, and the `console.log`
+ *   lines in the scan handlers. All of them now interpolate
+ *   `components/scanner/steps.ts`.
  *
- *   OUT: comments and `console.log` strings. There are still dozens of literal
- *   "Step N" mentions in scanner internals. They are developer-facing, several
- *   are prose about the pipeline rather than labels ("Step 4 is where a missing
- *   chain shows up"), and converting them would trade readable comments for
- *   interpolation with no reader-visible gain. **S-18 stays open for them**,
- *   measured rather than declared finished.
+ *   OUT: comments, and only comments. **A comment cannot interpolate a
+ *   constant** — there is no expression to evaluate — so no check can source
+ *   one, and rewriting them into code would be worse prose for no reader.
+ *   Every remaining comment mention was instead read by hand against the
+ *   canonical order; two were wrong and were corrected (`use-wheel-scanner.ts`
+ *   called the fundamental scan "Step 2"; `fundamental-scan.ts` logged itself
+ *   as Step 2 in a file whose own header says Step 3). One that LOOKS wrong is
+ *   correct and is left alone: `minMarketCapCategory` is annotated "Step 3
+ *   market-cap floor" while indexing `PRE_FILTER_MARKET_CAP_TIERS`, which
+ *   `constants.ts` calls "the Step 2 pre-filter slider" — the ladder is shared
+ *   between a Step 2 slider and a Step 3 floor, so both comments are right.
  *
  *   OUT: `components/wheel-strategy-planner.tsx` and
  *   `components/options-strategy-toolbox.tsx`. Those number steps 1-4 as well —
@@ -39,7 +45,7 @@
  * without the count moving.
  */
 
-import { readFileSync } from "node:fs"
+import { readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -51,16 +57,23 @@ function check(name: string, passed: boolean, detail = ""): void {
   if (!passed) failures++
 }
 
-/** Files whose USER-VISIBLE step labels must come from components/scanner/steps.ts. */
+/**
+ * Every scanner source, plus the shell that hosts them.
+ *
+ * DERIVED from the directory rather than listed, so a new scanner file is in
+ * scope the moment it exists — the first version of this check named six files
+ * by hand and therefore did not cover `scanner-notices.tsx`, which carries
+ * eight user-visible step labels, or the three results tables. A hand list
+ * covers what its author remembered, which is the same weakness as the hand
+ * sweep it was written to replace.
+ */
 const GUARDED = [
-  "components/scanner/step1-dollar-filter-card.tsx",
-  "components/scanner/step2-prefilter-card.tsx",
-  "components/scanner/step3-fundamentals-card.tsx",
-  "components/scanner/step4-technical-card.tsx",
+  ...readdirSync(join(ROOT, "components", "scanner"))
+    .filter((f) => /\.tsx?$/.test(f) && f !== "steps.ts")
+    .map((f) => `components/scanner/${f}`),
   "components/wheel-scanner.tsx",
-  "components/scanner/use-wheel-scanner.ts",
 ]
-const EXPECTED_GUARDED = 6
+const EXPECTED_GUARDED = 17
 
 check(
   `scope: ${GUARDED.length} file(s) guarded`,

@@ -10,11 +10,11 @@ import { Slider } from "@/components/ui/slider"
 import { Info, Loader2, Filter } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
-import { stepTitled, stepLabel } from "./steps"
   PRE_FILTER_MARKET_CAP_TIERS,
   PRE_FILTER_VOLATILITY_TIERS,
   getTopRankedLabel,
 } from "./constants"
+import { stepTitled, stepLabel } from "./steps"
 
 interface Step2PreFilterCardProps {
   preFilterMarketCap: number[]

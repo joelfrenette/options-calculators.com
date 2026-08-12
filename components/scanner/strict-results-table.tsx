@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { TrendingUp } from "lucide-react"
 import type { QualifyingStock } from "./types"
 import { evaluateCriteria, type TechnicalFilterSettings } from "./technical-criteria"
+import { stepLabel } from "./steps"
 
 interface StrictResultsTableProps {
   technicalResults: QualifyingStock[]
@@ -69,7 +70,7 @@ export function StrictResultsTable({
               <div className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5 text-green-600" />
                 <CardTitle className="text-green-900">
-                  Step 4: Technical Analysis Results (Premium Entries) ✨
+                  {stepLabel("technical")}: Technical Analysis Results (Premium Entries) ✨
                 </CardTitle>
               </div>
               <span className="text-sm font-semibold text-green-700 bg-green-100 px-3 py-1 rounded-full">

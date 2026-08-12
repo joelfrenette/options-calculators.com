@@ -15,6 +15,7 @@ import {
   stochasticK as calcStochastic,
   atr as calcATR,
 } from "@/lib/indicators"
+import { stepLabel } from "./steps"
 
   // Technical indicators (SMA/RSI/Bollinger/MACD/Stochastic/ATR) now come from
   // the shared lib/indicators.ts (Phase 4 extraction). All of them return null
@@ -86,7 +87,7 @@ export const runFundamentalScan = async ({
   minMarketCapCategory,
   onProgress,
 }: FundamentalScanParams): Promise<FundamentalScanOutcome> => {
-      console.log(`[v0] Step 2: Scanning ${tickers.length} stocks with Polygon API`)
+      console.log(`[v0] ${stepLabel("fundamentals")}: Scanning ${tickers.length} stocks with Polygon API`)
       console.log(`[v0] Using optimized batch processing for paid account: 5 stocks at a time with 1000ms delays`)
 
       const qualifyingStocks: QualifyingStock[] = []
@@ -514,7 +515,7 @@ export const runFundamentalScan = async ({
       }
 
       console.log(
-        `[v0] ✅ Step 2 Complete with REAL Polygon data: ${qualifyingStocks.length} passed out of ${tickers.length} scanned`,
+        `[v0] ✅ ${stepLabel("fundamentals")} Complete with REAL Polygon data: ${qualifyingStocks.length} passed out of ${tickers.length} scanned`,
       )
 
       if (skippedTickers.length > 0) {
