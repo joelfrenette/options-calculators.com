@@ -569,9 +569,19 @@ const PINNED: PinnedClaim[] = [
   },
   {
     finding: "P6-47",
-    claimFile: "components/ccpi-dashboard.tsx",
+    // P6-13 split `ccpi-dashboard.tsx` (992 lines) and the sentence moved with
+    // the score card that renders it. Fourth registry entry repointed by the
+    // day's splits (P6-66, P6-61, P6-58, and this) — every one a FAIL, none a
+    // silent pass. P7-65 now also guards the registry against losing an entry
+    // outright.
+    claimFile: "components/ccpi/dashboard-score-card.tsx",
     claim: "It does not select trades",
-    dependsOnFile: "components/ccpi-dashboard.tsx",
+    // Same file as the claim now: after the split, the sentence and the block
+    // that would contradict it sit together. Tree-wide coverage does not depend
+    // on this pin — the RETIRED phrase list above scans every UI file and every
+    // route for "Recommended Strategies This Week", so a strategy list
+    // reappearing in a SIBLING card is still caught.
+    dependsOnFile: "components/ccpi/dashboard-score-card.tsx",
     // The owner's decision was that the CCPI band recommends nothing. If a
     // per-band strategy list returns, this sentence is the first thing it
     // contradicts.

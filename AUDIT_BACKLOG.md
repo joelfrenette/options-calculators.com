@@ -298,7 +298,7 @@ recomputes it.
 | P6-10 | P2 | fixed | `100 - x \|\| 50` precedence bug. |
 | P6-11 | P1 | fixed | **Owner chose: fold the real rows into social-sentiment and retire the rest (2026-08-13).** The measured half of `/api/sentiment-heatmap` — StockTwits author-tagged bullish/bearish counts — **already existed in the social-sentiment tab** as `per_symbol`, scored the same way, null when fewer than 5 tagged messages, rendering "No live data". So the rebuild was a deletion: the route is gone (60 routes → 59), with its contract entry, its health-check entry and its consumer. What went with it was the AI path, which asked a model for its "best general impression" while telling it that it had no live data, and — when even that failed — returned `{bullishScore: 50, bearishScore: 50}` as data, on a scale where 50 is a real neutral reading (P6-18's shape). The consumer made it worse: `market-sentiment.tsx` rendered the rows as gauges under the heading **"Sector Analysis"** — three index ETFs, not sectors — and **discarded the per-row `source` field the route provided**, so an AI impression and a measured reading drew the identical dial (S-7's shape). |
 | P6-12 | P1 | fixed | 25+ raw `process.env` key reads routed through `resolveApiKey`. |
-| P6-13 | P3 | open | Module-size debt. 19 was stale; **P7-45 then said 25, which was ALSO wrong — it came off a `head -25` on a sorted list, a display limit read as a count. The true figure was 27, and 26 after P7-45 split the Step 4 card.** Four of the additions were that day's entry-exclusion work. The Black-Scholes duplication half was closed by P7-12. **Now 17 over `app components lib` and 19 including `scripts` (P7-49 — every earlier figure omitted which directories it counted), after the `use-wheel-scanner.ts`, `fundamental-scan.ts`, `strategy-scanner/route.ts`, `ccpi-audit-admin.tsx`, `market-sentiment.tsx`, `fomc-predictions.tsx`, `trend-analysis.tsx`, `panic-euphoria.tsx` and `market-sentiment/route.ts` splits.** The scanner route was the site's largest module at 1,808 lines and is now 216, its body in `lib/strategy-scanner/` — see P7-59 and P7-60 for what that did to the checks and to SITE_MAP. `ccpi-audit-admin.tsx` was 1,636 and is now 593, its data-shaping half in `lib/ccpi/audit/` — see P7-61 for the claim that extraction does NOT support. `market-sentiment.tsx` was 1,497 and is now 599, across ten modules under `components/market-sentiment/` — see P7-62. `fomc-predictions.tsx` was 1,460 and is now 549 across eleven modules — see P7-63. `trend-analysis.tsx` went 1,168 to 145 and `panic-euphoria.tsx` 1,163 to 188 — see P7-64, and the market-sentiment route went 1,140 to 351. Measured with `find app components lib -type f \( -name "*.ts" -o -name "*.tsx" \) -exec wc -l {} + \| awk '$1>600' \| wc -l`. |
+| P6-13 | P3 | open | Module-size debt. 19 was stale; **P7-45 then said 25, which was ALSO wrong — it came off a `head -25` on a sorted list, a display limit read as a count. The true figure was 27, and 26 after P7-45 split the Step 4 card.** Four of the additions were that day's entry-exclusion work. The Black-Scholes duplication half was closed by P7-12. **Now 14 over `app components lib` and 16 including `scripts` (P7-49 — every earlier figure omitted which directories it counted), after the `use-wheel-scanner.ts`, `fundamental-scan.ts`, `strategy-scanner/route.ts`, `ccpi-audit-admin.tsx`, `market-sentiment.tsx`, `fomc-predictions.tsx`, `trend-analysis.tsx`, `panic-euphoria.tsx` and `market-sentiment/route.ts`, `options-strategy-toolbox.tsx`, `ccpi-dashboard.tsx` and `ccpi/route.ts` splits.** The scanner route was the site's largest module at 1,808 lines and is now 216, its body in `lib/strategy-scanner/` — see P7-59 and P7-60 for what that did to the checks and to SITE_MAP. `ccpi-audit-admin.tsx` was 1,636 and is now 593, its data-shaping half in `lib/ccpi/audit/` — see P7-61 for the claim that extraction does NOT support. `market-sentiment.tsx` was 1,497 and is now 599, across ten modules under `components/market-sentiment/` — see P7-62. `fomc-predictions.tsx` was 1,460 and is now 549 across eleven modules — see P7-63. `trend-analysis.tsx` went 1,168 to 145 and `panic-euphoria.tsx` 1,163 to 188 — see P7-64, and the market-sentiment route went 1,140 to 351. Measured with `find app components lib -type f \( -name "*.ts" -o -name "*.tsx" \) -exec wc -l {} + \| awk '$1>600' \| wc -l`. |
 | P6-14 | P1 | fixed | MMF component normalised against its own history. |
 | P6-15 | P2 | fixed | social-sentiment error banner; decorative 47/54/50 constants removed. |
 | P6-16 | P0 | fixed | `/api/fomc-predictions` nullable end to end; 503 rather than a forecast on a stand-in rate. |
@@ -439,11 +439,12 @@ recomputes it.
 | P7-63 | P2 | fixed | `fomc-predictions.tsx` held TWO tooltip states. `tooltipsEnabled` is what the "Tooltips" toggle writes; `showTooltips` was initialised `true`, `setShowTooltips` was never called anywhere, and it gated exactly one control — the (i) beside each options-strategy row. So turning tooltips OFF turned off every tooltip on the tab except that one, which stayed on permanently: a toggle that does not do what its label says, in the smallest possible dose. Nothing surfaced it for as long as both states sat in one 1,460-line file. `check-write-only-state.ts` found it the moment the split moved the strategy rows into a child and left `showTooltips` unread. Deleted; that row reads the toggle like the rest. |
 | P7-64 | P2 | fixed | Splitting `trend-analysis.tsx` and `panic-euphoria.tsx` broke three checks in three different ways, and all three FAILED rather than passing quietly. `check-provenance`'s pinned-claim registry lost two entries — P6-66's "No momentum reading, so no weekly target" and P6-61's "DISPLAY ONLY — not scored" — because both sentences moved into the child component that renders them; a registry keyed by path rots on any refactor, and failing loudly is the only thing that makes it survivable. `check-panic-composite.ts` was pinned to the one file and reported **`scope: 0 score bar(s) read componentScores`** — the exact derived-set collapse its own scope assertion was written for (P6-75/P6-77), arriving on the day that assertion earned its keep. It now reads the tab plus `components/panic/**` and asserts the set's size. |
 | P7-65 | P2 | fixed | `check-provenance`'s pinned-claim registry could not notice a DELETION. Every entry fails individually — a claim that vanishes fails, a dependency that moves fails, and three did on 2026-08-14 — but an entry removed from the array takes its own failure with it: the loop iterates one fewer time and nothing says a claim stopped being watched. The P6-75/P6-77 shape, sitting inside the rule written to catch rotting claims. The registry now asserts its size AND the exact set of finding IDs it covers, spelled out rather than counted, because a bare length check is satisfied by swapping one pin for another. Negative-tested by deleting P6-45's entry: FAIL, naming the missing ID. |
+| P7-66 | P3 | fixed | Three more splits — the LEARN strategy toolbox, the CCPI dashboard and `/api/ccpi` — took module-size debt from 17 to 14 over `app components lib`. A FOURTH pinned-claim entry rotted: P6-47's "It does not select trades" moved with the score card that renders it. Its negative pin was repointed to the same file, which is defensible only because the RETIRED phrase list scans every UI file and route for "Recommended Strategies This Week" independently — a per-file negative pin would otherwise miss the phrase reappearing in a sibling card. Also corrected on the way through: `indicatorCount` is `number | null` and the extracted props were typed `number`, which would have made the old `|| 29` default expressible again. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-268 findings recorded · **234 fixed · 8 wontfix · 2 verified-ok · 24 open.**
+269 findings recorded · **235 fixed · 8 wontfix · 2 verified-ok · 24 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -4696,3 +4697,38 @@ FAILED, naming the missing ID, then restored.
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-65 | P2 | tooling | The pinned-claim registry could not notice its own deletions — a removed entry takes its failure with it. It now asserts its size and the exact finding IDs it covers; negative-tested by deleting one. |
+
+## 2026-08-14 — three more splits, and a fourth registry rot
+
+`components/options-strategy-toolbox.tsx` 1,026 → **415** (the strategy copy table and the
+payoff maths to `components/toolbox/`). `components/ccpi-dashboard.tsx` 992 → **533** (four
+render sections to `components/ccpi/`). `app/api/ccpi/route.ts` 990 → **315** (provenance,
+market data, the macro/sentiment feeds and the weekly summary to `lib/ccpi/route/`).
+
+**Ten modules over 600 lines removed today.** The count is **14** over `app components lib`
+and **16** including `scripts/`, from 24 and 26 this morning.
+
+### P7-66 — the registry rotted a fourth time, and a null nearly became a number
+
+P6-47 pins "It does not select trades" to the CCPI dashboard; the sentence moved with the
+score card. Repointed — the fourth today, after P6-66, P6-61 and P6-58, and again a FAIL
+rather than a silent pass. P7-65's new size assertion now covers the other half: an entry
+that disappears entirely.
+
+Its dependency is a NEGATIVE pin — the file must NOT contain "Recommended Strategies" —
+and pointing a negative pin at one file after a split is only defensible because the
+RETIRED phrase list scans every UI file and every route for that phrase independently. On
+its own the pin would now miss a strategy list reappearing in a sibling card. Written down
+because the next person to repoint a negative pin will not be able to tell that from the
+entry alone.
+
+**And the split nearly widened a null.** `indicatorCount` is `number | null` in the
+dashboard — deliberately, because the old `ccpi.totalIndicators || 29` invented a total of
+29 for any falsy value. The extracted child props were typed `number`, which typecheck
+caught; the fix was to widen the prop and carry the reason in a comment, not to coerce at
+the call site. P6-34's rule again: introducing a null is half a change, and every reader
+has to learn about it separately.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-66 | P3 | tooling | Three more splits took module-size debt 17 → 14. A fourth pinned-claim entry rotted (P6-47), repointed. Its negative pin is now single-file, which only works because the RETIRED phrase list scans every UI file independently. A `number \| null` was nearly narrowed to `number` in the extracted props — typecheck caught it; the prop was widened rather than the call site coerced. |
