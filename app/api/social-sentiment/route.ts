@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { resolveApiKey } from "@/lib/api-keys"
+import { weightFor } from "@/lib/social-sentiment-weights"
 import { generateWithFallback } from "@/lib/ai-providers"
 import {
   getGoogleNewsSentiment,
@@ -91,6 +92,16 @@ async function getStockTwitsSentiment(
 // scoring headline tone over the top 50 and the other counting greed/fear words
 // over the top 30 — so this is milder than P6-61. But two readings of one
 // article set are two opinions, not two witnesses.
+//
+// P6-65, closed 2026-08-13 on the owner's decision to REDUCE rather than remove:
+// the corpus is real measured data, unlike P6-8's VIX-derived proxies. The pair
+// now carries **0.06 + 0.04 = 0.10** between them, keeping their 11:8 ratio, and
+// the weights live in `lib/social-sentiment-weights.ts` where each row records
+// which corpus it reads. The share is asserted there, because the concentration
+// was invisible in a per-indicator table — read down the weight column and no
+// row exceeded 0.16; read down the corpus column and one article set held 30% of
+// the live weight. **A table can hide a concentration by being sorted the wrong
+// way.**
 async function fetchFinnhubGeneralNews(): Promise<any[] | null> {
   const key = resolveApiKey("FINNHUB_API_KEY")
   if (!key) return null
@@ -274,15 +285,25 @@ export async function GET() {
 
     // Build indicator list (name, score, weight, group). score -1 => not live.
     // Reliability weighting: hard data feeds (CNN F&G, news APIs) > social scrapes.
+    //
+    // P6-65: the weight and the CORPUS now come from lib/social-sentiment-weights.ts,
+    // not from literals here. The concentration this fixes was invisible in a
+    // per-indicator table — two rows, one Finnhub article set, 0.19 between them —
+    // so the corpus is a field and its share is asserted.
+    const w = (name: string): number => {
+      const found = weightFor(name)
+      if (found === null) throw new Error(`social-sentiment: no weight registered for "${name}"`)
+      return found
+    }
     const indicators = [
       // --- Hard data / aggregated indices (highest reliability) ---
-      { name: "CNN Fear & Greed", score: cnnFearGreed.score, source: cnnFearGreed.source, weight: 0.16, group: "macro", description: cnnFearGreed.score >= 0 ? `CNN multi-factor index${cnnFearGreed.detail ? ` (${cnnFearGreed.detail})` : ""}` : "CNN multi-factor index (no live reading)" },
-      { name: "Finnhub News", score: finnhub.score, source: finnhub.source, weight: 0.11, group: "macro", description: `Financial news headline sentiment (${finnhub.articles} articles)` },
-      { name: "Polygon News", score: polygon.score, source: polygon.source, weight: 0.1, group: "macro", description: `Polygon.io news sentiment (${polygon.articles} articles)` },
-      { name: "News Fear & Greed", score: newsFearGreed.score, source: newsFearGreed.source, weight: 0.08, group: "macro", description: "Greed vs fear word counts over the SAME Finnhub general-news feed as the row above — a second lens, not a second source" },
+      { name: "CNN Fear & Greed", score: cnnFearGreed.score, source: cnnFearGreed.source, weight: w("CNN Fear & Greed"), group: "macro", description: cnnFearGreed.score >= 0 ? `CNN multi-factor index${cnnFearGreed.detail ? ` (${cnnFearGreed.detail})` : ""}` : "CNN multi-factor index (no live reading)" },
+      { name: "Finnhub News", score: finnhub.score, source: finnhub.source, weight: w("Finnhub News"), group: "macro", description: `Financial news headline sentiment (${finnhub.articles} articles)` },
+      { name: "Polygon News", score: polygon.score, source: polygon.source, weight: w("Polygon News"), group: "macro", description: `Polygon.io news sentiment (${polygon.articles} articles)` },
+      { name: "News Fear & Greed", score: newsFearGreed.score, source: newsFearGreed.source, weight: w("News Fear & Greed"), group: "macro", description: "Greed vs fear word counts over the SAME Finnhub general-news feed as the row above — a second lens, not a second source" },
       // --- Social / retail scrapes (lower reliability) ---
-      { name: "StockTwits", score: stocktwitsSPY.score, source: stocktwitsSPY.source, weight: 0.11, group: "social", description: `SPY bullish/bearish tags (${stocktwitsSPY.bullish}B/${stocktwitsSPY.bearish}Be)` },
-      { name: "Google News", score: googleNews.score, source: googleNews.source, weight: 0.08, group: "social", description: `Market headline pulse (${googleNews.detail})` },
+      { name: "StockTwits", score: stocktwitsSPY.score, source: stocktwitsSPY.source, weight: w("StockTwits"), group: "social", description: `SPY bullish/bearish tags (${stocktwitsSPY.bullish}B/${stocktwitsSPY.bearish}Be)` },
+      { name: "Google News", score: googleNews.score, source: googleNews.source, weight: w("Google News"), group: "social", description: `Market headline pulse (${googleNews.detail})` },
     ].map((i) => ({ ...i, status: i.score >= 0 ? "LIVE" : "UNAVAILABLE" }))
 
     const valid = indicators.filter((i) => i.score >= 0)

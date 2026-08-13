@@ -350,7 +350,7 @@ recomputes it.
 | P6-62 | P1 | fixed | Two tooltips naming real surveys as the source of VIX-derived numbers. |
 | P6-63 | P2 | fixed | Registry grown to eight claims, walked from recorded owner decisions. |
 | P6-64 | P3 | fixed | Process gotcha recorded: `git checkout --` discarded uncommitted work. |
-| P6-65 | P2 | **open — Joel** | Social Sentiment fetched the identical Finnhub URL twice. The honesty is fixed; **the weight decision is the owner's: should 0.19 of the composite rest on one Finnhub corpus?** |
+| P6-65 | P2 | fixed | **Owner chose: reduce the weight (2026-08-13).** The concentration was invisible because the table was per-INDICATOR while the risk is per-CORPUS — "Finnhub News" (0.11) and "News Fear & Greed" (0.08) are two lenses over ONE Finnhub general-news article set, 29.7% of the live weight, and no single row exceeded 0.16. **A table can hide a concentration by being sorted the wrong way.** Weights moved to `lib/social-sentiment-weights.ts` with a `corpus` field per row; the pair now carries 0.06 + 0.04 = 0.10 in its previous 11:8 ratio, and a multi-row corpus is capped at 20% of total. 35 assertions, negative-tested by restoring 0.11/0.08 AND by renaming one row's corpus to dodge the cap. |
 | P6-66 | P3 | fixed | Momentum strength nullable end to end. The row's original "LOGGED, NOT FIXED" text is superseded by the later row. |
 | P6-67 | P3 | fixed | Composite independence audit — four defective, two clean. |
 | P6-68 | P1 | fixed | Component-side neutral defaults, including the `$0.00` price target. |
@@ -431,7 +431,7 @@ recomputes it.
 
 ### The open list, by severity
 
-256 findings recorded · **218 fixed · 8 wontfix · 1 verified-ok · 29 open.**
+256 findings recorded · **219 fixed · 8 wontfix · 1 verified-ok · 28 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
