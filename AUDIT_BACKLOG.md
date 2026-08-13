@@ -443,11 +443,12 @@ recomputes it.
 | P7-67 | P3 | wontfix | `lib/ccpi/scoring.ts` is 849 lines and must stay one file. Four check scripts load it under plain `node` with a relative `../lib/ccpi/scoring.ts`, and node cannot resolve an extensionless relative TypeScript import — tested directly: a two-file fixture with `import { X } from "./dep"` fails `ERR_MODULE_NOT_FOUND`. Splitting it would need `.ts` extensions in the source, which Next's bundler does not accept. Same trade P7-15 recorded for `daysBetween`: the import-free single file IS the test harness, and collapsing it costs coverage. |
 | P7-68 | P3 | fixed | Three more splits — the trade walkthrough, the insider dashboard and the risk calculator — took module-size debt from 14 to 11. `WalkthroughSetup` had to move to its own module rather than stay in the modal: the mockups need the type and the modal needs the mockups, so leaving it would have made the import circular; the modal re-exports it so no caller changed. Two prop types were narrowed by the extraction and had to be widened back — three setters are called as functional updaters (`setX(v => !v)`), which needs `Dispatch<SetStateAction<T>>` rather than `(v: T) => void`. |
 | P7-69 | P2 | open | **The CCPI is running on two of four pillars, and the only signal is a number nobody reads.** Measured on staging 2026-08-14: Valuation `scoredMax=0`, Risk Appetite `scoredMax=24` — both under `MIN_SCORED_MAX`, both dropped, so the headline 14 is computed over 55% of the pillar weight. The scoring is behaving exactly as designed; the causes are operational and named in the payload itself: `apify: live=false, source="baseline-no-token"` (APIFY_API_TOKEN unset — kills spxPE 18, spxPS 12 and equityRiskPremium 10 by derivation) and `buffett/putCall/aaii: live=false, source="groq"` (the three ScrapingBee scrapes fell through to the LLM — 16 more in Valuation, 55 in Risk Appetite). **What is missing is not honesty but ALERTING**: nothing fails, nothing warns, and `certainty: 56` is the whole signal. P6-35 predicted Valuation at 40 with everything up and 28 on an FMP hiccup; the real figure is 0, because it never modelled two providers down at once. |
+| P7-70 | **P1** | fixed | **An unauthenticated route published the first 15 characters of a live API key.** `/api/scraping-bee/diagnostics` carries no `needsAuth` and checks no session, and returned `apiKeyPreview: apiKey.substring(0, 15)`. It was harmless ONLY because `SCRAPINGBEE_API_KEY` is unset in both environments, so the field read "NOT CONFIGURED" — **the leak would have begun the moment the key was set, which is exactly the action P7-69 was about to recommend.** A defect that arms itself when someone follows your advice is the worst shape one can have. Field removed; `apiKeyConfigured` already carried everything actionable, the rule `budgetEnvReport` follows. The error path also echoed ScrapingBee's response body, which can contain the request — and the request carries `api_key` in its query string; now the status only. New provenance rule 12 bans slicing any identifier assigned from a key resolver, structurally rather than by field name, and was negative-tested by reintroducing the line. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-272 findings recorded · **236 fixed · 9 wontfix · 2 verified-ok · 25 open.**
+273 findings recorded · **237 fixed · 9 wontfix · 2 verified-ok · 25 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -4845,3 +4846,61 @@ than code:
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-69 | P2 | ANALYZE → CCPI | Valuation scores 0 of 100 live weight and Risk Appetite 24, so the headline CCPI runs on two of four pillars — 55% of the weight — with `certainty: 56` as the only signal. Causes are operational and named in `apiStatus`: `APIFY_API_TOKEN` unset, and three ScrapingBee scrapes falling through to Groq. The scoring is correct; the alerting does not exist. |
+
+## 2026-08-14 — P7-69 is PRODUCTION too, and P7-70 was waiting for the fix
+
+Two updates, and the second is why the first had to be checked before acting on it.
+
+### P7-69 confirmed on production, and the cause is simpler than "check the account"
+
+`/api/scraping-bee/diagnostics` answers the question outright, on both hosts:
+
+```
+apiKeyConfigured: false
+status: "MISSING_API_KEY"
+```
+
+**`SCRAPINGBEE_API_KEY` is not set.** Not a quota, not a changed page shape, not the
+account — the key is simply absent, which is why all three scrapes fall through to the LLM
+together. Same for `APIFY_API_TOKEN`, which `apiStatus` already named as
+`baseline-no-token`.
+
+And **production is in the identical state**: Valuation `scoredMax=0`, Risk Appetite 24,
+`ccpi=14`, `certainty=56`. www.options-calculators.com has been serving a crash index
+computed over 55% of its pillar weight. The refusal is correct and the renormalisation is
+correct; what is absent is two environment variables.
+
+### P7-70 — the fix would have armed a credential leak
+
+Reading the diagnostics route to confirm the above turned up the reason it was safe to read
+at all. It is **unauthenticated** — no `needsAuth` in its contract, no session check in the
+handler — and it returned:
+
+```ts
+apiKeyPreview: apiKey ? `${apiKey.substring(0, 15)}...` : 'NOT CONFIGURED'
+```
+
+Fifteen characters of a live credential, to anyone who asked. It reads "NOT CONFIGURED"
+today for exactly one reason: the key is unset. **Setting the key — the action P7-69 was
+about to recommend — is what would have started the leak.**
+
+That is the shape worth naming. Not "a latent bug", but *a defect that arms itself when
+someone follows your advice*. The recommendation and the vulnerability were pointed at the
+same switch.
+
+Removed. `apiKeyConfigured` already carried everything anyone acts on, which is the rule
+`budgetEnvReport` states in its own header: report the STATE, never the value. The error
+path also echoed ScrapingBee's response body into the JSON, and ScrapingBee echoes the
+request in some errors — a request whose query string contains `api_key`. Now the status
+only. `creditsRemaining` stays: a quota is not a credential, and an exhausted quota is one
+of the two states this endpoint exists to distinguish.
+
+**Provenance rule 12** bans slicing any identifier assigned from `resolveApiKey` /
+`getApiKey` / `process.env.*KEY|TOKEN|SECRET|PASSWORD`. Structural, not lexical — a ban on
+the string `apiKeyPreview` would have been satisfied by renaming the field, which is the
+scoped-by-prose failure this audit has now hit four times. Negative-tested by reintroducing
+the line: FAIL, naming the file and the identifier.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-70 | P1 | security | An unauthenticated route returned the first 15 characters of `SCRAPINGBEE_API_KEY`, harmless only because the key is unset — setting it, the action P7-69 recommends, is what would have started the leak. Field removed, error body no longer echoed, and provenance rule 12 now bans slicing any resolved key. |

@@ -857,5 +857,52 @@ check(
   aiLiveClaims.length ? aiLiveClaims.join(", ") : "AI values are tiered ai-estimate, which does not score (P6-34)",
 )
 
+// ---------------------------------------------------------------------------
+// 12. No route publishes key material, however short the substring.
+// ---------------------------------------------------------------------------
+//
+// P7-70. `/api/scraping-bee/diagnostics` is UNAUTHENTICATED — no `needsAuth` in
+// its contract, no session check in the handler — and returned
+// `apiKeyPreview: apiKey.substring(0, 15)`. Fifteen characters of a live
+// credential, to anyone who asked.
+//
+// It was harmless when found only because `SCRAPINGBEE_API_KEY` was unset in
+// both environments, so the field read "NOT CONFIGURED". The leak would have
+// started the moment the key was set — which was the action being recommended
+// at the time. **A defect that arms itself when someone follows your advice is
+// the worst shape a defect can have**, and the reason this is a rule rather
+// than a note in the route.
+//
+// Structural, not lexical: it finds identifiers ASSIGNED from a key resolver in
+// the same file, then flags any substring/slice/charAt taken of one. A ban on
+// the string "apiKeyPreview" would have been satisfied by renaming the field —
+// the scoped-by-prose failure this audit has now hit four times.
+
+const KEY_ASSIGN =
+  /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:resolveApiKey|getApiKey|getKey)\s*\(|(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*process\.env\.[A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD)/g
+
+const keyLeaks: string[] = []
+for (const f of API_FILES) {
+  const src = code(f)
+  const names = new Set<string>()
+  KEY_ASSIGN.lastIndex = 0
+  for (const m of src.matchAll(KEY_ASSIGN)) {
+    const n = m[1] ?? m[2]
+    if (n) names.add(n)
+  }
+  for (const n of names) {
+    const sliced = new RegExp(`\\b${n}\\s*\\.\\s*(?:substring|substr|slice|charAt)\\s*\\(`)
+    if (sliced.test(src)) keyLeaks.push(`${rel(f)}: ${n} is sliced`)
+  }
+}
+check(
+  "no route slices a resolved API key",
+  keyLeaks.length === 0,
+  keyLeaks.length
+    ? keyLeaks.join("; ")
+    : "report the STATE of a credential, never any part of its value — the rule budgetEnvReport already follows",
+)
+
+
 console.log(failures === 0 ? "\nAll provenance checks passed." : `\n${failures} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)
