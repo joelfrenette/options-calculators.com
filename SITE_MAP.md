@@ -16,7 +16,7 @@
 | `trend-analysis` | Index Trend Analysis | `TrendAnalysis` | `components/trend-analysis.tsx` | 1169 | `/api/trend-analysis` |
 | `risk-management` | CBOE VIX Volatility Index | `RiskCalculator` | `components/risk-calculator.tsx` | 859 | `/api/vix`<br>`/api/vix-history` |
 | `market-sentiment` | CNN's Fear & Greed | `MarketSentiment` | `components/market-sentiment.tsx` | 1616 | `/api/market-sentiment`<br>`/api/sentiment-heatmap` |
-| `panic-euphoria` | Citibank's Panic & Euphoria Index | `PanicEuphoria` | `components/panic-euphoria.tsx` | 1150 | `/api/panic-euphoria` |
+| `panic-euphoria` | Citibank's Panic & Euphoria Index | `PanicEuphoria` | `components/panic-euphoria.tsx` | 1164 | `/api/panic-euphoria` |
 | `social-sentiment` | Social Sentiment Index | `SocialSentiment` | `components/social-sentiment.tsx` | 758 | `/api/social-sentiment` |
 | `fomc-predictions` | FOMC Fed Rate Forecaster | `FomcPredictions` | `components/fomc-predictions.tsx` | 1461 | `/api/fomc-predictions` |
 | `cpi-inflation` | BLS CPI Inflation Forecaster | `CpiInflationAnalysis` | `components/cpi-inflation-analysis.tsx` | 669 | `/api/cpi-inflation` |
@@ -221,7 +221,7 @@ _None._
 | `components/market-sentiment.tsx` | 1616 | 1016 |
 | `components/fomc-predictions.tsx` | 1461 | 861 |
 | `components/trend-analysis.tsx` | 1169 | 569 |
-| `components/panic-euphoria.tsx` | 1150 | 550 |
+| `components/panic-euphoria.tsx` | 1164 | 564 |
 | `components/options-strategy-toolbox.tsx` | 1027 | 427 |
 | `components/ccpi-dashboard.tsx` | 993 | 393 |
 | `components/trade-walkthrough-modal.tsx` | 866 | 266 |

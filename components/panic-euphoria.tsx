@@ -57,7 +57,12 @@ interface PanicEuphoriaData {
   gasPrices: number | null
   // Server-computed scores for percentile-normalized components (P6-14) —
   // the client bars must not recompute these with the old hardcoded ranges.
-  componentScores?: { moneyMarketFunds: number | null; marginDebt: number; shortInterest: number | null }
+  // `marginDebt` is `number | null` like its two neighbours, and was typed
+  // `number` while the route could already... no: it could NOT, until P6-8 made
+  // the score null when FRED is quiet. The type is corrected in the same change
+  // that makes it reachable, which is the point — a non-null type is what stops
+  // the compiler asking the question, so it has to move with the value.
+  componentScores?: { moneyMarketFunds: number | null; marginDebt: number | null; shortInterest: number | null }
 }
 
 function PanicGradientBar({ value, min = -1, max = 1 }: { value: number; min?: number; max?: number }) {
@@ -551,11 +556,20 @@ export function PanicEuphoria() {
                 />
                 <PanicIndicator
                   label="Margin Debt"
-                  value={data.componentScores?.marginDebt ?? (data.marginDebt - 700) / 150}
+                  // P6-8. This read `?? (data.marginDebt - 700) / 150`, and the
+                  // fallback is the defect: the server now returns a null score
+                  // when the FRED series is unavailable, and `??` answered that
+                  // null by RECOMPUTING the score on the client from the
+                  // synthetic proxy — silently undoing the removal in the only
+                  // place a user looks. Introducing a null is half a change;
+                  // the other half is every guard downstream of it (P6-34).
+                  value={data.componentScores?.marginDebt ?? null}
                   rawValue={`$${data.marginDebt}B`}
                   tooltip={
                     tooltipsEnabled
-                      ? "Margin Debt tracks total borrowed money used for stock purchases. SOURCE: SYNTHETIC PROXY — derived from SPX momentum and VIX, NOT real FINRA statistics (FINRA publishes monthly with no free API). Treat as a directional gauge only. INTERPRETATION: High readings suggest leveraged speculation/euphoria; low readings suggest fear. Modeled range: $600-$850B."
+                      ? data.componentScores?.marginDebt !== null && data.componentScores?.marginDebt !== undefined
+                        ? "Margin Debt tracks total borrowed money used for stock purchases. SOURCE: FRED series BOGZ1FL663067003Q, scored as a percentile of its own history. INTERPRETATION: High readings suggest leveraged speculation/euphoria; low readings suggest fear."
+                        : "DISPLAY ONLY — not scored. Margin Debt tracks total borrowed money used for stock purchases. SOURCE: SYNTHETIC PROXY — derived from SPX momentum and VIX, NOT real FINRA statistics (FINRA publishes monthly with no free API). The real FRED series did not answer on this request, so the figure is a model of what margin debt might be and casts no vote in the composite. Modeled range: $600-$850B."
                       : ""
                   }
                 />
@@ -575,7 +589,7 @@ export function PanicEuphoria() {
                   rawValue={`${data.investorIntelligence}% bulls`}
                   tooltip={
                     tooltipsEnabled
-                      ? "Citi's model uses the Investor Intelligence survey of newsletter writers. This site does not have that survey. SOURCE: derived from VIX — the reading is 100 − ((VIX − 10) / 40) × 60, clamped to 30-70, so it is a volatility measure on a sentiment scale, not a poll of anybody. INTERPRETATION: the contrarian reading still applies (high = complacency, low = fear), but treat it as VIX wearing a survey's name. It IS scored in the composite."
+                      ? "DISPLAY ONLY — not scored. Citi's model uses the Investor Intelligence survey of newsletter writers. This site does not have that survey. SOURCE: derived from VIX — the reading is 100 − ((VIX − 10) / 40) × 60, clamped to 30-70, so it is a volatility measure on a sentiment scale, not a poll of anybody. INTERPRETATION: the contrarian reading still applies (high = complacency, low = fear), but treat it as VIX wearing a survey's name. Removed from the composite (P6-8): a component that cannot disagree with VIX is not a second piece of evidence about the market."
                       : ""
                   }
                 />

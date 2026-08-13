@@ -201,9 +201,22 @@ async function calculatePanicEuphoria() {
     // Weak/negative momentum + high VIX = low margin (600-700B)
     // Synthetic PROXY, used only when the real FRED series below is
     // unavailable — overridden by BOGZ1FL663067003Q when it fetches.
+    //
+    // P6-8, closed 2026-08-13 on the owner's decision to REMOVE rather than
+    // buy sources. **"Used only when the real series is unavailable" described
+    // the DISPLAY, never the score.** `marginScore` was computed from this
+    // formula unconditionally and was never null, so on every request where
+    // FRED was quiet the composite took an eighth of its value from
+    // `700 + spxMomentum*5 - (vix-15)*3` — an equal-weight vote cast by a
+    // formula, indistinguishable in the mean from the seven measured ones.
+    // `syntheticComponents` disclosed it, which is a different fact: a reader
+    // can accept a labelled proxy as a data point, and in an average it is not
+    // one.
+    //
+    // The value still displays, labelled synthetic. Only the vote is gone.
     let marginDebt = 700 + spxMomentum * 5 - (currentVix - 15) * 3
     marginDebt = Math.max(600, Math.min(850, marginDebt))
-    let marginScore = Math.max(-1, Math.min(1, normalize(marginDebt, 600, 850, 700)))
+    let marginScore: number | null = null
     let marginIsLive = false
 
     const qqqVolumes = qqqData.indicators.quote[0].volume.filter((v: number) => v !== null && v > 0)
@@ -213,8 +226,23 @@ async function calculatePanicEuphoria() {
     const volumeRatio = qqqAvgVol / diaAvgVol
     const volumeScore = Math.max(-1, Math.min(1, normalize(volumeRatio, 0.8, 1.5, 1.0)))
 
+    // Investor Intelligence: a pure, monotonic function of VIX and nothing
+    // else. There is no II survey behind it — the name is the whole of its
+    // provenance.
+    //
+    // P6-8: DROPPED FROM THE SCORE, kept as a labelled display value, exactly
+    // as `aaiiBullish` below already was. The reason is the same one P6-61 gave
+    // for AAII and it applies one step earlier: a component that cannot
+    // disagree with VIX is not evidence about the market, it is VIX wearing a
+    // survey's name. It sat in an equal-weight mean beside VIX-derived
+    // `putCallRatio`, so VIX level carried at least 2/8 of the composite
+    // through components that read as independent sentiment sources.
+    //
+    // What remains VIX-derived and still scores is `pcScore`, and that is
+    // deliberate: it reads the 5-day against the 50-day VIX, so it measures the
+    // SHAPE of the curve rather than its level and can genuinely disagree with
+    // a level reading. Its NAME is a separate defect — see P7-54.
     const investorIntelligence = Math.max(30, Math.min(70, 100 - ((currentVix - 10) / 40) * 60))
-    const iiScore = Math.max(-1, Math.min(1, normalize(investorIntelligence, 30, 70, 50)))
 
     // `aaiiBullish` is `investorIntelligence * 0.9`, and investorIntelligence is
     // itself a pure function of VIX. It is therefore a scaled copy of a
@@ -328,11 +356,13 @@ async function calculatePanicEuphoria() {
     // Composite over the components that actually have a value — a null
     // (unavailable FRED series) drops out instead of entering as a fake
     // neutral. Divisor = count actually scored.
+    // P6-8: `iiScore` is gone from this list, not set to null — Investor
+    // Intelligence is a pure function of VIX and never had a source to lose.
+    // `marginScore` remains, but is now null unless FRED answered.
     const componentScores = [
       shortInterestScore,
       marginScore,
       volumeScore,
-      iiScore,
       mmfScore,
       pcScore,
       commodityScore,
@@ -346,7 +376,6 @@ async function calculatePanicEuphoria() {
       shortInterestScore,
       marginScore,
       volumeScore,
-      iiScore,
       mmfScore,
       pcScore,
       commodityScore,
@@ -407,6 +436,10 @@ async function calculatePanicEuphoria() {
       // list when their FRED series fetched (P6-8/P6-14).
       syntheticComponents: [
         ...(shortInterestIsLive ? [] : ["nyseShortInterest"]),
+        // These three are DISPLAY-ONLY: they are listed as synthetic and none
+        // of them casts a vote in the composite (P6-61 for aaiiBullish, P6-8
+        // for investorIntelligence). `putCallRatio` DOES score — it is real VIX
+        // term structure under a false name, which is P7-54, not P6-8.
         "investorIntelligence",
         "aaiiBullish",
         "putCallRatio",
@@ -418,7 +451,7 @@ async function calculatePanicEuphoria() {
       // the old hardcoded ranges (P6-14).
       componentScores: {
         moneyMarketFunds: mmfScore !== null ? Math.round(mmfScore * 100) / 100 : null,
-        marginDebt: Math.round(marginScore * 100) / 100,
+        marginDebt: marginScore !== null ? Math.round(marginScore * 100) / 100 : null,
         shortInterest: shortInterestScore !== null ? Math.round(shortInterestScore * 100) / 100 : null,
       },
     }

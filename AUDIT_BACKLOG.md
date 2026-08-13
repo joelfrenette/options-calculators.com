@@ -293,7 +293,7 @@ recomputes it.
 | P6-5 | P2 | fixed | Dead "AI Structural" constants deleted. |
 | P6-6 | P0 | fixed | FRED observations parse to null; per-series tier map. |
 | P6-7 | P2 | fixed | The LLM call for a value nothing consumed. |
-| P6-8 | P1 | open | **Partial.** Commodities/gas/FINRA fixed. **Remaining:** short interest, margin debt, Investor Intelligence, AAII and "putCallRatio" are still VIX-derived proxies. Real sources or removal is a rebuild decision for Joel. |
+| P6-8 | P1 | fixed | **Owner chose: remove from the composite (2026-08-13).** Two components still voted without a source. `investorIntelligence` is `100 − ((VIX − 10) / 40) × 60` — a pure monotonic function of VIX under a survey's name, so it could never disagree with VIX: one vote counted twice. `marginDebt`'s comment said the proxy was "used only when the real FRED series is unavailable", and **that described the DISPLAY, never the score** — `marginScore` was computed unconditionally and was never null, so on every request FRED missed, `700 + spxMomentum*5 − (vix−15)*3` cast an equal-weight vote. Both are display-only now. Short interest is genuinely live (Quiver off-exchange, E-8a) and AAII stopped scoring at P6-61, so those two needed nothing. 16 assertions, negative-tested in three forms. **The near-miss worth keeping:** the client read `?? (data.marginDebt - 700) / 150`, so the new null was answered by RECOMPUTING the score on the client from the proxy — the server-side removal silently undone in the only place a user looks, with no type error because the client type said `number`. |
 | P6-9 | P2 | fixed | panic-euphoria SMA throws rather than returning a non-average. |
 | P6-10 | P2 | fixed | `100 - x \|\| 50` precedence bug. |
 | P6-11 | P1 | open | **Partial.** The hallucination pipeline is labelled and routed through the guarded chain. **Open decision:** rebuild the sentiment heatmap on real sources or retire the tab. |
@@ -422,6 +422,7 @@ recomputes it.
 | P7-46 | P3 | fixed | The tsconfig note claiming the Next bundler disallows .ts import extensions was FALSE and blocked Phase 7.0 for five phases. Vercel built it clean (chunk changed, /api/ccpi 200, homepage 200). An untested claim in a comment is a claim, not a constraint. |
 | P7-47 | **P1** | fixed | keywordScore matched by substring, so "Death cross forms as S&P 500 breaks support" scored 100/100 BULLISH (ath in death, up in support) and "Ford recalls 100,000 trucks" scored 100/100 (calls in recalls). A live indicator at 0.08 composite weight that could be exactly inverted. Word boundaries; scorer extracted to the import-free lib/headline-sentiment.ts; 14 assertions. |
 | P7-48 | P3 | fixed | P7-45's corrected module count of 25 came off a `head -25`-truncated list — a display limit read as a count. The real figure was 27, and is 26 after the Step 4 split. |
+| P7-54 | P2 | open | `/api/panic-euphoria` publishes `putCallRatio`, and it is not one: the value is `vixShortTerm / vixLongTerm`, the 5-day VIX over the 50-day — real measured data, correctly scored as curve SHAPE, under the name of an instrument nobody sources. `/api/market-sentiment` states the opposite in its own header — "putCallRatio is absent on purpose: nothing in the codebase sources one" — and lists it in `NOT_TRACKED`, returning null. **Two routes disagree about whether this site has a put/call ratio, and one of them scores the thing it says does not exist.** Renaming it touches the CCPI payload and the data-source-status map, so it is scoped separately rather than folded into P6-8. |
 | P7-53 | P2 | fixed | The scan built its rejection/skip buckets as an object literal while the notice card rendered their names as a `reason === "x" &&` chain in another file, connected by nothing. BOTH directions were broken: a bucket with no label rendered a BLANK heading beside a live count, and `fundamentalsIncomplete` had a written label that was unreachable because it is a `failedFilters` tag and never a bucket key. So an unknown ROE went into the `roe` bucket and the user was told **"ROE below Min ROE %"** about a company whose earnings never reported — P6-24 fixed that sentence in the log line and left the bucket. Keys and labels now come from `scan-diagnostics.ts`; 51 assertions. |
 | P7-52 | P2 | fixed | The Step 3 scan's arithmetic — the four-quarter TTM gate, the null D/E and ROE, the market cap that must not render "$0.0B", the S-17 earnings extraction, the premium estimate — sat inside an async three-endpoint fetch loop and could not be asserted by anything. Extracted to the import-free `components/scanner/fundamental-metrics.ts`; `fundamental-scan.ts` 646 → 496. 54 assertions in `check-fundamental-metrics.ts`, negative-tested in three forms. |
 | P7-51 | P3 | fixed | The Step 3 premium estimate's yield clamp has a FLOOR of 0.5%, and it applies to a row with no inputs at all: a ticker whose snapshot carries neither a live nor a previous close reaches `estimatePremium` with `currentPrice = 0`, fails on volume and incomplete fundamentals (two failures — a near miss, so it DOES appear in the relaxed Step 4 table) and renders a $0.00 strike beside a **0.50% yield**. A clamp bound in the column where a measurement goes. **Owner chose: drop those rows.** A ticker with no usable price is now a SKIP (`noPrice`) taken before any filter runs, so it never reaches the row builder — no filter verdict is invented for a ticker nobody could measure. |
@@ -431,7 +432,7 @@ recomputes it.
 
 ### The open list, by severity
 
-256 findings recorded · **219 fixed · 8 wontfix · 1 verified-ok · 28 open.**
+257 findings recorded · **220 fixed · 8 wontfix · 1 verified-ok · 28 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -4042,6 +4043,73 @@ in three of its last four quarters with the loss most recent counts as **zero**,
 cannot be asserted, and "days to earnings" is exactly the arithmetic that is wrong by one
 and looks right. All four snapshot fields that can carry the date now provably produce the
 same answer, which is the S-17 defect stated as a test.
+
+## 2026-08-13 — the owner's decisions, built
+
+### P6-8 — "used only when the real series is unavailable" described the display, never the score
+
+The Panic/Euphoria composite is an equal-weight mean over the components that have a
+score. Two of them had no source behind the number.
+
+`investorIntelligence` is `100 − ((VIX − 10) / 40) × 60`, clamped to 30–70. A pure,
+monotonic function of VIX wearing a newsletter survey's name. It cannot disagree with VIX
+at any level, ever, which is the same argument P6-61 made about AAII one step further
+down the chain — and AAII was `investorIntelligence × 0.9`, so the site was counting VIX
+three times and calling two of them sentiment surveys.
+
+`marginDebt` is the one worth the entry. Its comment read *"Synthetic PROXY, used only
+when the real FRED series below is unavailable"*, and that sentence was true about the
+DISPLAYED VALUE and false about the score. `marginScore` was computed from
+`700 + spxMomentum*5 − (vix−15)*3` unconditionally, at declaration, and the FRED branch
+overwrote it only on success. It was therefore **never null**, so on every request where
+BOGZ1FL663067003Q did not answer, an eighth of the composite was a formula — and inside
+a mean, a formula and a measurement are the same kind of thing.
+
+`syntheticComponents` listed both, and that is a genuinely different fact from excluding
+them. A reader can accept a labelled proxy as a data point. An average cannot.
+
+**Short interest and AAII needed nothing** — short interest has been real since E-8a
+(Quiver's FINRA off-exchange ratio, scored as a percentile of its own stored history, null
+until eight days accumulate) and AAII stopped scoring at P6-61. The finding's own text was
+stale about half its own subject, which is worth noticing before acting on any row this
+old.
+
+**The near-miss is the transferable part.** Making `marginScore` null server-side did
+nothing on screen, because the client read:
+
+    value={data.componentScores?.marginDebt ?? (data.marginDebt - 700) / 150}
+
+`??` answers null by evaluating the right-hand side, so the bar recomputed the score on
+the client, from the synthetic proxy, in the only place a user actually looks. No type
+error, because the client type declared the field `number` — a non-null type is what stops
+the compiler asking the question, so it has to move in the same change that makes the null
+reachable. **Introducing a null is half a change** (P6-34, P6-14). Every score bar's
+fallback is now asserted to be `null`.
+
+And the tooltip on the Investor Intelligence row ended with the sentence *"It IS scored in
+the composite."* — accurate when written, false the moment the row stopped scoring, and it
+would have survived as a confident claim about the opposite of the truth. It is asserted
+now too.
+
+### P7-54 — two routes disagree about whether this site has a put/call ratio
+
+`/api/panic-euphoria` publishes `putCallRatio` and scores it. The value is
+`vixShortTerm / vixLongTerm` — the 5-day VIX over the 50-day. That is real measured data
+and it is scored correctly, as the SHAPE of the volatility curve rather than its level,
+which is exactly why it can survive P6-8 while `investorIntelligence` cannot.
+
+The name is the defect. `/api/market-sentiment` says so in its own header — *"putCallRatio
+is absent on purpose: nothing in the codebase sources one"* — lists it in `NOT_TRACKED`,
+and returns null for it. So one route documents that the site cannot source a put/call
+ratio while another scores a number under that name.
+
+Left open: renaming reaches the CCPI payload, `data-source-status`, and the contract
+table, so it wants its own change rather than being folded into P6-8's.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P6-8 | P1 | Panic/Euphoria | Two composite members had no source: `investorIntelligence` (a pure function of VIX) and `marginDebt` whenever FRED was quiet, whose "proxy only when unavailable" comment described the display and not the score. Both display-only now; 16 assertions. |
+| P7-54 | P2 | Panic/Euphoria | `putCallRatio` is the VIX 5d/50d term-structure ratio under an instrument's name, while `/api/market-sentiment` states in its own header that nothing in the codebase sources one. Real data, false noun. |
 
 ### P7-53 — a label with no bucket, and a bucket with no label
 
