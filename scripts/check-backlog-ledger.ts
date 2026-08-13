@@ -42,9 +42,9 @@ const BACKLOG = "AUDIT_BACKLOG.md"
  * findings set that quietly shrinks, fails loudly instead of passing quietly.
  * Update them deliberately in the same commit that changes the counts.
  */
-const EXPECTED_LEDGER_ROWS = 265
+const EXPECTED_LEDGER_ROWS = 266
 const EXPECTED_OPEN = 24
-const EXPECTED_FIXED = 231
+const EXPECTED_FIXED = 232
 const EXPECTED_WONTFIX = 8
 const EXPECTED_VERIFIED_OK = 2
 
@@ -58,7 +58,7 @@ const EXPECTED_VERIFIED_OK = 2
  * "(251 - 241)" and went stale the first time either number moved, which in a
  * file about numbers going stale is not a comment anyone should have to notice.
  */
-const EXPECTED_TABLE_IDS = 255
+const EXPECTED_TABLE_IDS = 256
 
 /**
  * Table rows whose first cell is deliberately not a finding ID: they record a piece

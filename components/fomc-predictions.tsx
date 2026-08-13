@@ -19,127 +19,47 @@ import {
   ResponsiveContainer,
 } from "recharts"
 
-interface NextMeeting {
-  date: string
-  daysUntil: number
-  prediction: "CUT" | "HIKE" | "HOLD"
-  predictionBps: number
-  confidence: number
-  impliedRate: number
-  reliability: "full" | "degraded"
-}
 
-interface RatePath {
-  // Null when FRED's DFF history is too short to reach back a meeting cycle.
-  previousMeeting: number | null
-  current: number
-  nextMeeting: number
-  threeMonth: number
-  sixMonth: number
-  twelveMonth: number
-}
-
-interface FomcMeeting {
-  date: string
-  daysAway: number
-  impliedRate: number
-  probCut50: number
-  probCut25: number
-  probNoChange: number
-  probHike25: number
-  probHike50: number
-}
-
-interface HistoricalRate {
-  date: string
-  rate: number
-}
-
-interface EconomicFactors {
-  yieldCurve: string | null
-  yieldCurveSignal: string | null
-  treasuryTrend: string | null
-  treasurySignal: string | null
-  marketExpectation: string
-}
-
-interface EconomicIndicator {
-  current: number
-  previous: number
-  trend: "up" | "down" | "stable"
-}
-
-// Every indicator is null when its FRED series was unavailable. Nothing is
-// substituted, so the card renders "—" instead of a representative figure.
-interface EconomicIndicators {
-  unemployment: EconomicIndicator | null
-  cpi: EconomicIndicator | null
-  coreCPI: EconomicIndicator | null
-  pce: EconomicIndicator | null
-  gdp: EconomicIndicator | null
-  payrolls: EconomicIndicator | null
-}
-
-interface FedDecisionFactors {
-  inflationPressure: string | null
-  inflationTrend: string | null
-  laborMarket: string | null
-  laborTrend: string | null
-  economicGrowth: string | null
-  growthTrend: string | null
-}
-
-interface Provenance {
-  inputs: Record<string, { tier: "live" | "unavailable"; source: string }>
-  unavailable: string[]
-  keyInputsMissing: string[]
-  predictionReliability: "full" | "degraded" | "unavailable"
-  scoring?: { predictionScore: number; scoredInputs: string[]; excludedFromScore: string[] }
-}
-
-/** Human-readable names for the provenance keys the API reports. */
-const INPUT_LABELS: Record<string, string> = {
-  unemployment: "Unemployment (UNRATE)",
-  cpi: "CPI YoY (CPIAUCSL)",
-  coreCPI: "Core CPI YoY (CPILFESL)",
-  pce: "PCE YoY (PCEPI)",
-  gdp: "GDP growth (A191RL1Q225SBEA)",
-  payrolls: "Non-farm payrolls (PAYEMS)",
-  fedFundsRate: "Fed Funds rate (DFF)",
-  previousMeetingRate: "Rate at last meeting (DFF history)",
-  treasury10Y: "10Y Treasury (DGS10)",
-  treasury2Y: "2Y Treasury (DGS2)",
-}
-
-const labelFor = (key: string) => INPUT_LABELS[key] ?? key
-
-interface PredictionMethodology {
-  description: string
-  formula: string
-  factors: string[]
-  // Renamed from `weights`, which named four percentages the score never
-  // applied — including one for a "market pricing" input the route does not read.
-  scoreContributions: {
-    inflation: string
-    employment: string
-    growth: string
-    note: string
-  }
-  methodology?: string
-  comparison?: string
-}
-
-interface OptionsStrategy {
-  name: string
-  ticker: string
-  type: string
-  rationale: string
-  entry: string
-  target: string
-  stopLoss: string
-  timeframe: string
-  risk: string
-}
+// P6-13. This file was 1,460 lines. The payload shapes, the options-strategy
+// generator and the prediction/trend presentation lookups are now in
+// `components/fomc/`. `generateOptionsStrategies` was an arrow constant inside
+// the component and is now a function taking the same two arguments.
+import {
+  type EconomicFactors,
+  type EconomicIndicators,
+  type FedDecisionFactors,
+  type FomcMeeting,
+  type HistoricalRate,
+  type NextMeeting,
+  type OptionsStrategy,
+  type PredictionMethodology,
+  type Provenance,
+  type RatePath,
+  labelFor,
+} from "@/components/fomc/fomc-types"
+import { generateOptionsStrategies } from "@/components/fomc/options-strategies"
+import { InfoTooltip } from "@/components/fomc/info-tooltip"
+import { ProbabilityTableSection } from "@/components/fomc/probability-table-section"
+import { RatePathSection } from "@/components/fomc/rate-path-section"
+import { EconomicIndicatorsSection } from "@/components/fomc/economic-indicators-section"
+import { FedDecisionFactorsSection } from "@/components/fomc/fed-decision-factors-section"
+import { KeyEconomicFactorsSection } from "@/components/fomc/key-economic-factors-section"
+import { PredictionMethodologySection } from "@/components/fomc/prediction-methodology-section"
+import { OptionsStrategiesSection } from "@/components/fomc/options-strategies-section"
+import {
+  FactorValue,
+  IndicatorBody,
+  getConfidenceLevel,
+  getGrowthTrendStyle,
+  getInflationTrendStyle,
+  getLaborTrendStyle,
+  getMarketExpectationStyle,
+  getPredictionBg,
+  getPredictionColor,
+  getPredictionIcon,
+  getTrendColor,
+  getTrendIcon,
+} from "@/components/fomc/presentation"
 
 export function FomcPredictions() {
   const [loading, setLoading] = useState(false)
@@ -159,23 +79,15 @@ export function FomcPredictions() {
   const [optionsStrategies, setOptionsStrategies] = useState<OptionsStrategy[]>([])
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [chartData, setChartData] = useState<any[]>([])
-  const [showTooltips, setShowTooltips] = useState(true) // State for tooltip toggle
+  // `showTooltips` was a SECOND tooltip state (P7-63). It was initialised true,
+  // `setShowTooltips` was never called, and it gated exactly one control — the
+  // (i) beside each strategy row. So the "Tooltips" toggle, which drives
+  // `tooltipsEnabled`, turned off every tooltip on the tab except that one,
+  // which stayed on forever. Deleted; that row now reads the toggle like the
+  // rest. Found by `check-write-only-state.ts` when the split left it unread.
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true) // New state for tooltip toggle
   const [loaded, setLoaded] = useState(false)
 
-  const InfoTooltip = ({ content }: { content: string }) => {
-    if (!tooltipsEnabled) return null
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help inline ml-1" />
-        </TooltipTrigger>
-        <TooltipContent className="max-w-xs bg-white border shadow-lg">
-          <p className="text-sm">{content}</p>
-        </TooltipContent>
-      </Tooltip>
-    )
-  }
 
   const fetchFomcData = async () => {
     setLoading(true)
@@ -326,317 +238,7 @@ export function FomcPredictions() {
     )
   }
 
-  const generateOptionsStrategies = (meeting: NextMeeting, currentRate: number): OptionsStrategy[] => {
-    const strategies: OptionsStrategy[] = []
 
-    if (meeting.prediction === "CUT") {
-      // Rate cut expected - bullish for stocks, bearish for dollar
-      strategies.push({
-        name: "Long Calls on SPY",
-        ticker: "SPY",
-        type: "Directional Bullish",
-        rationale: `${Math.abs(meeting.predictionBps)}bp rate cut expected with ${meeting.confidence}% confidence. Rate cuts typically boost equity markets, especially large caps.`,
-        entry: "Buy ATM or slightly OTM calls (0.45-0.55 delta)",
-        target: `+3-5% move in SPY within ${meeting.daysUntil} days`,
-        stopLoss: "Exit if SPY breaks below recent support or loses 50% of premium",
-        timeframe: `${meeting.daysUntil} days until announcement`,
-        risk: "Limited to premium paid. Consider spreading to reduce cost.",
-      })
-
-      strategies.push({
-        name: "Bull Call Spread on QQQ",
-        ticker: "QQQ",
-        type: "Defined Risk Bullish",
-        rationale:
-          "Tech stocks benefit most from rate cuts due to lower discount rates on future earnings. Spread reduces cost and defines risk.",
-        entry: "Buy ATM call, sell call 5-7% OTM",
-        target: "Max profit if QQQ rallies above short strike by expiration",
-        stopLoss: "Exit at 50% loss or if QQQ breaks key support",
-        timeframe: "30-45 DTE, hold through announcement",
-        risk: "Limited to net debit paid. Max profit = strike width - debit.",
-      })
-
-      strategies.push({
-        name: "Long Calls on IWM",
-        ticker: "IWM",
-        type: "Directional Bullish",
-        rationale:
-          "Small caps carry more floating-rate debt than large caps, so they benefit most directly when rates fall. Historically strong reaction to cut cycles.",
-        entry: "Buy slightly OTM calls (0.40-0.50 delta)",
-        target: "+4-6% rally in small caps",
-        stopLoss: "Exit if IWM breaks below support or loses 40% of premium",
-        timeframe: `Hold through ${meeting.date} announcement`,
-        risk: "Limited to premium. Small caps can be volatile around Fed decisions.",
-      })
-
-      strategies.push({
-        name: "Long Calls on XLF",
-        ticker: "XLF",
-        type: "Sector Play",
-        rationale:
-          "Financial stocks often rally on initial rate cut as it signals economic support. Banks benefit from steeper yield curve.",
-        entry: "Buy slightly OTM calls (0.40-0.50 delta)",
-        target: "+4-6% move in financials sector",
-        stopLoss: "Exit if XLF fails to hold above 50-day MA",
-        timeframe: "Through FOMC announcement + 1 week",
-        risk: "Moderate. Financials can be volatile on Fed decisions.",
-      })
-    } else if (meeting.prediction === "HIKE") {
-      // Rate hike expected - bearish for stocks, bullish for dollar
-      strategies.push({
-        name: "Bear Put Spread on SPY",
-        ticker: "SPY",
-        type: "Defined Risk Bearish",
-        rationale: `${meeting.predictionBps}bp rate hike expected with ${meeting.confidence}% confidence. Hikes typically pressure equity valuations and increase recession risk.`,
-        entry: "Buy ATM put, sell put 5% OTM",
-        target: "Max profit if SPY drops below short strike",
-        stopLoss: "Exit at 50% loss or if SPY breaks above resistance",
-        timeframe: `${meeting.daysUntil} days until announcement`,
-        risk: "Limited to net debit. Max profit = strike width - debit.",
-      })
-
-      strategies.push({
-        name: "Long Puts on QQQ",
-        ticker: "QQQ",
-        type: "Directional Bearish",
-        rationale:
-          "Growth/tech stocks most vulnerable to rate hikes. Higher rates increase discount rates on future earnings, pressuring valuations.",
-        entry: "Buy ATM or slightly ITM puts (0.50-0.60 delta)",
-        target: "-4-7% decline in QQQ",
-        stopLoss: "Exit if QQQ holds above key support or loses 50% of premium",
-        timeframe: "30-45 DTE, hold through announcement",
-        risk: "Limited to premium. Tech can be highly volatile.",
-      })
-
-      strategies.push({
-        name: "Long Calls on XLP (Consumer Staples)",
-        ticker: "XLP",
-        type: "Defensive Sector Play",
-        rationale:
-          "Rate hikes increase recession risk. Money rotates into defensive staples with pricing power when growth expectations fall.",
-        entry: "Buy ATM calls on XLP",
-        target: "+3-5% relative outperformance in staples",
-        stopLoss: "Exit if XLP breaks below support",
-        timeframe: `Through ${meeting.date} + 1 week`,
-        risk: "Limited to premium. Defensive sectors move slowly; size accordingly.",
-      })
-
-      strategies.push({
-        name: "Short Calls on XLF (Covered)",
-        ticker: "XLF",
-        type: "Income Strategy",
-        rationale:
-          "If holding financial stocks, sell OTM calls to generate income. Rate hikes help banks but market may already price this in.",
-        entry: "Sell calls 5-7% OTM (0.20-0.30 delta)",
-        target: "Collect premium if XLF stays below strike",
-        stopLoss: "Buy back if XLF rallies strongly or at 200% loss",
-        timeframe: "Expiration after FOMC meeting",
-        risk: "Caps upside. Requires stock ownership or margin.",
-      })
-    } else {
-      // No change expected - neutral strategies
-      strategies.push({
-        name: "Iron Condor on SPY",
-        ticker: "SPY",
-        type: "Neutral Income",
-        rationale: `${meeting.confidence}% probability of no rate change. Market likely to stay range-bound. Sell premium on both sides.`,
-        entry: "Sell OTM call spread + OTM put spread (16-20 delta)",
-        target: "Collect premium if SPY stays within range",
-        stopLoss: "Exit at 2x credit received or if SPY breaks out",
-        timeframe: `${meeting.daysUntil} days, close before announcement`,
-        risk: "Defined risk. Max loss = strike width - credit received.",
-      })
-
-      strategies.push({
-        name: "Short Straddle on VIX",
-        ticker: "VIX",
-        type: "Volatility Play",
-        rationale:
-          "If no change expected, volatility should decline post-announcement. Sell straddle to profit from vol crush.",
-        entry: "Sell ATM call and put on VIX or VXX",
-        target: "Profit from volatility decline after FOMC",
-        stopLoss: "Exit if VIX spikes above 25 or at 150% loss",
-        timeframe: "Close day after FOMC announcement",
-        risk: "High risk. VIX can spike unexpectedly. Use small size.",
-      })
-
-      strategies.push({
-        name: "Calendar Spread on QQQ",
-        ticker: "QQQ",
-        type: "Time Decay Play",
-        rationale:
-          "Sell near-term options, buy longer-term at same strike. Profit from time decay if market stays flat.",
-        entry: "Sell options expiring before FOMC, buy options expiring after",
-        target: "Profit from faster decay of short-term options",
-        stopLoss: "Exit if QQQ moves >3% in either direction",
-        timeframe: "Front month expires before FOMC",
-        risk: "Limited risk to net debit. Profits if underlying stays near strike.",
-      })
-
-      strategies.push({
-        name: "Covered Calls on Holdings",
-        ticker: "Portfolio",
-        type: "Income Generation",
-        rationale: "If holding stocks and expecting range-bound market, sell OTM calls to generate income.",
-        entry: "Sell calls 5-10% OTM on existing positions",
-        target: "Collect premium if stocks stay below strikes",
-        stopLoss: "Buy back if position rallies strongly",
-        timeframe: "30-45 DTE",
-        risk: "Caps upside. Requires stock ownership.",
-      })
-    }
-
-    return strategies
-  }
-
-  const getPredictionColor = (prediction: string) => {
-    switch (prediction) {
-      case "CUT":
-        return "text-green-600"
-      case "HIKE":
-        return "text-red-600"
-      default:
-        return "text-gray-600"
-    }
-  }
-
-  const getPredictionBg = (prediction: string) => {
-    switch (prediction) {
-      case "CUT":
-        return "bg-green-50 border-green-200"
-      case "HIKE":
-        return "bg-red-50 border-red-200"
-      default:
-        return "bg-gray-50 border-gray-200"
-    }
-  }
-
-  const getPredictionIcon = (prediction: string) => {
-    switch (prediction) {
-      case "CUT":
-        return <TrendingDown className="h-8 w-8 text-green-600" />
-      case "HIKE":
-        return <TrendingUp className="h-8 w-8 text-red-600" />
-      default:
-        return <Minus className="h-8 w-8 text-gray-600" />
-    }
-  }
-
-  const getConfidenceLevel = (confidence: number) => {
-    if (confidence >= 70) return { label: "High", color: "text-green-600" }
-    if (confidence >= 50) return { label: "Moderate", color: "text-yellow-600" }
-    return { label: "Low", color: "text-orange-600" }
-  }
-
-  const getTrendIcon = (trend: string) => {
-    switch (trend) {
-      case "up":
-        return <TrendingUp className="h-4 w-4 text-red-600" />
-      case "down":
-        return <TrendingDown className="h-4 w-4 text-green-600" />
-      default:
-        return <Minus className="h-4 w-4 text-gray-600" />
-    }
-  }
-
-  const getTrendColor = (trend: string) => {
-    switch (trend) {
-      case "up":
-        return "text-red-600"
-      case "down":
-        return "text-green-600"
-      default:
-        return "text-gray-600"
-    }
-  }
-
-  // One indicator card body. A null series renders "—" plus an explicit
-  // insufficient-data note — never a substituted figure, and never a 0.
-  const IndicatorBody = ({
-    indicator,
-    format,
-    footnote,
-  }: {
-    indicator: EconomicIndicator | null
-    format: (n: number) => string
-    footnote: string
-  }) => {
-    if (!indicator) {
-      return (
-        <>
-          <div className="flex items-center justify-between mb-2">
-            <Minus className="h-4 w-4 text-gray-300" />
-          </div>
-          <p className="text-3xl font-bold text-gray-400">—</p>
-          <p className="text-xs text-gray-500 mt-1">Insufficient data — series unavailable</p>
-          <p className="text-xs text-gray-500 mt-2">{footnote}</p>
-        </>
-      )
-    }
-    return (
-      <>
-        <div className="flex items-center justify-between mb-2">{getTrendIcon(indicator.trend)}</div>
-        <p className="text-3xl font-bold text-gray-900">{format(indicator.current)}</p>
-        <p className={`text-xs mt-1 ${getTrendColor(indicator.trend)}`}>Previous: {format(indicator.previous)}</p>
-        <p className="text-xs text-gray-500 mt-2">{footnote}</p>
-      </>
-    )
-  }
-
-  /** Fed-decision category, or "—" when the input behind it was missing. */
-  const FactorValue = ({ value }: { value: string | null }) =>
-    value === null ? (
-      <>
-        <p className="text-lg font-bold text-gray-400">—</p>
-        <p className="text-xs text-gray-500 mt-1">Insufficient data</p>
-      </>
-    ) : (
-      <p className="text-lg font-bold text-gray-900">{value}</p>
-    )
-
-  const getInflationTrendStyle = (trend: string) => {
-    // Heating inflation = hawkish (red), Cooling inflation = dovish (green)
-    if (trend.toLowerCase().includes("heating") || trend.toLowerCase().includes("rising")) {
-      return "bg-red-50 text-red-700 border border-red-200"
-    }
-    if (trend.toLowerCase().includes("cooling") || trend.toLowerCase().includes("falling")) {
-      return "bg-green-50 text-green-700 border border-green-200"
-    }
-    return "bg-gray-50 text-gray-700 border border-gray-200"
-  }
-
-  const getLaborTrendStyle = (trend: string) => {
-    // Weakening labor = dovish (green), Strengthening labor = hawkish (red)
-    if (trend.toLowerCase().includes("weakening") || trend.toLowerCase().includes("softening")) {
-      return "bg-green-50 text-green-700 border border-green-200"
-    }
-    if (trend.toLowerCase().includes("strengthening") || trend.toLowerCase().includes("tightening")) {
-      return "bg-red-50 text-red-700 border border-red-200"
-    }
-    return "bg-gray-50 text-gray-700 border border-gray-200"
-  }
-
-  const getGrowthTrendStyle = (trend: string) => {
-    // Accelerating growth = hawkish (red), Slowing growth = dovish (green)
-    if (trend.toLowerCase().includes("accelerating") || trend.toLowerCase().includes("expanding")) {
-      return "bg-red-50 text-red-700 border border-red-200"
-    }
-    if (trend.toLowerCase().includes("slowing") || trend.toLowerCase().includes("contracting")) {
-      return "bg-green-50 text-green-700 border border-green-200"
-    }
-    return "bg-gray-50 text-gray-700 border border-gray-200"
-  }
-
-  const getMarketExpectationStyle = (expectation: string) => {
-    // Dovish = green, Hawkish = red
-    if (expectation.toLowerCase().includes("dovish")) {
-      return "bg-green-50 text-green-700 border border-green-200"
-    }
-    if (expectation.toLowerCase().includes("hawkish")) {
-      return "bg-red-50 text-red-700 border border-red-200"
-    }
-    return "bg-gray-50 text-gray-700 border border-gray-200"
-  }
 
   const unavailableInputs = provenance?.unavailable ?? []
   const keyInputsMissing = provenance?.keyInputsMissing ?? []
@@ -663,7 +265,7 @@ export function FomcPredictions() {
                 <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
                   <Target className="h-5 w-5 text-primary" />
                   Fed Rate Decision Predictor
-                  <InfoTooltip content="The Federal Reserve sets interest rates to control inflation and employment. Rate hikes slow the economy (bearish for stocks), while rate cuts stimulate growth (bullish). Options traders can profit from rate decisions by trading rate-sensitive sectors and index options." />
+                  <InfoTooltip enabled={tooltipsEnabled} content="The Federal Reserve sets interest rates to control inflation and employment. Rate hikes slow the economy (bearish for stocks), while rate cuts stimulate growth (bullish). Options traders can profit from rate decisions by trading rate-sensitive sectors and index options." />
                 </CardTitle>
                 {/* Was "AI-powered predictions using Fed Funds futures and
                     economic data". Both halves were false: the route imports no
@@ -730,7 +332,7 @@ export function FomcPredictions() {
             <CardHeader className="bg-primary/5 border-b border-primary/20">
               <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-1">
                 Federal Funds Rate - Forecast Chart
-                <InfoTooltip content="This chart shows historical Fed rates and market expectations for future rates. Falling forecasts signal potential rate cuts (bullish for growth stocks, bearish for banks). Rising forecasts signal hawkish Fed (bearish for growth, bullish for financials)." />
+                <InfoTooltip enabled={tooltipsEnabled} content="This chart shows historical Fed rates and market expectations for future rates. Falling forecasts signal potential rate cuts (bullish for growth stocks, bearish for banks). Rising forecasts signal hawkish Fed (bearish for growth, bullish for financials)." />
               </CardTitle>
               <CardDescription>
                 2-year historical data (solid) and 2-year market consensus forecast (dashed)
@@ -824,7 +426,7 @@ export function FomcPredictions() {
                         Qualified — insufficient data
                       </span>
                     )}
-                    <InfoTooltip content="FOMC meets 8 times per year to set rates. Markets move on rate decisions - unexpected cuts/hikes cause volatility. Trade IV expansion before meetings with straddles, or direction after decisions are announced." />
+                    <InfoTooltip enabled={tooltipsEnabled} content="FOMC meets 8 times per year to set rates. Markets move on rate decisions - unexpected cuts/hikes cause volatility. Trade IV expansion before meetings with straddles, or direction after decisions are announced." />
                   </CardTitle>
                   <CardDescription className="text-base">
                     {nextMeeting.daysUntil} days until announcement
@@ -869,7 +471,7 @@ export function FomcPredictions() {
                   </div>
                   <p className="text-sm text-gray-600 mb-1">
                     Confidence
-                    <InfoTooltip content="How confident the market is in the predicted outcome. High confidence (>80%) means the outcome is priced in - surprises cause big moves. Low confidence means uncertainty - expect volatility." />
+                    <InfoTooltip enabled={tooltipsEnabled} content="How confident the market is in the predicted outcome. High confidence (>80%) means the outcome is priced in - surprises cause big moves. Low confidence means uncertainty - expect volatility." />
                   </p>
                   <p className={`text-lg font-semibold ${getConfidenceLevel(nextMeeting.confidence).color}`}>
                     {getConfidenceLevel(nextMeeting.confidence).label}
@@ -885,7 +487,7 @@ export function FomcPredictions() {
                     <div>
                       <p className="text-sm text-gray-600 mb-1">
                         Current Rate
-                        <InfoTooltip content="The current Federal Funds rate target range. Higher rates increase borrowing costs, slowing economic activity. Lower rates stimulate borrowing and spending." />
+                        <InfoTooltip enabled={tooltipsEnabled} content="The current Federal Funds rate target range. Higher rates increase borrowing costs, slowing economic activity. Lower rates stimulate borrowing and spending." />
                       </p>
                       <p className="text-2xl font-bold text-gray-900">
                         {currentRate === null ? <span className="text-gray-400">—</span> : `${currentRate.toFixed(2)}%`}
@@ -902,7 +504,7 @@ export function FomcPredictions() {
                           undo what the word claims. */}
                       <p className="text-sm text-gray-600 mb-1">
                         Projected Rate
-                        <InfoTooltip content="This site's projection: the current Fed Funds rate plus the change suggested by its hawkish/dovish score over FRED series. It is NOT a market-implied rate — no futures are priced here — so it will not match the CME FedWatch Tool, and where they disagree the market is the one quoting real money." />
+                        <InfoTooltip enabled={tooltipsEnabled} content="This site's projection: the current Fed Funds rate plus the change suggested by its hawkish/dovish score over FRED series. It is NOT a market-implied rate — no futures are priced here — so it will not match the CME FedWatch Tool, and where they disagree the market is the one quoting real money." />
                       </p>
                       <p className="text-2xl font-bold text-primary">{nextMeeting.impliedRate.toFixed(2)}%</p>
                     </div>
@@ -913,547 +515,34 @@ export function FomcPredictions() {
           </Card>
         )}
 
-        {/* Probability Table */}
-        {meetings.length > 0 && (
-          <Card className="shadow-sm border-gray-200">
-            <CardHeader className="bg-gray-50 border-b border-gray-200">
-              <CardTitle className="text-lg font-bold text-gray-900">Meeting Probabilities</CardTitle>
-              {/* Not CME FedWatch, which prices 30-Day Fed Funds futures. This
-                  is a rule-based score over FRED series — see the route. */}
-              <CardDescription>Next FOMC Meeting - scored from FRED economic series</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-4">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-2 px-3 font-semibold text-gray-900">Meeting Date</th>
-                      <th className="text-right py-2 px-3 font-semibold text-gray-900">Days Away</th>
-                      <th className="text-right py-2 px-3 font-semibold text-gray-900">Implied Rate</th>
-                      <th className="text-right py-2 px-3 font-semibold text-green-700">50bp Cut</th>
-                      <th className="text-right py-2 px-3 font-semibold text-green-600">25bp Cut</th>
-                      <th className="text-right py-2 px-3 font-semibold text-gray-700">No Change</th>
-                      <th className="text-right py-2 px-3 font-semibold text-red-600">25bp Hike</th>
-                      <th className="text-right py-2 px-3 font-semibold text-red-700">50bp Hike</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {meetings.slice(0, 3).map((meeting, index) => (
-                      <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-2 px-3 font-medium text-gray-900">{meeting.date}</td>
-                        <td className="text-right py-2 px-3 text-gray-600">{meeting.daysAway} days</td>
-                        <td className="text-right py-2 px-3 text-gray-900 font-semibold">
-                          {meeting.impliedRate.toFixed(2)}%
-                        </td>
-                        <td className="text-right py-2 px-3 text-green-700 font-semibold">
-                          {meeting.probCut50.toFixed(1)}%
-                        </td>
-                        <td className="text-right py-2 px-3 text-green-600 font-semibold">
-                          {meeting.probCut25.toFixed(1)}%
-                        </td>
-                        <td className="text-right py-2 px-3 text-gray-700 font-semibold">
-                          {meeting.probNoChange.toFixed(1)}%
-                        </td>
-                        <td className="text-right py-2 px-3 text-red-600 font-semibold">
-                          {meeting.probHike25.toFixed(1)}%
-                        </td>
-                        <td className="text-right py-2 px-3 text-red-700 font-semibold">
-                          {meeting.probHike50.toFixed(1)}%
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded">
-                <p className="text-xs text-blue-800">
-                  <span className="font-semibold">Note:</span> Showing next 3 meetings for actionable near-term
-                  predictions. Market expectations become less reliable for meetings further out.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Expected Rate Path Card */}
-        {ratePath && (
-          <Card className="shadow-sm border-gray-200">
-            <CardHeader className="bg-gray-50 border-b border-gray-200">
-              <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-1">
-                Expected Rate Path
-                <InfoTooltip content="Shows where markets expect rates to be over time. A downward path suggests rate cuts coming (bullish for stocks). An upward path suggests more hikes (bearish). Use this to plan longer-dated options strategies." />
-              </CardTitle>
-              <CardDescription>Historical and projected Fed Funds rate over time</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-3 gap-4">
-                <div className="text-center">
-                  <p className="text-xs text-gray-600 mb-2">Last Meeting</p>
-                  <div className="bg-gray-100 rounded-lg p-3 border-2 border-gray-300">
-                    <p className="text-2xl font-bold text-gray-900">
-                      {ratePath.previousMeeting === null ? (
-                        <span className="text-gray-400">—</span>
-                      ) : (
-                        `${ratePath.previousMeeting.toFixed(2)}%`
-                      )}
-                    </p>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">~45 sessions ago</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {ratePath.previousMeeting === null ? "(Insufficient data)" : "(Historical)"}
-                  </p>
-                </div>
-
-                <div className="text-center">
-                  <p className="text-xs text-gray-600 mb-2">Current</p>
-                  <div className="bg-blue-100 rounded-lg p-3 border-2 border-blue-400">
-                    <p className="text-2xl font-bold text-blue-900">{ratePath.current.toFixed(2)}%</p>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">Today</p>
-                  <p className="text-xs text-gray-400 mt-0.5">(Real-time)</p>
-                </div>
-
-                <div className="text-center">
-                  <p className="text-xs text-gray-600 mb-2">Next Meeting</p>
-                  <div className="bg-green-50 rounded-lg p-3 border-2 border-green-300">
-                    <p className="text-2xl font-bold text-green-900">{ratePath.nextMeeting.toFixed(2)}%</p>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">{nextMeeting?.daysUntil} days</p>
-                  <p className="text-xs text-gray-400 mt-0.5">(Predicted)</p>
-                </div>
-              </div>
-
-              <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                <p className="text-xs text-gray-700">
-                  <span className="font-semibold">Note:</span> Historical rates from FRED data (real). Future
-                  projections based on market pricing, economic indicators, and FOMC meeting schedule. Predictions may
-                  change as economic data evolves.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Economic Indicators Section */}
-        {economicIndicators && (
-          <Card className="shadow-sm border-gray-200">
-            <CardHeader className="bg-gray-50 border-b border-gray-200">
-              <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-1">
-                Key Economic Indicators
-                <InfoTooltip content="The Fed watches these indicators to set policy. High inflation = hawkish (rate hikes). High unemployment = dovish (rate cuts). Strong GDP = less need for cuts. These drive Fed decisions and market expectations." />
-              </CardTitle>
-              <CardDescription>
-                Real-time data from Federal Reserve Economic Data (FRED). Series that did not return show "—" — no
-                figure is substituted.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-4">
-              <div className="grid md:grid-cols-3 gap-4">
-                {/* Unemployment */}
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-sm font-semibold text-gray-700 mb-2">
-                    Unemployment Rate
-                    <InfoTooltip content="Rising unemployment makes the Fed more likely to cut rates to stimulate jobs. Low unemployment lets Fed focus on fighting inflation. Watch for surprises vs expectations." />
-                  </p>
-                  <IndicatorBody
-                    indicator={economicIndicators.unemployment}
-                    format={(n) => `${n.toFixed(1)}%`}
-                    footnote="Fed Target: 4.0-4.5% (Full Employment)"
-                  />
-                </div>
-
-                {/* CPI */}
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-sm font-semibold text-gray-700 mb-2">
-                    CPI (YoY)
-                    <InfoTooltip content="Consumer Price Index measures inflation. Above Fed's 2% target = hawkish pressure (rates stay high). Below target = room for cuts. Hot CPI prints are bearish for stocks." />
-                  </p>
-                  <IndicatorBody
-                    indicator={economicIndicators.cpi}
-                    format={(n) => `${n.toFixed(1)}%`}
-                    footnote="Fed Target: 2.0% (Price Stability)"
-                  />
-                </div>
-
-                {/* PCE */}
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-sm font-semibold text-gray-700 mb-2">
-                    PCE Inflation
-                    <InfoTooltip content="Personal Consumption Expenditures price index is the Fed's preferred inflation measure. Similar trends to CPI but often smoother. High PCE also signals hawkish policy." />
-                  </p>
-                  <IndicatorBody
-                    indicator={economicIndicators.pce}
-                    format={(n) => `${n.toFixed(1)}%`}
-                    footnote="Fed's preferred inflation measure"
-                  />
-                </div>
-
-                {/* Core CPI */}
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-sm font-semibold text-gray-700 mb-2">
-                    Core CPI
-                    <InfoTooltip content="Core CPI excludes volatile food and energy prices, providing a clearer view of underlying inflation trends. Persistent high core inflation keeps the Fed hawkish." />
-                  </p>
-                  <IndicatorBody
-                    indicator={economicIndicators.coreCPI}
-                    format={(n) => `${n.toFixed(1)}%`}
-                    footnote="Excludes food & energy volatility"
-                  />
-                </div>
-
-                {/* GDP */}
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-sm font-semibold text-gray-700 mb-2">
-                    GDP Growth
-                    <InfoTooltip content="Strong GDP growth reduces urgency for rate cuts. Weak GDP increases cut probability. Negative GDP (recession) typically triggers aggressive easing - very bullish for stocks." />
-                  </p>
-                  <IndicatorBody
-                    indicator={economicIndicators.gdp}
-                    format={(n) => `${n.toFixed(1)}%`}
-                    footnote="Annualized quarterly growth rate"
-                  />
-                </div>
-
-                {/* Non-Farm Payrolls */}
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-sm font-semibold text-gray-700 mb-2">
-                    Non-Farm Payrolls
-                    <InfoTooltip content="Job creation numbers are key to labor market health. Strong payrolls suggest a robust economy, allowing the Fed to stay hawkish. Weak numbers can signal slowdown and increase cut odds." />
-                  </p>
-                  <IndicatorBody
-                    indicator={economicIndicators.payrolls}
-                    format={(n) => `${(n / 1000).toFixed(0)}M`}
-                    footnote="Total employed workers (thousands)"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Fed Decision Factors Section */}
-        {fedDecisionFactors && (
-          <Card className="shadow-sm border-gray-200">
-            <CardHeader className="bg-gray-50 border-b border-gray-200">
-              <CardTitle className="text-lg font-bold text-gray-900">Fed Decision Analysis</CardTitle>
-              <CardDescription>How economic data influences the Fed's rate decision</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-4">
-              <div className="grid md:grid-cols-3 gap-4">
-                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-xs font-semibold text-gray-600 mb-1">Inflation Pressure</p>
-                  <FactorValue value={fedDecisionFactors.inflationPressure} />
-                  {fedDecisionFactors.inflationTrend !== null && (
-                    <span
-                      className={`inline-block mt-2 px-2 py-1 text-xs font-semibold rounded ${getInflationTrendStyle(fedDecisionFactors.inflationTrend)}`}
-                    >
-                      Trend: {fedDecisionFactors.inflationTrend}
-                    </span>
-                  )}
-                </div>
-
-                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-xs font-semibold text-gray-600 mb-1">Labor Market</p>
-                  <FactorValue value={fedDecisionFactors.laborMarket} />
-                  {fedDecisionFactors.laborTrend !== null && (
-                    <span
-                      className={`inline-block mt-2 px-2 py-1 text-xs font-semibold rounded ${getLaborTrendStyle(fedDecisionFactors.laborTrend)}`}
-                    >
-                      Trend: {fedDecisionFactors.laborTrend}
-                    </span>
-                  )}
-                </div>
-
-                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-xs font-semibold text-gray-600 mb-1">Economic Growth</p>
-                  <FactorValue value={fedDecisionFactors.economicGrowth} />
-                  {fedDecisionFactors.growthTrend !== null && (
-                    <span
-                      className={`inline-block mt-2 px-2 py-1 text-xs font-semibold rounded ${getGrowthTrendStyle(fedDecisionFactors.growthTrend)}`}
-                    >
-                      Trend: {fedDecisionFactors.growthTrend}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Key Economic Factors section */}
-        {economicFactors && (
-          <Card className="shadow-sm border-gray-200">
-            <CardHeader className="bg-gray-50 border-b border-gray-200">
-              <CardTitle className="text-lg font-bold text-gray-900">Key Economic Factors</CardTitle>
-              <CardDescription>Market signals influencing the prediction</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-sm font-semibold text-gray-900 mb-1">Yield Curve</p>
-                  {economicFactors.yieldCurve === null ? (
-                    <>
-                      <p className="text-sm text-gray-400">—</p>
-                      <p className="text-xs text-gray-500 mt-1">Insufficient data — Treasury yields unavailable</p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-sm text-gray-700">{economicFactors.yieldCurve}</p>
-                      <span
-                        className={`inline-block mt-2 px-2 py-1 text-xs font-semibold rounded ${
-                          economicFactors.yieldCurveSignal === "bearish"
-                            ? "bg-red-100 text-red-700"
-                            : "bg-gray-100 text-gray-700"
-                        }`}
-                      >
-                        {economicFactors.yieldCurveSignal === "bearish"
-                          ? "Recession Signal"
-                          : economicFactors.yieldCurve === "Flat"
-                            ? "Flattening"
-                            : "Normal"}
-                      </span>
-                    </>
-                  )}
-                </div>
-
-                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-sm font-semibold text-gray-900 mb-1">Treasury Yields</p>
-                  {economicFactors.treasuryTrend === null ? (
-                    <>
-                      <p className="text-sm text-gray-400">—</p>
-                      <p className="text-xs text-gray-500 mt-1">Insufficient data — 10Y Treasury unavailable</p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-sm text-gray-700">{economicFactors.treasuryTrend}</p>
-                      <span
-                        className={`inline-block mt-2 px-2 py-1 text-xs font-semibold rounded ${
-                          economicFactors.treasurySignal === "dovish"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
-                        }`}
-                      >
-                        {economicFactors.treasurySignal === "dovish" ? "Dovish Signal" : "Hawkish Signal"}
-                      </span>
-                    </>
-                  )}
-                </div>
-
-                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 md:col-span-2">
-                  <p className="text-sm font-semibold text-gray-900 mb-1">Market Expectation</p>
-                  <span
-                    className={`inline-block mt-2 px-2 py-1 text-xs font-semibold rounded ${getMarketExpectationStyle(economicFactors.marketExpectation)}`}
-                  >
-                    {economicFactors.marketExpectation} Fed policy stance
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Prediction Methodology Section */}
-        {predictionMethodology && (
-          <Card className="shadow-sm border-2 border-blue-200 bg-blue-50">
-            <CardHeader className="bg-blue-100 border-b border-blue-200">
-              <CardTitle className="text-lg font-bold text-gray-900">Prediction Methodology</CardTitle>
-              <CardDescription className="text-gray-700">
-                Transparent formula showing how we calculate predictions
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-4">
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm font-semibold text-gray-900 mb-2">Description:</p>
-                  <p className="text-sm text-gray-700">{predictionMethodology.description}</p>
-                </div>
-
-                <div>
-                  <p className="text-sm font-semibold text-gray-900 mb-2">Formula:</p>
-                  <p className="text-sm font-mono bg-white p-3 rounded border border-blue-200 text-gray-900">
-                    {predictionMethodology.formula}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm font-semibold text-gray-900 mb-2">Score Contributions:</p>
-                  <div className="grid md:grid-cols-2 gap-2">
-                    <div className="text-sm bg-white p-2 rounded border border-blue-200">
-                      <span className="font-semibold text-gray-900">Inflation:</span>{" "}
-                      {predictionMethodology.scoreContributions.inflation}
-                    </div>
-                    <div className="text-sm bg-white p-2 rounded border border-blue-200">
-                      <span className="font-semibold text-gray-900">Employment:</span>{" "}
-                      {predictionMethodology.scoreContributions.employment}
-                    </div>
-                    <div className="text-sm bg-white p-2 rounded border border-blue-200">
-                      <span className="font-semibold text-gray-900">Growth:</span>{" "}
-                      {predictionMethodology.scoreContributions.growth}
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-600 mt-2">{predictionMethodology.scoreContributions.note}</p>
-                </div>
-
-                {predictionMethodology.methodology && (
-                  <div className="rounded border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
-                    <p>{predictionMethodology.methodology}</p>
-                    {predictionMethodology.comparison && <p className="mt-2">{predictionMethodology.comparison}</p>}
-                  </div>
-                )}
-
-                <div>
-                  <p className="text-sm font-semibold text-gray-900 mb-2">Scoring Factors:</p>
-                  <ul className="space-y-1">
-                    {predictionMethodology.factors.map((factor, index) => (
-                      <li key={index} className="text-xs text-gray-700 bg-white p-2 rounded border border-blue-200">
-                        • {factor}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* What the model actually read. Unavailable inputs are listed
-                    rather than quietly replaced, so the weights above can be
-                    checked against the data that existed. */}
-                {provenance && (
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900 mb-2">Inputs Used:</p>
-                    <div className="grid md:grid-cols-2 gap-2">
-                      {Object.entries(provenance.inputs).map(([key, info]) => (
-                        <div
-                          key={key}
-                          className="text-xs bg-white p-2 rounded border border-blue-200 flex items-center justify-between gap-2"
-                        >
-                          <span className="text-gray-900">{labelFor(key)}</span>
-                          <span
-                            className={`px-2 py-0.5 rounded font-semibold ${
-                              info.tier === "live" ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"
-                            }`}
-                          >
-                            {info.tier === "live" ? info.source : "unavailable"}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                    {unavailableInputs.length > 0 && (
-                      <p className="text-xs text-gray-700 mt-2">
-                        Excluded from the model: {unavailableInputs.map(labelFor).join(", ")}. Missing inputs are never
-                        replaced with representative values.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Wrapped strategies card in Accordion with default collapsed state */}
-        {optionsStrategies.length > 0 && (
-          <Accordion type="single" collapsible defaultValue="strategies">
-            <AccordionItem value="strategies" className="border-none">
-              <Card className="shadow-lg border-2 border-primary">
-                <AccordionTrigger className="hover:no-underline">
-                  <CardHeader className="bg-primary/5 border-b border-primary/20 w-full pb-4">
-                    <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                      <Target className="h-6 w-6 text-primary" />
-                      Rate-Based Options Strategies
-                      <InfoTooltip content="These strategies are designed for the current rate environment. Rate cut expectations favor growth stocks, small caps, and rate-sensitive sectors. Rate hike expectations favor banks and value stocks. Uncertainty favors volatility strategies like straddles." />
-                    </CardTitle>
-                    <CardDescription className="text-base">
-                      Actionable trades based on {nextMeeting?.prediction} prediction with{" "}
-                      {nextMeeting?.confidence.toFixed(0)}% confidence
-                    </CardDescription>
-                  </CardHeader>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <CardContent className="pt-6">
-                    <div className="grid md:grid-cols-2 gap-4">
-                      {optionsStrategies.map((strategy, index) => (
-                        <Card
-                          key={index}
-                          className="border-2 border-gray-200 hover:border-primary/50 transition-colors"
-                        >
-                          <CardHeader className="pb-3">
-                            <div className="flex items-start justify-between">
-                              <div>
-                                <CardTitle className="text-base font-bold text-gray-900">{strategy.name}</CardTitle>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded">
-                                    {strategy.ticker}
-                                  </span>
-                                  <span className="text-xs text-gray-600">{strategy.type}</span>
-                                </div>
-                              </div>
-                              {showTooltips && (
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Info className="h-4 w-4 text-gray-400 cursor-pointer" />
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p className="text-xs max-w-xs">
-                                        Detailed explanation of this strategy, including entry, target, stop-loss, and
-                                        risk.
-                                      </p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              )}
-                            </div>
-                          </CardHeader>
-                          <CardContent className="space-y-3">
-                            <div>
-                              <p className="text-sm text-gray-700">{strategy.rationale}</p>
-                            </div>
-
-                            <div className="space-y-2 text-xs">
-                              <div className="flex items-start gap-2">
-                                <span className="font-semibold text-gray-900 min-w-[70px]">Entry:</span>
-                                <span className="text-gray-700">{strategy.entry}</span>
-                              </div>
-                              <div className="flex items-start gap-2">
-                                <span className="font-semibold text-gray-900 min-w-[70px]">Target:</span>
-                                <span className="text-gray-700">{strategy.target}</span>
-                              </div>
-                              <div className="flex items-start gap-2">
-                                <span className="font-semibold text-gray-900 min-w-[70px]">Stop Loss:</span>
-                                <span className="text-gray-700">{strategy.stopLoss}</span>
-                              </div>
-                              <div className="flex items-start gap-2">
-                                <span className="font-semibold text-gray-900 min-w-[70px]">Timeframe:</span>
-                                <span className="text-gray-700">{strategy.timeframe}</span>
-                              </div>
-                            </div>
-
-                            <div className="pt-2 border-t border-gray-200">
-                              <div className="flex items-start gap-2 text-xs">
-                                <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0 text-orange-600" />
-                                <p className="text-gray-600">
-                                  <span className="font-semibold">Risk:</span> {strategy.risk}
-                                </p>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-
-                    <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                      <p className="text-sm text-yellow-800">
-                        <span className="font-semibold">⚠️ Important Disclaimer:</span> These strategies are for
-                        educational purposes only and do not constitute financial advice. Options trading involves
-                        substantial risk and is not suitable for all investors. Always conduct your own research,
-                        understand the risks, and consider consulting with a licensed financial advisor before making
-                        any investment decisions. Past performance does not guarantee future results.
-                      </p>
-                    </div>
-                  </CardContent>
-                </AccordionContent>
-              </Card>
-            </AccordionItem>
-          </Accordion>
-        )}
+        <ProbabilityTableSection
+          meetings={meetings}
+        />
+        <RatePathSection
+          ratePath={ratePath}
+          nextMeeting={nextMeeting}
+          tooltipsEnabled={tooltipsEnabled}
+        />
+        <EconomicIndicatorsSection
+          economicIndicators={economicIndicators}
+          tooltipsEnabled={tooltipsEnabled}
+        />
+        <FedDecisionFactorsSection
+          fedDecisionFactors={fedDecisionFactors}
+        />
+        <KeyEconomicFactorsSection
+          economicFactors={economicFactors}
+        />
+        <PredictionMethodologySection
+          predictionMethodology={predictionMethodology}
+          provenance={provenance}
+          unavailableInputs={unavailableInputs}
+        />
+        <OptionsStrategiesSection
+          optionsStrategies={optionsStrategies}
+          nextMeeting={nextMeeting}
+          tooltipsEnabled={tooltipsEnabled}
+        />
       </div>
     </TooltipProvider>
   )
