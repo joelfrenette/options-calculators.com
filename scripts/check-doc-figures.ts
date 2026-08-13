@@ -75,7 +75,7 @@ function walk(dir: string, match: (p: string) => boolean): string[] {
  * future check will do the same, and the failure will say so by name.
  */
 const BASELINES = {
-  formulas: 793,
+  formulas: 807,
   remediation: 31,
   typecheckKnown: 0,
 } as const

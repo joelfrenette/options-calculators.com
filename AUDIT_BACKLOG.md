@@ -420,11 +420,12 @@ recomputes it.
 | P7-44 | P2 | fixed | TypeScript errors 8 to 0. One of the tolerated eight was a live defect: risk-calculator never imported Recharts Tooltip, so its chart rendered the Radix component and the VIX chart had no hover readout. |
 | P7-45 | P3 | fixed | P6-13's module-size count corrected from 19 to 25; four of the additions are this session's entry-exclusion work. |
 | P7-46 | P3 | fixed | The tsconfig note claiming the Next bundler disallows .ts import extensions was FALSE and blocked Phase 7.0 for five phases. Vercel built it clean (chunk changed, /api/ccpi 200, homepage 200). An untested claim in a comment is a claim, not a constraint. |
+| P7-47 | **P1** | fixed | keywordScore matched by substring, so "Death cross forms as S&P 500 breaks support" scored 100/100 BULLISH (ath in death, up in support) and "Ford recalls 100,000 trucks" scored 100/100 (calls in recalls). A live indicator at 0.08 composite weight that could be exactly inverted. Word boundaries; scorer extracted to the import-free lib/headline-sentiment.ts; 14 assertions. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-249 findings recorded · **211 fixed · 8 wontfix · 1 verified-ok · 29 open.**
+250 findings recorded · **212 fixed · 8 wontfix · 1 verified-ok · 29 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -3859,3 +3860,63 @@ asserted capabilities the code lacked; this asserted an incapability the code di
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-46 | P3 | tooling | The tsconfig note claiming the Next bundler disallows `.ts` import extensions was false, and blocked Phase 7.0 for five phases. Vercel built the change clean; the note now records the test rather than the assumption. |
+
+---
+
+## Phase 7.14 — the last FORMULAS unknown, and what was behind it (2026-08-12)
+
+`lib/sentiment-sources.ts` scrape internals was the one §6 item left. Reading it found a
+live scoring defect.
+
+### P7-47 — the headline scorer could be inverted by a substring
+
+`keywordScore` matched with `String.includes` over a list containing `ath`, `up`, `gain`,
+`calls`, `red`, `long` and `fall`. Measured against the real lists:
+
+| Headline | Score before |
+|---|---|
+| "Death cross forms as S&P 500 breaks support" | **100/100 BULLISH** |
+| "Ford recalls 100,000 trucks" | **100/100 BULLISH** |
+| "Analysts warn against prolonged downturn" | **75/100 BULLISH** |
+
+`ath` inside "de**ath**", `calls` inside "re**calls**", `gain` inside "a**gain**st", `long`
+inside "pro**long**ed", `up` inside "s**up**port", `red` inside "p**red**icted". **The most
+bearish phrase in technical analysis scored maximum bullish**, on a live indicator carrying
+0.08 of the social-sentiment composite and labelled "Market headline pulse". Every stem
+pair also double-counted — `bull` and `bullish` both fired on "bullish".
+
+Word boundaries fix both classes at once: `\bbull\b` does not match "bullish", so the pair
+stops colliding without the lists changing.
+
+**The scorer moved to the import-free `lib/headline-sentiment.ts`** — it had lived in a
+module importing `@/lib/api-keys`, so no check could load it. **Third application of Phase
+7.0's lesson:** the import graph decides what gets tested, and here it had hidden a defect
+that reversed a public number.
+
+### The consequence, stated because it is not obviously good
+
+**The indicator gets much quieter.** All three headlines above now register *nothing* —
+"downturn" is not "down", "death" is not in either list, and the bearishness a human reads
+is vocabulary the scorer does not have. `getGoogleNewsSentiment` returns
+`source: "no_signal"` when nothing matches, and that will happen far more often now. **An
+indicator that goes dark more often is the honest version of one that was confidently
+wrong**, but it is a visible behaviour change and the tab may show fewer live sources.
+
+### The check corrected me before it corrected the code
+
+Three of the first draft's assertions expected "Death cross" and "prolonged downturn" to
+come out BEARISH. They do not, and the code is right — I had asserted an ability the word
+lists do not have. **That is the same over-claim this audit exists to remove, committed
+inside a check written to remove it**, and it is left recorded in the file rather than
+quietly rewritten. 14 assertions, negative-tested by reverting to `includes`: **ten of the
+fourteen fail** on the old implementation.
+
+### The other two §6 answers, from earlier today
+
+Also resolved by noticing that "needs a live payload" and "needs a deployed site" are the
+same requirement: Quiver `ExcessReturn` is already percent-scaled, and Polygon's snapshot
+carries no `shares_outstanding` field at all. **FORMULAS §6 is now empty.**
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-47 | **P1** | ANALYZE → Social Sentiment | `keywordScore` used substring matching, so "Death cross forms as S&P 500 breaks support" scored 100/100 BULLISH and "Ford recalls 100,000 trucks" scored 100/100 BULLISH — a live indicator at 0.08 composite weight, labelled "Market headline pulse", that could be exactly inverted. Word-boundary matching; scorer moved to the import-free `lib/headline-sentiment.ts`; 14 assertions, ten of which fail on the old code. |

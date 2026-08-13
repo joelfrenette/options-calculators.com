@@ -4,62 +4,12 @@
 // On any failure they return score: -1 ("No data") — NEVER a fabricated value.
 // ============================================================================
 import { resolveApiKey } from "@/lib/api-keys"
+import { keywordScore } from "@/lib/headline-sentiment"
 
-const BULLISH_WORDS = [
-  "moon",
-  "bull",
-  "bullish",
-  "calls",
-  "rally",
-  "pump",
-  "rocket",
-  "gain",
-  "gains",
-  "yolo",
-  "buy",
-  "long",
-  "breakout",
-  "surge",
-  "up",
-  "green",
-  "ath",
-  "squeeze",
-]
-const BEARISH_WORDS = [
-  "crash",
-  "dump",
-  "bear",
-  "bearish",
-  "puts",
-  "short",
-  "down",
-  "drop",
-  "fall",
-  "recession",
-  "sell",
-  "red",
-  "tank",
-  "collapse",
-  "fear",
-  "bubble",
-  "rug",
-  "bagholder",
-]
-
-function keywordScore(texts: string[]): { score: number; bullish: number; bearish: number } {
-  let bullish = 0
-  let bearish = 0
-  for (const raw of texts) {
-    const t = (raw || "").toLowerCase()
-    for (const w of BULLISH_WORDS) if (t.includes(w)) bullish++
-    for (const w of BEARISH_WORDS) if (t.includes(w)) bearish++
-  }
-  const total = bullish + bearish
-  // 50 is only used as the mathematical midpoint when there is genuine data but
-  // it is perfectly balanced — callers still treat total===0 as "no data".
-  const score = total > 0 ? Math.round((bullish / total) * 100) : 50
-  return { score, bullish, bearish }
-}
+// The keyword scorer and its word lists moved to lib/headline-sentiment.ts
+// (P7-47), which is import-free so scripts/check-headline-sentiment.ts can
+// load it. This file imports @/lib/api-keys, which is why the scorer behind a
+// public indicator had never been assertable.
 
 // ============================================================================
 // P7-9. THREE SCRAPERS DELETED HERE: getTwitterSentiment (Apify $SPY tweets),

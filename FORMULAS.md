@@ -166,7 +166,12 @@
 
 - Live Polygon/Finnhub/FRED behavior: no keys locally + workstation TLS interception;
   every "confirm against a live payload" note needs the preview-deploy pass.
-- `lib/sentiment-sources.ts` scrape internals.
+**§6 is empty as of 2026-08-12.** The last entry — `lib/sentiment-sources.ts` scrape
+internals — was resolved by reading it, and reading it found P7-47: the keyword scorer
+matched by substring, so "Death cross forms as S&P 500 breaks support" scored 100/100
+BULLISH. The section stays rather than being deleted, because an empty "not verified"
+list is a claim worth being able to see, and because the next thing that cannot be
+verified belongs here rather than nowhere.
 
 **Three of the original five were answered against production on 2026-08-12**, once it was
 noticed that "needs a live payload" and "needs a deployed site" are the same requirement —
