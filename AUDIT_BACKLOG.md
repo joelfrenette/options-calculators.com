@@ -442,11 +442,12 @@ recomputes it.
 | P7-66 | P3 | fixed | Three more splits — the LEARN strategy toolbox, the CCPI dashboard and `/api/ccpi` — took module-size debt from 17 to 14 over `app components lib`. A FOURTH pinned-claim entry rotted: P6-47's "It does not select trades" moved with the score card that renders it. Its negative pin was repointed to the same file, which is defensible only because the RETIRED phrase list scans every UI file and route for "Recommended Strategies This Week" independently — a per-file negative pin would otherwise miss the phrase reappearing in a sibling card. Also corrected on the way through: `indicatorCount` is `number | null` and the extracted props were typed `number`, which would have made the old `|| 29` default expressible again. |
 | P7-67 | P3 | wontfix | `lib/ccpi/scoring.ts` is 849 lines and must stay one file. Four check scripts load it under plain `node` with a relative `../lib/ccpi/scoring.ts`, and node cannot resolve an extensionless relative TypeScript import — tested directly: a two-file fixture with `import { X } from "./dep"` fails `ERR_MODULE_NOT_FOUND`. Splitting it would need `.ts` extensions in the source, which Next's bundler does not accept. Same trade P7-15 recorded for `daysBetween`: the import-free single file IS the test harness, and collapsing it costs coverage. |
 | P7-68 | P3 | fixed | Three more splits — the trade walkthrough, the insider dashboard and the risk calculator — took module-size debt from 14 to 11. `WalkthroughSetup` had to move to its own module rather than stay in the modal: the mockups need the type and the modal needs the mockups, so leaving it would have made the import circular; the modal re-exports it so no caller changed. Two prop types were narrowed by the extraction and had to be widened back — three setters are called as functional updaters (`setX(v => !v)`), which needs `Dispatch<SetStateAction<T>>` rather than `(v: T) => void`. |
+| P7-69 | P2 | open | **The CCPI is running on two of four pillars, and the only signal is a number nobody reads.** Measured on staging 2026-08-14: Valuation `scoredMax=0`, Risk Appetite `scoredMax=24` — both under `MIN_SCORED_MAX`, both dropped, so the headline 14 is computed over 55% of the pillar weight. The scoring is behaving exactly as designed; the causes are operational and named in the payload itself: `apify: live=false, source="baseline-no-token"` (APIFY_API_TOKEN unset — kills spxPE 18, spxPS 12 and equityRiskPremium 10 by derivation) and `buffett/putCall/aaii: live=false, source="groq"` (the three ScrapingBee scrapes fell through to the LLM — 16 more in Valuation, 55 in Risk Appetite). **What is missing is not honesty but ALERTING**: nothing fails, nothing warns, and `certainty: 56` is the whole signal. P6-35 predicted Valuation at 40 with everything up and 28 on an FMP hiccup; the real figure is 0, because it never modelled two providers down at once. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-271 findings recorded · **236 fixed · 9 wontfix · 2 verified-ok · 24 open.**
+272 findings recorded · **236 fixed · 9 wontfix · 2 verified-ok · 25 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -4777,3 +4778,70 @@ uses, not the one the name suggests.**
 |----|-----|------|---------|
 | P7-67 | P3 | tooling | `lib/ccpi/scoring.ts` stays one 849-line file: four check scripts load it under plain node, which cannot resolve extensionless relative TS imports (tested). The import-free single file is the test harness. |
 | P7-68 | P3 | tooling | Three splits took debt 14 → 11. `WalkthroughSetup` moved to its own module to break a circular import (the modal re-exports it). Two prop types were narrowed by extraction — functional-updater setters need `Dispatch<SetStateAction<T>>` — and were widened back. |
+
+## 2026-08-14 — P7-69: the CCPI is scoring on 55% of its weight, quietly
+
+Probing staging after the day's splits turned up something the refactoring had nothing to
+do with.
+
+| pillar | scoredMax | liveMax | state |
+|---|---|---|---|
+| Momentum | 91 | 91 | scores |
+| Risk Appetite | 24 | 24 | **null** — under the 40 minimum |
+| Valuation | **0** | **0** | **null** |
+| Macro | 85 | 85 | scores |
+
+The headline CCPI of 14 is computed over Momentum and Macro alone — **55 of the 100 points
+of pillar weight.** `certainty` reads 56.
+
+**The arithmetic is right.** `scorePillar` excludes anything not `live`, `MIN_SCORED_MAX`
+refuses to publish a pillar score under 40, and `computeBaseCCPI` renormalises over what
+survived. Every piece of the machinery the audit built for exactly this is doing its job.
+
+**The causes are operational, and the payload names them.** `apiStatus` on the live
+response:
+
+```
+apify      live=false  source=baseline-no-token
+buffett    live=false  source=groq
+putCall    live=false  source=groq
+aaii       live=false  source=groq
+```
+
+`baseline-no-token` is `APIFY_API_TOKEN` being unset — that removes `spxPE` (18), `spxPS`
+(12) and, by derivation through `calculateEquityRiskPremium`, `equityRiskPremium` (10).
+The three `groq` sources are ScrapingBee scrapes falling through to the LLM chain, costing
+`buffettIndicator` (16) in Valuation and `putCallRatio` + `aaiiBullish` (55) in Risk
+Appetite. Valuation's remaining 44 points — `qqqPE`, `mag7Concentration`, `shillerCAPE` —
+have no live source at all and never have (P6-35).
+
+**P6-35's forecast was optimistic, and it is worth saying why.** It predicted Valuation
+"lands on exactly 40" with everything up, dropping to 28 on an FMP hiccup. The real figure
+is zero, because the table modelled ONE provider failing at a time. Two are down at once,
+and their failures overlap inside the same pillar. A per-provider contingency table does
+not compose.
+
+**What is actually missing here is alerting, not honesty.** Nothing fails, nothing warns,
+and the entire signal that half the index is absent is `certainty: 56` sitting in a JSON
+payload beside a confident-looking 14. `run-health-checks` does not assert on pillar
+liveness or certainty. That is the durable half of this finding and the reason it is open
+rather than a note.
+
+**Two of the three fixes are the owner's**, since they are Vercel dashboard actions rather
+than code:
+
+1. Set `APIFY_API_TOKEN` on staging (and check production), or accept that `spxPE`/`spxPS`
+   are unreachable and let P6-35's rescale question be reopened under `CCPI_DESIGN.md`.
+2. Check ScrapingBee — key, quota, or the three target pages having changed shape. Three
+   scrapes failing together points at the account rather than the pages.
+3. Mine, and **done in this commit**: `run-health-checks` now reports
+   `ccpiPillarCoverage` — per-pillar `scoredMax` / `liveMax` / `aiMax`, which pillars
+   reported no score, and the certainty. A dropped pillar reads `degraded`, not `fail`:
+   refusing to score on absent data is CORRECT, and calling it a failure would train the
+   reader to skip the block. `fail` is reserved for no pillar scoring at all — the 503
+   state. Same shape as `budgetEnvReport`: a condition the code handles correctly, whose
+   cause is a dashboard setting, and which nothing was telling anyone about.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-69 | P2 | ANALYZE → CCPI | Valuation scores 0 of 100 live weight and Risk Appetite 24, so the headline CCPI runs on two of four pillars — 55% of the weight — with `certainty: 56` as the only signal. Causes are operational and named in `apiStatus`: `APIFY_API_TOKEN` unset, and three ScrapingBee scrapes falling through to Groq. The scoring is correct; the alerting does not exist. |

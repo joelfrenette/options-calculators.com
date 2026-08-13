@@ -260,6 +260,82 @@ async function seriesCoverageReport() {
 }
 
 /**
+ * How much of the CCPI is actually being measured, per pillar.
+ *
+ * P7-69. Measured on staging 2026-08-14: Valuation `scoredMax=0` and Risk
+ * Appetite `scoredMax=24`, both under `MIN_SCORED_MAX`, so the headline index
+ * was computed over **55 of the 100 points of pillar weight** — and nothing
+ * failed, nothing warned, and the entire signal was a `certainty: 56` sitting
+ * in a JSON payload beside a confident-looking score.
+ *
+ * The scoring was right. `scorePillar` excludes anything not `live`,
+ * `MIN_SCORED_MAX` refuses to publish a pillar under 40, and the composite
+ * renormalises over what survived. Every piece of machinery the audit built for
+ * this case did its job. What did not exist was anything that SAID SO.
+ *
+ * That is the same shape as `budgetEnvReport` above: a state the code handles
+ * correctly and no one is told about, whose cause is usually a dashboard
+ * setting rather than a bug. Here the causes were `APIFY_API_TOKEN` unset and
+ * three ScrapingBee scrapes falling through to the LLM chain — both visible in
+ * `apiStatus`, neither surfaced anywhere a person looks.
+ *
+ * A dropped pillar is reported `degraded`, not `fail`: refusing to score on
+ * absent data is correct behaviour, and marking it a failure would train the
+ * reader to ignore this block. `fail` is reserved for the case that cannot be
+ * intentional — no pillar scoring at all, which is the 503 state.
+ */
+async function ccpiPillarCoverage(origin: string) {
+  const PILLARS = ["momentum", "riskAppetite", "valuation", "macro"] as const
+  try {
+    // No cookie: /api/ccpi is public. Forwarding the admin session here would
+    // be a credential sent where it is not needed, and the probe above already
+    // showed how easily that goes cross-host (see `originFrom`).
+    const res = await fetch(`${origin}/api/ccpi`, {
+      signal: AbortSignal.timeout(60_000),
+      cache: "no-store",
+    })
+    if (!res.ok) {
+      return { status: "blocked" as Status, detail: `/api/ccpi answered ${res.status}`, pillars: [], certainty: null }
+    }
+    const body = await res.json()
+    const prov = body?.provenance ?? {}
+    const pillars = PILLARS.map((key) => {
+      const b = prov[key] ?? {}
+      const scoredMax = typeof b.scoredMax === "number" ? b.scoredMax : null
+      return {
+        pillar: key,
+        scoredMax,
+        liveMax: typeof b.liveMax === "number" ? b.liveMax : null,
+        // Weight dropped for being AI-estimated, which is a different fact from
+        // weight that has no source at all (P6-34).
+        aiMax: typeof b.aiMax === "number" ? b.aiMax : null,
+        scored: typeof body?.pillars?.[key] === "number",
+        excluded: Array.isArray(b.excluded) ? b.excluded : [],
+      }
+    })
+    const dropped = pillars.filter((p) => !p.scored).map((p) => p.pillar)
+    const certainty = typeof body?.certainty === "number" ? body.certainty : null
+    const status: Status = dropped.length === PILLARS.length ? "fail" : dropped.length > 0 ? "degraded" : "pass"
+    return {
+      status,
+      detail:
+        dropped.length === 0
+          ? null
+          : `${dropped.join(", ")} reported no score — the composite is renormalised over the rest. Check apiStatus for the provider behind each excluded input.`,
+      certainty,
+      pillars,
+    }
+  } catch (e) {
+    return {
+      status: "blocked" as Status,
+      detail: `could not read /api/ccpi: ${e instanceof Error ? e.message : String(e)}`,
+      certainty: null,
+      pillars: [],
+    }
+  }
+}
+
+/**
  * The three budget limits, as the DEPLOYMENT actually resolves them (P6-86).
  *
  * `scripts/check-budget-env.ts` and `lib/budget-env.ts` pin the CODE: a blank
@@ -425,6 +501,7 @@ export async function GET(request: NextRequest) {
     seriesCoverage: await seriesCoverageReport(),
     universeFreshness: await universeFreshnessReport(),
     budgetEnv: budgetEnvReport(),
+    ccpiPillarCoverage: await ccpiPillarCoverage(origin),
   })
 }
 
