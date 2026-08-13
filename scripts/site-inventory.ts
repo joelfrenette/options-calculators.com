@@ -73,6 +73,97 @@ const uniq = <T,>(xs: T[]) => [...new Set(xs)]
 /** 1-based line number of a character offset. */
 const lineOf = (src: string, index: number) => src.slice(0, index).split("\n").length
 
+/**
+ * Every `lib/` module reachable from `entry` by import, transitively.
+ *
+ * Scoped to `@/lib` and to relative specifiers that stay inside `lib/` — a
+ * route's own `./x` is its own directory, already covered. The visited set is
+ * also the cycle guard, which `lib/strategy-scanner/*` needs: several
+ * generators reach `market-data` by two paths.
+ */
+function reachableLibs(entry: string): string[] {
+  const seen = new Set<string>()
+  const libs: string[] = []
+  const visit = (file: string, isEntry: boolean) => {
+    const key = rel(file)
+    if (seen.has(key)) return
+    seen.add(key)
+    let src: string
+    try {
+      src = read(file)
+    } catch {
+      return // an import that does not resolve to a file on disk
+    }
+    if (!isEntry) libs.push(file)
+    const re = /from\s+["'](@\/lib\/[^"']+|\.{1,2}\/[^"']+)["']/g
+    let m: RegExpExecArray | null
+    while ((m = re.exec(src))) {
+      const spec = m[1]
+      const base = spec.startsWith("@/") ? join(ROOT, spec.slice(2)) : join(file, "..", spec)
+      if (!rel(base).startsWith("lib/")) continue
+      for (const ext of ["", ".ts", ".tsx", "/index.ts", "/index.tsx"]) {
+        const candidate = base + ext
+        try {
+          if (statSync(candidate).isFile()) {
+            visit(candidate, false)
+            break
+          }
+        } catch {
+          // try the next extension
+        }
+      }
+    }
+  }
+  visit(entry, true)
+  return libs
+}
+
+/**
+ * A route's source PLUS the modules that exist only to be its body.
+ *
+ * WHY A ROUTE IS NO LONGER ONE FILE. P6-13 split the 1,808-line strategy-scanner
+ * route into `lib/strategy-scanner/`, and this inventory — reading route files
+ * one at a time — immediately reported that `/api/strategy-scanner` reaches no
+ * upstream host, needs no env key and wires no timeout. All three were false the
+ * moment they were written: the fetches had moved one import away. SITE_MAP is
+ * where a reader asks "what does this route touch", and a refactor had just
+ * answered "nothing" for the route with the largest upstream surface on the site.
+ *
+ * WHY NOT THE FULL IMPORT CLOSURE, which was the first attempt: it changed 115
+ * of the 59 routes' rows. Every admin route inherited `lib/auth.ts`'s six
+ * secrets and every Supabase reader inherited its keys, so the Env-keys column
+ * stopped distinguishing routes from each other. That is not more accurate, it
+ * is less legible — and shared infrastructure already has its own row in the
+ * lib table below.
+ *
+ * So the body is the EXCLUSIVE closure: a lib module reachable from exactly one
+ * route is that route's implementation, and a module reachable from several is
+ * infrastructure. `lib/strategy-scanner/**` qualifies; `lib/auth.ts` does not.
+ * The distinction is derived from the import graph, so a module that gains a
+ * second caller leaves the first route's row on its own.
+ */
+const exclusiveBody = new Map<string, string[]>()
+function computeExclusiveBodies(routeFiles: string[]): void {
+  const reachedBy = new Map<string, string[]>()
+  const perRoute = new Map<string, string[]>()
+  for (const f of routeFiles) {
+    const libs = reachableLibs(f)
+    perRoute.set(f, libs)
+    for (const lib of libs) reachedBy.set(rel(lib), [...(reachedBy.get(rel(lib)) ?? []), f])
+  }
+  for (const f of routeFiles) {
+    exclusiveBody.set(
+      f,
+      (perRoute.get(f) ?? []).filter((lib) => (reachedBy.get(rel(lib)) ?? []).length === 1),
+    )
+  }
+}
+
+/** The route file's source concatenated with its exclusive-body modules'. */
+function routeBody(entry: string): string {
+  return [entry, ...(exclusiveBody.get(entry) ?? [])].map(read).join("\n")
+}
+
 // ------------------------------------------------------------- extractors
 
 /** Every `/api/...` path this file fetches, with the line it appears on. */
@@ -260,19 +351,24 @@ interface FileInfo {
 }
 
 const routeFiles = walk(join(ROOT, "app", "api"), (p) => /[\\/]route\.tsx?$/.test(p))
+computeExclusiveBodies(routeFiles)
 const routes: RouteInfo[] = routeFiles
   .map((f) => {
     const src = read(f)
+    // Verbs and segment config are properties of the entry file itself — only
+    // a route file can export GET or `dynamic`. Everything a route DOES is read
+    // from its reachable body, because since P6-13 the body is not the file.
+    const body = routeBody(f)
     return {
       path: "/" + rel(f).replace(/^app\//, "").replace(/\/route\.tsx?$/, ""),
       file: rel(f),
       lines: src.split("\n").length,
       methods: httpMethods(src),
       config: routeConfig(src),
-      hosts: upstreamHosts(src).filter((h) => !h.startsWith("localhost")),
-      env: envKeys(src),
-      calls: internalApiCalls(src).map((c) => c.route),
-      timeout: hasTimeout(src),
+      hosts: upstreamHosts(body).filter((h) => !h.startsWith("localhost")),
+      env: envKeys(body),
+      calls: internalApiCalls(body).map((c) => c.route),
+      timeout: hasTimeout(body),
     }
   })
   .sort((a, b) => a.path.localeCompare(b.path))

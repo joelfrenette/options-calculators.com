@@ -15,7 +15,7 @@
  * consistent one.
  */
 
-import { readFileSync } from "node:fs"
+import { readFileSync, readdirSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import {
@@ -33,6 +33,17 @@ function check(name: string, passed: boolean, detail = ""): void {
   if (!passed) failures++
 }
 const near = (a: number, b: number, eps = 1e-9) => Math.abs(a - b) < eps
+
+/** Every file under `dir` matching `match`, recursively. */
+function walk(dir: string, match: (p: string) => boolean): string[] {
+  const out: string[] = []
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry)
+    if (statSync(full).isDirectory()) out.push(...walk(full, match))
+    else if (match(full)) out.push(full)
+  }
+  return out
+}
 
 /** N trading days as YYYY-MM-DD, oldest first. Weekends are irrelevant here. */
 function days(n: number, start = "2025-01-01"): string[] {
@@ -232,9 +243,36 @@ check(
  * alternation pass, ordered by position — block-then-line eats a line comment
  * containing a glob and everything after it.
  */
-const routeRaw = readFileSync(join(ROOT, "app/api/strategy-scanner/route.ts"), "utf8")
+/**
+ * The scanner's own source, wherever it now lives.
+ *
+ * P6-13 split `app/api/strategy-scanner/route.ts` into `lib/strategy-scanner/`,
+ * and every beta assertion below lives in the calendar-spread generator, which
+ * moved. Pointing this at the route file alone would have left nine PASS lines
+ * reading exactly as they do now while asserting nothing — the failure CLAUDE.md
+ * describes as a check that stops COVERING rather than stops running.
+ *
+ * So the set is derived from disk, and its size is asserted below.
+ */
+const SCANNER_FILES = [
+  join(ROOT, "app/api/strategy-scanner/route.ts"),
+  ...walk(join(ROOT, "lib/strategy-scanner"), (p) => p.endsWith(".ts")),
+]
+const routeRaw = SCANNER_FILES.map((f) => readFileSync(f, "utf8")).join("\n")
 const routeSrc = routeRaw.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/[^\n]*/g, (m, pre) =>
   m.startsWith("/*") ? " " + "\n".repeat((m.match(/\n/g) || []).length) : (pre ?? ""),
+)
+
+const MIN_SCANNER_FILES = 8
+check(
+  `scope: ${SCANNER_FILES.length} strategy-scanner source file(s)`,
+  SCANNER_FILES.length >= MIN_SCANNER_FILES,
+  `floor ${MIN_SCANNER_FILES} — the route plus lib/strategy-scanner/**`,
+)
+check(
+  "the calendar-spread generator is inside the scanned set",
+  SCANNER_FILES.some((f) => f.replace(/\\/g, "/").endsWith("generators/calendar-spreads.ts")),
+  "every beta assertion below reads that file; without it they all pass vacuously",
 )
 
 check(

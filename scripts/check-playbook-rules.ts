@@ -24,11 +24,22 @@
  * report the same PASS line as a clean run.
  */
 
-import { readFileSync, readdirSync } from "node:fs"
+import { readFileSync, readdirSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..")
+
+/** Every file under `dir` matching `match`, recursively. */
+function walkDir(dir: string, match: (p: string) => boolean): string[] {
+  const out: string[] = []
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry)
+    if (statSync(full).isDirectory()) out.push(...walkDir(full, match))
+    else if (match(full)) out.push(full)
+  }
+  return out
+}
 
 const IMPL = "components/scanner/technical-criteria.ts"
 const PAGE = "components/learn-csp.tsx"
@@ -193,18 +204,38 @@ check(
 // So the lists are compared against the actual `entryExclusionReasons(...)`
 // call sites, derived from the generator each one sits in.
 
-const routeSrc = readFileSync(join(ROOT, "app/api/strategy-scanner/route.ts"), "utf8")
+/**
+ * The scanner's source, wherever it now lives.
+ *
+ * P6-13 split the 1,808-line route into `lib/strategy-scanner/`, so eight of the
+ * nine generators moved out of `app/api/strategy-scanner/route.ts` while the
+ * `entryExclusionPolicy` they are checked against stayed in it. A version of
+ * this check still reading only the route file would have derived ZERO call
+ * sites and then compared the published policy against nothing.
+ *
+ * The scope assertion below is what makes that visible rather than silent.
+ */
+const SCANNER_FILES = [
+  join(ROOT, "app/api/strategy-scanner/route.ts"),
+  ...walkDir(join(ROOT, "lib/strategy-scanner"), (p) => p.endsWith(".ts")),
+]
+const routeSrc = SCANNER_FILES.map((f) => readFileSync(f, "utf8")).join("\n")
 
 /** Generator function name → the policy literal at its exclusion call site. */
 const callSites = new Map<string, { spike: boolean; trend: boolean }>()
-{
+// PER FILE, not over the concatenation. A generator that is the LAST one in its
+// file would otherwise have a "body" running to the next file's first generator,
+// and would inherit that generator's gate — an ungated scanner reading as gated,
+// which is the exact direction of error this check exists to catch.
+for (const file of SCANNER_FILES) {
+  const src = readFileSync(file, "utf8")
   const genRe = /async function (generate\w+)\(/g
   const bounds: Array<{ name: string; at: number }> = []
-  for (const m of routeSrc.matchAll(genRe)) bounds.push({ name: m[1], at: m.index ?? 0 })
+  for (const m of src.matchAll(genRe)) bounds.push({ name: m[1], at: m.index ?? 0 })
   for (let i = 0; i < bounds.length; i++) {
     const start = bounds[i].at
-    const end = i + 1 < bounds.length ? bounds[i + 1].at : routeSrc.length
-    const body = routeSrc.slice(start, end)
+    const end = i + 1 < bounds.length ? bounds[i + 1].at : src.length
+    const body = src.slice(start, end)
     // The loop-level gate only. The bull-put leg's second call inside
     // generateCreditSpreads is asserted separately below, because a policy
     // table that flattened a two-leg strategy to one row would be the thing
@@ -213,6 +244,13 @@ const callSites = new Map<string, { spike: boolean; trend: boolean }>()
     if (m) callSites.set(bounds[i].name, { spike: m[1] === "true", trend: m[2] === "true" })
   }
 }
+
+const MIN_SCANNER_FILES = 8
+check(
+  `scope: ${SCANNER_FILES.length} strategy-scanner source file(s)`,
+  SCANNER_FILES.length >= MIN_SCANNER_FILES,
+  `floor ${MIN_SCANNER_FILES} — the route plus lib/strategy-scanner/**`,
+)
 
 const EXPECTED_GATED_GENERATORS = 7
 check(
@@ -354,9 +392,15 @@ check(
   /export const MAX_DAY_MOVE = \{ MIN: \d+, MAX: \d+, DEFAULT: \d+, STEP: \d+ \}/.test(trendLibSrc),
 )
 
+// `\bresolveMaxDayMove\b`, not `resolveMaxDayMove,` — the trailing comma was
+// incidental to the multi-line import block the route happened to have, and
+// P6-13's split reduced that block to one symbol on one line. The comma went
+// with it and this check failed on a route that still delegates correctly. A
+// rule scoped by punctuation is the same defect as one scoped by prose
+// (CLAUDE.md): the thing it pins is not the thing it means.
 check(
   "the route delegates the clamp rather than re-implementing it",
-  /resolveMaxDayMove,/.test(routeSrc) && !/Math\.min\(\s*25/.test(routeSrc),
+  /\bresolveMaxDayMove\b/.test(routeSrc) && !/Math\.min\(\s*25/.test(routeSrc),
   "a second clamp in the route is a second definition of the range",
 )
 

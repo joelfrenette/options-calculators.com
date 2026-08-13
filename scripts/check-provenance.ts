@@ -339,7 +339,30 @@ for (const table of ["strict-results-table.tsx", "relaxed-results-table.tsx"]) {
 // Components are exempt: static teaching examples live there on purpose, and
 // they are labelled where they render.
 
-const API_FILES = walk(join(ROOT, "app", "api"), (p) => p.endsWith(".ts"))
+/**
+ * Route-side source. Rules 6, 7 and 9 all read it.
+ *
+ * NOT just `app/api`. P6-13 split the 1,808-line strategy-scanner route into
+ * `lib/strategy-scanner/`, and rule 7 — which pairs a field the route hardcodes
+ * to null against any UI control still filtering on it — reads three of its
+ * withheld fields (`priceStability`, `historicalVolatility`, `ivSkew`) out of
+ * the calendar-spread generator that moved. A walk left at `app/api` would keep
+ * printing the same PASS line while no longer covering the code that produced
+ * the finding.
+ *
+ * The rule's own rationale extends cleanly: it says a ROUTE's job is to fetch or
+ * compute, and a module that exists only to be a route's body has the same job.
+ */
+const API_FILES = [
+  ...walk(join(ROOT, "app", "api"), (p) => p.endsWith(".ts")),
+  ...walk(join(ROOT, "lib", "strategy-scanner"), (p) => p.endsWith(".ts")),
+]
+const MIN_API_FILES = 60
+check(
+  `scope: ${API_FILES.length} route-side file(s)`,
+  API_FILES.length >= MIN_API_FILES,
+  `floor ${MIN_API_FILES} — app/api/** plus the modules routes delegate their bodies to`,
+)
 const TICKER_WITH_PRICE =
   /\bticker:\s*["'][A-Z.]{1,6}["'][^\n]*?(?:\$[0-9]|\bcredit:|\bpop:|\bpremium:|\bstrike:)|["'][A-Z]{2,5}["']\s*:\s*["']?~?\$[0-9]/
 

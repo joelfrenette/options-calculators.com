@@ -298,7 +298,7 @@ recomputes it.
 | P6-10 | P2 | fixed | `100 - x \|\| 50` precedence bug. |
 | P6-11 | P1 | fixed | **Owner chose: fold the real rows into social-sentiment and retire the rest (2026-08-13).** The measured half of `/api/sentiment-heatmap` — StockTwits author-tagged bullish/bearish counts — **already existed in the social-sentiment tab** as `per_symbol`, scored the same way, null when fewer than 5 tagged messages, rendering "No live data". So the rebuild was a deletion: the route is gone (60 routes → 59), with its contract entry, its health-check entry and its consumer. What went with it was the AI path, which asked a model for its "best general impression" while telling it that it had no live data, and — when even that failed — returned `{bullishScore: 50, bearishScore: 50}` as data, on a scale where 50 is a real neutral reading (P6-18's shape). The consumer made it worse: `market-sentiment.tsx` rendered the rows as gauges under the heading **"Sector Analysis"** — three index ETFs, not sectors — and **discarded the per-row `source` field the route provided**, so an AI impression and a measured reading drew the identical dial (S-7's shape). |
 | P6-12 | P1 | fixed | 25+ raw `process.env` key reads routed through `resolveApiKey`. |
-| P6-13 | P3 | open | Module-size debt. 19 was stale; **P7-45 then said 25, which was ALSO wrong — it came off a `head -25` on a sorted list, a display limit read as a count. The true figure was 27, and 26 after P7-45 split the Step 4 card.** Four of the additions were that day's entry-exclusion work. The Black-Scholes duplication half was closed by P7-12. **Now 24 over `app components lib` and 26 including `scripts` (P7-49 — every earlier figure omitted which directories it counted), after the `use-wheel-scanner.ts` and `fundamental-scan.ts` splits.** Measured with `find app components lib -type f \( -name "*.ts" -o -name "*.tsx" \) -exec wc -l {} + \| awk '$1>600' \| wc -l`. |
+| P6-13 | P3 | open | Module-size debt. 19 was stale; **P7-45 then said 25, which was ALSO wrong — it came off a `head -25` on a sorted list, a display limit read as a count. The true figure was 27, and 26 after P7-45 split the Step 4 card.** Four of the additions were that day's entry-exclusion work. The Black-Scholes duplication half was closed by P7-12. **Now 23 over `app components lib` and 25 including `scripts` (P7-49 — every earlier figure omitted which directories it counted), after the `use-wheel-scanner.ts`, `fundamental-scan.ts` and `strategy-scanner/route.ts` splits.** The scanner route was the site's largest module at 1,808 lines and is now 216, its body in `lib/strategy-scanner/` — see P7-59 and P7-60 for what that did to the checks and to SITE_MAP. Measured with `find app components lib -type f \( -name "*.ts" -o -name "*.tsx" \) -exec wc -l {} + \| awk '$1>600' \| wc -l`. |
 | P6-14 | P1 | fixed | MMF component normalised against its own history. |
 | P6-15 | P2 | fixed | social-sentiment error banner; decorative 47/54/50 constants removed. |
 | P6-16 | P0 | fixed | `/api/fomc-predictions` nullable end to end; 503 rather than a forecast on a stand-in rate. |
@@ -432,11 +432,13 @@ recomputes it.
 | P7-51 | P3 | fixed | The Step 3 premium estimate's yield clamp has a FLOOR of 0.5%, and it applies to a row with no inputs at all: a ticker whose snapshot carries neither a live nor a previous close reaches `estimatePremium` with `currentPrice = 0`, fails on volume and incomplete fundamentals (two failures — a near miss, so it DOES appear in the relaxed Step 4 table) and renders a $0.00 strike beside a **0.50% yield**. A clamp bound in the column where a measurement goes. **Owner chose: drop those rows.** A ticker with no usable price is now a SKIP (`noPrice`) taken before any filter runs, so it never reaches the row builder — no filter verdict is invented for a ticker nobody could measure. |
 | P7-50 | P2 | fixed | `check-open-summaries.ts` bans standing tallies and exempts the ledger's totals line "because `check-backlog-ledger.ts` recomputes it from the rows". It did not — nothing had ever read that line. The one tally the project permits was the one nobody checked, and it drifted to 251/213 against a real 252/214 with the suite green. The assertion now exists and is derived, never pinned. |
 | P7-49 | P3 | fixed | Every module-size figure P6-13 has ever carried — 19, 25, 27, 26 — omitted which directories it counted, and the last two differ only by that: 26 counts `app components lib`, 27 counts `scripts` as well. Three corrections to the same number, none of which stated its scope. The row now carries the command. |
+| P7-59 | P2 | fixed | Splitting `/api/strategy-scanner` moved nine beta assertions and every exclusion-policy assertion out of the file two check scripts read, and neither would have failed: `check-beta` would have printed nine PASS lines against an empty match and `check-playbook-rules` would have derived ZERO generator call sites, then compared the published policy against nothing. Both now read the route plus `lib/strategy-scanner/**` and assert that set's size. Two further edges: the per-generator body derivation had to move per file, because over a concatenation the last generator in a file inherits the first gate of the next one — an ungated scanner reading as gated; and one assertion was pinned to `/resolveMaxDayMove,/`, the trailing comma of an import block, so it failed on a route that still delegates correctly. A rule scoped by punctuation is a rule scoped by prose. |
+| P7-60 | P2 | fixed | `site-inventory.ts` read a route's upstream hosts, env keys and timeout wiring from its entry FILE, so the split regenerated SITE_MAP with `/api/strategy-scanner` reaching no upstream, needing no key and wiring no timeout — the route with the largest upstream surface on the site, reported as inert. The first fix, the full `@/lib` import closure, was wrong in the other direction: 115 rows changed and every admin route inherited `lib/auth.ts`'s six secrets, so the Env-keys column stopped telling routes apart. Shipped instead is the EXCLUSIVE closure — a module reachable from exactly one route is that route's body, a module reachable from several is infrastructure and already has its own row. The scanner's row came back byte-identical to its pre-split version; 17 others changed, all of them corrections the old derivation had been missing. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-261 findings recorded · **227 fixed · 8 wontfix · 2 verified-ok · 24 open.**
+263 findings recorded · **229 fixed · 8 wontfix · 2 verified-ok · 24 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -4397,3 +4399,79 @@ assertion pins the current behaviour so the number is at least written down.
 | P7-52 | P2 | SCAN → Sell Put | The Step 3 scan's arithmetic was unassertable inside a three-endpoint fetch loop. Extracted to the import-free `fundamental-metrics.ts` (646 → 496); 54 assertions, negative-tested in three forms. |
 | P7-51 | P3 | SCAN → Sell Put | The premium estimate's 0.5% yield floor applies to a row with no price data at all — a $0.00 strike beside a 0.50% yield, in the relaxed Step 4 table. Owner chose to drop those rows: no usable price is now a skip taken before any filter runs. |
 | P7-53 | P2 | SCAN → Sell Put | Scan buckets and their notice-card labels were defined in two files with nothing connecting them. An unlabelled bucket rendered blank; `fundamentalsIncomplete`'s label was unreachable, so an unknown ROE was reported as "ROE below Min ROE %". One source now, asserted both directions. |
+
+## 2026-08-14 — P6-13: the scanner route, and what the split told SITE_MAP
+
+`app/api/strategy-scanner/route.ts` was the largest module on the site at 1,808 lines. It
+is now 216, with its body in `lib/strategy-scanner/`: `market-data.ts` (what was
+measured), `pricing.ts` (what was derived), `entry-exclusions.ts` (the owner's entry
+rules), and one file per strategy family under `generators/`. Nothing changed in the move
+except `COMPANY_NAMES`, which existed twice in the file — once inside `getCompanyProfile`
+and once beside the butterfly generator, with identical contents — and is now one
+constant.
+
+Module-size debt goes **24 → 23** over `app components lib`, **26 → 25** including
+`scripts/`. Two of that reduction is offset in the wrong direction by this session's own
+work: `scripts/site-inventory.ts` grew from 601 to 697 lines and `check-provenance.ts`
+from 785 to 808, both already over the threshold.
+
+### P7-59 — a route stopped being a file, and three checks did not notice
+
+The split was routine. What it did to the project's own instruments was not.
+
+**`check-beta.ts` and `check-playbook-rules.ts` both read the route as one string.** Nine
+beta assertions and every exclusion-policy assertion live in code that moved. Left alone,
+`check-beta` would have gone on printing nine PASS lines while matching an empty file, and
+`check-playbook-rules` would have derived **zero** generator call sites and then compared
+the published `entryExclusionPolicy` against nothing. Both now read the route plus
+`lib/strategy-scanner/**`, and both assert the size of that set — the rule CLAUDE.md
+already carries, arriving again: *a check that stops COVERING is invisible, because the
+PASS count is identical either way.*
+
+`check-playbook-rules` needed one more change than the obvious one. It derives each
+generator's body as "from this `async function generate…` to the next", and over a
+concatenation of files the LAST generator in a file inherits the FIRST generator of the
+next file. An ungated scanner would have read as gated — the exact direction of error the
+check exists to catch. The derivation now runs per file.
+
+**And one assertion was pinned to a comma.** `"the route delegates the clamp rather than
+re-implementing it"` tested `/resolveMaxDayMove,/` — the trailing comma of the multi-line
+import block the route happened to have. The split reduced that block to one symbol on one
+line, the comma went with it, and the check failed on a route that still delegates
+correctly. Scoping a rule by punctuation is the same defect as scoping it by prose: what
+it pins is not what it means.
+
+### P7-60 — SITE_MAP said the scanner reaches nothing, and it was the inventory that was wrong
+
+`scripts/site-inventory.ts` derives each route's upstream hosts, env keys and timeout
+wiring **from the route file**. The moment the split landed, it regenerated
+`/api/strategy-scanner`'s row as: no upstream hosts, no env keys, timeout wiring **no**.
+
+All three false. The fetches had moved one import away. This is worse than a stale figure —
+SITE_MAP is where a reader asks *what does this route touch*, and a refactor had just
+answered "nothing" for the route with the largest upstream surface on the site. A check
+that reports a route as inert is not a check that failed loudly.
+
+The first fix was the obvious one and was wrong: following a route's full `@/lib` import
+closure changed **115 rows**. Every admin route inherited `lib/auth.ts`'s six secrets and
+every Supabase reader inherited its keys, so the Env-keys column stopped distinguishing
+routes from one another. More reachable is not more accurate when the column's job is to
+tell routes apart, and shared infrastructure already has its own rows further down the file.
+
+What shipped is the **exclusive** closure: a lib module reachable from exactly one route is
+that route's implementation; a module reachable from several is infrastructure.
+`lib/strategy-scanner/**` qualifies, `lib/auth.ts` does not, and the distinction is derived
+from the import graph rather than named — a module that gains a second caller drops out of
+the first route's row on its own.
+
+`/api/strategy-scanner`'s row came back **byte-identical to its pre-split version**, which
+is the result that says the refactor was invisible. Seventeen other rows changed, and every
+one of them is a correction the old derivation had been missing: `/api/ccpi` genuinely
+reaches ScrapingBee's three scrape targets and Groq through modules only it imports, and
+`/api/social-sentiment` genuinely reaches Serper and CNN. The inventory had been
+under-reporting those since it was written.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-59 | P2 | tooling | Splitting a route broke three assertions in two check scripts without failing them: two read the route as one file, and one was pinned to an import list's trailing comma. Both scripts now read the route plus its lib modules and assert that set's size; the per-generator derivation runs per file so a generator cannot inherit the next file's gate. |
+| P7-60 | P2 | tooling | `site-inventory.ts` derived a route's hosts, env keys and timeout from its entry file, so the split made SITE_MAP report `/api/strategy-scanner` as reaching no upstream at all. Route facts now come from the exclusive import closure — modules reachable from exactly one route — which also corrected 17 rows the old derivation had been under-reporting. |
