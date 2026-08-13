@@ -298,7 +298,7 @@ recomputes it.
 | P6-10 | P2 | fixed | `100 - x \|\| 50` precedence bug. |
 | P6-11 | P1 | open | **Partial.** The hallucination pipeline is labelled and routed through the guarded chain. **Open decision:** rebuild the sentiment heatmap on real sources or retire the tab. |
 | P6-12 | P1 | fixed | 25+ raw `process.env` key reads routed through `resolveApiKey`. |
-| P6-13 | P3 | open | Module-size debt. 19 was stale; **P7-45 then said 25, which was ALSO wrong — it came off a `head -25` on a sorted list, a display limit read as a count. The true figure was 27, and is 26 after P7-45 split the Step 4 card.** Four of the additions were that day's entry-exclusion work. The Black-Scholes duplication half was closed by P7-12. |
+| P6-13 | P3 | open | Module-size debt. 19 was stale; **P7-45 then said 25, which was ALSO wrong — it came off a `head -25` on a sorted list, a display limit read as a count. The true figure was 27, and 26 after P7-45 split the Step 4 card.** Four of the additions were that day's entry-exclusion work. The Black-Scholes duplication half was closed by P7-12. **Now 25 over `app components lib` and 27 including `scripts` (P7-49 — every earlier figure omitted which directories it counted), after the `use-wheel-scanner.ts` split.** Measured with `find app components lib -type f \( -name "*.ts" -o -name "*.tsx" \) -exec wc -l {} + \| awk '$1>600' \| wc -l`. |
 | P6-14 | P1 | fixed | MMF component normalised against its own history. |
 | P6-15 | P2 | fixed | social-sentiment error banner; decorative 47/54/50 constants removed. |
 | P6-16 | P0 | fixed | `/api/fomc-predictions` nullable end to end; 503 rather than a forecast on a stand-in rate. |
@@ -422,11 +422,13 @@ recomputes it.
 | P7-46 | P3 | fixed | The tsconfig note claiming the Next bundler disallows .ts import extensions was FALSE and blocked Phase 7.0 for five phases. Vercel built it clean (chunk changed, /api/ccpi 200, homepage 200). An untested claim in a comment is a claim, not a constraint. |
 | P7-47 | **P1** | fixed | keywordScore matched by substring, so "Death cross forms as S&P 500 breaks support" scored 100/100 BULLISH (ath in death, up in support) and "Ford recalls 100,000 trucks" scored 100/100 (calls in recalls). A live indicator at 0.08 composite weight that could be exactly inverted. Word boundaries; scorer extracted to the import-free lib/headline-sentiment.ts; 14 assertions. |
 | P7-48 | P3 | fixed | P7-45's corrected module count of 25 came off a `head -25`-truncated list — a display limit read as a count. The real figure was 27, and is 26 after the Step 4 split. |
+| P7-50 | P2 | fixed | `check-open-summaries.ts` bans standing tallies and exempts the ledger's totals line "because `check-backlog-ledger.ts` recomputes it from the rows". It did not — nothing had ever read that line. The one tally the project permits was the one nobody checked, and it drifted to 251/213 against a real 252/214 with the suite green. The assertion now exists and is derived, never pinned. |
+| P7-49 | P3 | fixed | Every module-size figure P6-13 has ever carried — 19, 25, 27, 26 — omitted which directories it counted, and the last two differ only by that: 26 counts `app components lib`, 27 counts `scripts` as well. Three corrections to the same number, none of which stated its scope. The row now carries the command. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-251 findings recorded · **213 fixed · 8 wontfix · 1 verified-ok · 29 open.**
+253 findings recorded · **215 fixed · 8 wontfix · 1 verified-ok · 29 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -3942,3 +3944,68 @@ obtained.
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-48 | P3 | docs | P7-45's corrected module count of 25 was itself taken from a `head -25`-truncated list. The real figure was 27, now 26. A display limit read as a count — the synthesis's own shape #3, committed while fixing an instance of it. |
+
+---
+
+## 2026-08-13 — P6-13 continues, and P7-49
+
+### P7-49 — the number was corrected three times and never once said what it counted
+
+P6-13's module count has been 19, then 25, then 27, then 26. Each correction fixed the
+arithmetic and none of them stated the scope, so the figures are not comparable to each
+other: **26 counts `app components lib`; 27 counts `scripts` as well.** The last
+"correction" therefore moved the number by exactly the two check scripts over 600 lines,
+and nothing in the row said so.
+
+This is the same family as P7-48 one rung up. P7-48 was a measurement error — a display
+limit read as a count. This is a *definition* error: the measurement was right and the
+thing measured was never named, which is why three people fixing the arithmetic all
+produced different right answers. **A count without its scope is not a smaller version of
+a count; it is a different kind of statement**, and it survives correction indefinitely
+because every new value looks like a fix.
+
+The P6-13 row now carries the command, both figures, and which directories each covers.
+
+### The split itself: use-wheel-scanner.ts 690 → 585
+
+The Sell Put scanner's hook was the largest file this audit created. Step 4's sliders,
+toggles and the four CSP entry exclusions moved to `use-technical-filters.ts` (120 lines);
+the three tables' sort order and the relaxed table's column filters moved to
+`use-scanner-sorting.ts` (73 lines). The comments moved verbatim with the state they
+annotate — several of them (why a gate defaults ON, which two thresholds have no UI
+control) record decisions not recoverable from the code, and a size split is exactly when
+those get dropped. `resultsToDisplay` was deleted: computed, never returned, never read.
+
+**Two guards fired, both correctly, for the second refactor running.**
+`check-playbook-rules` reported **"all four exclusions still default ON — 0 of 4"** — the
+identical line it would print if the four defaults had been deleted outright — because it
+read one pinned path and the state had moved to a sibling. The Step 4 *card* became a
+two-file list with an asserted size in the previous split for this exact reason; the
+*hook* is now one too. `check-scanner-steps` went 19 → 21 on its derived file count.
+
+### P7-50 — the one tally the project permits was the one nobody was checking
+
+`check-open-summaries.ts` exists because AUDIT_BACKLOG had three standing summaries of
+what was still open and all three drifted. It bans them, with exactly one exemption: the
+ledger's own totals line, granted *"because `check-backlog-ledger.ts` recomputes it from
+the rows"*.
+
+It did not. Nothing in that file, or any other, had ever read the line. The justification
+was written alongside the exemption and never tested, so the single tally the project
+trusts was the single tally with no derivation behind it. Adding two rows this session
+moved the ledger to 252/214 and left the prose reading 251/213 — **with every check
+green**, which is the whole failure in one sentence.
+
+Two Phase 7 synthesis shapes at once, inside the checks written to enforce them: *the
+audit infrastructure makes dead surface look alive* (a line marked "this one is verified"
+is the last line anyone re-reads), and *an untested claim in a comment is a constraint
+nobody tests*. The third instance of a check whose scope is decided by its own content.
+
+The assertion is **parsed, not pinned** — it compares the prose against the counts the
+script already computes, so it can never itself need updating, and the comment granting
+the exemption now records that removing the assertion means deleting the exemption.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-49 | P3 | docs | Every module-size figure P6-13 carried (19, 25, 27, 26) omitted the directories it counted; 26 and 27 differ only by `scripts/`. Three arithmetic corrections, no scope. The row now carries the command. |
+| P7-50 | P2 | tooling | The ledger's totals line was exempted from the standing-tally ban on the stated ground that `check-backlog-ledger.ts` recomputed it. Nothing read it; it drifted to 251/213 against 252/214 with the suite green. Now derived from the rows. |

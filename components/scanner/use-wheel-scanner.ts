@@ -19,17 +19,13 @@ import {
   getTopRankedValue,
   getTopRankedLabel,
 } from "./constants"
-import type { QualifyingStock, RejectionSummary, RelaxedFilters } from "./types"
+import type { QualifyingStock, RejectionSummary } from "./types"
 import { runFundamentalScan } from "./fundamental-scan"
 import { enrichWithOptionsData } from "./enrichment"
-import {
-  checkTechnicalCriteria as checkCriteriaWithSettings,
-  partitionByEntryExclusions,
-  type EntryExclusion,
-  type TechnicalFilterSettings,
-} from "./technical-criteria"
-import { MAX_DAY_MOVE } from "@/lib/trend-filters"
+import { partitionByEntryExclusions, type EntryExclusion } from "./technical-criteria"
 import { useLandmines } from "./use-landmines"
+import { useTechnicalFilters } from "./use-technical-filters"
+import { useScannerSorting } from "./use-scanner-sorting"
 import { stepLabel, stepTitled } from "./steps"
 
 export function useWheelScanner() {
@@ -73,16 +69,6 @@ export function useWheelScanner() {
   const [nearMissFundamentals, setNearMissFundamentals] = useState<QualifyingStock[]>([])
   const [technicalResults, setTechnicalResults] = useState<QualifyingStock[]>([])
   const [showRelaxedResults, setShowRelaxedResults] = useState(false)
-  const [fundamentalSortColumn, setFundamentalSortColumn] = useState<string>("ticker")
-  const [fundamentalSortDirection, setFundamentalSortDirection] = useState<"asc" | "desc">("asc")
-  const [showAllFundamentals, setShowAllFundamentals] = useState(false)
-
-  // Default: rank finalists by annualized premium yield — the "richest premium first" view
-  const [sortColumn, setSortColumn] = useState<keyof QualifyingStock>("annualizedYield")
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc")
-  // Default: shortest DTE first, then highest Yield % within each DTE group
-  const [relaxedSortColumn, setRelaxedSortColumn] = useState<keyof QualifyingStock>("daysToExpiry")
-  const [relaxedSortDirection, setRelaxedSortDirection] = useState<"asc" | "desc">("asc")
 
   const [scanProgress, setScanProgress] = useState(0)
   const [currentTicker, setCurrentTicker] = useState("")
@@ -99,43 +85,35 @@ export function useWheelScanner() {
 
   const [maxROE, setMaxROE] = useState(20)
 
-  // Step 3: Technical Analysis Filters
-  const [maxRSI, setMaxRSI] = useState([60]) // Default Max RSI 60 — 50 excludes normal uptrend momentum; overbought risk starts ~70
-  const [maxStochastic, setMaxStochastic] = useState([70]) // Default Max Stochastic 70 — uptrending stocks sit high on the stochastic most of the time
-  const [minATR, setMinATR] = useState([2]) // Default Min ATR 2% - min volatility
-  const [maxATR, setMaxATR] = useState([15]) // Default Max ATR 15% - max volatility
+  // Step 4's sliders, toggles and the four CSP entry exclusions, with the
+  // settings object the shared gate functions read (components/scanner/
+  // use-technical-filters.ts). Destructured rather than kept as one object so
+  // that the pipeline below reads exactly as it did before the split.
+  const {
+    maxRSI, setMaxRSI,
+    maxStochastic, setMaxStochastic,
+    minATR, setMinATR,
+    maxATR, setMaxATR,
+    requireBollingerBands, setRequireBollingerBands,
+    requireAbove200SMA, setRequireAbove200SMA,
+    requireAbove50SMA, setRequireAbove50SMA,
+    requireGoldenCross, setRequireGoldenCross,
+    requireMACDBullish, setRequireMACDBullish,
+    requireRedDay, setRequireRedDay,
+    excludeBigUpDay, setExcludeBigUpDay,
+    maxDayMove, setMaxDayMove,
+    excludeDownYear, setExcludeDownYear,
+    excludeBenchmarkLaggard, setExcludeBenchmarkLaggard,
+    excludeStage4, setExcludeStage4,
+    minYield, minVolumeTechnicals,
+    technicalFilterSettings,
+    checkTechnicalCriteria,
+  } = useTechnicalFilters()
 
-  // Bollinger default OFF: "price at/below the 20-day mean" directly contradicts the
-  // above-50-SMA uptrend gate for most volatile names — together they left strict
-  // Step 4 empty. Re-enable for precise pullback-entry timing.
-  const [requireBollingerBands, setRequireBollingerBands] = useState(false) // Bollinger Bands Setup
-  // FIX: Renamed state variables from require200SMA to requireAbove200SMA and require50SMA to requireAbove50SMA
-  const [requireAbove200SMA, setRequireAbove200SMA] = useState(true) // Above 200-day SMA
-  const [requireAbove50SMA, setRequireAbove50SMA] = useState(true) // Above 50-day SMA
-  const [requireGoldenCross, setRequireGoldenCross] = useState(true) // Golden Cross (50 > 200)
-  // MACD-bullish + red-day defaults are OFF: demanding a bullish crossover AND a
-  // down day AND oversold AND above all SMAs simultaneously left strict Step 4
-  // empty on nearly every run. Users can re-enable either for stricter entries.
-  const [requireMACDBullish, setRequireMACDBullish] = useState(false) // MACD Bullish Signal
-  const [requireRedDay, setRequireRedDay] = useState(false) // Red Day Preferred
+  // Table sort order + the relaxed table's column filters
+  // (components/scanner/use-scanner-sorting.ts).
+  const sorting = useScannerSorting()
 
-  // CSP entry filters (lib/trend-filters.ts). ALL FOUR DEFAULT ON, at the
-  // owner's instruction: these are not stricter-entry preferences like the
-  // toggles above, they are the two things he does not want to sell a put
-  // into — a stock that just ripped, and a stock that has fallen for a year.
-  //
-  // Defaulting a gate ON is a deliberate break from the pattern above, where
-  // MACD/red-day/Bollinger default OFF because stacking them empties strict
-  // Step 4. These can empty it too, on a weak tape, and that is the intended
-  // answer rather than a bug: "nothing qualifies today" is a result.
-  const [excludeBigUpDay, setExcludeBigUpDay] = useState(true) // no puts into a spike
-  // Annotated `number[]`: `MAX_DAY_MOVE` is `as const`, so an unannotated
-  // useState infers the literal type `10[]` and the setter stops accepting any
-  // other number.
-  const [maxDayMove, setMaxDayMove] = useState<number[]>([MAX_DAY_MOVE.DEFAULT])
-  const [excludeDownYear, setExcludeDownYear] = useState(true) // trailing year negative
-  const [excludeBenchmarkLaggard, setExcludeBenchmarkLaggard] = useState(true) // trailed SPY
-  const [excludeStage4, setExcludeStage4] = useState(true) // below a FALLING 150-day MA
   // What the exclusions removed, with reasons, so an empty Step 4 is explicable
   // rather than just empty.
   const [entryExclusionSummary, setEntryExclusionSummary] = useState<EntryExclusion[]>([])
@@ -152,20 +130,6 @@ export function useWheelScanner() {
   }, [])
 
   const [cacheStatus, setCacheStatus] = useState<string>("")
-
-  // S-8. **These two are HIDDEN GATES: they filter Step 3 results and no UI
-  // control exposes them.** `technical-criteria.ts` tests `yieldCheck` on
-  // `minYield` and `volumeCheck` on `minVolumeTechnicals`, so a stock can be
-  // dropped from the scan by a threshold the user never set and cannot see.
-  // Recorded here, and stated in the Step 3 explainer, until sliders exist.
-  //
-  // The comment that used to sit on the second line read "This variable is
-  // declared but not used in the provided code snippet" — flatly false, and the
-  // Wave-2 split introduced it. **A comment asserting that a live filter is
-  // dead is worse than no comment**: it invites the next reader to delete a
-  // gate that is changing results.
-  const [minYield, setMinYield] = useState([1]) // percent — filters at yieldCheck
-  const [minVolumeTechnicals, setMinVolumeTechnicals] = useState([2]) // millions — filters at volumeCheck
 
   const [relaxedResults, setRelaxedResults] = useState<QualifyingStock[]>([])
   const [relaxedResultsEnriched, setRelaxedResultsEnriched] = React.useState(false)
@@ -186,42 +150,6 @@ export function useWheelScanner() {
   // const isScanningTechnicals = technicalLoading // This is the correct state for technical scanning
 
   const { fetchLandmines, getLandminesForRow, resetLandmines } = useLandmines()
-
-  // Excel-style column filters for the relaxed results table. Empty string = no filter.
-  const [relaxedFilters, setRelaxedFilters] = useState<RelaxedFilters>({
-    ticker: "",
-    maxDTE: "",
-    minPremium: "",
-    minYield: "",
-    minAnnualYield: "",
-    minIV: "",
-  })
-  const clearRelaxedFilters = () =>
-    setRelaxedFilters({ ticker: "", maxDTE: "", minPremium: "", minYield: "", minAnnualYield: "", minIV: "" })
-
-  // Slider/toggle values packaged for the shared technical gate functions
-  // (components/scanner/technical-criteria.ts) — same reads as before extraction.
-  const technicalFilterSettings: TechnicalFilterSettings = {
-    maxRSI: maxRSI[0],
-    maxStochastic: maxStochastic[0],
-    minATR: minATR[0],
-    maxATR: maxATR[0],
-    requireBollingerBands,
-    requireAbove200SMA,
-    requireAbove50SMA,
-    requireGoldenCross,
-    requireMACDBullish,
-    requireRedDay,
-    minYield: minYield[0],
-    minVolumeTechnicals: minVolumeTechnicals[0],
-    excludeBigUpDay,
-    maxDayMove: maxDayMove[0],
-    excludeDownYear,
-    excludeBenchmarkLaggard,
-    excludeStage4,
-  }
-
-  const checkTechnicalCriteria = (stock: QualifyingStock) => checkCriteriaWithSettings(stock, technicalFilterSettings)
 
   const scanFundamentals = async () => {
     console.log("[v0] 🔴🔴🔴🔴🔴 SCAN FUNDAMENTALS CALLED 🔴🔴🔴🔴🔴")
@@ -520,35 +448,6 @@ export function useWheelScanner() {
     }
   }
 
-  const resultsToDisplay = technicalResults.length > 0 ? technicalResults : fundamentalResults
-
-  const handleFundamentalSort = (column: string) => {
-    if (fundamentalSortColumn === column) {
-      setFundamentalSortDirection(fundamentalSortDirection === "asc" ? "desc" : "asc")
-    } else {
-      setFundamentalSortColumn(column)
-      setFundamentalSortDirection("desc")
-    }
-  }
-
-  const handleRelaxedSort = (column: keyof QualifyingStock) => {
-    if (relaxedSortColumn === column) {
-      setRelaxedSortDirection(relaxedSortDirection === "asc" ? "desc" : "asc")
-    } else {
-      setRelaxedSortColumn(column)
-      setRelaxedSortDirection("asc")
-    }
-  }
-
-  const handleSort = (column: keyof QualifyingStock) => {
-    if (sortColumn === column) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
-    } else {
-      setSortColumn(column)
-      setSortDirection("asc")
-    }
-  }
-
   // Determine the current step based on state
   const currentStep =
     tickersToScan.trim().length === 0
@@ -677,12 +576,8 @@ export function useWheelScanner() {
     fundamentalResults, rejectionSummary, nearMissFundamentals,
     technicalResults, relaxedResults, showRelaxedResults,
     toggleRelaxedResults, promoteNearMissesToStep4,
-    // Sorting + table UI state
-    fundamentalSortColumn, fundamentalSortDirection, handleFundamentalSort,
-    showAllFundamentals, setShowAllFundamentals,
-    sortColumn, sortDirection, handleSort,
-    relaxedSortColumn, relaxedSortDirection, handleRelaxedSort,
-    relaxedFilters, setRelaxedFilters, clearRelaxedFilters,
+    // Sorting + table UI state (use-scanner-sorting.ts)
+    ...sorting,
     // Landmines + misc
     getLandminesForRow,
     tooltipsEnabled, setTooltipsEnabled,

@@ -81,7 +81,12 @@ const GUARDED = [
 // **to a size check, moving code is indistinguishable from adding it**, so a
 // module-size cleanup will trip every derived-set assertion it touches. That is
 // the cost of the guard, and it is the right cost.
-const EXPECTED_GUARDED = 19
+//
+// → 21 when P6-13 split `use-technical-filters.ts` and `use-scanner-sorting.ts`
+// out of `use-wheel-scanner.ts` (690 → 585 lines). Third bump, second refactor:
+// the pattern is now established rather than noteworthy, and the number moving
+// is the record that a human looked.
+const EXPECTED_GUARDED = 21
 
 check(
   `scope: ${GUARDED.length} file(s) guarded`,

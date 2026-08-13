@@ -42,18 +42,23 @@ const BACKLOG = "AUDIT_BACKLOG.md"
  * findings set that quietly shrinks, fails loudly instead of passing quietly.
  * Update them deliberately in the same commit that changes the counts.
  */
-const EXPECTED_LEDGER_ROWS = 251
+const EXPECTED_LEDGER_ROWS = 253
 const EXPECTED_OPEN = 29
-const EXPECTED_FIXED = 213
+const EXPECTED_FIXED = 215
 const EXPECTED_WONTFIX = 8
 const EXPECTED_VERIFIED_OK = 1
 
 /**
- * IDs reachable from a table's first cell. The remainder of the ledger (251 - 241)
- * is sub-items that exist only inside a parent row's prose — E-6a..E-6d, E-7a/b/d,
- * E-8a/c/d. Asserted so that findings cannot quietly stop being table rows.
+ * IDs reachable from a table's first cell. The remainder of the ledger — the
+ * difference between EXPECTED_LEDGER_ROWS and this number — is sub-items that
+ * exist only inside a parent row's prose: E-6a..E-6d, E-7a/b/d, E-8a/c/d.
+ * Asserted so that findings cannot quietly stop being table rows.
+ *
+ * Stated as a difference rather than as a worked subtraction: this comment read
+ * "(251 - 241)" and went stale the first time either number moved, which in a
+ * file about numbers going stale is not a comment anyone should have to notice.
  */
-const EXPECTED_TABLE_IDS = 241
+const EXPECTED_TABLE_IDS = 243
 
 /**
  * Table rows whose first cell is deliberately not a finding ID: they record a piece
@@ -264,6 +269,50 @@ check(
   "the four status counts account for every ledger row",
   dist.open + dist.fixed + dist.wontfix + dist["verified-ok"] === ledger.length,
 )
+
+/**
+ * The ledger's prose totals line, recomputed from the rows (P7-50).
+ *
+ * `check-open-summaries.ts` bans standing tallies of what is open, and grants
+ * this one line an exemption whose stated justification is that "this file
+ * recomputes it from the rows". **It did not.** Nothing here had ever read that
+ * line, so the one tally the project permits was the one nobody was checking —
+ * and it drifted the moment two rows were added, reading 251/213 against a real
+ * 252/214 with every check green.
+ *
+ * The exemption is what made it invisible: a line explicitly marked as the
+ * trustworthy tally is not a line anyone re-reads. Same shape as the audit
+ * infrastructure making dead surface look alive, and as an untested claim in a
+ * comment being taken for a constraint — Phase 7 synthesis shapes #2 and #4,
+ * both at once, inside the checks written to enforce them.
+ *
+ * Parsed rather than pinned, so the numbers here can never need updating: the
+ * line must agree with the rows, whatever the rows say.
+ */
+const totalsRe =
+  /^(\d+) findings recorded · \*\*(\d+) fixed · (\d+) wontfix · (\d+) verified-ok · (\d+) open\.\*\*/m
+const totalsMatch = totalsRe.exec(text)
+check(
+  "the ledger's prose totals line is present and in the expected shape",
+  totalsMatch !== null,
+  totalsMatch ? totalsMatch[0] : "not found — reworded? check-open-summaries exempts this exact line",
+)
+if (totalsMatch) {
+  const [, tRows, tFixed, tWontfix, tVerified, tOpen] = totalsMatch.map(Number) as unknown as number[]
+  const agrees =
+    tRows === ledger.length &&
+    tFixed === dist.fixed &&
+    tWontfix === dist.wontfix &&
+    tVerified === dist["verified-ok"] &&
+    tOpen === dist.open
+  check(
+    "the prose totals line agrees with the ledger rows",
+    agrees,
+    `prose ${tRows}/${tFixed}/${tWontfix}/${tVerified}/${tOpen} vs rows ` +
+      `${ledger.length}/${dist.fixed}/${dist.wontfix}/${dist["verified-ok"]}/${dist.open} ` +
+      `(total/fixed/wontfix/verified-ok/open)`,
+  )
+}
 
 console.log(
   `\nBacklog ledger: ${ledger.length} findings — ${dist.open} open, ${dist.fixed} fixed, ` +

@@ -48,6 +48,25 @@ const CARD_FILES = [
 ]
 const EXPECTED_CARD_FILES = 2
 
+/**
+ * The Sell Put scanner's hook, which is now TWO files, for the same reason and
+ * by the same route as the card above.
+ *
+ * P6-13's module-size work moved every Step 4 slider, toggle and exclusion
+ * default out of `use-wheel-scanner.ts` into `use-technical-filters.ts`, and
+ * both assertions that read the hook source failed the moment it did — "all
+ * four exclusions still default ON" reported **0 of 4**, which is what deleting
+ * the four defaults outright would also report. That is the same lesson the
+ * card list already carries, arriving a second time in the same directory: a
+ * check pinned to one path cannot tell a relocation from a deletion. Listing
+ * the set and asserting its size is what makes the next move deliberate.
+ */
+const HOOK_FILES = [
+  "components/scanner/use-wheel-scanner.ts",
+  "components/scanner/use-technical-filters.ts",
+]
+const EXPECTED_HOOK_FILES = 2
+
 let failures = 0
 function check(name: string, passed: boolean, detail = ""): void {
   console.log(`${passed ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`)
@@ -58,6 +77,12 @@ check(
   `scope: ${CARD_FILES.length} Step 4 file(s)`,
   CARD_FILES.length === EXPECTED_CARD_FILES,
   CARD_FILES.join(", "),
+)
+
+check(
+  `scope: ${HOOK_FILES.length} Sell Put hook file(s)`,
+  HOOK_FILES.length === EXPECTED_HOOK_FILES,
+  HOOK_FILES.join(", "),
 )
 
 const implSrc = readFileSync(join(ROOT, IMPL), "utf8")
@@ -144,7 +169,7 @@ for (const control of enforcedBy) {
  * reader; if they shipped defaulted off, that sentence would be false for
  * anyone who never opened Step 4.
  */
-const hookSrc = readFileSync(join(ROOT, "components/scanner/use-wheel-scanner.ts"), "utf8")
+const hookSrc = HOOK_FILES.map((f) => readFileSync(join(ROOT, f), "utf8")).join("\n")
 const defaultsOn = ["excludeBigUpDay", "excludeDownYear", "excludeBenchmarkLaggard", "excludeStage4"].filter((s) =>
   new RegExp(`\\[${s},\\s*set\\w+\\]\\s*=\\s*useState\\(true\\)`).test(hookSrc),
 )

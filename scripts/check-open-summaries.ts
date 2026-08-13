@@ -50,6 +50,15 @@ if (ledgerStart === -1) process.exit(1)
  * because `check-backlog-ledger.ts` recomputes it from the rows. Its line
  * number is found rather than assumed, so this exemption cannot be smuggled
  * onto some other line by moving text around.
+ *
+ * P7-50: that justification was FALSE for as long as it was written down.
+ * `check-backlog-ledger.ts` never read the line — the sentence above described
+ * an assertion nobody had written, and the exemption it granted was real. The
+ * line drifted to 251/213 against a real 252/214 with the whole suite green.
+ * The assertion now exists (`the prose totals line agrees with the ledger
+ * rows`), which is the only reason this comment is true. **Do not remove that
+ * assertion without deleting this exemption in the same commit** — one is the
+ * price of the other.
  */
 const totalsLine = lines.findIndex((l) => /^\d+ findings recorded · \*\*/.test(l))
 check(
