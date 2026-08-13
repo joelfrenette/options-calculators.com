@@ -43,8 +43,8 @@ const BACKLOG = "AUDIT_BACKLOG.md"
  * Update them deliberately in the same commit that changes the counts.
  */
 const EXPECTED_LEDGER_ROWS = 261
-const EXPECTED_OPEN = 25
-const EXPECTED_FIXED = 226
+const EXPECTED_OPEN = 24
+const EXPECTED_FIXED = 227
 const EXPECTED_WONTFIX = 8
 const EXPECTED_VERIFIED_OK = 2
 

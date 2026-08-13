@@ -423,7 +423,7 @@ recomputes it.
 | P7-47 | **P1** | fixed | keywordScore matched by substring, so "Death cross forms as S&P 500 breaks support" scored 100/100 BULLISH (ath in death, up in support) and "Ford recalls 100,000 trucks" scored 100/100 (calls in recalls). A live indicator at 0.08 composite weight that could be exactly inverted. Word boundaries; scorer extracted to the import-free lib/headline-sentiment.ts; 14 assertions. |
 | P7-48 | P3 | fixed | P7-45's corrected module count of 25 came off a `head -25`-truncated list — a display limit read as a count. The real figure was 27, and is 26 after the Step 4 split. |
 | P7-58 | P3 | verified-ok | **Swept and clean, recorded so nobody re-runs it.** The scanner has two answers to "what will this option pay" — `fundamental-scan`'s `estimatePremium` heuristic and `enrichment`'s premium from the real chain — which is P7-55's shape exactly. It is handled: enrichment sets `priceSource = "synthesized"` whenever it falls back (and the comment records that the flag covers rate limits and outages, not just a closed market), and **both** results tables read that field and disclose the row. A negative result, kept per the Phase 6 rule about recording what came back clean. |
-| P7-57 | P3 | open | **A comment made live data look absent — the inverse of the usual shape.** `/api/market-sentiment`'s header stated "putCallRatio is absent on purpose: nothing in the codebase sources one", and `NOT_TRACKED` was documented as "indicators with no source at all". Both false: `scrapePutCallRatio` in `/api/ccpi` fetches the CBOE reading via ScrapingBee, and since P6-72 only a genuine reading may claim `live`. So one tab renders "—" for a figure the site actually goes and gets. **Comments corrected** — "not tracked by this route" and "unobtainable" are different claims. **Left open:** whether to wire the CCPI scraper's reading into this tab, which is a cost decision (the scraper is metered, budget-guarded and cached for its own tab), not a comment fix. |
+| P7-57 | P3 | fixed | **A comment made live data look absent — the inverse of the usual shape.** `/api/market-sentiment`'s header stated "putCallRatio is absent on purpose: nothing in the codebase sources one", and `NOT_TRACKED` was documented as "indicators with no source at all". Both false: `scrapePutCallRatio` in `/api/ccpi` fetches the CBOE reading via ScrapingBee, and since P6-72 only a genuine reading may claim `live`. So one tab renders "—" for a figure the site actually goes and gets. **Comments corrected** — "not tracked by this route" and "unobtainable" are different claims. **CORRECTED ON INSPECTION, before any wiring was proposed:** `scrapePutCallRatio` tries **Grok FIRST** and returns `ai-estimate` whenever the model gives a plausible number (0.3–3); the CBOE scrape is the FALLBACK, not the primary. So the site usually holds a language model's recollection of the ratio — correctly tiered and correctly barred from scoring since P6-72 — and only sometimes a real CBOE reading. The comment was literally false and practically near-right. **Wiring it into market-sentiment would mostly pipe an AI estimate into a second tab, which is what P6-11 deleted a route for the same day.** Recommendation recorded as DO NOT WIRE; the corrected comments are the whole fix. |
 | P7-56 | P2 | fixed | **The site computes "VIX term structure" TWICE, with opposite directions — and P7-54's rename made it worse before it made it better.** `lib/vix-term.ts` (CCPI, the cron, `data-source-status`) computes **VIX3M ÷ spot VIX**, where above 1 = contango = CALM. `/api/panic-euphoria` computes the **5-day VIX average ÷ its 50-day average**, where above 1 = near-term elevated = STRESS. One published concept name, two quantities, inverted meanings. Third convention defect on this exact figure (P3-14 was point-spread-vs-ratio). **And P7-54, hours earlier, renamed the second one `vixTermRatio` / "VIX Term Structure (5d/50d)" — a term structure compares MATURITIES, not two lookbacks of one spot series.** A more precise false noun is still a false noun, and harder to catch because it reads like expertise. Now `vixMomentumRatio` / "VIX Momentum (5d vs 50d avg)", with both tooltips stating that it runs opposite to the CCPI tab's term structure. |
 | P7-55 | **P1** | fixed | **`compute_breadth` counted a delisted member on a seven-month-old price, every day, in one direction.** The daily cron's function ranked `row_number() ... order by day desc` and qualified any ticker with 200 stored rows **with no date constraint at all**, so MMC (1,111 rows ending 2026-01-13) qualified on every run: January close 182.70 against its own January 200-day average of 205.44, voting "below" in a reading published for August. **The sibling function was right the whole time** — `compute_breadth_range` windows by date — so `/api/breadth` returned `sample: 99` for every historical day and `sampleSize: 100` for today **in the same payload**, and nobody read down the column. Two definitions of one number on one table. Migration `20260813164047` applied to production on the owner's authorisation: freshness (latest row within 6 days) plus a 400-day span bound; `universe_size` now reports the qualified set rather than every ticker ever stored. Production verified before/after: 69/100/100 → 69.70/99/99, and the daily row now agrees with the history. 11 assertions. **Found only because the owner ran a backfill for an unrelated build.** |
 | P7-54 | P2 | fixed | **Owner chose: rename it to what it is (2026-08-13).** `/api/panic-euphoria` scored `putCallRatio`, and the value is `vixShortTerm / vixLongTerm` — the 5-day VIX over the 50-day. Real measured data, correctly scored as curve SHAPE, which is exactly why it survived P6-8 where `investorIntelligence` did not: shape can disagree with level. **The site contradicted itself about it** — `/api/market-sentiment` states in its own header that "nothing in the codebase sources one", lists it in `NOT_TRACKED` and returns null, while this route published a number under that name. Two routes, two answers to "does this site have a put/call feed", and the one saying yes was the one publishing. The tab was worse than the route: the tooltip attributed the row to "options flow data" and a second panel called it the "CBOE equity put/call ratio" — a named exchange product the site has never had. Now `vixTermRatio` / `vixTermScore`, labelled "VIX Term Structure (5d/50d)", and OUT of `syntheticComponents`, because a direct reading of the curve is not a proxy for anything. 7 assertions. |
@@ -436,7 +436,7 @@ recomputes it.
 
 ### The open list, by severity
 
-261 findings recorded · **226 fixed · 8 wontfix · 2 verified-ok · 25 open.**
+261 findings recorded · **227 fixed · 8 wontfix · 2 verified-ok · 24 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -4127,9 +4127,22 @@ quietly obtained it. Three routes, three positions, no contradiction visible fro
 any one of them.
 
 The comments are corrected — *"not tracked by this route"* and *"unobtainable"* are
-different claims. **Wiring the CCPI reading into the market-sentiment tab is left open**,
-because it is a cost decision rather than a documentation one: the scraper is metered,
-budget-guarded and cached for its own tab, and a second consumer changes that arithmetic.
+different claims.
+
+**And then reading the scraper corrected the finding.** `scrapePutCallRatio` tries **Grok
+first**, returning `ai-estimate` whenever the model gives a number between 0.3 and 3; the
+CBOE scrape runs only if that fails. So the site usually holds *a language model's
+recollection* of the put/call ratio — correctly tiered, and correctly barred from scoring
+since P6-72 — and only sometimes a measured CBOE figure.
+
+That inverts the recommendation. Wiring this into the market-sentiment tab would mostly
+pipe an AI estimate into a second surface, **which is precisely what P6-11 deleted a route
+for the same day.** The corrected comments are the whole fix; the dash stays.
+
+The transferable part is smaller than the finding and more useful: *"something in the
+codebase sources X"* and *"the codebase usually has a measured X"* are different claims,
+and I made the first one while meaning the second. Checking which of the two is true took
+one look at the function's ordering — and I had written the finding up before taking it.
 
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|

@@ -29,12 +29,19 @@ import { getSeriesHistory } from "@/lib/market-series"
  * to claim `live` (P6-72). So this tab renders "—" for a figure the site
  * actually goes and gets.
  *
- * It stays null here for now, and that is a WIRING decision rather than a
- * sourcing fact: the CCPI scraper is metered, budget-guarded and cached for its
- * own tab, and pointing a second tab at it is a change with a cost, not a
- * comment fix. Named in `notTracked` so the null is not read as a bug — but
- * "not tracked by this route" and "unobtainable" are different claims, and the
- * old wording made the second one.
+ * It stays null here DELIBERATELY, and the reason is worth stating precisely
+ * because the correction above overshot. `scrapePutCallRatio` tries **Grok
+ * first** and returns `ai-estimate` whenever the model gives a plausible number;
+ * the CBOE scrape is the fallback, not the primary. So `/api/ccpi` usually holds
+ * a language model's recollection of the ratio — correctly tiered, and barred
+ * from scoring since P6-72 — and only sometimes a measured reading.
+ *
+ * Piping that into a second tab would mostly spread an AI estimate, which is
+ * what P6-11 retired a whole route for. The dash stays.
+ *
+ * Named in `notTracked` so the null is not read as a bug — but "not tracked by
+ * this route" and "unobtainable" are different claims, and the old wording made
+ * the second one.
  *
  * The general shape is P7-55's: two routes making contradictory statements about
  * the same quantity, each internally consistent, neither reading the other.
