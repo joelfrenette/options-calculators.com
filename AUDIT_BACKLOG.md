@@ -298,7 +298,7 @@ recomputes it.
 | P6-10 | P2 | fixed | `100 - x \|\| 50` precedence bug. |
 | P6-11 | P1 | fixed | **Owner chose: fold the real rows into social-sentiment and retire the rest (2026-08-13).** The measured half of `/api/sentiment-heatmap` — StockTwits author-tagged bullish/bearish counts — **already existed in the social-sentiment tab** as `per_symbol`, scored the same way, null when fewer than 5 tagged messages, rendering "No live data". So the rebuild was a deletion: the route is gone (60 routes → 59), with its contract entry, its health-check entry and its consumer. What went with it was the AI path, which asked a model for its "best general impression" while telling it that it had no live data, and — when even that failed — returned `{bullishScore: 50, bearishScore: 50}` as data, on a scale where 50 is a real neutral reading (P6-18's shape). The consumer made it worse: `market-sentiment.tsx` rendered the rows as gauges under the heading **"Sector Analysis"** — three index ETFs, not sectors — and **discarded the per-row `source` field the route provided**, so an AI impression and a measured reading drew the identical dial (S-7's shape). |
 | P6-12 | P1 | fixed | 25+ raw `process.env` key reads routed through `resolveApiKey`. |
-| P6-13 | P3 | open | Module-size debt. 19 was stale; **P7-45 then said 25, which was ALSO wrong — it came off a `head -25` on a sorted list, a display limit read as a count. The true figure was 27, and 26 after P7-45 split the Step 4 card.** Four of the additions were that day's entry-exclusion work. The Black-Scholes duplication half was closed by P7-12. **Now 23 over `app components lib` and 25 including `scripts` (P7-49 — every earlier figure omitted which directories it counted), after the `use-wheel-scanner.ts`, `fundamental-scan.ts` and `strategy-scanner/route.ts` splits.** The scanner route was the site's largest module at 1,808 lines and is now 216, its body in `lib/strategy-scanner/` — see P7-59 and P7-60 for what that did to the checks and to SITE_MAP. Measured with `find app components lib -type f \( -name "*.ts" -o -name "*.tsx" \) -exec wc -l {} + \| awk '$1>600' \| wc -l`. |
+| P6-13 | P3 | open | Module-size debt. 19 was stale; **P7-45 then said 25, which was ALSO wrong — it came off a `head -25` on a sorted list, a display limit read as a count. The true figure was 27, and 26 after P7-45 split the Step 4 card.** Four of the additions were that day's entry-exclusion work. The Black-Scholes duplication half was closed by P7-12. **Now 22 over `app components lib` and 24 including `scripts` (P7-49 — every earlier figure omitted which directories it counted), after the `use-wheel-scanner.ts`, `fundamental-scan.ts`, `strategy-scanner/route.ts` and `ccpi-audit-admin.tsx` splits.** The scanner route was the site's largest module at 1,808 lines and is now 216, its body in `lib/strategy-scanner/` — see P7-59 and P7-60 for what that did to the checks and to SITE_MAP. `ccpi-audit-admin.tsx` was 1,636 and is now 593, its data-shaping half in `lib/ccpi/audit/` — see P7-61 for the claim that extraction does NOT support. Measured with `find app components lib -type f \( -name "*.ts" -o -name "*.tsx" \) -exec wc -l {} + \| awk '$1>600' \| wc -l`. |
 | P6-14 | P1 | fixed | MMF component normalised against its own history. |
 | P6-15 | P2 | fixed | social-sentiment error banner; decorative 47/54/50 constants removed. |
 | P6-16 | P0 | fixed | `/api/fomc-predictions` nullable end to end; 503 rather than a forecast on a stand-in rate. |
@@ -434,11 +434,12 @@ recomputes it.
 | P7-49 | P3 | fixed | Every module-size figure P6-13 has ever carried — 19, 25, 27, 26 — omitted which directories it counted, and the last two differ only by that: 26 counts `app components lib`, 27 counts `scripts` as well. Three corrections to the same number, none of which stated its scope. The row now carries the command. |
 | P7-59 | P2 | fixed | Splitting `/api/strategy-scanner` moved nine beta assertions and every exclusion-policy assertion out of the file two check scripts read, and neither would have failed: `check-beta` would have printed nine PASS lines against an empty match and `check-playbook-rules` would have derived ZERO generator call sites, then compared the published policy against nothing. Both now read the route plus `lib/strategy-scanner/**` and assert that set's size. Two further edges: the per-generator body derivation had to move per file, because over a concatenation the last generator in a file inherits the first gate of the next one — an ungated scanner reading as gated; and one assertion was pinned to `/resolveMaxDayMove,/`, the trailing comma of an import block, so it failed on a route that still delegates correctly. A rule scoped by punctuation is a rule scoped by prose. |
 | P7-60 | P2 | fixed | `site-inventory.ts` read a route's upstream hosts, env keys and timeout wiring from its entry FILE, so the split regenerated SITE_MAP with `/api/strategy-scanner` reaching no upstream, needing no key and wiring no timeout — the route with the largest upstream surface on the site, reported as inert. The first fix, the full `@/lib` import closure, was wrong in the other direction: 115 rows changed and every admin route inherited `lib/auth.ts`'s six secrets, so the Env-keys column stopped telling routes apart. Shipped instead is the EXCLUSIVE closure — a module reachable from exactly one route is that route's body, a module reachable from several is infrastructure and already has its own row. The scanner's row came back byte-identical to its pre-split version; 17 others changed, all of them corrections the old derivation had been missing. |
+| P7-61 | P3 | fixed | Splitting `ccpi-audit-admin.tsx` was about to ship a header claiming the extraction made `validateCCPI` — which decides whether a green "✅ VALID" badge prints over the site's headline number — assertable. False: check scripts run under plain node with relative `.ts` imports, which is why `scoring.ts` and `beta.ts` are import-free and why P7-15 tolerated a triplicated helper; `structure.ts` composes its four pillars through `@/` aliases and cannot be loaded. `check-dead-exports` caught the two exports nothing imported. Both are unexported and both headers now say which module a check can load and which it cannot. The label-is-a-claim failure, in the audit's own scaffolding. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-263 findings recorded · **229 fixed · 8 wontfix · 2 verified-ok · 24 open.**
+264 findings recorded · **230 fixed · 8 wontfix · 2 verified-ok · 24 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -4475,3 +4476,50 @@ under-reporting those since it was written.
 |----|-----|------|---------|
 | P7-59 | P2 | tooling | Splitting a route broke three assertions in two check scripts without failing them: two read the route as one file, and one was pinned to an import list's trailing comma. Both scripts now read the route plus its lib modules and assert that set's size; the per-generator derivation runs per file so a generator cannot inherit the next file's gate. |
 | P7-60 | P2 | tooling | `site-inventory.ts` derived a route's hosts, env keys and timeout from its entry file, so the split made SITE_MAP report `/api/strategy-scanner` as reaching no upstream at all. Route facts now come from the exclusive import closure — modules reachable from exactly one route — which also corrected 17 rows the old derivation had been under-reporting. |
+
+## 2026-08-14 — the CCPI audit panel, and a claim the split does not support
+
+`components/ccpi-audit-admin.tsx` was 1,636 lines, roughly 900 of them containing no JSX
+at all: four pillar builders, the composite validation, the data-quality card and the
+downloadable report, all written as arrow constants inside the component body. That half
+is now `lib/ccpi/audit/` — `format.ts` (the null-safe formatters and the two shapes),
+`pillars/{momentum,risk-appetite,valuation,macro}.ts`, `structure.ts`, `report.ts` — and
+the component is 593 lines of state, one fetch, the badge vocabulary, download plumbing
+and render.
+
+One detail worth keeping about the report extraction: its body is a single template
+literal, so leading whitespace is report CONTENT. Re-indenting it to match its new
+function would have put two spaces in front of every line of the markdown the owner
+downloads. It is left unindented, with a comment saying why.
+
+### P7-61 — the extraction does not make the arithmetic testable, and saying so
+
+The obvious thing to write in the new file's header was that `validateCCPI` — the function
+deciding whether the panel prints a green **✅ VALID** badge over the site's headline
+number — can now have assertions on it. That was the justification for the split and it
+would have been false.
+
+The check scripts run under plain `node` with relative `.ts` imports. That is why
+`lib/ccpi/scoring.ts` and `lib/beta.ts` are import-free, and why P7-15 accepted `daysBetween`
+being written three times rather than lose it. `structure.ts` composes four pillar modules
+through `@/` aliases, so no check script can load it. Only `format.ts` inherits the
+property, because it happens to have no imports at all.
+
+`check-dead-exports` caught this before the comment shipped: `validateCCPI` and
+`buildDataQuality` were exported and nothing imported them. Exporting a function to suggest
+a coverage that does not exist is the label-is-a-claim failure this audit is about, in the
+audit's own scaffolding. Both are unexported and both file headers now state which of them
+is loadable and which is not.
+
+### An environment note, not a finding
+
+`pnpm build` fails locally under Node v24.16.0 with
+`TypeError: Cannot read properties of undefined (reading 'length')` inside webpack's
+`WasmHash._updateWithBuffer`. **It fails identically on the committed tree**, checked by
+stashing and rebuilding, so it is the toolchain rather than any change here. The project's
+own verification gate (`check:formulas && check:contracts`, plus `typecheck`) is unaffected
+and passes. Worth knowing before anyone reads a local build failure as a regression.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-61 | P3 | tooling | The CCPI audit split was about to claim it made `validateCCPI` assertable. It does not: check scripts run under plain node with relative `.ts` imports, and `structure.ts` composes its pillars through `@/` aliases. `check-dead-exports` caught the two exports nothing imported. Both unexported; both headers now state which module is loadable by a check and which is not. |
