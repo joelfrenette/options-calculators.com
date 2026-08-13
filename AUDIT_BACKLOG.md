@@ -298,7 +298,7 @@ recomputes it.
 | P6-10 | P2 | fixed | `100 - x \|\| 50` precedence bug. |
 | P6-11 | P1 | fixed | **Owner chose: fold the real rows into social-sentiment and retire the rest (2026-08-13).** The measured half of `/api/sentiment-heatmap` — StockTwits author-tagged bullish/bearish counts — **already existed in the social-sentiment tab** as `per_symbol`, scored the same way, null when fewer than 5 tagged messages, rendering "No live data". So the rebuild was a deletion: the route is gone (60 routes → 59), with its contract entry, its health-check entry and its consumer. What went with it was the AI path, which asked a model for its "best general impression" while telling it that it had no live data, and — when even that failed — returned `{bullishScore: 50, bearishScore: 50}` as data, on a scale where 50 is a real neutral reading (P6-18's shape). The consumer made it worse: `market-sentiment.tsx` rendered the rows as gauges under the heading **"Sector Analysis"** — three index ETFs, not sectors — and **discarded the per-row `source` field the route provided**, so an AI impression and a measured reading drew the identical dial (S-7's shape). |
 | P6-12 | P1 | fixed | 25+ raw `process.env` key reads routed through `resolveApiKey`. |
-| P6-13 | P3 | open | Module-size debt. 19 was stale; **P7-45 then said 25, which was ALSO wrong — it came off a `head -25` on a sorted list, a display limit read as a count. The true figure was 27, and 26 after P7-45 split the Step 4 card.** Four of the additions were that day's entry-exclusion work. The Black-Scholes duplication half was closed by P7-12. **Now 20 over `app components lib` and 22 including `scripts` (P7-49 — every earlier figure omitted which directories it counted), after the `use-wheel-scanner.ts`, `fundamental-scan.ts`, `strategy-scanner/route.ts`, `ccpi-audit-admin.tsx`, `market-sentiment.tsx` and `fomc-predictions.tsx` splits.** The scanner route was the site's largest module at 1,808 lines and is now 216, its body in `lib/strategy-scanner/` — see P7-59 and P7-60 for what that did to the checks and to SITE_MAP. `ccpi-audit-admin.tsx` was 1,636 and is now 593, its data-shaping half in `lib/ccpi/audit/` — see P7-61 for the claim that extraction does NOT support. `market-sentiment.tsx` was 1,497 and is now 599, across ten modules under `components/market-sentiment/` — see P7-62. `fomc-predictions.tsx` was 1,460 and is now 549 across eleven modules — see P7-63. Measured with `find app components lib -type f \( -name "*.ts" -o -name "*.tsx" \) -exec wc -l {} + \| awk '$1>600' \| wc -l`. |
+| P6-13 | P3 | open | Module-size debt. 19 was stale; **P7-45 then said 25, which was ALSO wrong — it came off a `head -25` on a sorted list, a display limit read as a count. The true figure was 27, and 26 after P7-45 split the Step 4 card.** Four of the additions were that day's entry-exclusion work. The Black-Scholes duplication half was closed by P7-12. **Now 18 over `app components lib` and 20 including `scripts` (P7-49 — every earlier figure omitted which directories it counted), after the `use-wheel-scanner.ts`, `fundamental-scan.ts`, `strategy-scanner/route.ts`, `ccpi-audit-admin.tsx`, `market-sentiment.tsx`, `fomc-predictions.tsx`, `trend-analysis.tsx` and `panic-euphoria.tsx` splits.** The scanner route was the site's largest module at 1,808 lines and is now 216, its body in `lib/strategy-scanner/` — see P7-59 and P7-60 for what that did to the checks and to SITE_MAP. `ccpi-audit-admin.tsx` was 1,636 and is now 593, its data-shaping half in `lib/ccpi/audit/` — see P7-61 for the claim that extraction does NOT support. `market-sentiment.tsx` was 1,497 and is now 599, across ten modules under `components/market-sentiment/` — see P7-62. `fomc-predictions.tsx` was 1,460 and is now 549 across eleven modules — see P7-63. `trend-analysis.tsx` went 1,168 to 145 and `panic-euphoria.tsx` 1,163 to 188 — see P7-64. Measured with `find app components lib -type f \( -name "*.ts" -o -name "*.tsx" \) -exec wc -l {} + \| awk '$1>600' \| wc -l`. |
 | P6-14 | P1 | fixed | MMF component normalised against its own history. |
 | P6-15 | P2 | fixed | social-sentiment error banner; decorative 47/54/50 constants removed. |
 | P6-16 | P0 | fixed | `/api/fomc-predictions` nullable end to end; 503 rather than a forecast on a stand-in rate. |
@@ -437,11 +437,12 @@ recomputes it.
 | P7-61 | P3 | fixed | Splitting `ccpi-audit-admin.tsx` was about to ship a header claiming the extraction made `validateCCPI` — which decides whether a green "✅ VALID" badge prints over the site's headline number — assertable. False: check scripts run under plain node with relative `.ts` imports, which is why `scoring.ts` and `beta.ts` are import-free and why P7-15 tolerated a triplicated helper; `structure.ts` composes its four pillars through `@/` aliases and cannot be loaded. `check-dead-exports` caught the two exports nothing imported. Both are unexported and both headers now say which module a check can load and which it cannot. The label-is-a-claim failure, in the audit's own scaffolding. |
 | P7-62 | P2 | fixed | Splitting `market-sentiment.tsx` deleted two render sections without replacing them: the insertion anchors for `<HistoricalScaleCard>` and `<TradeRecommendationsCard>` sat inside the line ranges being cut, so the tab lost its headline score card and its entire allocation accordion — and typecheck passed, because a component nothing renders is not a type error. `check-write-only-state.ts` caught it from the side, flagging `refreshing` and `tooltipsEnabled` as newly write-only because the only code reading them had just vanished. A rule written for P7-16 found a refactor that deleted two cards. Fixed, then verified by comparing every user-visible string in the pre-split file against the ten post-split files as a multiset — nothing missing. |
 | P7-63 | P2 | fixed | `fomc-predictions.tsx` held TWO tooltip states. `tooltipsEnabled` is what the "Tooltips" toggle writes; `showTooltips` was initialised `true`, `setShowTooltips` was never called anywhere, and it gated exactly one control — the (i) beside each options-strategy row. So turning tooltips OFF turned off every tooltip on the tab except that one, which stayed on permanently: a toggle that does not do what its label says, in the smallest possible dose. Nothing surfaced it for as long as both states sat in one 1,460-line file. `check-write-only-state.ts` found it the moment the split moved the strategy rows into a child and left `showTooltips` unread. Deleted; that row reads the toggle like the rest. |
+| P7-64 | P2 | fixed | Splitting `trend-analysis.tsx` and `panic-euphoria.tsx` broke three checks in three different ways, and all three FAILED rather than passing quietly. `check-provenance`'s pinned-claim registry lost two entries — P6-66's "No momentum reading, so no weekly target" and P6-61's "DISPLAY ONLY — not scored" — because both sentences moved into the child component that renders them; a registry keyed by path rots on any refactor, and failing loudly is the only thing that makes it survivable. `check-panic-composite.ts` was pinned to the one file and reported **`scope: 0 score bar(s) read componentScores`** — the exact derived-set collapse its own scope assertion was written for (P6-75/P6-77), arriving on the day that assertion earned its keep. It now reads the tab plus `components/panic/**` and asserts the set's size. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-266 findings recorded · **232 fixed · 8 wontfix · 2 verified-ok · 24 open.**
+267 findings recorded · **233 fixed · 8 wontfix · 2 verified-ok · 24 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -4604,3 +4605,41 @@ that catches a silently deleted card on its own.
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-63 | P2 | ANALYZE → FOMC | Two tooltip states, one of them permanently on: `showTooltips` was initialised true, never set, and gated the single (i) beside each strategy row, so the Tooltips toggle silenced every tooltip on the tab except that one. Found by `check-write-only-state.ts` when the split left it unread. Deleted. |
+
+## 2026-08-14 — trend-analysis and panic-euphoria, and three checks that failed loudly
+
+`components/trend-analysis.tsx` was 1,168 lines and is now **145**, across eleven modules in
+`components/trend/`. `components/panic-euphoria.tsx` was 1,163 and is now **188**, across
+ten in `components/panic/`. Both keep only state, one fetch and a render that is a list of
+child components; everything else — payload shapes, colour and band lookups, per-band
+guidance, the tooltip, the indicator rows — moved out.
+
+Six modules over 600 lines have been removed today. The count is 18 over
+`app components lib`, 20 including `scripts/`, from 24 and 26 this morning.
+
+### P7-64 — three checks broke, and every one of them said so
+
+Nothing here passed quietly, which is the whole point.
+
+**`check-provenance`'s pinned-claim registry lost two entries.** P6-66 pins the sentence
+"No momentum reading, so no weekly target" to `trend-analysis.tsx`; P6-61 pins
+"DISPLAY ONLY — not scored" to `panic-euphoria.tsx`. Both sentences moved into the child
+component that renders them, and the registry — keyed by file path — failed on both. That
+is a design constraint worth stating: **a path-keyed registry rots on any refactor, and the
+only thing that makes it survivable is failing rather than passing on a file that no longer
+holds the claim.** It did exactly that, twice.
+
+**`check-panic-composite.ts` reported `scope: 0 score bar(s) read componentScores`.** It
+was pinned to the single view file, and every score bar had just moved. This is the
+derived-set collapse P6-75 and P6-77 added scope assertions for, arriving on the day the
+assertion earned its keep: without that line the rule would have printed the same PASS
+count while checking an empty string. It now reads the tab plus `components/panic/**` and
+asserts the set's size against a floor.
+
+Both splits were checked the way P7-62 made mandatory: every user-visible string literal
+and text node from the pre-split file compared as a multiset against the post-split set.
+Both came back with nothing missing.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-64 | P2 | tooling | Two splits broke three checks — two pinned-claim registry entries whose sentences moved into child components, and `check-panic-composite.ts` reporting `scope: 0 score bar(s)` when every bar it reads moved out of the one file it was pinned to. All three failed loudly rather than passing on nothing. Registry repointed; the composite check now reads `components/panic/**` and asserts its scope. |

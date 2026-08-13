@@ -587,7 +587,12 @@ const PINNED: PinnedClaim[] = [
   },
   {
     finding: "P6-66",
-    claimFile: "components/trend-analysis.tsx",
+    // P6-13 split `trend-analysis.tsx` (1,168 lines) and this sentence moved
+    // with the Price Targets card it explains. A registry keyed by path rots on
+    // a refactor, which is exactly what it did here — and it FAILED loudly
+    // rather than passing on a file that no longer holds the claim, which is
+    // the behaviour worth keeping.
+    claimFile: "components/trend/price-targets-section.tsx",
     claim: "No momentum reading, so no weekly target",
     dependsOnFile: "app/api/trend-analysis/route.ts",
     dependsOn: /if \(!contributed\) return null/,
@@ -595,7 +600,12 @@ const PINNED: PinnedClaim[] = [
   },
   {
     finding: "P6-61",
-    claimFile: "components/panic-euphoria.tsx",
+    // P6-13 split `panic-euphoria.tsx` (1,163 lines) and the AAII row moved with
+    // the sentiment-scale card it sits in. Second registry entry to be repointed
+    // by the same day's splits (see P6-66); both FAILED rather than silently
+    // passing on a file that no longer holds the claim, which is what a
+    // path-keyed registry has to do to be worth having.
+    claimFile: "components/panic/sentiment-scale-section.tsx",
     claim: "DISPLAY ONLY — not scored",
     dependsOnFile: "app/api/panic-euphoria/route.ts",
     // Negative pin, and it must be one: the explanatory comment is stripped

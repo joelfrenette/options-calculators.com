@@ -32,13 +32,30 @@
  * So every score bar's fallback is asserted to be `null`.
  */
 
-import { readFileSync } from "node:fs"
+import { readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..")
 const ROUTE = "app/api/panic-euphoria/route.ts"
-const VIEW = "components/panic-euphoria.tsx"
+/**
+ * The tab's source, wherever it now lives.
+ *
+ * P6-13 split `panic-euphoria.tsx` (1,163 lines) into `components/panic/`, and
+ * the score bars, the client-side margin type and the display-only tooltips all
+ * moved. Pinned to the one file, this check reported `scope: 0 score bar(s) read
+ * componentScores` — the exact collapse its own scope assertion exists to make
+ * visible, arriving on the day the assertion earned its keep.
+ *
+ * The set is derived from disk and its size is asserted below.
+ */
+const VIEW_FILES = [
+  "components/panic-euphoria.tsx",
+  ...readdirSync(join(ROOT, "components/panic"))
+    .filter((f) => f.endsWith(".tsx") || f.endsWith(".ts"))
+    .map((f) => `components/panic/${f}`),
+]
+const MIN_VIEW_FILES = 6
 
 let failures = 0
 function check(name: string, passed: boolean, detail = ""): void {
@@ -47,7 +64,12 @@ function check(name: string, passed: boolean, detail = ""): void {
 }
 
 const routeSrc = readFileSync(join(ROOT, ROUTE), "utf8")
-const viewSrc = readFileSync(join(ROOT, VIEW), "utf8")
+const viewSrc = VIEW_FILES.map((f) => readFileSync(join(ROOT, f), "utf8")).join("\n")
+check(
+  `scope: ${VIEW_FILES.length} view file(s)`,
+  VIEW_FILES.length >= MIN_VIEW_FILES,
+  `floor ${MIN_VIEW_FILES} — the tab plus components/panic/**`,
+)
 
 // ---------------------------------------------------------------------------
 // The composite's membership, derived from the array itself.
