@@ -444,11 +444,12 @@ recomputes it.
 | P7-68 | P3 | fixed | Three more splits — the trade walkthrough, the insider dashboard and the risk calculator — took module-size debt from 14 to 11. `WalkthroughSetup` had to move to its own module rather than stay in the modal: the mockups need the type and the modal needs the mockups, so leaving it would have made the import circular; the modal re-exports it so no caller changed. Two prop types were narrowed by the extraction and had to be widened back — three setters are called as functional updaters (`setX(v => !v)`), which needs `Dispatch<SetStateAction<T>>` rather than `(v: T) => void`. |
 | P7-69 | P2 | open | **The CCPI is running on two of four pillars, and the only signal is a number nobody reads.** Measured on staging 2026-08-14: Valuation `scoredMax=0`, Risk Appetite `scoredMax=24` — both under `MIN_SCORED_MAX`, both dropped, so the headline 14 is computed over 55% of the pillar weight. The scoring is behaving exactly as designed; the causes are operational and named in the payload itself: `apify: live=false, source="baseline-no-token"` (APIFY_API_TOKEN unset — kills spxPE 18, spxPS 12 and equityRiskPremium 10 by derivation) and `buffett/putCall/aaii: live=false, source="groq"` (the three ScrapingBee scrapes fell through to the LLM — 16 more in Valuation, 55 in Risk Appetite). **What is missing is not honesty but ALERTING**: nothing fails, nothing warns, and `certainty: 56` is the whole signal. P6-35 predicted Valuation at 40 with everything up and 28 on an FMP hiccup; the real figure is 0, because it never modelled two providers down at once. |
 | P7-70 | **P1** | fixed | **An unauthenticated route published the first 15 characters of a live API key.** `/api/scraping-bee/diagnostics` carries no `needsAuth` and checks no session, and returned `apiKeyPreview: apiKey.substring(0, 15)`. It was harmless ONLY because `SCRAPINGBEE_API_KEY` is unset in both environments, so the field read "NOT CONFIGURED" — **the leak would have begun the moment the key was set, which is exactly the action P7-69 was about to recommend.** A defect that arms itself when someone follows your advice is the worst shape one can have. Field removed; `apiKeyConfigured` already carried everything actionable, the rule `budgetEnvReport` follows. The error path also echoed ScrapingBee's response body, which can contain the request — and the request carries `api_key` in its query string; now the status only. New provenance rule 12 bans slicing any identifier assigned from a key resolver, structurally rather than by field name, and was negative-tested by reintroducing the line. |
+| P7-71 | P2 | fixed | **P7-70's shape one step out, found by sweeping for it: two more routes echo an upstream error body while the key rides in the URL's query string.** `/api/polygon-proxy` returns `details: errorText.substring(0, 200)` and `/api/scraping-bee` returns the WHOLE body as `message`; both build `?apiKey=` / `?api_key=` URLs, and an upstream that quotes the request quotes the credential. polygon-proxy is the one that names the defect — it already had `url.replace(apiKey, "API_KEY")` on its CONSOLE line, so the author knew, and **redacted the surface nobody reads while leaving the one the public gets**. `redactCredentials` added to `lib/api-keys.ts`, redacting by VALUE across every configured key so a route cannot forget to name its own. Rule 13 fires on the COMBINATION and took two corrections to be worth anything: scoped first to the name `redactCredentials`, it false-positived on `/api/admin/api-status`, which was already correct with its own `redact(raw, key)`; then, matching line-wise, it PASSED on the very leak it was written for, because scraping-bee's ternary spans four lines — proved by a negative test that changed nothing. Now matches balanced `NextResponse.json(...)` calls and accepts any `redact*` wrapper; negative-tested in both the single-line and multi-line shapes. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-273 findings recorded · **237 fixed · 9 wontfix · 2 verified-ok · 25 open.**
+274 findings recorded · **238 fixed · 9 wontfix · 2 verified-ok · 25 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -4904,3 +4905,53 @@ the line: FAIL, naming the file and the identifier.
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-70 | P1 | security | An unauthenticated route returned the first 15 characters of `SCRAPINGBEE_API_KEY`, harmless only because the key is unset — setting it, the action P7-69 recommends, is what would have started the leak. Field removed, error body no longer echoed, and provenance rule 12 now bans slicing any resolved key. |
+
+## 2026-08-14 — P7-71: sweeping for P7-70's shape, and two corrections to my own rule
+
+The sweep asked three questions of all 59 routes: does any return a whole key, does any
+slice one, and is any diagnostic-shaped route unauthenticated. **No whole-key returns, no
+remaining slices, and the one unauthenticated diagnostics route was the one just fixed.**
+
+The fourth question was the productive one: **P7-70's shape one step out.** Several
+providers take the key in a URL query string — Polygon `?apiKey=`, ScrapingBee `?api_key=`
+— and several routes echo the upstream error body back. An upstream that quotes the
+request it received quotes the credential with it.
+
+Two more instances:
+
+- `/api/polygon-proxy` — `details: errorText.substring(0, 200)`
+- `/api/scraping-bee` — `message: errorText`, the whole body, unbounded
+
+**polygon-proxy is the one that names the defect.** Its console line already read
+`url.replace(apiKey, "API_KEY")`. The author knew the URL carried a credential — and
+redacted the LOG, while the response object twelve lines below returned the same text
+untouched. *The sanitisation existed on the surface nobody reads and not on the one the
+public gets.*
+
+`redactCredentials` now lives in `lib/api-keys.ts` and redacts by VALUE across every
+configured credential, not by key name: a route cannot forget to name its own key, and text
+containing somebody else's is caught too.
+
+### The rule took two corrections, and both are the audit's own recurring defect
+
+**First it was scoped to a function name.** Rule 13 looked for the literal
+`redactCredentials` and immediately failed on `/api/admin/api-status` — a route that was
+already correct, carrying its own `redact(raw, key)`. A rule scoped to one function name is
+the same defect as one scoped to prose or to a trailing comma, committed *inside the rule
+written to catch leaks*.
+
+**Then it was scoped to a line.** The corrected rule matched the response key and the
+identifier on the same line. `/api/scraping-bee` writes its ternary across four lines, so
+**the rule PASSED on the very leak it was written for** — and the only reason that is known
+is the negative test: putting the raw body back changed nothing at all. A rule that cannot
+see the code is worse than no rule, because it reports coverage it does not have. That is
+the gotcha the project already records in a different form — *a negative test that does not
+produce the negative condition proves nothing* — arriving as its own demonstration.
+
+It now walks balanced `NextResponse.json(...)` calls, accepts any `redact*` wrapper, and is
+negative-tested in both shapes: single-line (polygon-proxy) and multi-line (scraping-bee),
+each failing when reintroduced and passing when restored.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-71 | P2 | security | Two more routes echoed an upstream error body while the key rode in the query string; polygon-proxy had already redacted its console line and not its response. `redactCredentials` added and applied. Rule 13 needed two corrections — scoped first to a function name, then to a line, where it passed on the leak it was written for until a negative test exposed it. |

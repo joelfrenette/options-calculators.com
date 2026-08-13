@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { resolveApiKey } from "@/lib/api-keys"
+import { resolveApiKey, redactCredentials } from "@/lib/api-keys"
 import { fetchWithTimeout } from "@/lib/fetch-timeout"
 
 export async function POST(request: Request) {
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       if (response.status === 503 || response.status === 500) {
         console.log(`[v0] ScrapingBee ${response.status}: Service temporarily unavailable, will use AI fallback`)
       } else {
-        console.error("[v0] ScrapingBee API Error:", response.status, errorText)
+        console.error("[v0] ScrapingBee API Error:", response.status, redactCredentials(errorText))
       }
 
       // Was 200 "so the calling function can handle fallback". That caller is
@@ -55,7 +55,13 @@ export async function POST(request: Request) {
           success: false,
           error: "ScrapingBee request failed",
           status: response.status,
-          message: response.status === 503 || response.status === 500 ? "Service temporarily unavailable" : errorText,
+          // P7-71: `scrapingBeeUrl` carries `api_key` in its query string, and
+          // ScrapingBee quotes the request in some error bodies. Redact before
+          // this leaves the server; the whole body is returned, not a prefix.
+          message:
+            response.status === 503 || response.status === 500
+              ? "Service temporarily unavailable"
+              : redactCredentials(errorText),
         },
         { status: 502 },
       )

@@ -22,7 +22,7 @@ async function fetchWithTimeout(url: string, timeoutMs: number = FETCH_TIMEOUT_M
   }
 }
 
-import { getApiKey } from "@/lib/api-keys"
+import { getApiKey, redactCredentials } from "@/lib/api-keys"
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -125,16 +125,19 @@ export async function GET(request: Request) {
       const errorText = await response.text()
 
       if (response.status === 429) {
-        console.error("[v0] Polygon API rate limit hit for", ticker, "-", errorText.substring(0, 100))
+        console.error("[v0] Polygon API rate limit hit for", ticker, "-", redactCredentials(errorText).substring(0, 100))
         return NextResponse.json({ error: "Rate limit exceeded", ticker, status: 429 }, { status: 429 })
       }
 
-      console.error("[v0] Polygon API error:", response.status, errorText.substring(0, 200))
+      console.error("[v0] Polygon API error:", response.status, redactCredentials(errorText).substring(0, 200))
 
       return NextResponse.json(
         {
           error: `Polygon API error: ${response.status}`,
-          details: errorText.substring(0, 200),
+          // P7-71: the key travels in this URL's query string, and an upstream
+          // that quotes the request quotes the key. The console line below was
+          // already redacted; the response was not.
+          details: redactCredentials(errorText).substring(0, 200),
           ticker,
           status: response.status,
         },

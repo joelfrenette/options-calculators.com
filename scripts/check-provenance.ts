@@ -904,5 +904,76 @@ check(
 )
 
 
+// ---------------------------------------------------------------------------
+// 13. An upstream error body does not reach the caller unredacted.
+// ---------------------------------------------------------------------------
+//
+// P7-71, and it is P7-70's shape one step out. Several providers take the key in
+// a URL QUERY STRING — Polygon `?apiKey=`, ScrapingBee `?api_key=` — and several
+// routes echo the upstream error body back as `details` or `message`. An
+// upstream that quotes the request it received quotes the credential with it.
+//
+// `/api/polygon-proxy` is the one that names the problem, because it was already
+// half-solved there: `console.log(url.replace(apiKey, "API_KEY"))`. The author
+// knew the URL carried a credential and redacted the LOG, while the response
+// object two lines below returned the same text untouched. **The sanitisation
+// existed on the surface nobody reads and not on the one the public gets.**
+//
+// The rule fires on the combination, not on either half: a file that puts a
+// credential in a query string AND returns an upstream `.text()` must pass that
+// text through `redactCredentials`. Redacting by VALUE rather than by key name
+// is what makes the helper safe to apply blindly — a route cannot forget to name
+// its own key.
+
+const echoLeaks: string[] = []
+for (const f of API_FILES) {
+  const src = code(f)
+  const keyInQuery =
+    /(?:api_key|apikey|apiKey|access_key|token)\s*[:=]\s*[A-Za-z_$][\w$]*/.test(src) ||
+    /[?&](?:api_key|apikey|apiKey|token)=\$\{/.test(src)
+  if (!keyInQuery) continue
+
+  const bodies = [...src.matchAll(/(?:const|let)\s+(\w+)\s*=\s*await\s+\w+\.text\(\)/g)].map((m) => m[1])
+  if (bodies.length === 0) continue
+
+  // BALANCED CALL, not a line. The first version of this rule matched the
+  // response key and the identifier on the SAME LINE, and /api/scraping-bee
+  // writes its ternary across four — so the rule passed on the very leak it was
+  // written for. The negative test is what proved it: putting the raw body back
+  // changed nothing. A rule that cannot see the code is worse than no rule,
+  // because it reports coverage it does not have.
+  for (const m of src.matchAll(/(?:NextResponse|Response)\.json\(/g)) {
+    let i = m.index! + m[0].length
+    let depth = 1
+    while (i < src.length && depth > 0) {
+      if (src[i] === "(") depth++
+      else if (src[i] === ")") depth--
+      i++
+    }
+    const call = src.slice(m.index!, i)
+    for (const name of bodies) {
+      if (!new RegExp(`\\b${name}\\b`).test(call)) continue
+      // ANY redactor, not the one this project happens to have named: the rule
+      // also failed on /api/admin/api-status, which was already correct with its
+      // own `redact(raw, key)`. Scoping a rule to one function name is the same
+      // defect as scoping it to prose, committed inside the rule meant to catch
+      // leaks.
+      const redactedHere = new RegExp(`\\bredact\\w*\\s*\\(\\s*${name}\\b`, "i").test(call)
+      const redactedEarlier = new RegExp(`=\\s*\\bredact\\w*\\s*\\(\\s*${name}\\b`, "i").test(src)
+      if (!redactedHere && !redactedEarlier) {
+        echoLeaks.push(`${rel(f)}: \`${name}\` reaches a response unredacted`)
+      }
+    }
+  }
+}
+check(
+  "no upstream error body is returned without redaction",
+  echoLeaks.length === 0,
+  echoLeaks.length
+    ? [...new Set(echoLeaks)].join("; ")
+    : "routes that put a key in a query string pass the upstream body through a redactor",
+)
+
+
 console.log(failures === 0 ? "\nAll provenance checks passed." : `\n${failures} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)

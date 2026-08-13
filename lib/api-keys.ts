@@ -267,3 +267,34 @@ export function getConfiguredKeys(): Record<string, boolean> {
   }
   return result
 }
+
+/**
+ * Strip every configured credential out of text before it leaves the server.
+ *
+ * WHY THIS EXISTS (P7-71). Several routes put an API key in a URL query string
+ * — Polygon and ScrapingBee both take `?apiKey=` / `?api_key=` — then echo the
+ * upstream error body back to the caller as `details` or `message`. An upstream
+ * that quotes the request it received quotes the key with it.
+ *
+ * `/api/polygon-proxy` is the one that names the problem, because it was already
+ * half-solved there: the console line reads
+ * `url.replace(apiKey, "API_KEY")`, so the author knew the URL carried a
+ * credential — and redacted the LOG while leaving the RESPONSE untouched. The
+ * sanitisation existed on the surface nobody reads and not on the one the public
+ * gets.
+ *
+ * Redacts by VALUE, not by key name: it walks every configured credential and
+ * replaces any occurrence. A route cannot forget to name its own key, and a text
+ * that happens to contain someone else's is caught too.
+ */
+export function redactCredentials(text: string): string {
+  if (!text) return text
+  let out = text
+  for (const name of Object.keys(API_KEY_ALIASES)) {
+    const value = resolveApiKey(name)
+    // Short values would match everywhere; a real credential is never this small.
+    if (!value || value.length < 12) continue
+    out = out.split(value).join(`[REDACTED:${name}]`)
+  }
+  return out
+}
