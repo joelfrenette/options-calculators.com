@@ -12,6 +12,11 @@ import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/comp
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { yahooChartUrl } from "@/lib/ticker-links"
+import {
+  EntryExclusionNotice,
+  type EntryExclusion,
+  type EntryExclusionPolicy,
+} from "@/components/scanner/entry-exclusion-notice"
 
 interface ZEBRASetup {
   ticker: string
@@ -71,6 +76,12 @@ export function ZEBRAScanner() {
   const [setups, setSetups] = useState<ZEBRASetup[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Entry exclusions (P7-32). The threshold is a SERVER parameter, so changing
+  // it re-runs the scan rather than re-filtering rows already on screen —
+  // the excluded tickers never reach the client to be filtered.
+  const [entryExclusions, setEntryExclusions] = useState<EntryExclusion[]>([])
+  const [exclusionPolicy, setExclusionPolicy] = useState<EntryExclusionPolicy | null>(null)
+  const [maxDayMove, setMaxDayMove] = useState(10)
   const [optionType, setOptionType] = useState<"all" | "call" | "put">("all")
   const [trendFilter, setTrendFilter] = useState<"all" | "bullish" | "bearish">("all")
   const [minDTE, setMinDTE] = useState(60)
@@ -117,12 +128,17 @@ export function ZEBRAScanner() {
     })
     .sort((a, b) => rankScore(b) - rankScore(a))
 
-  const handleRefresh = async () => {
+  // Takes the threshold explicitly. Calling this straight after
+  // setMaxDayMove would read the PREVIOUS value from the closure — React
+  // state is not updated synchronously — and rescan with the number the
+  // user just changed away from.
+  const handleRefresh = async (overrideMaxDayMove?: number) => {
+    const effectiveMaxDayMove = overrideMaxDayMove ?? maxDayMove
     setIsLoading(true)
     setError(null)
 
     try {
-      const response = await fetch("/api/strategy-scanner?type=zebra")
+      const response = await fetch(`/api/strategy-scanner?type=zebra&maxDayMove=${effectiveMaxDayMove}`)
 
       if (!response.ok) {
         const text = await response.text()
@@ -131,6 +147,9 @@ export function ZEBRAScanner() {
       }
 
       const data = await response.json()
+
+      setEntryExclusions(Array.isArray(data.entryExclusions) ? data.entryExclusions : [])
+      setExclusionPolicy(data.entryExclusionPolicy ?? null)
 
       if (data.zebra && data.zebra.length > 0) {
         setSetups(data.zebra)
@@ -221,6 +240,15 @@ export function ZEBRAScanner() {
         </CardHeader>
 
         <CardContent>
+          <EntryExclusionNotice
+            excluded={entryExclusions}
+            policy={exclusionPolicy}
+            strategy="zebra"
+            maxDayMove={maxDayMove}
+            onMaxDayMoveChange={setMaxDayMove}
+            onRescan={handleRefresh}
+            disabled={isLoading}
+          />
           {/* Status Bar */}
           <div className="flex items-center justify-between mb-4 text-sm">
             <div className="flex items-center gap-4">

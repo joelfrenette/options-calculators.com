@@ -12,6 +12,11 @@ import { Layers, Zap, Filter, ArrowUpRight, AlertTriangle, CheckCircle2, Info, W
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { yahooChartUrl } from "@/lib/ticker-links"
+import {
+  EntryExclusionNotice,
+  type EntryExclusion,
+  type EntryExclusionPolicy,
+} from "@/components/scanner/entry-exclusion-notice"
 
 interface CondorSetup {
   ticker: string
@@ -52,6 +57,12 @@ export function IronCondorScanner() {
   // rendering it would have re-asserted the claim P1-10 deleted.
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Entry exclusions (P7-32). The threshold is a SERVER parameter, so changing
+  // it re-runs the scan rather than re-filtering rows already on screen —
+  // the excluded tickers never reach the client to be filtered.
+  const [entryExclusions, setEntryExclusions] = useState<EntryExclusion[]>([])
+  const [exclusionPolicy, setExclusionPolicy] = useState<EntryExclusionPolicy | null>(null)
+  const [maxDayMove, setMaxDayMove] = useState(10)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
   const [maxMargin, setMaxMargin] = useState(1000) // Step 1 dollar filter: max buying-power reduction per condor ($)
 
@@ -89,18 +100,26 @@ export function IronCondorScanner() {
     })
     .sort((a, b) => rankScore(b) - rankScore(a))
 
-  const handleRefresh = async () => {
+  // Takes the threshold explicitly. Calling this straight after
+  // setMaxDayMove would read the PREVIOUS value from the closure — React
+  // state is not updated synchronously — and rescan with the number the
+  // user just changed away from.
+  const handleRefresh = async (overrideMaxDayMove?: number) => {
+    const effectiveMaxDayMove = overrideMaxDayMove ?? maxDayMove
     setIsLoading(true)
     setError(null)
 
     try {
-      const response = await fetch("/api/strategy-scanner?type=iron-condors")
+      const response = await fetch(`/api/strategy-scanner?type=iron-condors&maxDayMove=${effectiveMaxDayMove}`)
 
       if (!response.ok) {
         throw new Error(`API returned ${response.status}`)
       }
 
       const data = await response.json()
+
+      setEntryExclusions(Array.isArray(data.entryExclusions) ? data.entryExclusions : [])
+      setExclusionPolicy(data.entryExclusionPolicy ?? null)
 
       if (data.ironCondors && data.ironCondors.length > 0) {
         setSetups(data.ironCondors)
@@ -202,6 +221,15 @@ export function IronCondorScanner() {
           </div>
         </CardHeader>
         <CardContent>
+          <EntryExclusionNotice
+            excluded={entryExclusions}
+            policy={exclusionPolicy}
+            strategy="iron-condors"
+            maxDayMove={maxDayMove}
+            onMaxDayMoveChange={setMaxDayMove}
+            onRescan={handleRefresh}
+            disabled={isLoading}
+          />
           {/* Dollar Amount Filtering (Step 1) */}
           <div className="mb-6">
             <DollarAmountFilter

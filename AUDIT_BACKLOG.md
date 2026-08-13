@@ -406,11 +406,12 @@ recomputes it.
 | P7-30 | — | fixed | Owner feature: four CSP entry exclusions in Step 4 (big up day, down on the year, trailed SPY, Weinstein Stage 4), all defaulting on, applied before options enrichment so an excluded stock reaches neither results table. Built, checked with 29 assertions, negative-tested four ways. |
 | P7-31 | — | fixed | The CSP playbook states the four entry exclusions with the control enforcing each; check-playbook-rules.ts derives the gate list from the implementation so a gate cannot be removed while the page keeps teaching it. Negative-tested three ways. |
 | P7-32 | P3 | fixed | Sweep of the other six scanners. Big-up-day applies to all seven; the year-long gates apply to LEAPS, ZEBRA and the bull-put half of credit spreads, are INVERTED for bear-call, and are wrong for the three neutral strategies. Owner approved; applied with the per-strategy split, one memoised year-of-bars call per ticker per request. |
+| P7-33 | — | fixed | The six server-driven scanner tabs render the shared entry-exclusion notice and set the threshold via ?maxDayMove= (clamped 3-25 server-side). A stale-closure bug that would have rescanned with the previous threshold was caught before commit. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-235 findings recorded · **188 fixed · 8 wontfix · 1 verified-ok · 38 open.**
+236 findings recorded · **189 fixed · 8 wontfix · 1 verified-ok · 38 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -3183,3 +3184,45 @@ code in the same file, and adding a gate is a two-line edit that leaves the list
 every test still green. Negative-tested three ways: a policy claiming a trend gate the code
 lacks, a gate landing on a strategy the policy calls ungated, and the bear-call leg
 acquiring the trend gate.
+
+### P7-33 — the six tabs show what was excluded, and set the threshold
+
+The gates were server-side and silent. `components/scanner/entry-exclusion-notice.tsx` is
+one shared component used by all six server-driven scanner tabs; it lists the excluded
+tickers with reasons, states which gates apply to that strategy, and carries the
+big-up-day threshold control.
+
+**It renders even when nothing was excluded**, which is the opposite of the Sell Put
+scanner's card and deliberate. There the exclusions are visible as toggles a few inches up
+the page, so a "0 excluded" card is noise. Here the gates run on the server with no other
+on-screen trace, and a tab showing nothing is indistinguishable from a tab with no gates.
+
+`?maxDayMove=` now sets the threshold, **clamped 3-25 server-side**. `maxDayMove=0` would
+exclude every stock that closed up at all, and a non-numeric value parses to `NaN`, which
+loses every comparison and silently disables the gate — a filter reporting itself active
+while excluding nothing is this project's recurring failure, not a hypothetical.
+
+**A stale-closure bug was found and fixed before commit.** The select called
+`setMaxDayMove(next)` then a zero-argument `handleRefresh()`, which reads the PREVIOUS
+threshold out of the parent's closure because React state is not updated synchronously —
+the scan would have run with the number the user had just changed away from, and the
+result would have looked like a filter that did nothing. `handleRefresh` now takes the
+value explicitly in all six tabs, and the check asserts that shape.
+
+Also verified rather than assumed: `RefreshButton` invokes its handler as `handler()` with
+no arguments, so wiring `handleRefresh` to a click cannot leak a `MouseEvent` into the new
+first parameter.
+
+`check-playbook-rules.ts` grew 20 assertions, over a tab list DERIVED from the fetch calls
+rather than hand-written. Negative-tested four ways: a tab that stops sending the
+threshold, the stale-closure regression returning, a route that trusts the caller's value,
+and a tab that drops the notice.
+
+**A scope guard fired during this work, correctly.** `check-scanner-steps.ts` derives its
+file set from `components/scanner/` and asserts the size; the new component made it 18
+against a pinned 17, and the suite stopped at a subtotal of 614 rather than reporting a
+smaller number as a pass. That is the P6-77 assertion doing exactly what it exists for.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-33 | — | SCAN tabs | The six server-driven scanners now render the shared entry-exclusion notice and set the big-up-day threshold via `?maxDayMove=` (clamped 3-25). A stale-closure bug that would have rescanned with the previous threshold was found and fixed before commit. |

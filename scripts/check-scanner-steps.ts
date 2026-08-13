@@ -73,7 +73,10 @@ const GUARDED = [
     .map((f) => `components/scanner/${f}`),
   "components/wheel-scanner.tsx",
 ]
-const EXPECTED_GUARDED = 17
+// 17 → 18 when P7-32 added `entry-exclusion-notice.tsx`. The bump is the guard
+// working as designed: a new file in this directory enters scope silently, and
+// the assertion is what makes "silently" mean "with a deliberate edit here".
+const EXPECTED_GUARDED = 18
 
 check(
   `scope: ${GUARDED.length} file(s) guarded`,

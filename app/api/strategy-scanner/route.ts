@@ -192,6 +192,8 @@ async function fetchTrendProfile(ticker: string): Promise<TrendProfile | null> {
  */
 interface ExclusionContext {
   benchmarkReturn12m: number | null
+  /** Big-up-day threshold for THIS request. */
+  maxDayMovePercent: number
   excluded: Array<{ ticker: string; reasons: string[] }>
 }
 
@@ -203,7 +205,23 @@ interface ExclusionPolicy {
 }
 
 /** The owner's number (P7-30). Same 10% as the Sell Put scanner's default. */
-const MAX_DAY_MOVE_PERCENT = 10
+const DEFAULT_MAX_DAY_MOVE_PERCENT = 10
+
+/**
+ * The caller's threshold, clamped to the Sell Put scanner's own slider range.
+ *
+ * CLAMPED, NOT TRUSTED. `?maxDayMove=0` would exclude every stock that closed
+ * up at all, and a non-numeric value parses to NaN, which loses every
+ * comparison and silently disables the gate — a filter that reports itself as
+ * active while excluding nothing, which is the failure this project keeps
+ * finding. Anything unparseable falls back to the default rather than through
+ * the gate.
+ */
+function resolveMaxDayMove(raw: string | null): number {
+  const n = Number(raw)
+  if (!Number.isFinite(n)) return DEFAULT_MAX_DAY_MOVE_PERCENT
+  return Math.min(25, Math.max(3, n))
+}
 
 /** The benchmark the relative-strength gate compares against. Matches the Sell Put scanner. */
 const BENCHMARK_TICKER = "SPY"
@@ -234,6 +252,7 @@ function entryExclusionReasons(
   profile: TrendProfile | null,
   policy: ExclusionPolicy,
   benchmarkReturn12m: number | null,
+  maxDayMovePercent: number,
 ): string[] {
   if (!policy.spike && !policy.trend) return []
   if (profile === null) return ["history unavailable"]
@@ -241,7 +260,7 @@ function entryExclusionReasons(
   const reasons: string[] = []
   if (policy.spike) {
     if (profile.dayMovePercent === null) reasons.push("session move unavailable")
-    else if (profile.dayMovePercent >= MAX_DAY_MOVE_PERCENT) reasons.push("big up day")
+    else if (profile.dayMovePercent >= maxDayMovePercent) reasons.push(`big up day (>= ${maxDayMovePercent}%)`)
   }
   if (policy.trend) {
     if (profile.return12m === null) reasons.push("12-month return unavailable")
@@ -569,7 +588,7 @@ async function generateCreditSpreads(tickers: string[], ctx: ExclusionContext) {
     if (!quote) continue // no verified price → no row (P1-9)
     // Entry exclusions (P7-32) — spike only at loop level; the bull-put branch adds the trend gates below, and the bear-call branch must NOT have them.
     const trend = await fetchTrendProfile(ticker)
-    const excluded = entryExclusionReasons(trend, { spike: true, trend: false }, ctx.benchmarkReturn12m)
+    const excluded = entryExclusionReasons(trend, { spike: true, trend: false }, ctx.benchmarkReturn12m, ctx.maxDayMovePercent)
     if (excluded.length > 0) {
       ctx.excluded.push({ ticker, reasons: excluded })
       continue
@@ -593,7 +612,7 @@ async function generateCreditSpreads(tickers: string[], ctx: ExclusionContext) {
     // gates reject, so applying them there would remove the candidates that
     // strategy wants — the reason P7-32 refused a single shared flag across all
     // nine generators.
-    const bullPutExcluded = entryExclusionReasons(trend, { spike: false, trend: true }, ctx.benchmarkReturn12m)
+    const bullPutExcluded = entryExclusionReasons(trend, { spike: false, trend: true }, ctx.benchmarkReturn12m, ctx.maxDayMovePercent)
     if (bullPutExcluded.length > 0) {
       ctx.excluded.push({ ticker, reasons: bullPutExcluded.map((r) => `${r} (bull-put leg)`) })
     }
@@ -665,7 +684,7 @@ async function generateIronCondors(tickers: string[], ctx: ExclusionContext) {
     if (!quote) continue
     // Entry exclusions (P7-32) — neutral: a fresh 10% move breaks the range premise; a year-long downtrend does not disqualify a range trade.
     const trend = await fetchTrendProfile(ticker)
-    const excluded = entryExclusionReasons(trend, { spike: true, trend: false }, ctx.benchmarkReturn12m)
+    const excluded = entryExclusionReasons(trend, { spike: true, trend: false }, ctx.benchmarkReturn12m, ctx.maxDayMovePercent)
     if (excluded.length > 0) {
       ctx.excluded.push({ ticker, reasons: excluded })
       continue
@@ -871,7 +890,7 @@ async function generateWheelCandidates(tickers: string[], ctx: ExclusionContext)
     if (!quote) continue
     // Entry exclusions (P7-32) — short put — assignment means ownership.
     const trend = await fetchTrendProfile(ticker)
-    const excluded = entryExclusionReasons(trend, { spike: true, trend: true }, ctx.benchmarkReturn12m)
+    const excluded = entryExclusionReasons(trend, { spike: true, trend: true }, ctx.benchmarkReturn12m, ctx.maxDayMovePercent)
     if (excluded.length > 0) {
       ctx.excluded.push({ ticker, reasons: excluded })
       continue
@@ -1045,7 +1064,7 @@ async function generateCalendarSpreads(tickers: string[] = CALENDAR_SPREAD_TICKE
       if (!quote) continue // was: a price table frozen at authoring time, else $100
       // Entry exclusions (P7-32) — neutral: a pop distorts near-term IV, which is the whole trade; the trend is not the thesis.
       const trend = await fetchTrendProfile(ticker)
-      const excluded = entryExclusionReasons(trend, { spike: true, trend: false }, ctx.benchmarkReturn12m)
+      const excluded = entryExclusionReasons(trend, { spike: true, trend: false }, ctx.benchmarkReturn12m, ctx.maxDayMovePercent)
       if (excluded.length > 0) {
         ctx.excluded.push({ ticker, reasons: excluded })
         continue
@@ -1249,7 +1268,7 @@ async function generateButterflies(tickers: string[], ctx: ExclusionContext): Pr
       if (!quote) continue
       // Entry exclusions (P7-32) — neutral, pinning.
       const trend = await fetchTrendProfile(ticker)
-      const excluded = entryExclusionReasons(trend, { spike: true, trend: false }, ctx.benchmarkReturn12m)
+      const excluded = entryExclusionReasons(trend, { spike: true, trend: false }, ctx.benchmarkReturn12m, ctx.maxDayMovePercent)
       if (excluded.length > 0) {
         ctx.excluded.push({ ticker, reasons: excluded })
         continue
@@ -1429,7 +1448,7 @@ async function generateLEAPS(tickers: string[], ctx: ExclusionContext): Promise<
       if (!quote) continue
       // Entry exclusions (P7-32) — deep-ITM long calls are stock replacement — you are buying the year.
       const trend = await fetchTrendProfile(ticker)
-      const excluded = entryExclusionReasons(trend, { spike: true, trend: true }, ctx.benchmarkReturn12m)
+      const excluded = entryExclusionReasons(trend, { spike: true, trend: true }, ctx.benchmarkReturn12m, ctx.maxDayMovePercent)
       if (excluded.length > 0) {
         ctx.excluded.push({ ticker, reasons: excluded })
         continue
@@ -1535,7 +1554,7 @@ async function generateZEBRA(tickers: string[], ctx: ExclusionContext): Promise<
       if (!quote) continue
       // Entry exclusions (P7-32) — 2 long ITM calls minus 1 short ATM is roughly +100 delta: synthetic long stock.
       const trend = await fetchTrendProfile(ticker)
-      const excluded = entryExclusionReasons(trend, { spike: true, trend: true }, ctx.benchmarkReturn12m)
+      const excluded = entryExclusionReasons(trend, { spike: true, trend: true }, ctx.benchmarkReturn12m, ctx.maxDayMovePercent)
       if (excluded.length > 0) {
         ctx.excluded.push({ ticker, reasons: excluded })
         continue
@@ -1663,6 +1682,7 @@ export async function GET(request: NextRequest) {
     // also a candidate.
     const ctx: ExclusionContext = {
       benchmarkReturn12m: await getBenchmarkReturn12m(),
+      maxDayMovePercent: resolveMaxDayMove(searchParams.get("maxDayMove")),
       excluded: [],
     }
 
@@ -1709,7 +1729,7 @@ export async function GET(request: NextRequest) {
     // below makes explicit.
     results.entryExclusions = ctx.excluded
     results.entryExclusionPolicy = {
-      maxDayMovePercent: MAX_DAY_MOVE_PERCENT,
+      maxDayMovePercent: ctx.maxDayMovePercent,
       benchmark: BENCHMARK_TICKER,
       benchmarkReturn12m: ctx.benchmarkReturn12m,
       trendGatedStrategies: ["wheel", "leaps", "zebra", "credit-spreads (bull-put leg only)"],

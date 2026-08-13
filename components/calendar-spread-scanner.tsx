@@ -26,6 +26,11 @@ import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/comp
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { yahooChartUrl } from "@/lib/ticker-links"
+import {
+  EntryExclusionNotice,
+  type EntryExclusion,
+  type EntryExclusionPolicy,
+} from "@/components/scanner/entry-exclusion-notice"
 
 interface CalendarSpreadSetup {
   ticker: string
@@ -65,6 +70,12 @@ export function CalendarSpreadScanner() {
   const [spreads, setSpreads] = useState<CalendarSpreadSetup[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Entry exclusions (P7-32). The threshold is a SERVER parameter, so changing
+  // it re-runs the scan rather than re-filtering rows already on screen —
+  // the excluded tickers never reach the client to be filtered.
+  const [entryExclusions, setEntryExclusions] = useState<EntryExclusion[]>([])
+  const [exclusionPolicy, setExclusionPolicy] = useState<EntryExclusionPolicy | null>(null)
+  const [maxDayMove, setMaxDayMove] = useState(10)
   const [spreadType, setSpreadType] = useState<"all" | "call" | "put">("all")
   const [maxBeta, setMaxBeta] = useState(1.0)
   const [maxDebit, setMaxDebit] = useState(1000) // Step 1 dollar filter: max net debit per spread ($)
@@ -115,12 +126,17 @@ export function CalendarSpreadScanner() {
     })
     .sort((a, b) => rankScore(b) - rankScore(a))
 
-  const handleRefresh = async () => {
+  // Takes the threshold explicitly. Calling this straight after
+  // setMaxDayMove would read the PREVIOUS value from the closure — React
+  // state is not updated synchronously — and rescan with the number the
+  // user just changed away from.
+  const handleRefresh = async (overrideMaxDayMove?: number) => {
+    const effectiveMaxDayMove = overrideMaxDayMove ?? maxDayMove
     setIsLoading(true)
     setError(null)
 
     try {
-      const response = await fetch("/api/strategy-scanner?type=calendar-spreads")
+      const response = await fetch(`/api/strategy-scanner?type=calendar-spreads&maxDayMove=${effectiveMaxDayMove}`)
 
       if (!response.ok) {
         const text = await response.text()
@@ -131,6 +147,9 @@ export function CalendarSpreadScanner() {
       let data
       try {
         data = await response.json()
+
+        setEntryExclusions(Array.isArray(data.entryExclusions) ? data.entryExclusions : [])
+        setExclusionPolicy(data.entryExclusionPolicy ?? null)
       } catch (parseError) {
         console.error("[Calendar Spread Scanner] JSON parse error:", parseError)
         throw new Error("Invalid response from server")
@@ -241,6 +260,15 @@ export function CalendarSpreadScanner() {
           </div>
         </CardHeader>
         <CardContent>
+          <EntryExclusionNotice
+            excluded={entryExclusions}
+            policy={exclusionPolicy}
+            strategy="calendar-spreads"
+            maxDayMove={maxDayMove}
+            onMaxDayMoveChange={setMaxDayMove}
+            onRescan={handleRefresh}
+            disabled={isLoading}
+          />
           {/* Educational Info Banner */}
           <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
             <div className="flex items-start gap-2">

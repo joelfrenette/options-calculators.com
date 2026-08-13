@@ -12,6 +12,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { yahooChartUrl } from "@/lib/ticker-links"
+import {
+  EntryExclusionNotice,
+  type EntryExclusion,
+  type EntryExclusionPolicy,
+} from "@/components/scanner/entry-exclusion-notice"
 
 interface SpreadSetup {
   ticker: string
@@ -53,6 +58,12 @@ export function CreditSpreadScanner() {
   // rendering it would have re-asserted the claim P1-10 deleted.
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Entry exclusions (P7-32). The threshold is a SERVER parameter, so changing
+  // it re-runs the scan rather than re-filtering rows already on screen —
+  // the excluded tickers never reach the client to be filtered.
+  const [entryExclusions, setEntryExclusions] = useState<EntryExclusion[]>([])
+  const [exclusionPolicy, setExclusionPolicy] = useState<EntryExclusionPolicy | null>(null)
+  const [maxDayMove, setMaxDayMove] = useState(10)
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
   const [maxMargin, setMaxMargin] = useState(1000) // Step 1 dollar filter: max buying-power reduction per spread ($)
 
@@ -88,18 +99,26 @@ export function CreditSpreadScanner() {
     })
     .sort((a, b) => rankScore(b) - rankScore(a))
 
-  const handleRefresh = async () => {
+  // Takes the threshold explicitly. Calling this straight after
+  // setMaxDayMove would read the PREVIOUS value from the closure — React
+  // state is not updated synchronously — and rescan with the number the
+  // user just changed away from.
+  const handleRefresh = async (overrideMaxDayMove?: number) => {
+    const effectiveMaxDayMove = overrideMaxDayMove ?? maxDayMove
     setIsLoading(true)
     setError(null)
 
     try {
-      const response = await fetch("/api/strategy-scanner?type=credit-spreads")
+      const response = await fetch(`/api/strategy-scanner?type=credit-spreads&maxDayMove=${effectiveMaxDayMove}`)
 
       if (!response.ok) {
         throw new Error(`API returned ${response.status}`)
       }
 
       const data = await response.json()
+
+      setEntryExclusions(Array.isArray(data.entryExclusions) ? data.entryExclusions : [])
+      setExclusionPolicy(data.entryExclusionPolicy ?? null)
 
       if (data.creditSpreads && data.creditSpreads.length > 0) {
         setSetups(data.creditSpreads)
@@ -201,6 +220,15 @@ export function CreditSpreadScanner() {
           </div>
         </CardHeader>
         <CardContent>
+          <EntryExclusionNotice
+            excluded={entryExclusions}
+            policy={exclusionPolicy}
+            strategy="credit-spreads"
+            maxDayMove={maxDayMove}
+            onMaxDayMoveChange={setMaxDayMove}
+            onRescan={handleRefresh}
+            disabled={isLoading}
+          />
           {/* Dollar Amount Filtering (Step 1) */}
           <div className="mb-6">
             <DollarAmountFilter

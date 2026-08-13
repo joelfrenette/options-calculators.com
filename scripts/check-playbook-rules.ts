@@ -24,7 +24,7 @@
  * report the same PASS line as a clean run.
  */
 
-import { readFileSync } from "node:fs"
+import { readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -246,6 +246,54 @@ check(
   "the bull-put leg carries its own trend gate",
   /bullPutExcluded\s*=\s*entryExclusionReasons\(\s*trend,\s*\{\s*spike:\s*false,\s*trend:\s*true\s*\}/.test(routeSrc),
   "a bear call profits from the decline these gates reject — the legs cannot share one policy",
+)
+
+// ---------------------------------------------------------------------------
+// The six server-driven tabs surface what was excluded, and send the threshold.
+// ---------------------------------------------------------------------------
+//
+// The route can exclude perfectly and the tab still be wrong in two silent
+// ways: it can drop `entryExclusions` on the floor, in which case a scanner
+// that returned fewer rows is indistinguishable from a market with fewer
+// candidates; or it can offer a threshold control that never reaches the
+// server. Both fail with no error and no changed PASS line.
+//
+// The tab list is DERIVED from the fetch calls, not hand-written — a
+// hand-written list covers what its author remembered, which is the weakness
+// `check-scanner-steps` shipped with and had to be fixed for.
+
+const componentsDir = join(ROOT, "components")
+const tabFiles = readdirSync(componentsDir).filter((f) => f.endsWith(".tsx"))
+const scannerTabs = tabFiles.filter((f) =>
+  /fetch\(\s*[`"']\/api\/strategy-scanner\?type=/.test(readFileSync(join(componentsDir, f), "utf8")),
+)
+
+const EXPECTED_SCANNER_TABS = 6
+check(
+  `scope: ${scannerTabs.length} tab(s) call /api/strategy-scanner`,
+  scannerTabs.length === EXPECTED_SCANNER_TABS,
+  scannerTabs.length ? scannerTabs.join(", ") : "none — the derivation collapsed",
+)
+
+for (const f of scannerTabs) {
+  const src = readFileSync(join(componentsDir, f), "utf8")
+  check(`${f} renders <EntryExclusionNotice>`, src.includes("<EntryExclusionNotice"))
+  check(`${f} sends the threshold to the server`, /&maxDayMove=\$\{/.test(src))
+  // The regression this guards is specific: a zero-argument refresh reads the
+  // PREVIOUS threshold out of the closure and scans with the value the user
+  // just changed away from, which looks exactly like a filter that did nothing.
+  check(
+    `${f} passes the new threshold explicitly, not via state`,
+    /handleRefresh = async \(overrideMaxDayMove\?: number\)/.test(src) &&
+      /effectiveMaxDayMove = overrideMaxDayMove \?\? maxDayMove/.test(src),
+    "a refresh that takes no argument re-reads stale state",
+  )
+}
+
+check(
+  "the route clamps the caller's threshold instead of trusting it",
+  /Math\.min\(25,\s*Math\.max\(3,\s*n\)\)/.test(routeSrc) && /Number\.isFinite\(n\)/.test(routeSrc),
+  "maxDayMove=0 would exclude every up day; a non-numeric value is NaN, which loses every comparison and disables the gate silently",
 )
 
 if (failures > 0) {
