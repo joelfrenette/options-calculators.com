@@ -412,11 +412,12 @@ recomputes it.
 | P7-36 | P2 | fixed | The fourth banned open-list summary disagreed with the ledger in six places and with itself in one. Deleted; check-open-summaries.ts guards against a fifth. Two more undated open-lists found, one naming two environment variables that do not exist. |
 | P7-37 | P3 | fixed | S-16, S-17 and S-7 closed: superseded scan caches pruned, two disagreeing earnings extractions collapsed to one (the premium bump and the displayed date came from different answers), and Step 2 shows which universe it loaded. |
 | P7-38 | P3 | fixed | P0-1 became a rule: check-orphan-routes.ts excludes audit artefacts from the referrer set and finds twelve orphaned routes, not six. Two defects in the check were found by running it. |
+| P7-39 | P3 | fixed | Re-verified the four open P1s. P6-27 answered with evidence: MMC 404s at Polygon while AAPL returns 200, so the symbol stopped resolving rather than being omitted from a feed, and its 1,111 stored rows (not 188) cannot be repaired. P6-8 and P6-11 confirmed genuinely owner-blocked. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-241 findings recorded · **201 fixed · 8 wontfix · 1 verified-ok · 31 open.**
+242 findings recorded · **202 fixed · 8 wontfix · 1 verified-ok · 31 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -3424,3 +3425,78 @@ call stays the owner's.
 |----|-----|------|---------|
 | P7-37 | P3 | SCAN / scanner | S-16, S-17 and S-7 closed: superseded scan caches are pruned, the two disagreeing earnings extractions became one, and Step 2 shows which universe it actually loaded. |
 | P7-38 | P3 | ops / routes | P0-1 re-verified as a standing rule rather than a triage. Twelve orphaned routes, not the six grep reported. Two defects in the check were found by running it. |
+
+---
+
+## Phase 7.11 (twenty-fourth pass) — re-verifying the four open P1s (2026-08-12)
+
+Phase 7.4's lesson was that a prediction about whether an item is still real is wrong
+about half the time, so each of the four was confirmed against the code and the data
+rather than against its own row.
+
+**One of the four was not blocked at all, and is now answered.**
+
+### P6-27 — answered: MMC does not resolve at the provider
+
+The row said the remainder "needs one live grouped call to inspect". It needed two
+queries.
+
+The store, asked directly for any ticker short of a full recent history:
+
+```sql
+select ticker, count(*), min(day), max(day) from market_closes
+group by ticker having count(*) < 200 or max(day) < (select max(day) from market_closes) - interval '7 days';
+```
+
+Exactly one row: **MMC, 1,111 rows, 2021-08-11 → 2026-01-13.** Every other universe member
+runs current. **The backlog's "188 stored closes" was wrong** — MMC has a full history that
+simply stops.
+
+Then the provider, through production:
+
+- `/api/polygon-proxy?endpoint=snapshot&ticker=MMC` → **HTTP 404**
+- `/api/polygon-proxy?endpoint=snapshot&ticker=AAPL` → HTTP 200, updated today
+
+So it is **not** the grouped feed omitting a live ticker. **The symbol itself no longer
+resolves at Polygon**, as of 2026-01-13 — a delisting, merger or rename. That answers the
+"symbol change, or feed omission?" question the row has carried since it was opened.
+
+Two consequences follow, and only the second needs the owner:
+
+1. **The 1,111 stored rows cannot be repaired.** There is no upstream to repair them from.
+   They are a correct historical record of a symbol that stopped existing, and
+   `compute_breadth_range` already excludes any ticker without a full trailing window, so
+   they do no harm where they sit.
+2. **`lib/breadth-universe.ts:27` still lists MMC**, which is why `sample_size` reads
+   99/100 rather than 100/100 and will forever. Replacing it is a one-line edit; WHICH
+   symbol replaces it is a universe-composition decision, so it stays the owner's.
+
+### P6-8 — genuinely blocked, confirmed in the code
+
+`app/api/panic-euphoria/route.ts:204` still reads:
+
+```ts
+let marginDebt = 700 + spxMomentum * 5 - (currentVix - 15) * 3
+```
+
+A synthetic transform of SPX and VIX, presented as margin debt. Short interest, Investor
+Intelligence and AAII are the same shape. Real sources cost money and removal changes the
+composite, so this is a spend-or-scope call, not code.
+
+### P6-11 — genuinely blocked, confirmed in the code
+
+`app/api/sentiment-heatmap/route.ts:39` still asks a model for its "best general
+impression" while telling it "you have no live data access", and falls back to
+`{ bullishScore: 50, bearishScore: 50 }` on every error path. The labelling was fixed;
+the tab still has no sources. Rebuild-or-retire is the owner's.
+
+### P3-16 — bookkeeping, as recorded
+
+Its open remainder is P6-8's open remainder under a second ID. It closes when P6-8 does.
+
+**Score: one of four was not blocked** — the same roughly-half hit rate Phase 7.4 found,
+which is the argument for checking rather than trusting the row.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-39 | P3 | ops / data | Re-verification of the four open P1s. P6-27's open question is answered with evidence: MMC returns 404 from Polygon while AAPL returns 200, so the symbol stopped resolving on 2026-01-13 rather than being omitted from a feed; its 1,111 stored rows (not the recorded 188) cannot be repaired. P6-8 and P6-11 confirmed genuinely owner-blocked; P3-16 is P6-8 under a second ID. |
