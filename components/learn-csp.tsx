@@ -53,6 +53,32 @@ export function LearnCSP() {
         "Implied volatility (IV) is moderate-to-high, so premium is meaningful relative to capital.",
         "You have the cash to back the trade — no margin needed.",
       ]}
+      // The playbook half of P7-30. Every rule here is a gate the Sell Put
+      // Scanner actually applies in Step 4 — `scripts/check-playbook-rules.ts`
+      // asserts the wording still matches the gate labels, so this page cannot
+      // describe a discipline the software has stopped having.
+      entryRules={[
+        {
+          rule: "The stock had a big up day — 10% or more in one session.",
+          why: "A large up session comes with an implied-volatility spike, so the put premium looks rich. If the pop was a reaction to news, the volatility crush lands within a day: you keep a collapsing premium against a full retracement of downside. Your strike is also chosen off the inflated price, so a strike that looked well out of the money can sit at the money after the retrace. The scanner shows the move in ATR units too, because 10% in a stock that swings 1% a day is a different event from 10% in one that swings 8%.",
+          enforcedBy: "Sell Put Scanner → Step 4 → Entry exclusions → \"Exclude a stock that just ripped\" (10%, adjustable 3-25%)",
+        },
+        {
+          rule: "The stock is down on the year — a negative trailing 12-month return.",
+          why: "Selling a put is an agreement to buy the stock. A year of decline is a year of the market disagreeing with that purchase, and assignment means owning it. Measured as the total return over the last 252 trading sessions; a stock with less than a year of history cannot be measured and is excluded rather than assumed fine.",
+          enforcedBy: "Sell Put Scanner → Step 4 → Entry exclusions → \"Exclude down on the year\"",
+        },
+        {
+          rule: "The stock trailed SPY over the last year.",
+          why: "This is the clause that separates \"it fell\" from \"it fell while the market rose\". The simple form of what IBD's RS Rating and Mansfield's Relative Performance both measure. When SPY's own year is positive this is the stricter of the two year-long filters — a stock up 7.5% against a market up 8% passes \"down on the year\" and fails this one. When the market itself fell they disagree, which is why both exist.",
+          enforcedBy: "Sell Put Scanner → Step 4 → Entry exclusions → \"Exclude laggards vs SPY\"",
+        },
+        {
+          rule: "The stock is in a Stage 4 decline — below a 150-day average that is itself falling.",
+          why: "Weinstein's stage analysis, and the slope is the half that matters. Price below a RISING long average is a pullback inside an advance, which is exactly the setup a put seller wants. Price below a FALLING one is the stage the method exists to keep you out of. This catches a breakdown that started recently, which a 12-month return can still show as positive.",
+          enforcedBy: "Sell Put Scanner → Step 4 → Entry exclusions → \"Exclude Stage 4 declines\"",
+        },
+      ]}
       risks={[
         "If the stock falls hard, you'll be assigned shares at a price higher than the market — paper loss until the stock recovers.",
         "Opportunity cost: the cash sits as collateral and can't be used for anything else.",

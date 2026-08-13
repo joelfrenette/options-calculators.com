@@ -404,11 +404,13 @@ recomputes it.
 | P7-28 | P2 | fixed | Fifteen components hand-built the Yahoo ticker URL in three spellings; only one normalised `.` to `-`, so class shares linked to a 404 from fourteen tabs. One library now owns it, pointing at the advanced chart per the owner's request, with a check. |
 | P7-29 | P3 | verified-ok | Swept the other 6 outbound-link families after P7-28: no duplication, no hand-built interpolation, `rel="noopener noreferrer"` on all 21 `target="_blank"` sites. Recorded so the sweep is not repeated. |
 | P7-30 | — | fixed | Owner feature: four CSP entry exclusions in Step 4 (big up day, down on the year, trailed SPY, Weinstein Stage 4), all defaulting on, applied before options enrichment so an excluded stock reaches neither results table. Built, checked with 29 assertions, negative-tested four ways. |
+| P7-31 | — | fixed | The CSP playbook states the four entry exclusions with the control enforcing each; check-playbook-rules.ts derives the gate list from the implementation so a gate cannot be removed while the page keeps teaching it. Negative-tested three ways. |
+| P7-32 | P3 | open | Sweep of the other six scanners. Big-up-day applies to all seven; the year-long gates apply to LEAPS, ZEBRA and the bull-put half of credit spreads, are INVERTED for bear-call, and are wrong for the three neutral strategies. Blocked on the owner: /api/strategy-scanner fetches one bar per ticker, so this is new metered Polygon traffic. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-233 findings recorded · **186 fixed · 8 wontfix · 1 verified-ok · 38 open.**
+235 findings recorded · **187 fixed · 8 wontfix · 1 verified-ok · 39 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -3086,3 +3088,57 @@ and 12-1 momentum that forgets to skip the month.
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-30 | — | SCAN / wheel-scanner | Owner feature, not a defect: four CSP entry exclusions (big up day, down on the year, trailed SPY, Weinstein Stage 4) in Step 4, all defaulting on, applied before options enrichment so an excluded stock reaches neither results table. `lib/trend-filters.ts` + 29 assertions. |
+
+### P7-31 — the playbook now states the rules the scanner runs
+
+`components/learn-csp.tsx` teaches the four P7-30 exclusions as a **"Do not enter when"**
+section, each naming the control that enforces it. A new optional `entryRules` prop on
+`strategy-learn-page.tsx` renders it — deliberately separate from `risks`, because a risk
+is something taken knowingly once in the trade and an exclusion is a reason not to open
+it. Folding them together is how a rule becomes a caveat.
+
+`scripts/check-playbook-rules.ts` connects the two. Nothing structural did before:
+deleting a gate would have left the page teaching a discipline the software no longer has,
+which is the first of the Phase 6 synthesis's five shapes — **a label naming a provenance
+the code lacks**. It derives the gate list from `cspEntryGates` itself (not from the label
+map, which is prose and could be edited to match the page), asserts each is taught, checks
+that every control the page names as "Enforced by" exists in the Step 4 card, and asserts
+all four still default ON — because the page tells the reader the scanner applies them.
+
+**What it cannot do, stated rather than implied: it verifies each gate is DESCRIBED, not
+that the description is accurate.** It cannot read English. What it prevents is the silent
+case.
+
+Negative-tested three ways: a rule reworded out of the page, a gate quietly defaulted off,
+and a fifth gate landing with no playbook entry.
+
+### P7-32 — which of the seven scanners should share the exclusions
+
+The sweep, by what each strategy's position actually is. This is a recommendation with an
+open decision attached, not a change.
+
+| Scanner | Position | Big up day | Year-long trend gates |
+|---|---|---|---|
+| Sell Put (wheel) | short put, assignment risk | applies — **done** | applies — **done** |
+| LEAPS | deep-ITM long calls, stock replacement | applies | applies — you are buying the year |
+| ZEBRA | 2 long ITM calls − 1 short ATM ≈ +100 delta synthetic long | applies | applies |
+| Credit spreads | emits **both** bull-put and bear-call | applies to both | **bull-put only** — a year-long downtrend is a reason TO sell a bear call, not to skip it |
+| Iron condor | neutral, wants a range | applies — a fresh 10% move breaks the range premise | does not — a trending-down stock is not disqualifying for a neutral position |
+| Butterfly | neutral, pinning | applies | does not |
+| Calendar spread | neutral, term structure | applies — a pop distorts near-term IV | does not |
+
+**The cost, which is the reason this is a decision and not a follow-up commit.**
+`/api/strategy-scanner` fetches `aggs/ticker/<T>/prev` — **one bar per ticker**. It has no
+history at all. Adding these gates there means a year-of-bars call per ticker per scan.
+The lists are fixed and small (~15-25 symbols per strategy), so this is bounded, but it is
+new metered Polygon traffic on a flat $79/mo plan, and it lands on the E-5 budget guard.
+
+**The inversion is the part that would be wrong to do blindly.** Applying "exclude down on
+the year" to the bear-call half of the credit-spread scanner would remove exactly the
+candidates that strategy wants. A single shared flag across all seven would be the
+composite-counting-one-input-twice shape in a new place.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-31 | — | LEARN / learn-csp | The CSP playbook states the four entry exclusions with the control that enforces each, and `check-playbook-rules.ts` derives the gate list from the implementation so a gate cannot be removed while the page keeps teaching it. |
+| P7-32 | P3 | SCAN / strategy-scanner | Sweep of the other six scanners: big-up-day applies to all seven; the year-long trend gates apply to LEAPS, ZEBRA and the bull-put half of credit spreads, and would be INVERTED for bear-call and wrong for the three neutral strategies. Blocked on the owner: `/api/strategy-scanner` fetches one bar per ticker, so this is new metered Polygon traffic. |

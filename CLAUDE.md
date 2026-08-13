@@ -57,6 +57,13 @@ options come from his standard set:
 The user can always type free-form instead ("Other" is built in). Never ask
 permission-style questions this way — it is a navigation menu, not a gate.
 
+**The menu is ALWAYS `multiSelect: true`.** Joel routinely wants more than one
+of the offered actions — he answered "1 and 2" to a single-select menu on
+2026-08-12 and had to type it rather than click it. A single-select menu makes
+him choose between things he wants both of, which is the opposite of what a
+navigation menu is for. Set it on every question in every call; when he picks
+several, do them in the order listed unless one blocks another.
+
 **The failure mode is long working turns.** On 2026-08-10 the menu was dropped
 for roughly fifteen consecutive replies once a multi-tool-call task got
 absorbing, and Joel had to ask for it a second time. It is never omitted because
@@ -89,7 +96,7 @@ down from 12 to 11.
 
 **Count the PASS lines — do not trust the exit code alone.** The suites chain with
 `&&`, so a script that stops *running* is indistinguishable from one that passes, and
-this has cost the project a commit twice. Current baselines: **formulas 677**,
+this has cost the project a commit twice. Current baselines: **formulas 693**,
 contracts 60 routes / 60 contracts, remediation 31.
 
 These four numbers are enforced by `scripts/check-doc-figures.ts` (Phase 7.5), because

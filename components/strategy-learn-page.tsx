@@ -220,6 +220,19 @@ export interface StrategyLearnPageProps {
   formulas: Array<{ label: string; value: string; tone?: "good" | "bad" | "neutral" }>
   whenToUse: string[]
   risks: string[]
+  /**
+   * Hard entry exclusions — the setups to skip, not the risks to accept.
+   *
+   * Separate from `risks` on purpose. A risk is something you take knowingly
+   * once you are in the trade; an exclusion is a reason not to open it. Folding
+   * them together is how a rule becomes a caveat.
+   *
+   * `enforcedBy` names the control that actually applies the rule in the app,
+   * so the page cannot describe a discipline the software does not have. Where
+   * it is present, `scripts/check-playbook-rules.ts` asserts the wording still
+   * matches the gate's own label.
+   */
+  entryRules?: Array<{ rule: string; why: string; enforcedBy?: string }>
   example: {
     setup: string
     walkthrough: string[]
@@ -356,6 +369,34 @@ export function StrategyLearnPage(props: StrategyLearnPageProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Do not enter when — hard exclusions, rendered only when a strategy
+          declares them. Placed after "When to use" and before the worked
+          example, because it answers the question that section raises. */}
+      {props.entryRules && props.entryRules.length > 0 ? (
+        <Card className="bg-white border-amber-300">
+          <CardContent className="pt-5">
+            <h2 className="text-base font-bold text-amber-800 mb-1 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" /> Do not enter when
+            </h2>
+            <p className="text-xs text-slate-600 mb-3">
+              These are exclusions, not risks — reasons to skip the trade rather than things to accept once you are in
+              it. Where a rule names a control, the scanner applies it for you.
+            </p>
+            <ul className="space-y-3">
+              {props.entryRules.map((r, i) => (
+                <li key={i} className="text-sm">
+                  <span className="font-semibold text-slate-900">{r.rule}</span>
+                  <span className="block text-slate-700 mt-0.5">{r.why}</span>
+                  {r.enforcedBy ? (
+                    <span className="block text-xs text-amber-800 mt-0.5">Enforced by: {r.enforcedBy}</span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Real example */}
       <Card className="bg-blue-50 border-blue-200">
