@@ -413,11 +413,12 @@ recomputes it.
 | P7-37 | P3 | fixed | S-16, S-17 and S-7 closed: superseded scan caches pruned, two disagreeing earnings extractions collapsed to one (the premium bump and the displayed date came from different answers), and Step 2 shows which universe it loaded. |
 | P7-38 | P3 | fixed | P0-1 became a rule: check-orphan-routes.ts excludes audit artefacts from the referrer set and finds twelve orphaned routes, not six. Two defects in the check were found by running it. |
 | P7-39 | P3 | fixed | Re-verified the four open P1s. P6-27 answered with evidence: MMC 404s at Polygon while AAPL returns 200, so the symbol stopped resolving rather than being omitted from a feed, and its 1,111 stored rows (not 188) cannot be repaired. P6-8 and P6-11 confirmed genuinely owner-blocked. |
+| P7-40 | P3 | fixed | Audited all 100 breadth-universe members from the store: MMC is the only stale one, none is unstored. Its successor cannot be resolved (no ticker search), and the market-cap substitute fails because /api/polygon-tickers answered from the grouped-bars path, which is not market-cap ranked — 42 universe members including LLY and COST are absent from its output. No replacement recommended. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-242 findings recorded · **202 fixed · 8 wontfix · 1 verified-ok · 31 open.**
+243 findings recorded · **203 fixed · 8 wontfix · 1 verified-ok · 31 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -3500,3 +3501,54 @@ which is the argument for checking rather than trusting the row.
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-39 | P3 | ops / data | Re-verification of the four open P1s. P6-27's open question is answered with evidence: MMC returns 404 from Polygon while AAPL returns 200, so the symbol stopped resolving on 2026-01-13 rather than being omitted from a feed; its 1,111 stored rows (not the recorded 188) cannot be repaired. P6-8 and P6-11 confirmed genuinely owner-blocked; P3-16 is P6-8 under a second ID. |
+
+---
+
+## Phase 7.12 (twenty-fifth pass) — the whole breadth universe, and MMC's replacement (2026-08-12)
+
+### The universe audit costs nothing and is definitive
+
+MMC was found by accident, so the obvious question is how many others there are. It does
+not need 100 API calls: `market-snapshot` writes a row for every ticker the grouped feed
+returns, so **absence from recent days IS the signal**. One query over `market_closes`,
+left-joined against the universe literal so a never-stored member cannot hide:
+
+**Exactly one row — MMC.** The other 99 are current, and none has a null history. The
+universe is otherwise healthy, and the method is now written down so the next check is a
+query rather than a discovery.
+
+### MMC's successor cannot be identified from anything the app exposes
+
+Probed through production: `MMC` → 404, `MARSH` → 404, `MMLN` → 404, against `AAPL` → 200.
+The app has no ticker-search or company-name endpoint, so there is no way from here to
+resolve what the symbol became.
+
+### And the obvious substitute — "take the next-largest name" — does not work either
+
+`/api/polygon-tickers` answered with `source: "polygon-grouped-bars"`, not
+`"fmp-screener"`. **That matters, and it is exactly the distinction S-7 made visible
+hours earlier:** the grouped-bars path is not ranked by market capitalisation. The proof is
+in its own output — **42 of the 100 universe members are absent from its 140-name list**,
+including LLY, COST, GS, BLK and LMT. A list that omits Eli Lilly is not a market-cap
+ranking, and the names it surfaces instead (MU, SPCX, SNDK, NBIS, CRWV) are high-turnover
+symbols, several of which are not large caps at all.
+
+So the honest report is: **no replacement can be recommended from available data.**
+Offering "MU" because it sat at the top of a list that is not a ranking would be precisely
+the failure this audit exists to remove — a number presented as an answer to a question it
+was not measuring.
+
+**What the owner needs, and the cheapest route to it:** one market-cap-ranked source. The
+FMP screener already does this and is already wired; it was simply unavailable on this
+request. Re-running Step 2 when FMP answers gives a genuine ranking, and the replacement
+becomes a one-line edit at `lib/breadth-universe.ts:27`.
+
+**Until then MMC stays in the list on purpose.** Removing it without a replacement drops
+the universe to 99 and changes what the breadth percentage is a percentage OF, silently,
+mid-series. `compute_breadth_range` already excludes it from every window for want of a
+full history, so leaving it costs nothing but the 99/100 `sample_size` — which is now a
+true statement about the data rather than a hidden one.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-40 | P3 | ops / data | Audited all 100 breadth-universe members against the store: MMC is the only stale one and none is unstored. Its successor cannot be resolved — the app exposes no ticker search, and the market-cap substitute fails because `/api/polygon-tickers` answered from the grouped-bars path, which is not market-cap ranked (42 universe members, including LLY and COST, are absent from its output). No replacement recommended; MMC stays until a ranked source answers. |
