@@ -271,6 +271,16 @@ async function seriesCoverageReport() {
  * be reached — NOT that everything is fine — because "no stale members found"
  * and "never looked" must not render as the same line. That distinction is the
  * one this audit has had to make in a dozen other places.
+ *
+ * MMC was removed from the universe on 2026-08-13 (owner's decision), so the
+ * list is 99 and `sample_size` can now reach `universe_size`. Keeping it had
+ * been the conservative choice — removing a member changes what the percentage
+ * is a percentage of — but the paragraph above records why that reasoning was
+ * wrong: **the denominator had already moved.** A delisted member is excluded
+ * from every window whether or not the constant still names it, so the constant
+ * was not protecting the denominator, only hiding that it had changed.
+ * `lib/breadth-universe.ts` now carries `BREADTH_UNIVERSE_REMOVED` so an
+ * absence has to be written down.
  */
 async function universeFreshnessReport() {
   const stale = await getStaleUniverseMembers(BREADTH_UNIVERSE)

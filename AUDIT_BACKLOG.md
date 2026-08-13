@@ -312,7 +312,7 @@ recomputes it.
 | P6-24 | P2 | fixed | Two static calculators no longer grade an empty form. |
 | P6-25 | P1 | fixed | learn-csp and learn-leaps arithmetic; part (c) closed by P6-26. |
 | P6-26 | P1 | fixed | TTM requires four reported quarters or is null. |
-| P6-27 | P1 | open | **Partial.** `missingTickers[]` now surfaces a constituent going dark. **Still open:** why MMC dropped out, and whether its 188 stored rows should be repaired. Needs one live grouped call. |
+| P6-27 | P1 | fixed | **Owner chose: drop the universe to 99 and state it (2026-08-13).** MMC is delisted, not repairable — Polygon 404s it since 2026-01-13 with 1,111 stored rows that can never extend. It had been kept in the list on purpose to avoid changing what the breadth percentage is a percentage OF, **and that reasoning was wrong: the denominator had already moved.** A delisted member is excluded from every 200-day window whether or not the constant still names it, so `sample_size` had read 99 against a `universe_size` of 100 on every row for seven months. **A stale constant does not preserve a denominator; it stops the denominator being visible.** No substitute was picked — a hand-chosen replacement is a judgement rendered inside a number labelled index breadth, and no market-cap-ranked source exists on this plan. `BREADTH_UNIVERSE_REMOVED` records the absence with a reason and a date; 9 assertions require list + removals to equal the original 100, so a name cannot leave silently in either direction. |
 | P6-28 | P2 | fixed | Health check reports which admin credential is in use. |
 | P6-29 | P2 | fixed | The dead duplicate `components/ccpi/` directory deleted. |
 | P6-30 | P2 | fixed | Social Sentiment no longer publishes 50/100 when every source is down. |
@@ -432,7 +432,7 @@ recomputes it.
 
 ### The open list, by severity
 
-257 findings recorded · **221 fixed · 8 wontfix · 1 verified-ok · 27 open.**
+257 findings recorded · **222 fixed · 8 wontfix · 1 verified-ok · 26 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -4090,6 +4090,44 @@ And the tooltip on the Investor Intelligence row ended with the sentence *"It IS
 the composite."* — accurate when written, false the moment the row stopped scoring, and it
 would have survived as a confident claim about the opposite of the truth. It is asserted
 now too.
+
+### P6-27 — a stale constant does not preserve a denominator
+
+The owner's decision was to drop the breadth universe to 99 and say so, rather than
+substitute a name.
+
+What makes it worth an entry is that the reasoning for keeping MMC was careful and wrong
+in an interesting way. Breadth is "% of THIS list above its own 200-DMA", so the list IS
+the denominator, and removing a member genuinely does change what the percentage is a
+percentage of. That is a real cost and it was the stated reason for leaving a delisted
+ticker in the array.
+
+**But the denominator had already changed.** Polygon has 404'd MMC since 2026-01-13, so it
+held no advancing history, so it was excluded from every 200-day window from that date
+onward. `sample_size` had been reading 99 against a `universe_size` of 100 on every row for
+seven months. Keeping the constant did not preserve the old denominator — it only stopped
+the new one from being visible. **A stale constant does not preserve a denominator; it
+stops the denominator being legible.**
+
+This is the same shape as P6-11's client discarding the `source` field and P7-53's
+unreachable label: the system had the honest number and something upstream of the reader
+was still asserting the old one.
+
+No replacement was chosen, and that refusal is recorded rather than quietly worked around:
+a hand-picked constituent is a judgement rendered inside a figure labelled index breadth,
+and this plan has no market-cap-ranked source to make it anything else — the FMP screener
+is paid, 403s, and *latches* (`status: "skipped-latched"`), so it can never answer. P7-40
+closed by pointing at it, which would have sent the owner into a retry loop with no
+terminating condition.
+
+`BREADTH_UNIVERSE_REMOVED` now records each absence with a reason and a date, and the size
+is asserted as `list + removed === 100` rather than against a bare baseline — so a name can
+only leave by being written down. Negative-tested both ways: deleting a ticker without
+recording it fails, and recording one while leaving it in the list fails twice.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P6-27 | P1 | E-6a breadth | MMC delisted 2026-01-13 and was kept in the universe to protect the denominator, which had already moved — sample_size read 99/100 for seven months. Universe is 99 and says so; removals are recorded and asserted. |
 
 ### P6-11 — the rebuild turned out to be a deletion
 
