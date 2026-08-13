@@ -35,6 +35,12 @@
 
 import { API_COSTS, getMeteredKeys } from "@/lib/api-costs"
 import { getMeteringSupabaseConfig } from "@/lib/metered-fetch"
+import {
+  BUDGET_ENV_NAMES,
+  DEFAULT_DAILY_HARD_STOP,
+  DEFAULT_MONTHLY_HARD_STOP,
+  resolveBudgetLimit,
+} from "@/lib/budget-env"
 // The synchronous snapshot lives in api-keys.ts because `resolveApiKey` must
 // read it without an await and that file has to stay import-free — see the
 // "Budget guard (E-5)" block there for the full reason.
@@ -42,35 +48,17 @@ import { clearBudgetKillSnapshot, getBudgetKillSnapshot, setBudgetKillSnapshot }
 
 // ------------------------------------------------------------------ config
 
-/** Default hard stops, overridable per environment. */
-const DEFAULT_DAILY_HARD_STOP = 50
-const DEFAULT_MONTHLY_HARD_STOP = 100
-
-function readBudget(envName: string, fallback: number): number {
-  // A budget of 0 is meaningful ("cut off immediately"), so 0 must be accepted
-  // when it is genuinely CONFIGURED — and that is precisely what made the old
-  // version dangerous. `Number("")` is 0, not NaN, so a DEFINED-BUT-BLANK
-  // `DAILY_HARD_STOP` or `MONTHLY_HARD_STOP` read as a deliberate "cut off
-  // immediately" and killed every metered API on the first cent of spend.
-  //
-  // Worse here than in `getMonthlyBudgetTarget` (P6-86): that one sets a
-  // reporting target, this one is the hard stop. An empty string is the most
-  // likely malformed value for an env var — Vercel produces one whenever a
-  // variable exists with no value — so the single most probable operator
-  // mistake took the site's paid data offline with nothing on screen to explain
-  // it. Trim first, treat blank as unset, and only then let 0 mean zero.
-  const raw = process.env[envName]?.trim()
-  if (!raw) return fallback
-  const n = Number(raw)
-  return Number.isFinite(n) && n >= 0 ? n : fallback
-}
+// Defaults and the env-reading rule live in lib/budget-env.ts, which is
+// import-free so `scripts/check-budget-env.ts` can load it (Phase 7.0, P6-87).
+// This file cannot be loaded by any check script — it reaches Supabase — and
+// that is exactly why the decision that cuts off paid data was untestable.
 
 function getDailyHardStop(): number {
-  return readBudget("DAILY_BUDGET_HARD_STOP", DEFAULT_DAILY_HARD_STOP)
+  return resolveBudgetLimit(process.env[BUDGET_ENV_NAMES.dailyHardStop], DEFAULT_DAILY_HARD_STOP)
 }
 
 function getMonthlyHardStop(): number {
-  return readBudget("MONTHLY_BUDGET_HARD_STOP", DEFAULT_MONTHLY_HARD_STOP)
+  return resolveBudgetLimit(process.env[BUDGET_ENV_NAMES.monthlyHardStop], DEFAULT_MONTHLY_HARD_STOP)
 }
 
 /**

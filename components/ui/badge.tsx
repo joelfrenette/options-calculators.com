@@ -32,7 +32,10 @@ function Badge({
   ...props
 }: React.ComponentProps<'span'> &
   VariantProps<typeof badgeVariants> & { asChild?: boolean }) {
-  const Comp = asChild ? Slot : 'span'
+  // Typed as ElementType: `Comp` is a union of Slot and an intrinsic tag, and
+  // TS cannot reconcile their prop sets under React 19 ref typing. The runtime
+  // value is unchanged.
+  const Comp: React.ElementType = asChild ? Slot : 'span'
 
   return (
     <Comp

@@ -46,7 +46,10 @@ function Button({
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
   }) {
-  const Comp = asChild ? Slot : 'button'
+  // Typed as ElementType: `Comp` is a union of Slot and an intrinsic tag, and
+  // TS cannot reconcile their prop sets under React 19 ref typing. The runtime
+  // value is unchanged.
+  const Comp: React.ElementType = asChild ? Slot : 'button'
 
   return (
     <Comp

@@ -179,7 +179,14 @@ Order: SCAN (Sell Put = template) → ANALYZE (CCPI first) → COPY → LEARN (p
 > Phase 6 demonstrated the cost of doing it later, and the first two steps unblock
 > everything after them.
 
-**7.0 — Make the unverifiable verifiable. Do this first.**
+**7.0 — Make the unverifiable verifiable. DONE 2026-08-12 — and it was last, not first.**
+The step the plan said to do first was done last, because it wanted a `next build` the
+workstation cannot run (P7-7). **Vercel builds every push, and had been available the whole
+time** — the blocker was a missing idea, not a missing tool. `allowImportingTsExtensions`
+plus three import extensions made the CCPI constants loadable (P7-42, 19 assertions on
+`CCPI_THRESHOLDS` vs `CCPI_ALLOCATION`); `resolveBudgetLimit` moved to the import-free
+`lib/budget-env.ts` (P7-43, 14 assertions). **With 7.1–7.5 already done, Phase 7 — and the
+plan's seven phases — close here.** The original text follows.
 Three modules cannot be loaded by any check script, and that constraint has been
 silently deciding what gets tested — `lib/ccpi/calculations.ts` and `lib/ccpi/constants.ts`
 (extensionless relative imports node's type-stripping cannot resolve, P6-85) and

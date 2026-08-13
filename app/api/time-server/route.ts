@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server"
 import { fetchWithTimeout } from "@/lib/fetch-timeout"
 export async function GET() {
   try {
@@ -12,7 +13,7 @@ export async function GET() {
 
     const data = await response.json()
 
-    return Response.json({
+    return NextResponse.json({
       datetime: data.datetime,
       timezone: data.timezone,
       day_of_week: data.day_of_week, // 0=Sunday, 1=Monday, ..., 5=Friday
@@ -22,7 +23,7 @@ export async function GET() {
   } catch (error) {
     // Fallback to server time if API fails
     const now = new Date()
-    return Response.json({
+    return NextResponse.json({
       datetime: now.toISOString(),
       timezone: "America/New_York",
       day_of_week: now.getDay(), // 0=Sunday, 5=Friday

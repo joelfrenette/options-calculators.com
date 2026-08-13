@@ -12,7 +12,7 @@ export const CCPI_THRESHOLDS = {
 // Pillar shares of the composite (35/30/15/20). The definition lives in
 // lib/ccpi/scoring.ts — the pure scoring core owns its weights — and is
 // re-exported here so existing consumers keep importing it from constants.
-export { PILLAR_WEIGHTS } from "./scoring"
+export { PILLAR_WEIGHTS } from "./scoring.ts"
 
 export const COLOR_MAP = {
   green: "#16a34a", // Green for low risk

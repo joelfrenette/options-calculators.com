@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server"
 import { fetchWithTimeout } from "@/lib/fetch-timeout"
 // E-7d: daily VIX closes do not move intraday-fast enough to justify a
 // fresh Yahoo history pull per page view; 15-min edge cache.
@@ -41,9 +42,9 @@ export async function GET() {
       }))
       .filter((item: any) => item.value !== null)
 
-    return Response.json({ history })
+    return NextResponse.json({ history })
   } catch (error) {
     console.error("Error fetching VIX history:", error)
-    return Response.json({ error: "Failed to fetch VIX historical data" }, { status: 500 })
+    return NextResponse.json({ error: "Failed to fetch VIX historical data" }, { status: 500 })
   }
 }

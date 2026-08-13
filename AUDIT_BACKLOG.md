@@ -298,7 +298,7 @@ recomputes it.
 | P6-10 | P2 | fixed | `100 - x \|\| 50` precedence bug. |
 | P6-11 | P1 | open | **Partial.** The hallucination pipeline is labelled and routed through the guarded chain. **Open decision:** rebuild the sentiment heatmap on real sources or retire the tab. |
 | P6-12 | P1 | fixed | 25+ raw `process.env` key reads routed through `resolveApiKey`. |
-| P6-13 | P3 | open | Module-size debt: 19 modules over 600 lines. **The Black-Scholes duplication half is done** — P7-12 folded `greeks-calculator`'s copy into `lib/black-scholes.ts` on 2026-08-11, and this note went on listing it as outstanding until 2026-08-12. |
+| P6-13 | P3 | open | Module-size debt. **19 was wrong — it is 25 as of 2026-08-12 (P7-45)**, and four of the additions are that day's entry-exclusion work: strategy-scanner/route.ts 1,796, use-wheel-scanner.ts 690, step4-technical-card.tsx 678, fundamental-scan.ts 646. The Black-Scholes duplication half was closed by P7-12. |
 | P6-14 | P1 | fixed | MMF component normalised against its own history. |
 | P6-15 | P2 | fixed | social-sentiment error banner; decorative 47/54/50 constants removed. |
 | P6-16 | P0 | fixed | `/api/fomc-predictions` nullable end to end; 503 rather than a forecast on a stand-in rate. |
@@ -370,9 +370,9 @@ recomputes it.
 | P6-82 | P2 | fixed | Dead-code sweep; four unreferenced exports deleted. |
 | P6-83 | P3 | fixed | The generator check earned itself on first live use. |
 | P6-84 | P2 | fixed | `normalCDF` accuracy measured against its own citation. |
-| P6-85 | P2 | open | `lib/ccpi/calculations.ts` and `lib/ccpi/constants.ts` cannot be loaded by any check script. Needs `.ts` on two relative imports plus a `next build` to confirm the bundler accepts it. **This is Phase 7.0.** |
+| P6-85 | P2 | fixed | **FIXED 2026-08-12** by Phase 7.0/P7-42: `.ts` on three relative imports plus `allowImportingTsExtensions` (legal under `noEmit`) makes `lib/ccpi/calculations.ts` and `lib/ccpi/constants.ts` loadable by check scripts. The assertion this row existed for is `scripts/check-ccpi-bands.ts`. |
 | P6-86 | P1 | fixed | A blank env var set the spend hard-stop to $0. |
-| P6-87 | P3 | open | `lib/budget-guard.ts` is unassertable for the same reason. Needs `readBudget` extracted into an import-free module. **This is Phase 7.0.** |
+| P6-87 | P3 | fixed | **FIXED 2026-08-12** by Phase 7.0/P7-43: `resolveBudgetLimit` extracted into the import-free `lib/budget-env.ts`, asserted by `scripts/check-budget-env.ts`. |
 | P6-88 | P1 | fixed | Default encryption key deleted from `lib/api-keys.ts`. |
 | P6-89 | P1 | fixed | A commit broke `check:formulas` on staging and the suite went on looking green. Pure maths moved to the import-free `lib/vix-term.ts`. Numbered during 7.1 — it had been recorded as an unnumbered row. |
 | P7-1 | P2 | fixed | The Costs tab's budget verdict excluded pay-per-use spend and called one of two budgets "the budget". |
@@ -415,11 +415,15 @@ recomputes it.
 | P7-39 | P3 | fixed | Re-verified the four open P1s. P6-27 answered with evidence: MMC 404s at Polygon while AAPL returns 200, so the symbol stopped resolving rather than being omitted from a feed, and its 1,111 stored rows (not 188) cannot be repaired. P6-8 and P6-11 confirmed genuinely owner-blocked. |
 | P7-40 | P3 | fixed | Audited all 100 breadth-universe members from the store: MMC is the only stale one, none is unstored. Its successor cannot be resolved (no ticker search), and the market-cap substitute fails because /api/polygon-tickers answered from the grouped-bars path, which is not market-cap ranked — 42 universe members including LLY and COST are absent from its output. No replacement recommended. |
 | P7-41 | P2 | fixed | P7-40 closing advice was wrong: the FMP screener is a PAID endpoint answering 403, and the route latches ("skipped-latched"), so no market-cap ranking is reachable on this plan and MMC cannot be replaced by market cap. Adds universeFreshness to the admin health check so the MMC class is detected rather than stumbled upon. |
+| P7-42 | P2 | fixed | Phase 7.0 made the CCPI constants loadable (three import extensions + allowImportingTsExtensions); check-ccpi-bands.ts pins that CCPI_THRESHOLDS and CCPI_ALLOCATION agree on boundaries, names and monotonic cash. 19 assertions. |
+| P7-43 | P2 | fixed | resolveBudgetLimit extracted to the import-free lib/budget-env.ts; 14 assertions pin that a blank env var falls back while a configured "0" is honoured as zero, and that the two are distinguished. |
+| P7-44 | P2 | fixed | TypeScript errors 8 to 0. One of the tolerated eight was a live defect: risk-calculator never imported Recharts Tooltip, so its chart rendered the Radix component and the VIX chart had no hover readout. |
+| P7-45 | P3 | fixed | P6-13's module-size count corrected from 19 to 25; four of the additions are this session's entry-exclusion work. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-244 findings recorded · **204 fixed · 8 wontfix · 1 verified-ok · 31 open.**
+248 findings recorded · **210 fixed · 8 wontfix · 1 verified-ok · 29 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -3619,3 +3623,88 @@ Three decisions in it worth keeping:
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-41 | P2 | ops / data | P7-40's closing advice was wrong: the FMP screener is a paid endpoint that answers 403 and the route latches on it (`"status": "skipped-latched"`), so no market-cap ranking is reachable and MMC's replacement cannot be chosen by market cap on this plan. Also adds `universeFreshness` to the admin health check so the MMC class is detected rather than stumbled upon — two requests, no API calls, with unreachable reported as unavailable rather than ok. |
+
+---
+
+## Phase 7.0 — DONE 2026-08-12. Phase 7 closes.
+
+The step the plan said to do first, done last, because it needed a build gate the
+workstation does not have. **Vercel is that gate**, and it had been available all along.
+
+### The import constraint was the whole blocker, and it was one line of tsconfig
+
+`lib/ccpi/calculations.ts` and `lib/ccpi/constants.ts` imported `./types`, `./constants`
+and `./scoring` without extensions, which node's native type-stripping cannot resolve. Three
+extensions plus `allowImportingTsExtensions: true` (legal under `noEmit`) and both modules
+load. **The tsconfig's own comment asserted the Next bundler disallows this** — that claim
+is now under test on staging rather than taken on trust.
+
+Proof it worked: a throwaway probe importing both modules failed with *"does not provide an
+export named CCPI_ALLOCATION"* — a **missing-export** error, not a resolution error. Node
+had got inside the module.
+
+### P7-42 — the assertion P6-85 identified and could not write
+
+`scripts/check-ccpi-bands.ts`, 19 assertions. Two tables describe the same 0-100 scale from
+different files — `CCPI_THRESHOLDS` (the regime floors, read by `getRegimeZone`) and
+`CCPI_ALLOCATION.bands` (min/max/level/cash, read by the allocation panel) — **with nothing
+connecting them.** A boundary moved in one gives a score labelled "High Alert" beside an
+allocation row for "Caution", and neither file is wrong on its own terms.
+
+They agree today: bands tile 0-19 · 20-39 · 40-59 · 60-79 · 80-100 with no gap or overlap,
+every threshold sits on its band's floor, every band is named by a threshold, and cash rises
+monotonically 10 → 20 → 35 → 55 → 75%. That last one is the only assertion about *meaning*
+rather than bookkeeping: a table can tile perfectly, match every name, and still tell the
+user to hold less cash as crash risk climbs.
+
+### P7-43 — the budget hard stop is assertable at last
+
+`lib/budget-guard.ts` reaches Supabase, so no check could load it — and the decision that
+can take **every paid data source offline** lived inside it. `resolveBudgetLimit` now sits
+in the import-free `lib/budget-env.ts`; `scripts/check-budget-env.ts` pins it with 14
+assertions.
+
+The pair that matters: **a blank variable falls back, a configured `"0"` is honoured as
+zero.** `Number("")` is `0`, not `NaN`, and Vercel produces a defined-but-empty variable
+whenever someone creates one and leaves it blank — so the most likely operator mistake used
+to read as "cut off immediately". A `||`-based implementation passes the blank tests and
+fails the zero test; a `!== undefined` one does the reverse. Both are asserted, plus that
+the two are *distinguished* rather than merely both handled.
+
+`BUDGET_ENV_NAMES` is now the single spelling of the three variables, asserted to carry
+`_BUDGET_` — the project has written them wrong twice.
+
+### P7-44 — zero TypeScript errors, and one of the "known 8" was a live defect
+
+The Definition of Done wants zero; the baseline had been 10, then 8. All are gone:
+
+- `time-server` and `vix-history` used bare `Response.json`, which this lib config does not
+  type. Every other route uses `NextResponse.json`; now these do too.
+- `ui/badge` and `ui/button` type `Comp` as `React.ElementType` — a union of `Slot` and an
+  intrinsic tag cannot be reconciled under React 19 ref typing. Runtime unchanged.
+- `theme-provider` adds `children` explicitly: next-themes declares it on neither
+  `ThemeProviderProps` nor the component's own props in this version.
+- **`risk-calculator` never imported Recharts' `Tooltip`.** `Tooltip` was already bound to
+  the shadcn/Radix component at the top of the file, so the `<Tooltip>` inside the LineChart
+  resolved to *that* — which renders nothing inside a chart. **The VIX chart has had no
+  hover readout**, and the only symptom was a type error absorbed into the baseline and
+  treated as noise.
+
+**A tolerated error is an unread error.** Seven of the eight were genuinely cosmetic, which
+is exactly what made the eighth invisible. The baseline is zero now, so any error is a new
+one.
+
+### P7-45 — P6-13's module-size count was stale, and this session made it worse
+
+The row said 19 modules over 600 lines. It is **25**, and four of the additions are from
+today's own work: `strategy-scanner/route.ts` (1,796), `use-wheel-scanner.ts` (690),
+`step4-technical-card.tsx` (678), `fundamental-scan.ts` (646). The entry-exclusion feature
+traded module size for correctness, which was the right trade — but it is not free, and a
+row that still says 19 lets the cost go unrecorded.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-42 | P2 | ANALYZE → CCPI | Phase 7.0 unblocked the CCPI constants: three import extensions plus `allowImportingTsExtensions` make them loadable, and `check-ccpi-bands.ts` (19 assertions) pins that `CCPI_THRESHOLDS` and `CCPI_ALLOCATION` still agree on boundaries, names and monotonic cash. |
+| P7-43 | P2 | ops / budget | `resolveBudgetLimit` extracted to the import-free `lib/budget-env.ts`; 14 assertions pin that a blank variable falls back while a configured "0" is honoured, and that the two are distinguished. The env names are spelled once and asserted to carry `_BUDGET_`. |
+| P7-44 | P2 | site-wide | TypeScript errors 8 → 0. One was a live defect: `risk-calculator` never imported Recharts' `Tooltip`, so its chart rendered the Radix one and the VIX chart had no hover readout. |
+| P7-45 | P3 | docs | P6-13's module-size count was 19 and is 25; four of the additions are from this session's entry-exclusion work. |

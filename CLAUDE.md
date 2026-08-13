@@ -81,8 +81,13 @@ block present, menu present, first options specific to this turn.
 
 ## Verification before any commit
 Run `pnpm check:formulas && pnpm check:contracts` (typecheck via `pnpm typecheck`;
-8 known errors remain, do not add new ones — it was 10 until P7-27 deleted two
-dead components that carried one each). Regenerate SITE_MAP.md with
+**0 known errors remain — the baseline is now zero, so any error is a new one.**
+It was 10, then 8 when P7-27 deleted two dead components, then 0 when Phase 7.0
+cleared the rest. **One of the "known 8" was a live defect the baseline had
+normalised**: `risk-calculator.tsx` never imported Recharts' `Tooltip`, so the
+`<Tooltip>` inside its chart resolved to the shadcn/Radix one and the VIX chart
+had no hover readout at all. A tolerated error is an unread error).
+Regenerate SITE_MAP.md with
 `pnpm inventory` when routes/components change — `check:formulas` now enforces this via
 `site-inventory.ts --check`, so a stale SITE_MAP fails the suite rather than going unnoticed.
 
@@ -96,7 +101,7 @@ down from 12 to 11.
 
 **Count the PASS lines — do not trust the exit code alone.** The suites chain with
 `&&`, so a script that stops *running* is indistinguishable from one that passes, and
-this has cost the project a commit twice. Current baselines: **formulas 760**,
+this has cost the project a commit twice. Current baselines: **formulas 793**,
 contracts 60 routes / 60 contracts, remediation 31.
 
 These four numbers are enforced by `scripts/check-doc-figures.ts` (Phase 7.5), because

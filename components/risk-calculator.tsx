@@ -22,7 +22,21 @@ import {
   BarChart3,
   Info,
 } from "lucide-react"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts"
+// `Tooltip` is already bound to the shadcn/Radix tooltip on line 13, so the
+// chart tooltip is imported under an alias. It was NOT imported at all before:
+// the <Tooltip> inside the LineChart resolved to the Radix component, which
+// renders nothing there, so the VIX chart had no hover readout. The only
+// symptom was a TypeScript error that had been absorbed into the "8 known
+// errors" baseline and treated as noise.
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip as ChartTooltip,
+} from "recharts"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 
 interface VixLevel {
@@ -489,7 +503,7 @@ export function RiskCalculator() {
                     }}
                   />
                   <YAxis tick={{ fontSize: 12 }} domain={["dataMin - 2", "dataMax + 2"]} />
-                  <Tooltip
+                  <ChartTooltip
                     contentStyle={{
                       backgroundColor: "white",
                       border: "1px solid #e5e7eb",

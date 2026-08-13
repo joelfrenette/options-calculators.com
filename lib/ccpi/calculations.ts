@@ -1,8 +1,8 @@
 // CCPI Calculation & Utility Functions
 // Pure functions for color mapping, scoring, and data transformations
 
-import type { CCPIData, CCPIRegimeZone } from "./types"
-import { COLOR_MAP, CCPI_THRESHOLDS, PILLAR_WEIGHTS } from "./constants"
+import type { CCPIData, CCPIRegimeZone } from "./types.ts"
+import { COLOR_MAP, CCPI_THRESHOLDS, PILLAR_WEIGHTS } from "./constants.ts"
 
 /**
  * Converts color name to hex value
