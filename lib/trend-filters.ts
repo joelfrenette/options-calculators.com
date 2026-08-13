@@ -30,6 +30,38 @@ export const SESSIONS_PER_MONTH = 21
 export const SESSIONS_PER_YEAR = 252
 
 /**
+ * The big-up-day threshold: one range, one default, one owner.
+ *
+ * WHY IT LIVES HERE. It shipped in three places at once — a 3-25 slider in the
+ * Sell Put scanner's Step 4 card, a dropdown of eight fixed steps in the six
+ * server-driven tabs, and a clamp in `/api/strategy-scanner` — and three copies
+ * of a number is two chances to disagree. It is the same shape as the Yahoo URL
+ * written fifteen times (P7-28): nothing was wrong yet, and nothing structural
+ * stopped it from going wrong.
+ *
+ * `DEFAULT` is the owner's 10%. `MIN` is 3 because below that a normal session
+ * in a volatile name would exclude it; `MAX` is 25 because a move that large is
+ * excluded by every sane setting and a higher ceiling is a control with no
+ * effect.
+ */
+export const MAX_DAY_MOVE = { MIN: 3, MAX: 25, DEFAULT: 10, STEP: 1 } as const
+
+/**
+ * The caller's threshold, clamped to the range above.
+ *
+ * CLAMPED, NOT TRUSTED, and NaN does not fall through. `0` would exclude every
+ * stock that closed up at all, and a non-numeric value parses to `NaN`, which
+ * loses every comparison — a gate that reports itself active while excluding
+ * nothing. Anything unparseable returns the default rather than disabling the
+ * filter.
+ */
+export function resolveMaxDayMove(raw: unknown): number {
+  const n = typeof raw === "number" ? raw : Number(raw)
+  if (!Number.isFinite(n)) return MAX_DAY_MOVE.DEFAULT
+  return Math.min(MAX_DAY_MOVE.MAX, Math.max(MAX_DAY_MOVE.MIN, n))
+}
+
+/**
  * Percent move of one session, `(last − prior) / prior × 100`.
  *
  * Null when either close is missing or the prior close is not positive — a

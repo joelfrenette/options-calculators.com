@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Info, TrendingUp, CheckCircle2 } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { MAX_DAY_MOVE } from "@/lib/trend-filters"
 import { stepTitled } from "./steps"
 
 interface Step4TechnicalCardProps {
@@ -567,9 +568,9 @@ export function Step4TechnicalCard({
                   <Slider
                     value={maxDayMove}
                     onValueChange={setMaxDayMove}
-                    min={3}
-                    max={25}
-                    step={1}
+                    min={MAX_DAY_MOVE.MIN}
+                    max={MAX_DAY_MOVE.MAX}
+                    step={MAX_DAY_MOVE.STEP}
                     disabled={!excludeBigUpDay}
                     className="mt-2"
                   />

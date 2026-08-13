@@ -128,7 +128,7 @@ Every route: HTTP verbs, segment config, upstream hosts, env keys, timeout wirin
 | `/api/serper-finance` | GET | — | google.serper.dev<br>serper.dev | SERPER_API_KEY | yes | `lib/api-contracts.ts`<br>`lib/remediation.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/smart-money-etfs` | GET | dynamic="force-dynamic" | api.polygon.io | POLYGON_API_KEY | yes | `components/smart-money-etfs.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/social-sentiment` | GET | dynamic="force-dynamic"<br>maxDuration=90 | api.polygon.io<br>api.stocktwits.com<br>finnhub.io | FINNHUB_API_KEY<br>POLYGON_API_KEY | yes | `components/social-sentiment.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
-| `/api/strategy-scanner` | GET, POST | — | api.polygon.io<br>finnhub.io | FINNHUB_API_KEY<br>POLYGON_API_KEY | yes | `components/butterfly-scanner.tsx`<br>`components/calendar-spread-scanner.tsx`<br>`components/credit-spread-scanner.tsx`<br>`components/iron-condor-scanner.tsx`<br>`components/leaps-scanner.tsx`<br>`components/zebra-scanner.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
+| `/api/strategy-scanner` | GET, POST | — | api.polygon.io<br>finnhub.io | FINNHUB_API_KEY<br>POLYGON_API_KEY | yes | `components/butterfly-scanner.tsx`<br>`components/calendar-spread-scanner.tsx`<br>`components/credit-spread-scanner.tsx`<br>`components/iron-condor-scanner.tsx`<br>`components/leaps-scanner.tsx`<br>`components/zebra-scanner.tsx`<br>`lib/api-contracts.ts`<br>`lib/trend-filters.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/time-server` | GET | — | worldtimeapi.org | — | **no** | `components/scanner/enrichment.ts`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/top-performers` | GET | dynamic="force-dynamic" | — | — | **no** | `components/top-performers.tsx`<br>`lib/api-contracts.ts`<br>`lib/remediation.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/trend-analysis` | GET | dynamic="force-dynamic" | query1.finance.yahoo.com | — | **no** | `components/trend-analysis.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
@@ -232,9 +232,9 @@ _None._
 | `lib/remediation.ts` | 756 | 156 |
 | `components/jobs-report-dashboard.tsx` | 751 | 151 |
 | `app/page.tsx` | 697 | 97 |
-| `components/scanner/step4-technical-card.tsx` | 678 | 78 |
+| `components/scanner/step4-technical-card.tsx` | 679 | 79 |
 | `components/cpi-inflation-analysis.tsx` | 669 | 69 |
-| `components/scanner/use-wheel-scanner.ts` | 662 | 62 |
+| `components/scanner/use-wheel-scanner.ts` | 666 | 66 |
 | `components/admin/health-check-panel.tsx` | 622 | 22 |
 | `lib/api-contracts.ts` | 621 | 21 |
 | `components/scanner/fundamental-scan.ts` | 620 | 20 |

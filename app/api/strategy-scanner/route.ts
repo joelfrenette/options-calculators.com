@@ -13,6 +13,7 @@ import {
   SESSIONS_PER_MONTH,
   isStage4Decline,
   relativeReturnPoints,
+  resolveMaxDayMove,
   sessionMovePercent,
   trailingReturnPercent,
 } from "@/lib/trend-filters"
@@ -204,24 +205,10 @@ interface ExclusionPolicy {
   trend: boolean
 }
 
-/** The owner's number (P7-30). Same 10% as the Sell Put scanner's default. */
-const DEFAULT_MAX_DAY_MOVE_PERCENT = 10
-
-/**
- * The caller's threshold, clamped to the Sell Put scanner's own slider range.
- *
- * CLAMPED, NOT TRUSTED. `?maxDayMove=0` would exclude every stock that closed
- * up at all, and a non-numeric value parses to NaN, which loses every
- * comparison and silently disables the gate — a filter that reports itself as
- * active while excluding nothing, which is the failure this project keeps
- * finding. Anything unparseable falls back to the default rather than through
- * the gate.
- */
-function resolveMaxDayMove(raw: string | null): number {
-  const n = Number(raw)
-  if (!Number.isFinite(n)) return DEFAULT_MAX_DAY_MOVE_PERCENT
-  return Math.min(25, Math.max(3, n))
-}
+// The threshold's range, default and clamp live in lib/trend-filters.ts —
+// imported above, never re-derived here. It had briefly been written in three
+// places (this clamp, the Sell Put slider, the six tabs' control), which is the
+// P7-28 shape: nothing wrong yet, nothing structural stopping it.
 
 /** The benchmark the relative-strength gate compares against. Matches the Sell Put scanner. */
 const BENCHMARK_TICKER = "SPY"

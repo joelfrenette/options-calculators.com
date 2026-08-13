@@ -22,6 +22,7 @@ import {
   type EntryExclusion,
   type TechnicalFilterSettings,
 } from "./technical-criteria"
+import { MAX_DAY_MOVE } from "@/lib/trend-filters"
 import { useLandmines } from "./use-landmines"
 import { stepLabel, stepTitled } from "./steps"
 
@@ -122,7 +123,10 @@ export function useWheelScanner() {
   // Step 4. These can empty it too, on a weak tape, and that is the intended
   // answer rather than a bug: "nothing qualifies today" is a result.
   const [excludeBigUpDay, setExcludeBigUpDay] = useState(true) // no puts into a spike
-  const [maxDayMove, setMaxDayMove] = useState([10]) // percent — the owner's number
+  // Annotated `number[]`: `MAX_DAY_MOVE` is `as const`, so an unannotated
+  // useState infers the literal type `10[]` and the setter stops accepting any
+  // other number.
+  const [maxDayMove, setMaxDayMove] = useState<number[]>([MAX_DAY_MOVE.DEFAULT])
   const [excludeDownYear, setExcludeDownYear] = useState(true) // trailing year negative
   const [excludeBenchmarkLaggard, setExcludeBenchmarkLaggard] = useState(true) // trailed SPY
   const [excludeStage4, setExcludeStage4] = useState(true) // below a FALLING 150-day MA

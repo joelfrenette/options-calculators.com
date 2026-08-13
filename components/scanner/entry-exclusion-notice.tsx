@@ -6,6 +6,8 @@
 // theirs from /api/strategy-scanner's `entryExclusions` field.
 
 import { Filter } from "lucide-react"
+import { Slider } from "@/components/ui/slider"
+import { MAX_DAY_MOVE } from "@/lib/trend-filters"
 
 export interface EntryExclusion {
   ticker: string
@@ -43,9 +45,6 @@ interface EntryExclusionNoticeProps {
   disabled?: boolean
 }
 
-/** Threshold choices. Matches the Sell Put scanner's 3-25 slider range. */
-const THRESHOLDS = [3, 5, 8, 10, 12, 15, 20, 25]
-
 /**
  * What the entry exclusions removed, and the control that sets the one
  * threshold they take.
@@ -82,24 +81,30 @@ export function EntryExclusionNotice({
             ? "Entry exclusions active — nothing excluded on this scan"
             : `${excluded.length} candidate${excluded.length === 1 ? "" : "s"} excluded`}
         </div>
-        <label className="flex items-center gap-2 text-xs text-amber-900">
-          Exclude a session move at or above
-          <select
-            value={maxDayMove}
+        {/* The SAME control as the Sell Put scanner's Step 4 card, reading the
+            same range from lib/trend-filters. One number, one meaning — a
+            dropdown of eight fixed steps here and a continuous slider there
+            made "10%" mean two slightly different things depending on which
+            tab you were looking at.
+
+            Committed on release rather than on drag: every change is a server
+            round trip, and a slider that refetches per pixel would fire a
+            dozen scans crossing from 3 to 15. */}
+        <label className="flex min-w-[16rem] flex-1 items-center gap-3 text-xs text-amber-900">
+          <span className="whitespace-nowrap">
+            Exclude a session move at or above{" "}
+            <span className="font-semibold text-amber-950">{maxDayMove}%</span>
+          </span>
+          <Slider
+            value={[maxDayMove]}
+            onValueChange={(v) => onMaxDayMoveChange(v[0])}
+            onValueCommit={(v) => onRescan(v[0])}
+            min={MAX_DAY_MOVE.MIN}
+            max={MAX_DAY_MOVE.MAX}
+            step={MAX_DAY_MOVE.STEP}
             disabled={disabled}
-            onChange={(e) => {
-              const next = Number(e.target.value)
-              onMaxDayMoveChange(next)
-              onRescan(next)
-            }}
-            className="rounded border border-amber-300 bg-white px-2 py-1 text-xs font-semibold disabled:opacity-50"
-          >
-            {THRESHOLDS.map((t) => (
-              <option key={t} value={t}>
-                {t}%
-              </option>
-            ))}
-          </select>
+            className="flex-1"
+          />
         </label>
       </div>
 

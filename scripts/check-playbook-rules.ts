@@ -290,10 +290,54 @@ for (const f of scannerTabs) {
   )
 }
 
+// ---------------------------------------------------------------------------
+// One threshold, one definition (P7-34).
+// ---------------------------------------------------------------------------
+//
+// The range, default and clamp briefly lived in three places: the route's own
+// clamp, the Sell Put scanner's 3-25 slider, and the six tabs' dropdown of
+// eight fixed steps. Nothing disagreed yet — which is exactly the state the
+// fifteen hand-built Yahoo URLs were in before one of them diverged (P7-28).
+//
+// `lib/trend-filters.ts` owns it now. These assertions are the structural part:
+// the number may not be re-typed anywhere else.
+
+const trendLibSrc = readFileSync(join(ROOT, "lib/trend-filters.ts"), "utf8")
+
 check(
-  "the route clamps the caller's threshold instead of trusting it",
-  /Math\.min\(25,\s*Math\.max\(3,\s*n\)\)/.test(routeSrc) && /Number\.isFinite\(n\)/.test(routeSrc),
-  "maxDayMove=0 would exclude every up day; a non-numeric value is NaN, which loses every comparison and disables the gate silently",
+  "lib/trend-filters.ts owns the threshold range and default",
+  /export const MAX_DAY_MOVE = \{ MIN: \d+, MAX: \d+, DEFAULT: \d+, STEP: \d+ \}/.test(trendLibSrc),
+)
+
+check(
+  "the route delegates the clamp rather than re-implementing it",
+  /resolveMaxDayMove,/.test(routeSrc) && !/Math\.min\(\s*25/.test(routeSrc),
+  "a second clamp in the route is a second definition of the range",
+)
+
+check(
+  "the clamp still refuses 0 and NaN",
+  /Number\.isFinite\(n\)/.test(trendLibSrc) &&
+    /Math\.min\(MAX_DAY_MOVE\.MAX,\s*Math\.max\(MAX_DAY_MOVE\.MIN,\s*n\)\)/.test(trendLibSrc),
+  "maxDayMove=0 would exclude every up day; NaN loses every comparison and disables the gate silently",
+)
+
+for (const [label, file] of [
+  ["the Sell Put slider", "components/scanner/step4-technical-card.tsx"],
+  ["the shared tab notice", "components/scanner/entry-exclusion-notice.tsx"],
+] as const) {
+  const src = readFileSync(join(ROOT, file), "utf8")
+  check(
+    `${label} reads the shared range, not its own numbers`,
+    /min=\{MAX_DAY_MOVE\.MIN\}/.test(src) && /max=\{MAX_DAY_MOVE\.MAX\}/.test(src) && /step=\{MAX_DAY_MOVE\.STEP\}/.test(src),
+    file,
+  )
+}
+
+check(
+  "the Sell Put scanner's default comes from the shared constant",
+  /useState<number\[\]>\(\[MAX_DAY_MOVE\.DEFAULT\]\)/.test(hookSrc),
+  "a hardcoded 10 here and a DEFAULT of 10 there is two numbers that happen to agree",
 )
 
 if (failures > 0) {

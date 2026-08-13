@@ -407,11 +407,12 @@ recomputes it.
 | P7-31 | — | fixed | The CSP playbook states the four entry exclusions with the control enforcing each; check-playbook-rules.ts derives the gate list from the implementation so a gate cannot be removed while the page keeps teaching it. Negative-tested three ways. |
 | P7-32 | P3 | fixed | Sweep of the other six scanners. Big-up-day applies to all seven; the year-long gates apply to LEAPS, ZEBRA and the bull-put half of credit spreads, are INVERTED for bear-call, and are wrong for the three neutral strategies. Owner approved; applied with the per-strategy split, one memoised year-of-bars call per ticker per request. |
 | P7-33 | — | fixed | The six server-driven scanner tabs render the shared entry-exclusion notice and set the threshold via ?maxDayMove= (clamped 3-25 server-side). A stale-closure bug that would have rescanned with the previous threshold was caught before commit. |
+| P7-34 | P3 | fixed | The big-up-day threshold was written in three places — a route clamp, a slider range and a dropdown of eight fixed steps. lib/trend-filters.ts owns the range, default and clamp now, and the six tabs use the same slider as the Sell Put scanner. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-236 findings recorded · **189 fixed · 8 wontfix · 1 verified-ok · 38 open.**
+237 findings recorded · **190 fixed · 8 wontfix · 1 verified-ok · 38 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -3226,3 +3227,33 @@ smaller number as a pass. That is the P6-77 assertion doing exactly what it exis
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-33 | — | SCAN tabs | The six server-driven scanners now render the shared entry-exclusion notice and set the big-up-day threshold via `?maxDayMove=` (clamped 3-25). A stale-closure bug that would have rescanned with the previous threshold was found and fixed before commit. |
+
+### P7-34 — one threshold, one definition
+
+The big-up-day percentage briefly lived in three places: a `Math.min(25, Math.max(3, n))`
+clamp in `/api/strategy-scanner`, a 3-25 slider in the Sell Put scanner's Step 4 card, and
+a dropdown of eight fixed steps in the six server-driven tabs. Nothing disagreed yet —
+which is exactly the state the fifteen hand-built Yahoo URLs were in before one of them
+diverged (P7-28), and the state `lib/ticker-links.ts` exists to end.
+
+`lib/trend-filters.ts` owns it now: `MAX_DAY_MOVE = { MIN: 3, MAX: 25, DEFAULT: 10, STEP: 1 }`
+and `resolveMaxDayMove()`, the clamp the route imports rather than re-implements. The six
+tabs' dropdown became **the same slider the Sell Put scanner uses**, reading the same
+bounds, so "10%" means one thing wherever it appears. It commits on release rather than on
+drag — every change is a server round trip, and a slider that refetched per pixel would
+fire a dozen scans crossing from 3 to 15.
+
+A typing detail worth keeping: `MAX_DAY_MOVE` is `as const`, so `useState([MAX_DAY_MOVE.DEFAULT])`
+infers the literal type `10[]` and the setter stops accepting any other number. The state
+is annotated `number[]`.
+
+Five assertions, negative-tested two ways: a slider re-typing its own bounds, and the route
+growing a second clamp.
+
+**Verified on staging before this change** (`7a1974b`): `maxDayMove=3` excluded 12 and
+returned 7 ZEBRA rows; `maxDayMove=25` excluded 11 and returned 8. The clamp answered
+`0 → 3` and `abc → 10`, so a hostile or broken value cannot disable the gate.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-34 | P3 | SCAN / lib | The big-up-day threshold was written in three places — a route clamp, a slider range and a dropdown. `lib/trend-filters.ts` owns the range, default and clamp now; the six tabs use the same slider as the Sell Put scanner. Five assertions, negative-tested twice. |
