@@ -87,7 +87,7 @@ const GUARDED = [
 // split `fundamental-metrics.ts` out of `fundamental-scan.ts` (646 → 496).
 // Third and fourth bumps, both refactors: the pattern is established rather
 // than noteworthy now, and the number moving is the record that a human looked.
-const EXPECTED_GUARDED = 22
+const EXPECTED_GUARDED = 23
 
 check(
   `scope: ${GUARDED.length} file(s) guarded`,

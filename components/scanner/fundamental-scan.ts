@@ -35,6 +35,7 @@ import {
   extractEarningsData,
   sortQuarterRows,
 } from "./fundamental-metrics"
+import { REJECTION_REASONS, SKIP_REASONS, emptyBuckets } from "./scan-diagnostics"
 
   // Technical indicators (SMA/RSI/Bollinger/MACD/Stochastic/ATR) now come from
   // the shared lib/indicators.ts (Phase 4 extraction). All of them return null
@@ -79,21 +80,12 @@ export const runFundamentalScan = async ({
       const nearMissStocks: QualifyingStock[] = []
       const skippedTickers: string[] = []
 
-      // Diagnostics: track WHY each ticker was rejected/skipped so we can show it on-screen
-      const rejectionBuckets: Record<string, string[]> = {
-        priceCap: [],
-        volume: [],
-        debtEquity: [],
-        roe: [],
-        profitableQuarters: [],
-        marketCap: [],
-      }
-      const skipBuckets: Record<string, string[]> = {
-        rateLimit: [],
-        apiError: [],
-        thinFinancials: [],
-        exception: [],
-      }
+      // Diagnostics: track WHY each ticker was rejected/skipped so we can show
+      // it on-screen. The KEYS come from scan-diagnostics.ts, which also owns
+      // the label the notice card renders for each — a bucket without a label
+      // used to render a blank heading beside a live count (P7-53).
+      const rejectionBuckets = emptyBuckets(REJECTION_REASONS)
+      const skipBuckets = emptyBuckets(SKIP_REASONS)
 
       const batchSize = 2 // Reduced from 5 to 2 for better rate limit compliance
       const batchDelay = 2000 // Increased from 1000ms to 2000ms between batches
@@ -182,6 +174,28 @@ export const runFundamentalScan = async ({
 
             const currentPrice = day.c || prevDay.c || 0
 
+            // P7-51. NO PRICE IS A SKIP, NOT A ROW.
+            //
+            // `day.c || prevDay.c || 0` yields 0 when Polygon returns neither a
+            // live nor a previous close, and 0 sailed through everything below:
+            // the price cap compares `0 > cap` and passes, and the ticker went
+            // on to fail volume and incomplete-fundamentals — TWO failures,
+            // which is a near miss, so it was not discarded but SHOWN in the
+            // relaxed Step 4 table. It rendered a $0.00 strike, a $0.00 premium
+            // and a **0.50% yield**, because the estimate's clamp has a floor
+            // and a floor applies to a row with nothing in it.
+            //
+            // A clamp bound is not a measurement, and this is the house rule's
+            // own shape: missing data must not render as a number. It is a skip
+            // rather than a rejection because no filter was ever evaluated — we
+            // never looked, which is a different answer from "it failed".
+            if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
+              console.log(`[v0] ⚠️ ${ticker} - no price (day.c and prevDay.c both absent). Skipping...`)
+              skippedTickers.push(ticker)
+              skipBuckets.noPrice.push(ticker)
+              return null
+            }
+
             // Step 1 Dollar Amount filter: exclude stocks priced above the chosen max.
             // A slider value of 1000 means "1,000+" and is treated as no upper limit.
             const priceCap = maxStockPrice[0]
@@ -262,7 +276,11 @@ export const runFundamentalScan = async ({
             // "incomplete financials" instead of quoting a fabricated 0.0%.
             if (roe === null) {
               console.log(`[v0]   ❌ ${ticker}: ROE unknown (TTM covers ${ttmQuarters}/4 quarters)`)
-              rejectionBuckets.roe.push(`${ticker}(ROE unknown)`)
+              // P7-53: this used to push into the `roe` bucket, so the notice
+              // card told the user "ROE below Min ROE %" about a company whose
+              // earnings never reported. P6-24 fixed that exact sentence in the
+              // LOG line above and left the bucket pointing at the wrong label.
+              rejectionBuckets.fundamentalsIncomplete.push(`${ticker}(ROE unknown)`)
               failedFilters.push("fundamentalsIncomplete")
             } else if (roe < minROEValue) {
               console.log(`[v0]   ❌ ${ticker}: ROE ${roe.toFixed(1)}% < ${minROEValue}%`)
@@ -286,7 +304,8 @@ export const runFundamentalScan = async ({
               // Unknown cap used to compare as 0 and be rejected as "below
               // minimum", quoting a $0.0B figure that was never measured.
               console.log(`[v0]   ❌ ${ticker}: Market Cap unknown (no shares outstanding and no complete TTM)`)
-              rejectionBuckets.marketCap.push(`${ticker}(unknown)`)
+              // Same correction as ROE above: unknown is not "below minimum".
+              rejectionBuckets.fundamentalsIncomplete.push(`${ticker}(market cap unknown)`)
               if (!failedFilters.includes("fundamentalsIncomplete")) failedFilters.push("fundamentalsIncomplete")
             } else if (minMarketCapValue > 0 && marketCap !== null && marketCap < minMarketCapValue) {
               console.log(

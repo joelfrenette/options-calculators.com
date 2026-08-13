@@ -12,6 +12,20 @@ import { AlertCircle, Filter } from "lucide-react"
 import type { QualifyingStock, RejectionSummary } from "./types"
 import type { EntryExclusion } from "./technical-criteria"
 import { stepLabel } from "./steps"
+import { REJECTION_REASONS, SKIP_REASONS } from "./scan-diagnostics"
+
+/**
+ * The heading for a bucket, from the map that also defines the bucket keys.
+ *
+ * This was a chain of `{reason === "x" && "…"}` expressions with no `else`
+ * (P7-53), so an unlabelled bucket rendered a BLANK heading beside a live
+ * count — invisible in exactly the way a missing check is. Falling back to the
+ * raw key is deliberately ugly: an unlabelled bucket should look wrong on
+ * screen, not look like nothing.
+ */
+function reasonLabel(labels: Record<string, string>, reason: string): string {
+  return (labels[reason] ?? reason).replace("{step}", stepLabel("dollarFilter"))
+}
 
 interface RejectionSummaryCardProps {
   rejectionSummary: RejectionSummary
@@ -53,16 +67,7 @@ export function RejectionSummaryCard({
               .map(([reason, ts]) => (
                 <div key={reason} className="flex flex-col gap-1 border-b border-amber-200 pb-2 last:border-0">
                   <div className="flex justify-between font-semibold text-amber-900">
-                    <span>
-                      {reason === "priceCap" && `Above Max Stock Price (${stepLabel("dollarFilter")})`}
-                      {reason === "volume" && "Volume below Min Volume"}
-                      {reason === "debtEquity" && "Debt/Equity above Max"}
-                      {reason === "roe" && "ROE below Min ROE %"}
-                      {reason === "fundamentalsIncomplete" &&
-                        "Financials incomplete — fewer than 4 reported quarters, so ROE/market cap could not be computed"}
-                      {reason === "profitableQuarters" && "Fewer consecutive profitable quarters than required"}
-                      {reason === "marketCap" && "Market cap below Min"}
-                    </span>
+                    <span>{reasonLabel(REJECTION_REASONS, reason)}</span>
                     <span>{ts.length}</span>
                   </div>
                   <div className="text-xs text-amber-700 break-words">
@@ -76,12 +81,7 @@ export function RejectionSummaryCard({
               .map(([reason, ts]) => (
                 <div key={reason} className="flex flex-col gap-1 border-b border-amber-200 pb-2 last:border-0">
                   <div className="flex justify-between font-semibold text-amber-900">
-                    <span>
-                      {reason === "rateLimit" && "Skipped — Polygon rate limit (429)"}
-                      {reason === "apiError" && "Skipped — Polygon API error (non-200)"}
-                      {reason === "thinFinancials" && "Warn — Polygon returned thin financials (likely null ROE/EPS)"}
-                      {reason === "exception" && "Skipped — client-side exception in loop"}
-                    </span>
+                    <span>{reasonLabel(SKIP_REASONS, reason)}</span>
                     <span>{ts.length}</span>
                   </div>
                   <div className="text-xs text-amber-700 break-words">
