@@ -298,7 +298,7 @@ recomputes it.
 | P6-10 | P2 | fixed | `100 - x \|\| 50` precedence bug. |
 | P6-11 | P1 | fixed | **Owner chose: fold the real rows into social-sentiment and retire the rest (2026-08-13).** The measured half of `/api/sentiment-heatmap` — StockTwits author-tagged bullish/bearish counts — **already existed in the social-sentiment tab** as `per_symbol`, scored the same way, null when fewer than 5 tagged messages, rendering "No live data". So the rebuild was a deletion: the route is gone (60 routes → 59), with its contract entry, its health-check entry and its consumer. What went with it was the AI path, which asked a model for its "best general impression" while telling it that it had no live data, and — when even that failed — returned `{bullishScore: 50, bearishScore: 50}` as data, on a scale where 50 is a real neutral reading (P6-18's shape). The consumer made it worse: `market-sentiment.tsx` rendered the rows as gauges under the heading **"Sector Analysis"** — three index ETFs, not sectors — and **discarded the per-row `source` field the route provided**, so an AI impression and a measured reading drew the identical dial (S-7's shape). |
 | P6-12 | P1 | fixed | 25+ raw `process.env` key reads routed through `resolveApiKey`. |
-| P6-13 | P3 | open | Module-size debt. 19 was stale; **P7-45 then said 25, which was ALSO wrong — it came off a `head -25` on a sorted list, a display limit read as a count. The true figure was 27, and 26 after P7-45 split the Step 4 card.** Four of the additions were that day's entry-exclusion work. The Black-Scholes duplication half was closed by P7-12. **Now 22 over `app components lib` and 24 including `scripts` (P7-49 — every earlier figure omitted which directories it counted), after the `use-wheel-scanner.ts`, `fundamental-scan.ts`, `strategy-scanner/route.ts` and `ccpi-audit-admin.tsx` splits.** The scanner route was the site's largest module at 1,808 lines and is now 216, its body in `lib/strategy-scanner/` — see P7-59 and P7-60 for what that did to the checks and to SITE_MAP. `ccpi-audit-admin.tsx` was 1,636 and is now 593, its data-shaping half in `lib/ccpi/audit/` — see P7-61 for the claim that extraction does NOT support. Measured with `find app components lib -type f \( -name "*.ts" -o -name "*.tsx" \) -exec wc -l {} + \| awk '$1>600' \| wc -l`. |
+| P6-13 | P3 | open | Module-size debt. 19 was stale; **P7-45 then said 25, which was ALSO wrong — it came off a `head -25` on a sorted list, a display limit read as a count. The true figure was 27, and 26 after P7-45 split the Step 4 card.** Four of the additions were that day's entry-exclusion work. The Black-Scholes duplication half was closed by P7-12. **Now 21 over `app components lib` and 23 including `scripts` (P7-49 — every earlier figure omitted which directories it counted), after the `use-wheel-scanner.ts`, `fundamental-scan.ts`, `strategy-scanner/route.ts`, `ccpi-audit-admin.tsx` and `market-sentiment.tsx` splits.** The scanner route was the site's largest module at 1,808 lines and is now 216, its body in `lib/strategy-scanner/` — see P7-59 and P7-60 for what that did to the checks and to SITE_MAP. `ccpi-audit-admin.tsx` was 1,636 and is now 593, its data-shaping half in `lib/ccpi/audit/` — see P7-61 for the claim that extraction does NOT support. `market-sentiment.tsx` was 1,497 and is now 599, across ten modules under `components/market-sentiment/` — see P7-62. Measured with `find app components lib -type f \( -name "*.ts" -o -name "*.tsx" \) -exec wc -l {} + \| awk '$1>600' \| wc -l`. |
 | P6-14 | P1 | fixed | MMF component normalised against its own history. |
 | P6-15 | P2 | fixed | social-sentiment error banner; decorative 47/54/50 constants removed. |
 | P6-16 | P0 | fixed | `/api/fomc-predictions` nullable end to end; 503 rather than a forecast on a stand-in rate. |
@@ -435,11 +435,12 @@ recomputes it.
 | P7-59 | P2 | fixed | Splitting `/api/strategy-scanner` moved nine beta assertions and every exclusion-policy assertion out of the file two check scripts read, and neither would have failed: `check-beta` would have printed nine PASS lines against an empty match and `check-playbook-rules` would have derived ZERO generator call sites, then compared the published policy against nothing. Both now read the route plus `lib/strategy-scanner/**` and assert that set's size. Two further edges: the per-generator body derivation had to move per file, because over a concatenation the last generator in a file inherits the first gate of the next one — an ungated scanner reading as gated; and one assertion was pinned to `/resolveMaxDayMove,/`, the trailing comma of an import block, so it failed on a route that still delegates correctly. A rule scoped by punctuation is a rule scoped by prose. |
 | P7-60 | P2 | fixed | `site-inventory.ts` read a route's upstream hosts, env keys and timeout wiring from its entry FILE, so the split regenerated SITE_MAP with `/api/strategy-scanner` reaching no upstream, needing no key and wiring no timeout — the route with the largest upstream surface on the site, reported as inert. The first fix, the full `@/lib` import closure, was wrong in the other direction: 115 rows changed and every admin route inherited `lib/auth.ts`'s six secrets, so the Env-keys column stopped telling routes apart. Shipped instead is the EXCLUSIVE closure — a module reachable from exactly one route is that route's body, a module reachable from several is infrastructure and already has its own row. The scanner's row came back byte-identical to its pre-split version; 17 others changed, all of them corrections the old derivation had been missing. |
 | P7-61 | P3 | fixed | Splitting `ccpi-audit-admin.tsx` was about to ship a header claiming the extraction made `validateCCPI` — which decides whether a green "✅ VALID" badge prints over the site's headline number — assertable. False: check scripts run under plain node with relative `.ts` imports, which is why `scoring.ts` and `beta.ts` are import-free and why P7-15 tolerated a triplicated helper; `structure.ts` composes its four pillars through `@/` aliases and cannot be loaded. `check-dead-exports` caught the two exports nothing imported. Both are unexported and both headers now say which module a check can load and which it cannot. The label-is-a-claim failure, in the audit's own scaffolding. |
+| P7-62 | P2 | fixed | Splitting `market-sentiment.tsx` deleted two render sections without replacing them: the insertion anchors for `<HistoricalScaleCard>` and `<TradeRecommendationsCard>` sat inside the line ranges being cut, so the tab lost its headline score card and its entire allocation accordion — and typecheck passed, because a component nothing renders is not a type error. `check-write-only-state.ts` caught it from the side, flagging `refreshing` and `tooltipsEnabled` as newly write-only because the only code reading them had just vanished. A rule written for P7-16 found a refactor that deleted two cards. Fixed, then verified by comparing every user-visible string in the pre-split file against the ten post-split files as a multiset — nothing missing. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-264 findings recorded · **230 fixed · 8 wontfix · 2 verified-ok · 24 open.**
+265 findings recorded · **231 fixed · 8 wontfix · 2 verified-ok · 24 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -4523,3 +4524,41 @@ and passes. Worth knowing before anyone reads a local build failure as a regress
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-61 | P3 | tooling | The CCPI audit split was about to claim it made `validateCCPI` assertable. It does not: check scripts run under plain node with relative `.ts` imports, and `structure.ts` composes its pillars through `@/` aliases. `check-dead-exports` caught the two exports nothing imported. Both unexported; both headers now state which module is loadable by a check and which is not. |
+
+## 2026-08-14 — market-sentiment, and a check that caught the split mid-mistake
+
+`components/market-sentiment.tsx` was 1,497 lines and is now 599, across ten modules in
+`components/market-sentiment/`: the payload shape, the eleven hand-written SVG icons, the
+sparkline, the per-indicator tooltip copy and sentiment vocabulary, the series-to-indicator
+mapping, the seven indicator cards, the score-to-colour lookup, the conditional tooltip,
+and the two largest render sections — the Fear & Greed historical-scale card and the trade
+recommendations accordion — as child components.
+
+Three functions took the same one mechanical change: `getChartDataForIndicator`,
+`buildIndicatorCards` and `ConditionalTooltip` read `marketData`, `components` and
+`tooltipsEnabled` from the component's closure and now take them as arguments. Nothing
+else in any of them moved.
+
+### P7-62 — the split dropped two whole cards, and the state check said so
+
+Cutting the two render sections and inserting the child components were done in one pass,
+and the insertion anchors were **inside the deleted ranges**. Both `<HistoricalScaleCard>`
+and `<TradeRecommendationsCard>` were therefore never inserted: the tab lost its headline
+score card and its entire allocation section, and **typecheck passed**, because a component
+nobody renders is not a type error.
+
+`check-write-only-state.ts` caught it, from a direction that has nothing to do with
+rendering: `refreshing` and `tooltipsEnabled` were suddenly written and never read, because
+the only places reading them were the two JSX blocks that had just vanished. A rule written
+for P7-16 — a dashboard that knew its data was cached and never said — found a refactor
+that silently deleted two cards.
+
+The verification that followed is the transferable part. Typecheck is not evidence that a
+render survived a move, so every user-visible string literal and text node was extracted
+from the pre-split file and from the ten post-split files and compared as a multiset:
+**nothing missing**. That check costs one command and is the only thing here that would have
+caught the deletion on its own.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-62 | P2 | tooling | Splitting `market-sentiment.tsx` deleted two render sections without replacing them — the anchors for the new child components sat inside the ranges being cut, so the tab lost its headline score card and its whole allocation accordion while typecheck stayed green: an unrendered component is not a type error. `check-write-only-state.ts` caught it sideways, flagging `refreshing` and `tooltipsEnabled` as newly write-only because the only readers had just disappeared. Fixed, and verified by comparing every user-visible string in the pre-split file against the ten post-split files as a multiset. |
