@@ -96,17 +96,6 @@ interface MarketData {
   }
 }
 
-interface SentimentData {
-  ticker: string
-  sector: string
-  bullishScore: number
-  bearishScore: number
-  netSentiment: number
-  volume: number
-  category?: string
-  industry?: string
-}
-
 const RefreshIcon = ({ className = "h-4 w-4" }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path
@@ -456,7 +445,6 @@ const getSentimentColor = (sentiment: string): string => {
 
 export function MarketSentiment() {
   const [marketData, setMarketData] = useState<MarketData | null>(null)
-  const [sentimentData, setSentimentData] = useState<SentimentData[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
@@ -690,7 +678,6 @@ export function MarketSentiment() {
     if (!loaded) return
 
     const cachedData = localStorage.getItem(CACHE_KEY)
-    const cachedSentiment = localStorage.getItem("sentimentHeatmapData")
     const cachedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY)
     const cacheVersion = localStorage.getItem(CACHE_VERSION_KEY)
 
@@ -733,14 +720,6 @@ export function MarketSentiment() {
           )
           setLoading(false)
 
-          if (cachedSentiment) {
-            try {
-              const sentiment = JSON.parse(cachedSentiment)
-              setSentimentData(Array.isArray(sentiment) ? sentiment : [])
-            } catch (error) {
-              console.error("[v0] Error loading cached sentiment:", error)
-            }
-          }
           return // Return early - don't auto-fetch when cache is valid
         } else {
           console.log("[v0] Cache data invalid, fetching fresh CNN data with charts...")
@@ -766,14 +745,6 @@ export function MarketSentiment() {
       fetchData()
     }
 
-    if (cachedSentiment) {
-      try {
-        const sentiment = JSON.parse(cachedSentiment)
-        setSentimentData(Array.isArray(sentiment) ? sentiment : [])
-      } catch (error) {
-        console.error("[v0] Error loading cached sentiment:", error)
-      }
-    }
   }, [loaded])
 
   const fetchData = async () => {
@@ -784,16 +755,13 @@ export function MarketSentiment() {
       }
       setFromCache(false)
       console.log("[v0] Fetching fresh Fear & Greed data from API...")
-      const [marketRes, sentimentRes] = await Promise.all([
-        fetch("/api/market-sentiment", {
-          cache: "no-store",
-          headers: {
-            "Cache-Control": "no-cache",
-            Pragma: "no-cache",
-          },
-        }),
-        fetch("/api/sentiment-heatmap"),
-      ])
+      const marketRes = await fetch("/api/market-sentiment", {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
+      })
 
       if (marketRes.ok) {
         const market = await marketRes.json()
@@ -828,21 +796,6 @@ export function MarketSentiment() {
         const errorData = await marketRes.json().catch(() => ({}))
         console.error("[v0] ✗ Market sentiment API error:", marketRes.status, errorData)
         throw new Error(errorData.error || `API returned ${marketRes.status}`)
-      }
-
-      if (sentimentRes.ok) {
-        const sentiment = await sentimentRes.json()
-        const sentimentArray = sentiment.data || sentiment // Handle both old and new formats
-        if (Array.isArray(sentimentArray)) {
-          setSentimentData(sentimentArray)
-          localStorage.setItem("sentimentHeatmapData", JSON.stringify(sentimentArray))
-        } else {
-          console.error("[v0] Sentiment data is not an array:", sentiment)
-          setSentimentData([]) // Keep as empty array on error
-        }
-      } else {
-        console.error("[v0] ✗ Sentiment heatmap API error:", sentimentRes.status)
-        setSentimentData([]) // Keep as empty array on error
       }
 
       setLastUpdated(new Date())
@@ -1058,7 +1011,6 @@ export function MarketSentiment() {
   const sentimentBand = bandForScore(SENTIMENT_ALLOCATION.bands, marketData.overallScore)
   const recommendations = getTradeRecommendations(sentimentBand?.level ?? null)
 
-  const safeSentimentData = Array.isArray(sentimentData) ? sentimentData : []
 
   /**
    * When this reading was taken, and whether it came from localStorage.
@@ -1435,76 +1387,6 @@ export function MarketSentiment() {
                       <p className={`text-sm ${getScoreColor(marketData.overallScore)}`}>{recommendations.coachTips}</p>
                     </div>
                   </div>
-                </CardContent>
-              </AccordionContent>
-            </Card>
-          </AccordionItem>
-        </Accordion>
-
-        {/* Sector Analysis accordion */}
-        <Accordion type="multiple" defaultValue={["sector-analysis"]} className="space-y-0">
-          <AccordionItem value="sector-analysis" className="border-0">
-            <Card className="shadow-sm border-gray-200">
-              <AccordionTrigger className="hover:no-underline px-6 py-4 bg-gray-50 border-b border-gray-200 rounded-t-lg">
-                <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <BarChartIcon className="h-5 w-5 text-primary" />
-                  Sector Analysis
-                </CardTitle>
-              </AccordionTrigger>
-              <AccordionContent>
-                <CardContent className="pt-4">
-                  {safeSentimentData.length > 0 ? (
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {safeSentimentData.map((item, index) => (
-                        <Card key={index} className="shadow-sm border-gray-200 bg-white">
-                          <CardHeader className="bg-gray-50 border-b border-gray-200">
-                            <CardTitle className="text-base font-bold text-gray-900 flex items-center justify-between">
-                              {item.sector}
-                              <span className="text-xs font-normal text-gray-600">{item.ticker}</span>
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="flex flex-col items-center justify-center py-4">
-                              <div className="relative h-20 w-20">
-                                <svg className="h-full w-full" viewBox="0 0 100 100" fill="none">
-                                  <circle cx="50" cy="50" r="50" fill="url(#gradient-sentiment)" />
-                                  <defs>
-                                    <linearGradient id="gradient-sentiment" x1="0%" y1="0%" x2="100%" y2="0%">
-                                      <stop offset="0%" style={{ stopColor: "#EF4444", stopOpacity: 1 }} />
-                                      <stop offset="50%" style={{ stopColor: "#F59E0B", stopOpacity: 1 }} />
-                                      <stop offset="100%" style={{ stopColor: "#22C55E", stopOpacity: 1 }} />
-                                    </linearGradient>
-                                  </defs>
-                                </svg>
-                                <div
-                                  className="absolute inset-0 flex items-center justify-center rounded-full text-xs font-bold text-white shadow-inner"
-                                  style={{
-                                    transform: `rotate(${(100 - item.netSentiment) * 1.8}deg)`,
-                                  }}
-                                >
-                                  <div
-                                    className="absolute bottom-0 w-1 h-1/2 origin-bottom"
-                                    style={{
-                                      background:
-                                        "linear-gradient(to top, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 100%)",
-                                    }}
-                                  />
-                                </div>
-                              </div>
-                              <div className="mt-3 text-center">
-                                <p className="text-lg font-bold text-gray-900">{item.netSentiment.toFixed(0)}</p>
-                                <p className="text-xs font-semibold text-gray-600 uppercase">
-                                  {getIndicatorSentiment(item.netSentiment)}
-                                </p>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center text-gray-500 py-8">Sector sentiment data not available.</div>
-                  )}
                 </CardContent>
               </AccordionContent>
             </Card>

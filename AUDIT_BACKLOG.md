@@ -296,7 +296,7 @@ recomputes it.
 | P6-8 | P1 | fixed | **Owner chose: remove from the composite (2026-08-13).** Two components still voted without a source. `investorIntelligence` is `100 − ((VIX − 10) / 40) × 60` — a pure monotonic function of VIX under a survey's name, so it could never disagree with VIX: one vote counted twice. `marginDebt`'s comment said the proxy was "used only when the real FRED series is unavailable", and **that described the DISPLAY, never the score** — `marginScore` was computed unconditionally and was never null, so on every request FRED missed, `700 + spxMomentum*5 − (vix−15)*3` cast an equal-weight vote. Both are display-only now. Short interest is genuinely live (Quiver off-exchange, E-8a) and AAII stopped scoring at P6-61, so those two needed nothing. 16 assertions, negative-tested in three forms. **The near-miss worth keeping:** the client read `?? (data.marginDebt - 700) / 150`, so the new null was answered by RECOMPUTING the score on the client from the proxy — the server-side removal silently undone in the only place a user looks, with no type error because the client type said `number`. |
 | P6-9 | P2 | fixed | panic-euphoria SMA throws rather than returning a non-average. |
 | P6-10 | P2 | fixed | `100 - x \|\| 50` precedence bug. |
-| P6-11 | P1 | open | **Partial.** The hallucination pipeline is labelled and routed through the guarded chain. **Open decision:** rebuild the sentiment heatmap on real sources or retire the tab. |
+| P6-11 | P1 | fixed | **Owner chose: fold the real rows into social-sentiment and retire the rest (2026-08-13).** The measured half of `/api/sentiment-heatmap` — StockTwits author-tagged bullish/bearish counts — **already existed in the social-sentiment tab** as `per_symbol`, scored the same way, null when fewer than 5 tagged messages, rendering "No live data". So the rebuild was a deletion: the route is gone (60 routes → 59), with its contract entry, its health-check entry and its consumer. What went with it was the AI path, which asked a model for its "best general impression" while telling it that it had no live data, and — when even that failed — returned `{bullishScore: 50, bearishScore: 50}` as data, on a scale where 50 is a real neutral reading (P6-18's shape). The consumer made it worse: `market-sentiment.tsx` rendered the rows as gauges under the heading **"Sector Analysis"** — three index ETFs, not sectors — and **discarded the per-row `source` field the route provided**, so an AI impression and a measured reading drew the identical dial (S-7's shape). |
 | P6-12 | P1 | fixed | 25+ raw `process.env` key reads routed through `resolveApiKey`. |
 | P6-13 | P3 | open | Module-size debt. 19 was stale; **P7-45 then said 25, which was ALSO wrong — it came off a `head -25` on a sorted list, a display limit read as a count. The true figure was 27, and 26 after P7-45 split the Step 4 card.** Four of the additions were that day's entry-exclusion work. The Black-Scholes duplication half was closed by P7-12. **Now 24 over `app components lib` and 26 including `scripts` (P7-49 — every earlier figure omitted which directories it counted), after the `use-wheel-scanner.ts` and `fundamental-scan.ts` splits.** Measured with `find app components lib -type f \( -name "*.ts" -o -name "*.tsx" \) -exec wc -l {} + \| awk '$1>600' \| wc -l`. |
 | P6-14 | P1 | fixed | MMF component normalised against its own history. |
@@ -432,7 +432,7 @@ recomputes it.
 
 ### The open list, by severity
 
-257 findings recorded · **220 fixed · 8 wontfix · 1 verified-ok · 28 open.**
+257 findings recorded · **221 fixed · 8 wontfix · 1 verified-ok · 27 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -4090,6 +4090,42 @@ And the tooltip on the Investor Intelligence row ended with the sentence *"It IS
 the composite."* — accurate when written, false the moment the row stopped scoring, and it
 would have survived as a confident claim about the opposite of the truth. It is asserted
 now too.
+
+### P6-11 — the rebuild turned out to be a deletion
+
+The owner's call was "rebuild on real sources", and the checkpoint question — is a
+three-row heatmap worth a tab? — produced the better answer: **fold the real rows into
+social-sentiment and retire the rest.**
+
+Then the folding turned out to be already done. `/api/sentiment-heatmap`'s measured half
+read StockTwits author-tagged bullish/bearish counts for QQQ/SPY/SPX, returning null below
+five tagged messages rather than presenting a two-message sample as a percentage. The
+social-sentiment tab **already carries exactly that**, as `per_symbol` over SPY/QQQ/IWM/DIA,
+scored the same way, rendering "No live data" when it cannot be scored. Nothing measured
+was lost by deleting the route; one index (SPX, which has no meaningful retail stream) went
+and two (IWM, DIA) were already there.
+
+What went with it is the finding. The AI path asked a model for its *"best general
+impression"* of a security while telling it in the same sentence that it had no live data
+access — and when even that failed, returned `{ bullishScore: 50, bearishScore: 50 }` and
+called it sentiment. On a 0–100 sentiment scale 50 is a real neutral reading, which is
+P6-18's defect in a second place: **the failure value and a genuine measurement are the
+same number.**
+
+**The consumer was worse than the route.** `market-sentiment.tsx` rendered the rows as
+gauges under the heading **"Sector Analysis"** — the three items are index ETFs, not
+sectors — and it **discarded the per-row `source` field the route went to the trouble of
+providing.** The route knew which rows were measured and which were a model's impression,
+said so per row, and the client threw it away and drew the same dial for both. That is
+S-7's shape exactly (the universe source the scanner discarded), and it is the more
+instructive half of this finding: *a route can be honest into a client that is not.*
+
+Route count 60 → 59, with the contract entry, the health-check entry, the consumer, its
+`localStorage` cache and its two cache-restore branches.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P6-11 | P1 | ANALYZE → Market Sentiment | The sentiment heatmap's measured half already existed in social-sentiment; its other half asked a model for an impression and returned 50/50 when that failed. Route retired (60 → 59). The consumer discarded the per-row `source` the route provided, drawing one dial for measured and estimated alike. |
 
 ### P7-54 — two routes disagree about whether this site has a put/call ratio
 

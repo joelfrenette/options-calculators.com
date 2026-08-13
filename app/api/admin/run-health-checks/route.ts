@@ -434,7 +434,7 @@ function contractCoverage() {
     "/api/market-sentiment", "/api/panic-euphoria", "/api/politician-spotlight",
     "/api/polygon-proxy", "/api/polygon-tickers",
     "/api/scenario-analysis", "/api/scraping-bee", "/api/scraping-bee/diagnostics",
-    "/api/sentiment-heatmap", "/api/serper-finance", "/api/smart-money-etfs",
+    "/api/serper-finance", "/api/smart-money-etfs",
     "/api/social-sentiment", "/api/strategy-scanner", "/api/time-server", "/api/top-performers",
     "/api/trend-analysis", "/api/vix",
     "/api/vix-history", "/api/yahoo-proxy",

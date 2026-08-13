@@ -37,8 +37,14 @@ import { fileURLToPath } from "node:url"
 const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..")
 const rel = (p: string) => relative(ROOT, p).split(sep).join("/")
 
-/** Asserted, not printed. Update deliberately when the route set really changes. */
-const EXPECTED_ROUTES = 60
+/**
+ * Asserted, not printed. Update deliberately when the route set really changes.
+ *
+ * 61 → 60 when `/api/ccpi/cache` was deleted (P2-2), → 59 when P6-11 retired
+ * `/api/sentiment-heatmap`: its measured half already existed in the
+ * social-sentiment tab, and its other half asked a model for an impression.
+ */
+const EXPECTED_ROUTES = 59
 const MIN_OUTBOUND_ROUTES = 30
 
 let failures = 0

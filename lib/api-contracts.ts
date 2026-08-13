@@ -178,13 +178,6 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     tabs: ["market-sentiment"],
   },
   {
-    path: "/api/sentiment-heatmap",
-    method: "GET",
-    schema: anyObject,
-    budgetMs: 10000,
-    tabs: ["market-sentiment"],
-  },
-  {
     path: "/api/panic-euphoria",
     method: "GET",
     schema: anyObject,
