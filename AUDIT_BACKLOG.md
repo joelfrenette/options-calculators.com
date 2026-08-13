@@ -312,7 +312,7 @@ recomputes it.
 | P6-24 | P2 | fixed | Two static calculators no longer grade an empty form. |
 | P6-25 | P1 | fixed | learn-csp and learn-leaps arithmetic; part (c) closed by P6-26. |
 | P6-26 | P1 | fixed | TTM requires four reported quarters or is null. |
-| P6-27 | P1 | fixed | **Owner chose: drop the universe to 99 and state it (2026-08-13).** MMC is delisted, not repairable — Polygon 404s it since 2026-01-13 with 1,111 stored rows that can never extend. It had been kept in the list on purpose to avoid changing what the breadth percentage is a percentage OF, **and that reasoning was wrong: the denominator had already moved.** A delisted member is excluded from every 200-day window whether or not the constant still names it, so `sample_size` had read 99 against a `universe_size` of 100 on every row for seven months. **A stale constant does not preserve a denominator; it stops the denominator being visible.** No substitute was picked — a hand-chosen replacement is a judgement rendered inside a number labelled index breadth, and no market-cap-ranked source exists on this plan. `BREADTH_UNIVERSE_REMOVED` records the absence with a reason and a date; 9 assertions require list + removals to equal the original 100, so a name cannot leave silently in either direction. |
+| P6-27 | P1 | fixed | **Owner chose: drop the universe to 99 and state it (2026-08-13).** **Correction, same day: this fixed the CONSTANT and not the number.** `compute_breadth` derives its universe from `count(distinct ticker) from market_closes`, not from `BREADTH_UNIVERSE`, so removing MMC from the list left the published reading unchanged — see P7-55, which is the half that moved it. **Fixing the list a number is supposed to come from is not the same as fixing where the number comes from.** MMC is delisted, not repairable — Polygon 404s it since 2026-01-13 with 1,111 stored rows that can never extend. It had been kept in the list on purpose to avoid changing what the breadth percentage is a percentage OF, **and that reasoning was wrong: the denominator had already moved.** A delisted member is excluded from every 200-day window whether or not the constant still names it, so `sample_size` had read 99 against a `universe_size` of 100 on every row for seven months. **A stale constant does not preserve a denominator; it stops the denominator being visible.** No substitute was picked — a hand-chosen replacement is a judgement rendered inside a number labelled index breadth, and no market-cap-ranked source exists on this plan. `BREADTH_UNIVERSE_REMOVED` records the absence with a reason and a date; 9 assertions require list + removals to equal the original 100, so a name cannot leave silently in either direction. |
 | P6-28 | P2 | fixed | Health check reports which admin credential is in use. |
 | P6-29 | P2 | fixed | The dead duplicate `components/ccpi/` directory deleted. |
 | P6-30 | P2 | fixed | Social Sentiment no longer publishes 50/100 when every source is down. |
@@ -422,6 +422,7 @@ recomputes it.
 | P7-46 | P3 | fixed | The tsconfig note claiming the Next bundler disallows .ts import extensions was FALSE and blocked Phase 7.0 for five phases. Vercel built it clean (chunk changed, /api/ccpi 200, homepage 200). An untested claim in a comment is a claim, not a constraint. |
 | P7-47 | **P1** | fixed | keywordScore matched by substring, so "Death cross forms as S&P 500 breaks support" scored 100/100 BULLISH (ath in death, up in support) and "Ford recalls 100,000 trucks" scored 100/100 (calls in recalls). A live indicator at 0.08 composite weight that could be exactly inverted. Word boundaries; scorer extracted to the import-free lib/headline-sentiment.ts; 14 assertions. |
 | P7-48 | P3 | fixed | P7-45's corrected module count of 25 came off a `head -25`-truncated list — a display limit read as a count. The real figure was 27, and is 26 after the Step 4 split. |
+| P7-55 | **P1** | fixed | **`compute_breadth` counted a delisted member on a seven-month-old price, every day, in one direction.** The daily cron's function ranked `row_number() ... order by day desc` and qualified any ticker with 200 stored rows **with no date constraint at all**, so MMC (1,111 rows ending 2026-01-13) qualified on every run: January close 182.70 against its own January 200-day average of 205.44, voting "below" in a reading published for August. **The sibling function was right the whole time** — `compute_breadth_range` windows by date — so `/api/breadth` returned `sample: 99` for every historical day and `sampleSize: 100` for today **in the same payload**, and nobody read down the column. Two definitions of one number on one table. Migration `20260813164047` applied to production on the owner's authorisation: freshness (latest row within 6 days) plus a 400-day span bound; `universe_size` now reports the qualified set rather than every ticker ever stored. Production verified before/after: 69/100/100 → 69.70/99/99, and the daily row now agrees with the history. 11 assertions. **Found only because the owner ran a backfill for an unrelated build.** |
 | P7-54 | P2 | fixed | **Owner chose: rename it to what it is (2026-08-13).** `/api/panic-euphoria` scored `putCallRatio`, and the value is `vixShortTerm / vixLongTerm` — the 5-day VIX over the 50-day. Real measured data, correctly scored as curve SHAPE, which is exactly why it survived P6-8 where `investorIntelligence` did not: shape can disagree with level. **The site contradicted itself about it** — `/api/market-sentiment` states in its own header that "nothing in the codebase sources one", lists it in `NOT_TRACKED` and returns null, while this route published a number under that name. Two routes, two answers to "does this site have a put/call feed", and the one saying yes was the one publishing. The tab was worse than the route: the tooltip attributed the row to "options flow data" and a second panel called it the "CBOE equity put/call ratio" — a named exchange product the site has never had. Now `vixTermRatio` / `vixTermScore`, labelled "VIX Term Structure (5d/50d)", and OUT of `syntheticComponents`, because a direct reading of the curve is not a proxy for anything. 7 assertions. |
 | P7-53 | P2 | fixed | The scan built its rejection/skip buckets as an object literal while the notice card rendered their names as a `reason === "x" &&` chain in another file, connected by nothing. BOTH directions were broken: a bucket with no label rendered a BLANK heading beside a live count, and `fundamentalsIncomplete` had a written label that was unreachable because it is a `failedFilters` tag and never a bucket key. So an unknown ROE went into the `roe` bucket and the user was told **"ROE below Min ROE %"** about a company whose earnings never reported — P6-24 fixed that sentence in the log line and left the bucket. Keys and labels now come from `scan-diagnostics.ts`; 51 assertions. |
 | P7-52 | P2 | fixed | The Step 3 scan's arithmetic — the four-quarter TTM gate, the null D/E and ROE, the market cap that must not render "$0.0B", the S-17 earnings extraction, the premium estimate — sat inside an async three-endpoint fetch loop and could not be asserted by anything. Extracted to the import-free `components/scanner/fundamental-metrics.ts`; `fundamental-scan.ts` 646 → 496. 54 assertions in `check-fundamental-metrics.ts`, negative-tested in three forms. |
@@ -432,7 +433,7 @@ recomputes it.
 
 ### The open list, by severity
 
-257 findings recorded · **223 fixed · 8 wontfix · 1 verified-ok · 25 open.**
+258 findings recorded · **224 fixed · 8 wontfix · 1 verified-ok · 25 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -4090,6 +4091,63 @@ And the tooltip on the Investor Intelligence row ended with the sentence *"It IS
 the composite."* — accurate when written, false the moment the row stopped scoring, and it
 would have survived as a confident claim about the opposite of the truth. It is asserted
 now too.
+
+### P7-55 — two definitions of one number, disagreeing in the same payload
+
+**Found only because the owner ran a backfill for an unrelated build.** P7-21 needed
+stored closes, the backfill response reported `breadth 69% (100/100 qualified)`, and 100
+was impossible under P6-27's premise: MMC has been dark since January, so it cannot hold a
+200-day window ending in August. It should have read 99.
+
+It read 100 because `compute_breadth` — the function the daily cron calls — ranks
+`row_number() over (partition by ticker order by day desc)` and qualifies any ticker whose
+last 200 rows number 200. **There is no date constraint anywhere in it.** So:
+
+| ticker | latest_day | latest_close | its own sma200 | counts as |
+|---|---|---|---|---|
+| AAPL | 2026-08-13 | 303.46 | 280.29 | above |
+| MMC | **2026-01-13** | **182.70** | **205.44** | **below** |
+
+A delisted stock, priced seven months ago, compared against a seven-month-old average of
+itself, voting "below its 200-day moving average" in a reading published for August. Every
+day. In one direction. Drifting further as the stale price ages away from a market that
+keeps moving. Published 69.00%; the fresh 99 give 69.70%.
+
+**The disagreement was in the API response the whole time.** `compute_breadth_range` —
+used for history and backfills — windows correctly by date and excludes MMC, so
+`/api/breadth` returned `sample: 99` on every historical day and `sampleSize: 100` for
+today, **in one payload**. Nobody read down the column. Two definitions of one number, on
+one table, differing by exactly one member, visible in a single GET.
+
+**It also survived P6-27's fix, applied a few hours earlier the same day.** Removing MMC
+from `lib/breadth-universe.ts` did nothing to the published figure, because this function
+derives its universe from `count(distinct ticker) from market_closes`, not from the
+constant. That correction is recorded in P6-27's own row rather than left to be inferred.
+**Fixing the list a number is supposed to come from is not the same as fixing where the
+number comes from** — and I verified the finding's premise without verifying the path the
+number actually travels, which is P7-26's lesson (verify a finding's blast radius, not just
+its premise) arriving from the other direction.
+
+The migration adds freshness — latest row within 6 days of the latest trading day, the same
+rule `lib/market-closes.ts` already applies — plus a 400-day span bound that currently
+excludes nobody and guards the case freshness alone cannot: a ticker that goes dark for
+months and *resumes* is fresh, but its last 200 rows straddle the gap and its "200-day
+average" would silently span two eras. `universe_size` now reports the qualified set;
+counting rows in the table is how a delisted member stayed in the denominator after it had
+stopped being in the universe.
+
+Applied to production as `20260813164047` on the owner's explicit authorisation, signature
+unchanged so it replaced rather than adding an overload, and verified by probing production
+before and after: `69 / 100 / 100` → `69.70 / 99 / 99`.
+
+`scripts/check-breadth-sql.ts` reads the migration SQL as text and states its own limit
+out loud: **it cannot run the database.** It pins that the conditions are still written and
+that a later migration cannot silently drop an earlier one's fix — negative-tested by
+deleting the freshness line, and by adding a 0014 that reinstates SPY/QQQ.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-55 | **P1** | E-6a breadth | `compute_breadth` qualified tickers on 200 stored rows with no date constraint, so delisted MMC voted daily on a January price. The sibling function was correct, so `/api/breadth` published 99 and 100 in the same response for seven months. Migration applied; 69.00% → 69.70%. |
 
 ### P6-27 — a stale constant does not preserve a denominator
 
