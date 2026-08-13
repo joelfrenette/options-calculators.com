@@ -42,18 +42,18 @@ const BACKLOG = "AUDIT_BACKLOG.md"
  * findings set that quietly shrinks, fails loudly instead of passing quietly.
  * Update them deliberately in the same commit that changes the counts.
  */
-const EXPECTED_LEDGER_ROWS = 248
+const EXPECTED_LEDGER_ROWS = 249
 const EXPECTED_OPEN = 29
-const EXPECTED_FIXED = 210
+const EXPECTED_FIXED = 211
 const EXPECTED_WONTFIX = 8
 const EXPECTED_VERIFIED_OK = 1
 
 /**
- * IDs reachable from a table's first cell. The remainder of the ledger (248 - 238)
+ * IDs reachable from a table's first cell. The remainder of the ledger (249 - 239)
  * is sub-items that exist only inside a parent row's prose — E-6a..E-6d, E-7a/b/d,
  * E-8a/c/d. Asserted so that findings cannot quietly stop being table rows.
  */
-const EXPECTED_TABLE_IDS = 238
+const EXPECTED_TABLE_IDS = 239
 
 /**
  * Table rows whose first cell is deliberately not a finding ID: they record a piece

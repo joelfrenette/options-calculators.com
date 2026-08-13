@@ -419,11 +419,12 @@ recomputes it.
 | P7-43 | P2 | fixed | resolveBudgetLimit extracted to the import-free lib/budget-env.ts; 14 assertions pin that a blank env var falls back while a configured "0" is honoured as zero, and that the two are distinguished. |
 | P7-44 | P2 | fixed | TypeScript errors 8 to 0. One of the tolerated eight was a live defect: risk-calculator never imported Recharts Tooltip, so its chart rendered the Radix component and the VIX chart had no hover readout. |
 | P7-45 | P3 | fixed | P6-13's module-size count corrected from 19 to 25; four of the additions are this session's entry-exclusion work. |
+| P7-46 | P3 | fixed | The tsconfig note claiming the Next bundler disallows .ts import extensions was FALSE and blocked Phase 7.0 for five phases. Vercel built it clean (chunk changed, /api/ccpi 200, homepage 200). An untested claim in a comment is a claim, not a constraint. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-248 findings recorded · **210 fixed · 8 wontfix · 1 verified-ok · 29 open.**
+249 findings recorded · **211 fixed · 8 wontfix · 1 verified-ok · 29 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -3708,3 +3709,27 @@ row that still says 19 lets the cost go unrecorded.
 | P7-43 | P2 | ops / budget | `resolveBudgetLimit` extracted to the import-free `lib/budget-env.ts`; 14 assertions pin that a blank variable falls back while a configured "0" is honoured, and that the two are distinguished. The env names are spelled once and asserted to carry `_BUDGET_`. |
 | P7-44 | P2 | site-wide | TypeScript errors 8 → 0. One was a live defect: `risk-calculator` never imported Recharts' `Tooltip`, so its chart rendered the Radix one and the VIX chart had no hover readout. |
 | P7-45 | P3 | docs | P6-13's module-size count was 19 and is 25; four of the additions are from this session's entry-exclusion work. |
+
+### P7-46 — the thing blocking Phase 7.0 was a comment, and it was wrong
+
+`tsconfig.json` carried a note saying scripts import "with explicit .ts extensions,
+**which the Next bundler config disallows**". That sentence is why nobody tried the
+one-line fix: it read as a settled constraint.
+
+**It was false.** Pushed to staging 2026-08-12 and Vercel built it clean —
+`page-d284f845e39e9154.js` → `page-d8b1baab9849c6b5.js`, `/api/ccpi` answering 200 in 2.2s
+with CCPI 17 / Low Risk / certainty 56 and its two null pillars intact, homepage 200. The
+bundler accepts `.ts` import specifiers.
+
+**An untested claim in a comment is a claim, not a constraint** — and this one had the
+authority of sitting in a config file, in the imperative, next to the thing it described.
+It blocked the step AUDIT_PLAN calls "do this first" through five phases of work. The note
+now records what was actually tested and when.
+
+The general form is one this audit keeps meeting from the other direction: P6-42's tabs
+asserted capabilities the code lacked; this asserted an incapability the code did not have.
+**Both are labels nobody checked against the thing they describe.**
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-46 | P3 | tooling | The tsconfig note claiming the Next bundler disallows `.ts` import extensions was false, and blocked Phase 7.0 for five phases. Vercel built the change clean; the note now records the test rather than the assumption. |

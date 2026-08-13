@@ -24,6 +24,6 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "//": "scripts/ holds standalone Node tools run via `node scripts/x.ts` (native type stripping). They import with explicit .ts extensions, which the Next bundler config disallows, and they are not part of the app build.",
+  "//": "scripts/ holds standalone Node tools run via `node scripts/x.ts` (native type stripping) and is excluded from the app build. This note used to add 'which the Next bundler config disallows' about explicit .ts import extensions. THAT WAS FALSE, and it blocked AUDIT_PLAN step 7.0 for as long as it was believed: allowImportingTsExtensions (legal under noEmit) plus .ts on three lib/ccpi imports built clean on Vercel 2026-08-12 and the CCPI route answered 200. An untested claim in a comment is a claim, not a constraint.",
   "exclude": ["node_modules", "scripts"]
 }
