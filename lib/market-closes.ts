@@ -121,3 +121,94 @@ export async function getStoredBars(ticker: string, limit: number, minBars: numb
     return null
   }
 }
+
+/**
+ * Universe members whose stored history has stopped advancing. (P7-40/P7-41)
+ *
+ * WHY THIS EXISTS. `MMC` stopped resolving at Polygon on 2026-01-13 and nobody
+ * noticed for seven months. The design degraded gracefully — breadth divides
+ * only by tickers holding a full 200-day window, so the published percentage
+ * stayed honest while `sample_size` quietly read 99/100 — and that is precisely
+ * why it went unseen. **Silence is not the same as "nothing to report".**
+ *
+ * It was found by hand, with a query somebody had to think of running. This
+ * makes it something the admin health check asks every time.
+ *
+ * ABSENCE IS THE SIGNAL, so no API calls are needed: `market-snapshot` writes a
+ * row for every ticker the grouped feed returns, so a universe member with no
+ * recent row is a member the feed stopped returning. A ticker that was NEVER
+ * stored reports too, with `lastDay: null` — otherwise a member that never
+ * entered the store would be invisible to a freshness test, which is the
+ * never-ran-versus-passed confusion in a new place.
+ *
+ * @param staleAfterDays how far behind the newest stored day counts as stale.
+ *   Six calendar days clears a long weekend plus a holiday.
+ */
+export async function getStaleUniverseMembers(
+  universe: readonly string[],
+  staleAfterDays = 6,
+): Promise<{ ticker: string; lastDay: string | null; daysBehind: number | null }[] | null> {
+  const cfg = getMeteringSupabaseConfig()
+  if (!cfg) return null
+  const headers = { apikey: cfg.key, Authorization: `Bearer ${cfg.key}` }
+  const base = `${cfg.url}/rest/v1/market_closes`
+
+  try {
+    // The newest day in the whole table is the reference. Using "today" instead
+    // would report every ticker as stale whenever the snapshot cron itself has
+    // not run — a real problem, but a different one, and conflating them would
+    // make this report cry wolf on the morning after any outage.
+    const newestRes = await fetch(`${base}?select=day&order=day.desc&limit=1`, {
+      headers,
+      signal: AbortSignal.timeout(6000),
+      cache: "no-store",
+    })
+    if (!newestRes.ok) return null
+    const newestRows = (await newestRes.json()) as { day: string }[]
+    const newest = newestRows?.[0]?.day
+    if (!newest) return null
+
+    const cutoff = new Date(`${newest}T00:00:00Z`)
+    cutoff.setUTCDate(cutoff.getUTCDate() - staleAfterDays)
+    const cutoffDay = cutoff.toISOString().slice(0, 10)
+
+    // One request: every ticker in the universe that HAS a row at or after the
+    // cutoff. Whatever is missing from the answer is stale or unstored.
+    const inList = universe.map((t) => `"${t}"`).join(",")
+    const freshRes = await fetch(
+      `${base}?select=ticker&ticker=in.(${encodeURIComponent(inList)})&day=gte.${cutoffDay}`,
+      { headers, signal: AbortSignal.timeout(8000), cache: "no-store" },
+    )
+    if (!freshRes.ok) return null
+    const fresh = new Set(((await freshRes.json()) as { ticker: string }[]).map((r) => r.ticker))
+
+    const stale = universe.filter((t) => !fresh.has(t))
+    if (stale.length === 0) return []
+
+    // Only for the few that failed: their actual last day, so the report says
+    // "since 2026-01-13" rather than merely "stale".
+    return await Promise.all(
+      stale.map(async (ticker) => {
+        try {
+          const res = await fetch(
+            `${base}?select=day&ticker=eq.${encodeURIComponent(ticker)}&order=day.desc&limit=1`,
+            { headers, signal: AbortSignal.timeout(6000), cache: "no-store" },
+          )
+          const rows = res.ok ? ((await res.json()) as { day: string }[]) : []
+          const lastDay = rows?.[0]?.day ?? null
+          const daysBehind =
+            lastDay === null
+              ? null
+              : Math.round(
+                  (Date.parse(`${newest}T00:00:00Z`) - Date.parse(`${lastDay}T00:00:00Z`)) / 86_400_000,
+                )
+          return { ticker, lastDay, daysBehind }
+        } catch {
+          return { ticker, lastDay: null, daysBehind: null }
+        }
+      }),
+    )
+  } catch {
+    return null
+  }
+}

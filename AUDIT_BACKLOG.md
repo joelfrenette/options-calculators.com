@@ -414,11 +414,12 @@ recomputes it.
 | P7-38 | P3 | fixed | P0-1 became a rule: check-orphan-routes.ts excludes audit artefacts from the referrer set and finds twelve orphaned routes, not six. Two defects in the check were found by running it. |
 | P7-39 | P3 | fixed | Re-verified the four open P1s. P6-27 answered with evidence: MMC 404s at Polygon while AAPL returns 200, so the symbol stopped resolving rather than being omitted from a feed, and its 1,111 stored rows (not 188) cannot be repaired. P6-8 and P6-11 confirmed genuinely owner-blocked. |
 | P7-40 | P3 | fixed | Audited all 100 breadth-universe members from the store: MMC is the only stale one, none is unstored. Its successor cannot be resolved (no ticker search), and the market-cap substitute fails because /api/polygon-tickers answered from the grouped-bars path, which is not market-cap ranked — 42 universe members including LLY and COST are absent from its output. No replacement recommended. |
+| P7-41 | P2 | fixed | P7-40 closing advice was wrong: the FMP screener is a PAID endpoint answering 403, and the route latches ("skipped-latched"), so no market-cap ranking is reachable on this plan and MMC cannot be replaced by market cap. Adds universeFreshness to the admin health check so the MMC class is detected rather than stumbled upon. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-243 findings recorded · **203 fixed · 8 wontfix · 1 verified-ok · 31 open.**
+244 findings recorded · **204 fixed · 8 wontfix · 1 verified-ok · 31 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -3538,10 +3539,18 @@ Offering "MU" because it sat at the top of a list that is not a ranking would be
 the failure this audit exists to remove — a number presented as an answer to a question it
 was not measuring.
 
-**What the owner needs, and the cheapest route to it:** one market-cap-ranked source. The
-FMP screener already does this and is already wired; it was simply unavailable on this
-request. Re-running Step 2 when FMP answers gives a genuine ranking, and the replacement
-becomes a one-line edit at `lib/breadth-universe.ts:27`.
+**What the owner needs is a market-cap-ranked source — and there is not one on this plan.**
+
+~~Re-running Step 2 when FMP answers gives a genuine ranking.~~ **That sentence was wrong
+and P7-41 disproved it within the hour.** The FMP screener is a PAID endpoint; on the free
+tier it answers 403, and S-14 made the route *latch* on that 403 rather than spend a
+metered call per scan on an endpoint the plan has already refused — so it reports
+`"fmp": { "status": "skipped-latched" }` and will not be retried, however long you wait.
+
+The correction is left visible rather than edited away, because the failure mode is worth
+seeing: this row correctly refused to recommend a replacement from a list that was not a
+ranking, and then closed by pointing at a source that cannot answer. **Refusing a bad
+answer is only half the job; the other half is not inventing a route to a good one.**
 
 **Until then MMC stays in the list on purpose.** Removing it without a replacement drops
 the universe to 99 and changes what the breadth percentage is a percentage OF, silently,
@@ -3552,3 +3561,61 @@ true statement about the data rather than a hidden one.
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-40 | P3 | ops / data | Audited all 100 breadth-universe members against the store: MMC is the only stale one and none is unstored. Its successor cannot be resolved — the app exposes no ticker search, and the market-cap substitute fails because `/api/polygon-tickers` answered from the grouped-bars path, which is not market-cap ranked (42 universe members, including LLY and COST, are absent from its output). No replacement recommended; MMC stays until a ranked source answers. |
+
+---
+
+## Phase 7.13 (twenty-sixth pass) — the freshness check, and a wrong recommendation corrected (2026-08-12)
+
+### P7-41 — MMC has no market-cap-ranked replacement source, and my last recommendation was wrong
+
+P7-40 ended by advising: re-run Step 2 until `/api/polygon-tickers` answers from
+`fmp-screener`, then pick the replacement from a real ranking. **That advice was wrong.**
+
+Polling production returned `polygon-grouped-bars` four times, and the route's own status
+field says why:
+
+```json
+"universe": { "fmp": { "status": "skipped-latched" } }
+```
+
+`/api/v3/stock-screener` is a **paid** FMP endpoint. On the free tier it answers 403, and
+S-14 made the route **latch** on that 403 rather than spend a metered call per scan on an
+endpoint the plan has already refused. So the screener will not be retried, and no amount
+of waiting produces a ranking.
+
+**The correction matters more than the original finding.** P7-40 correctly refused to
+recommend a replacement from a list that was not a ranking, then closed by pointing at a
+source that cannot answer — which would have sent the owner into a retry loop with no
+terminating condition. The right statement is: **choosing MMC's replacement by market cap
+requires a source this project does not currently have.** The options are an FMP upgrade,
+another ranked provider, or picking the replacement by hand from index membership. All
+three are spend-or-judgement calls, so all three are the owner's.
+
+### P7-41 also makes the MMC class detectable
+
+MMC went dark for seven months and was found by hand, with a query somebody had to think of
+running. `getStaleUniverseMembers()` in `lib/market-closes.ts` now answers it, and the
+admin health check reports it as `universeFreshness` beside the existing series-coverage
+report.
+
+**No API calls: absence is the signal.** `market-snapshot` writes a row for every ticker
+the grouped feed returns, so a universe member with no recent row is a member the feed
+stopped returning. One request establishes the newest stored day, one asks which universe
+members have a row since the cutoff, and only the failures get a follow-up for their actual
+last day — so a clean run costs two requests, not a hundred.
+
+Three decisions in it worth keeping:
+
+1. **A never-stored ticker reports too**, with `lastDay: null`. A freshness test that only
+   compares dates cannot see a member that never arrived, which is the
+   never-ran-versus-passed confusion in a new place.
+2. **The reference is the newest stored day, not today.** Using today would report all 100
+   as stale whenever the snapshot cron itself had not run — a real problem, but a different
+   one, and conflating them makes the report cry wolf after any outage.
+3. **`status: "unavailable"` is not `"ok"`.** An unreachable store returns its own status
+   with a note saying no conclusion can be drawn, because "no stale members found" and
+   "never looked" must not render as the same line.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-41 | P2 | ops / data | P7-40's closing advice was wrong: the FMP screener is a paid endpoint that answers 403 and the route latches on it (`"status": "skipped-latched"`), so no market-cap ranking is reachable and MMC's replacement cannot be chosen by market cap on this plan. Also adds `universeFreshness` to the admin health check so the MMC class is detected rather than stumbled upon — two requests, no API calls, with unreachable reported as unavailable rather than ok. |

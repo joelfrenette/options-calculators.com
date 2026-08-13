@@ -5,6 +5,8 @@ import { API_KEY_ALIASES, getDisabledServices, hasRawKey, resolveApiKey } from "
 import { ROUTE_CONTRACTS, type RouteContract, errorShape, routesByRequiredKey } from "@/lib/api-contracts"
 import { getSeriesCoverage } from "@/lib/market-series"
 import { FRED_SERIES } from "@/lib/market-snapshot"
+import { getStaleUniverseMembers } from "@/lib/market-closes"
+import { BREADTH_UNIVERSE, BREADTH_UNIVERSE_AS_OF } from "@/lib/breadth-universe"
 import { REFERENCE_DRAWDOWNS } from "@/lib/ccpi/drawdowns"
 
 /**
@@ -256,6 +258,43 @@ async function seriesCoverageReport() {
   })
 }
 
+/**
+ * Breadth-universe members whose stored history has stopped advancing.
+ *
+ * P7-40 found `MMC` seven months after it went dark, by hand, with a query
+ * somebody had to think of running. The failure was invisible precisely because
+ * the system degraded well: breadth divides only by tickers holding a full
+ * 200-day window, so the published percentage stayed correct while
+ * `sample_size` quietly read 99/100.
+ *
+ * `status` is the part worth reading. `unavailable` means the store could not
+ * be reached — NOT that everything is fine — because "no stale members found"
+ * and "never looked" must not render as the same line. That distinction is the
+ * one this audit has had to make in a dozen other places.
+ */
+async function universeFreshnessReport() {
+  const stale = await getStaleUniverseMembers(BREADTH_UNIVERSE)
+  if (stale === null) {
+    return {
+      status: "unavailable" as const,
+      note: "Store unreachable — this is NOT a clean result. No conclusion can be drawn about universe freshness.",
+      universeSize: BREADTH_UNIVERSE.length,
+      asOf: BREADTH_UNIVERSE_AS_OF,
+      stale: [] as { ticker: string; lastDay: string | null; daysBehind: number | null }[],
+    }
+  }
+  return {
+    status: stale.length === 0 ? ("ok" as const) : ("stale-members" as const),
+    note:
+      stale.length === 0
+        ? `All ${BREADTH_UNIVERSE.length} universe members have a stored close within the last 6 days.`
+        : `${stale.length} of ${BREADTH_UNIVERSE.length} universe members stopped updating. A member that stops resolving upstream is silently excluded from every breadth window, so sample_size drops without the number itself ever looking wrong.`,
+    universeSize: BREADTH_UNIVERSE.length,
+    asOf: BREADTH_UNIVERSE_AS_OF,
+    stale,
+  }
+}
+
 export async function GET(request: NextRequest) {
   if (!(await isAuthenticated())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -321,6 +360,7 @@ export async function GET(request: NextRequest) {
     // which reference drawdowns are testable, so it is reported beside a count
     // of exactly that.
     seriesCoverage: await seriesCoverageReport(),
+    universeFreshness: await universeFreshnessReport(),
   })
 }
 
