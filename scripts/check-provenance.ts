@@ -620,6 +620,35 @@ const PINNED: PinnedClaim[] = [
   },
 ]
 
+/**
+ * The registry's own size, and every finding it covers.
+ *
+ * WHY THIS EXISTS (P7-65). Every entry below fails individually — a claim that
+ * disappears fails, a dependency that moves fails — and on 2026-08-14 three did,
+ * as P6-13's splits moved P6-66's sentence, P6-61's sentence and P6-58's
+ * dependency into the modules that now render or build them. All three were
+ * repointed. That is the registry working.
+ *
+ * What it could NOT do is notice a DELETION. An entry removed from this array
+ * takes its own failure with it: the loop simply iterates one fewer time, the
+ * suite's PASS count drops by one, and nothing says a claim stopped being
+ * watched. That is the P6-75/P6-77 shape — a check that stops COVERING is
+ * invisible — sitting inside the rule written to catch claims that rot.
+ *
+ * The list is spelled out rather than counted, because a bare `length === 8`
+ * would be satisfied by swapping one finding for another. Removing a pin now
+ * means deleting its entry AND its ID here, in the same commit, on purpose.
+ */
+const PINNED_FINDINGS = ["P6-34", "P6-43", "P6-45", "P6-58", "P6-47", "P6-53", "P6-66", "P6-61"] as const
+const pinnedIds = PINNED.map((p) => p.finding)
+check(
+  `scope: ${PINNED.length} pinned claim(s), covering ${PINNED_FINDINGS.length} finding(s)`,
+  PINNED.length === PINNED_FINDINGS.length &&
+    PINNED_FINDINGS.every((f) => pinnedIds.includes(f)) &&
+    pinnedIds.every((f) => (PINNED_FINDINGS as readonly string[]).includes(f)),
+  `registry ${pinnedIds.join(", ")} vs expected ${PINNED_FINDINGS.join(", ")} — a pin dropped from the array takes its own failure with it`,
+)
+
 for (const p of PINNED) {
   let claimSrc = ""
   try {

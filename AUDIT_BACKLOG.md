@@ -438,11 +438,12 @@ recomputes it.
 | P7-62 | P2 | fixed | Splitting `market-sentiment.tsx` deleted two render sections without replacing them: the insertion anchors for `<HistoricalScaleCard>` and `<TradeRecommendationsCard>` sat inside the line ranges being cut, so the tab lost its headline score card and its entire allocation accordion — and typecheck passed, because a component nothing renders is not a type error. `check-write-only-state.ts` caught it from the side, flagging `refreshing` and `tooltipsEnabled` as newly write-only because the only code reading them had just vanished. A rule written for P7-16 found a refactor that deleted two cards. Fixed, then verified by comparing every user-visible string in the pre-split file against the ten post-split files as a multiset — nothing missing. |
 | P7-63 | P2 | fixed | `fomc-predictions.tsx` held TWO tooltip states. `tooltipsEnabled` is what the "Tooltips" toggle writes; `showTooltips` was initialised `true`, `setShowTooltips` was never called anywhere, and it gated exactly one control — the (i) beside each options-strategy row. So turning tooltips OFF turned off every tooltip on the tab except that one, which stayed on permanently: a toggle that does not do what its label says, in the smallest possible dose. Nothing surfaced it for as long as both states sat in one 1,460-line file. `check-write-only-state.ts` found it the moment the split moved the strategy rows into a child and left `showTooltips` unread. Deleted; that row reads the toggle like the rest. |
 | P7-64 | P2 | fixed | Splitting `trend-analysis.tsx` and `panic-euphoria.tsx` broke three checks in three different ways, and all three FAILED rather than passing quietly. `check-provenance`'s pinned-claim registry lost two entries — P6-66's "No momentum reading, so no weekly target" and P6-61's "DISPLAY ONLY — not scored" — because both sentences moved into the child component that renders them; a registry keyed by path rots on any refactor, and failing loudly is the only thing that makes it survivable. `check-panic-composite.ts` was pinned to the one file and reported **`scope: 0 score bar(s) read componentScores`** — the exact derived-set collapse its own scope assertion was written for (P6-75/P6-77), arriving on the day that assertion earned its keep. It now reads the tab plus `components/panic/**` and asserts the set's size. |
+| P7-65 | P2 | fixed | `check-provenance`'s pinned-claim registry could not notice a DELETION. Every entry fails individually — a claim that vanishes fails, a dependency that moves fails, and three did on 2026-08-14 — but an entry removed from the array takes its own failure with it: the loop iterates one fewer time and nothing says a claim stopped being watched. The P6-75/P6-77 shape, sitting inside the rule written to catch rotting claims. The registry now asserts its size AND the exact set of finding IDs it covers, spelled out rather than counted, because a bare length check is satisfied by swapping one pin for another. Negative-tested by deleting P6-45's entry: FAIL, naming the missing ID. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-267 findings recorded · **233 fixed · 8 wontfix · 2 verified-ok · 24 open.**
+268 findings recorded · **234 fixed · 8 wontfix · 2 verified-ok · 24 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -4669,3 +4670,29 @@ something cleverer that would fail open.
 panel, the market-sentiment tab, the FOMC tab, trend-analysis, panic-euphoria and the
 market-sentiment route. The count is **17** over `app components lib` and **19** including
 `scripts/`, from 24 and 26 this morning.
+
+## 2026-08-14 — P7-65, the gap the day's own findings pointed at
+
+Reviewing P7-59 through P7-64 turned up one thing none of them fixed.
+
+`check-provenance`'s pinned-claim registry caught three rots today (P6-66, P6-61, P6-58),
+and each was caught because that entry failed on its own. **A deleted entry has no such
+property.** Remove a pin from the array and the loop iterates one fewer time: no failure,
+no message, and the suite's PASS count drops by exactly one — which is indistinguishable
+from any other single-assertion change. A claim would quietly stop being watched.
+
+That is P6-75 and P6-77's shape — *a check that stops COVERING is invisible* — sitting
+inside the rule written to catch claims that go stale. The registry watched the code and
+nothing watched the registry.
+
+It now asserts its own size **and the exact set of finding IDs it covers**. Spelled out
+rather than counted, because `length === 8` is satisfied by swapping one pin for another,
+which is the same class of silent substitution. Removing a pin now means deleting its entry
+and its ID together, in one commit, deliberately.
+
+Negative-tested the only way that proves anything: P6-45's entry was deleted and the check
+FAILED, naming the missing ID, then restored.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-65 | P2 | tooling | The pinned-claim registry could not notice its own deletions — a removed entry takes its failure with it. It now asserts its size and the exact finding IDs it covers; negative-tested by deleting one. |
