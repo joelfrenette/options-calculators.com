@@ -7,6 +7,7 @@ import { getSeriesCoverage } from "@/lib/market-series"
 import { FRED_SERIES } from "@/lib/market-snapshot"
 import { getStaleUniverseMembers } from "@/lib/market-closes"
 import { BREADTH_UNIVERSE, BREADTH_UNIVERSE_AS_OF } from "@/lib/breadth-universe"
+import { BUDGET_ENV_NAMES } from "@/lib/budget-env"
 import { REFERENCE_DRAWDOWNS } from "@/lib/ccpi/drawdowns"
 
 /**
@@ -259,6 +260,58 @@ async function seriesCoverageReport() {
 }
 
 /**
+ * The three budget limits, as the DEPLOYMENT actually resolves them (P6-86).
+ *
+ * `scripts/check-budget-env.ts` and `lib/budget-env.ts` pin the CODE: a blank
+ * variable falls back to the default while a configured "0" is honoured as
+ * zero, and the two are distinguished. None of that says anything about what is
+ * in Vercel, and the difference matters most in the one case the code cannot
+ * see — a variable that EXISTS WITH NO VALUE. `Number("")` is `0`, not `NaN`,
+ * so before P7-43 that shape read as a deliberate "cut off immediately" and
+ * killed every metered API on the first cent of spend, with nothing on screen
+ * to explain it. Vercel produces exactly that shape whenever a variable is
+ * created and left empty.
+ *
+ * The finding was closed as "the owner will check the dashboard". A dashboard
+ * check is a point-in-time answer to a question that can change silently, which
+ * is the shape of every other finding in this audit. So it is reported here on
+ * every health-check run instead.
+ *
+ * NO VALUES ARE RETURNED, only the state. A budget ceiling is not a credential,
+ * but there is no reason to publish it either, and `state` is the whole of what
+ * anyone needs to act on:
+ *
+ *   `unset`      — absent. The default applies. Correct and intended.
+ *   `configured` — present with a parseable, non-negative number.
+ *   `BLANK`      — present and empty. The operator error this exists to catch.
+ *   `unparseable`— present but not a number; falls back, which hides a typo.
+ */
+function budgetEnvReport() {
+  const entries = (Object.entries(BUDGET_ENV_NAMES) as [string, string][]).map(([key, name]) => {
+    const raw = process.env[name]
+    const trimmed = raw?.trim()
+    let state: "unset" | "configured" | "BLANK" | "unparseable"
+    if (raw === undefined) state = "unset"
+    else if (!trimmed) state = "BLANK"
+    else {
+      const n = Number(trimmed)
+      state = Number.isFinite(n) && n >= 0 ? "configured" : "unparseable"
+    }
+    return { key, name, state }
+  })
+
+  const bad = entries.filter((e) => e.state === "BLANK" || e.state === "unparseable")
+  return {
+    status: bad.length === 0 ? ("ok" as const) : ("misconfigured" as const),
+    note:
+      bad.length === 0
+        ? `All ${entries.length} budget variables are either unset (default applies) or hold a usable number.`
+        : `${bad.map((e) => `${e.name} is ${e.state}`).join("; ")}. A blank variable is not the same as an unset one to an operator reading the dashboard, and it used to mean "spend zero".`,
+    vars: entries,
+  }
+}
+
+/**
  * Breadth-universe members whose stored history has stopped advancing.
  *
  * P7-40 found `MMC` seven months after it went dark, by hand, with a query
@@ -371,6 +424,7 @@ export async function GET(request: NextRequest) {
     // of exactly that.
     seriesCoverage: await seriesCoverageReport(),
     universeFreshness: await universeFreshnessReport(),
+    budgetEnv: budgetEnvReport(),
   })
 }
 

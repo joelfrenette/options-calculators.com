@@ -20,12 +20,17 @@
  * which is why both are pinned here with worked values rather than described.
  */
 
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 import {
   BUDGET_ENV_NAMES,
   DEFAULT_DAILY_HARD_STOP,
   DEFAULT_MONTHLY_HARD_STOP,
   resolveBudgetLimit,
 } from "../lib/budget-env.ts"
+
+const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..")
 
 let failures = 0
 function check(name: string, passed: boolean, detail = ""): void {
@@ -109,6 +114,54 @@ check(
   "the defaults are positive and monthly exceeds daily",
   DEFAULT_DAILY_HARD_STOP > 0 && DEFAULT_MONTHLY_HARD_STOP > DEFAULT_DAILY_HARD_STOP,
   `daily ${DEFAULT_DAILY_HARD_STOP}, monthly ${DEFAULT_MONTHLY_HARD_STOP}`,
+)
+
+// ------------------------------------------- the deployment side (P6-86)
+
+/**
+ * The code side of P6-86 is everything above. This half is about the PLATFORM:
+ * only the running deployment knows whether `MONTHLY_BUDGET_TARGET` is unset,
+ * holds a number, or exists with an empty value.
+ *
+ * The finding was going to close as "the owner will check the Vercel dashboard".
+ * A dashboard check is a point-in-time answer to a question that can change
+ * silently afterwards, which is the shape of most findings in this audit, so the
+ * health check reports it on every run instead. These assertions pin that the
+ * report exists, distinguishes the four states, and never publishes a value.
+ */
+const healthSrc = readFileSync(join(ROOT, "app/api/admin/run-health-checks/route.ts"), "utf8")
+
+check(
+  "the health check reports budget env state",
+  /budgetEnv: budgetEnvReport\(\)/.test(healthSrc),
+  "alongside seriesCoverage and universeFreshness in the same payload",
+)
+check(
+  "it reads the names from BUDGET_ENV_NAMES rather than re-typing them",
+  /Object\.entries\(BUDGET_ENV_NAMES\)/.test(healthSrc),
+  "the project has typed these names wrong twice already",
+)
+for (const state of ["unset", "configured", "BLANK", "unparseable"]) {
+  check(
+    `the report can say "${state}"`,
+    new RegExp(`"${state}"`).test(healthSrc),
+    state === "BLANK" ? "present-and-empty is the operator error the finding is about" : "",
+  )
+}
+check(
+  "BLANK is distinguished from unset rather than folded into it",
+  /raw === undefined\) state = "unset"[\s\S]{0,160}!trimmed\) state = "BLANK"/.test(healthSrc),
+  'Number("") === 0, so a blank used to mean spend-zero — the two must not render alike',
+)
+check(
+  "the report publishes state, never the configured value",
+  !/return \{ key, name, state, (raw|value)/.test(healthSrc),
+  "a ceiling is not a credential, but there is no reason to publish it either",
+)
+check(
+  "a blank or unparseable variable makes the whole report non-ok",
+  /status: bad\.length === 0 \? \("ok" as const\) : \("misconfigured" as const\)/.test(healthSrc),
+  "a per-variable state nobody aggregates is a state nobody notices",
 )
 
 if (failures > 0) {
