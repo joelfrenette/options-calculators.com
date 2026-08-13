@@ -83,10 +83,11 @@ const GUARDED = [
 // the cost of the guard, and it is the right cost.
 //
 // → 21 when P6-13 split `use-technical-filters.ts` and `use-scanner-sorting.ts`
-// out of `use-wheel-scanner.ts` (690 → 585 lines). Third bump, second refactor:
-// the pattern is now established rather than noteworthy, and the number moving
-// is the record that a human looked.
-const EXPECTED_GUARDED = 21
+// out of `use-wheel-scanner.ts` (690 → 585 lines), → 22 when the same finding
+// split `fundamental-metrics.ts` out of `fundamental-scan.ts` (646 → 496).
+// Third and fourth bumps, both refactors: the pattern is established rather
+// than noteworthy now, and the number moving is the record that a human looked.
+const EXPECTED_GUARDED = 22
 
 check(
   `scope: ${GUARDED.length} file(s) guarded`,

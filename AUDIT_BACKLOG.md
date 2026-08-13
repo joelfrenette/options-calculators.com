@@ -298,7 +298,7 @@ recomputes it.
 | P6-10 | P2 | fixed | `100 - x \|\| 50` precedence bug. |
 | P6-11 | P1 | open | **Partial.** The hallucination pipeline is labelled and routed through the guarded chain. **Open decision:** rebuild the sentiment heatmap on real sources or retire the tab. |
 | P6-12 | P1 | fixed | 25+ raw `process.env` key reads routed through `resolveApiKey`. |
-| P6-13 | P3 | open | Module-size debt. 19 was stale; **P7-45 then said 25, which was ALSO wrong — it came off a `head -25` on a sorted list, a display limit read as a count. The true figure was 27, and 26 after P7-45 split the Step 4 card.** Four of the additions were that day's entry-exclusion work. The Black-Scholes duplication half was closed by P7-12. **Now 25 over `app components lib` and 27 including `scripts` (P7-49 — every earlier figure omitted which directories it counted), after the `use-wheel-scanner.ts` split.** Measured with `find app components lib -type f \( -name "*.ts" -o -name "*.tsx" \) -exec wc -l {} + \| awk '$1>600' \| wc -l`. |
+| P6-13 | P3 | open | Module-size debt. 19 was stale; **P7-45 then said 25, which was ALSO wrong — it came off a `head -25` on a sorted list, a display limit read as a count. The true figure was 27, and 26 after P7-45 split the Step 4 card.** Four of the additions were that day's entry-exclusion work. The Black-Scholes duplication half was closed by P7-12. **Now 24 over `app components lib` and 26 including `scripts` (P7-49 — every earlier figure omitted which directories it counted), after the `use-wheel-scanner.ts` and `fundamental-scan.ts` splits.** Measured with `find app components lib -type f \( -name "*.ts" -o -name "*.tsx" \) -exec wc -l {} + \| awk '$1>600' \| wc -l`. |
 | P6-14 | P1 | fixed | MMF component normalised against its own history. |
 | P6-15 | P2 | fixed | social-sentiment error banner; decorative 47/54/50 constants removed. |
 | P6-16 | P0 | fixed | `/api/fomc-predictions` nullable end to end; 503 rather than a forecast on a stand-in rate. |
@@ -422,13 +422,15 @@ recomputes it.
 | P7-46 | P3 | fixed | The tsconfig note claiming the Next bundler disallows .ts import extensions was FALSE and blocked Phase 7.0 for five phases. Vercel built it clean (chunk changed, /api/ccpi 200, homepage 200). An untested claim in a comment is a claim, not a constraint. |
 | P7-47 | **P1** | fixed | keywordScore matched by substring, so "Death cross forms as S&P 500 breaks support" scored 100/100 BULLISH (ath in death, up in support) and "Ford recalls 100,000 trucks" scored 100/100 (calls in recalls). A live indicator at 0.08 composite weight that could be exactly inverted. Word boundaries; scorer extracted to the import-free lib/headline-sentiment.ts; 14 assertions. |
 | P7-48 | P3 | fixed | P7-45's corrected module count of 25 came off a `head -25`-truncated list — a display limit read as a count. The real figure was 27, and is 26 after the Step 4 split. |
+| P7-52 | P2 | fixed | The Step 3 scan's arithmetic — the four-quarter TTM gate, the null D/E and ROE, the market cap that must not render "$0.0B", the S-17 earnings extraction, the premium estimate — sat inside an async three-endpoint fetch loop and could not be asserted by anything. Extracted to the import-free `components/scanner/fundamental-metrics.ts`; `fundamental-scan.ts` 646 → 496. 54 assertions in `check-fundamental-metrics.ts`, negative-tested in three forms. |
+| P7-51 | P3 | open | The Step 3 premium estimate's yield clamp has a FLOOR of 0.5%, and it applies to a row with no inputs at all: a ticker whose snapshot carries neither a live nor a previous close reaches `estimatePremium` with `currentPrice = 0`, fails on volume and incomplete fundamentals (two failures — a near miss, so it DOES appear in the relaxed Step 4 table) and renders a $0.00 strike beside a **0.50% yield**. A clamp bound in the column where a measurement goes. Pinned by an assertion rather than fixed: changing it changes what the scanner shows, which wants the owner's call and a UAT. |
 | P7-50 | P2 | fixed | `check-open-summaries.ts` bans standing tallies and exempts the ledger's totals line "because `check-backlog-ledger.ts` recomputes it from the rows". It did not — nothing had ever read that line. The one tally the project permits was the one nobody checked, and it drifted to 251/213 against a real 252/214 with the suite green. The assertion now exists and is derived, never pinned. |
 | P7-49 | P3 | fixed | Every module-size figure P6-13 has ever carried — 19, 25, 27, 26 — omitted which directories it counted, and the last two differ only by that: 26 counts `app components lib`, 27 counts `scripts` as well. Three corrections to the same number, none of which stated its scope. The row now carries the command. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-253 findings recorded · **215 fixed · 8 wontfix · 1 verified-ok · 29 open.**
+255 findings recorded · **216 fixed · 8 wontfix · 1 verified-ok · 30 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -4009,3 +4011,57 @@ the exemption now records that removing the assertion means deleting the exempti
 |----|-----|------|---------|
 | P7-49 | P3 | docs | Every module-size figure P6-13 carried (19, 25, 27, 26) omitted the directories it counted; 26 and 27 differ only by `scripts/`. Three arithmetic corrections, no scope. The row now carries the command. |
 | P7-50 | P2 | tooling | The ledger's totals line was exempted from the standing-tally ban on the stated ground that `check-backlog-ledger.ts` recomputed it. Nothing read it; it drifted to 251/213 against 252/214 with the suite green. Now derived from the rows. |
+
+### P7-52 — the scanner's money math had never been testable, and now is
+
+`fundamental-scan.ts` fetches three Polygon endpoints per ticker and derives, inside that
+loop, every number Step 3 shows: the four-quarter TTM gate, EPS, market cap, P/E,
+debt-to-equity, ROE, the consecutive-profitable-quarters streak, the S-17 earnings
+extraction and the premium estimate.
+
+**Every null-integrity fix this audit made to the Sell Put scanner lives in those ~140
+lines, and nothing could assert a single one of them.** Their correctness rested entirely
+on the comments recording it — which is the Phase 7 synthesis's fourth shape exactly: an
+untested claim in a comment is a constraint nobody tests. P6-24's "a partial year is not a
+year", the unknown equity that must not read as a flattering zero D/E, the unmeasured
+market cap that used to render a confident "$0.0B" — all of them prose.
+
+The arithmetic is now `components/scanner/fundamental-metrics.ts`, import-free so a check
+script can load it under node's type stripping (the constraint P7-46 finally made
+workable). `fundamental-scan.ts` 646 → 496; it keeps the fetching, the batching and the
+rejection diagnostics.
+
+**54 assertions**, negative-tested in three forms rather than one: restoring the
+pre-P6-24 partial-TTM sum fails four of them; `finite(equity) ?? 0` fails the
+unknown-equity assertion; deleting the `else break` that makes the profitable-quarter
+streak *consecutive* fails three, including the case that matters — a company profitable
+in three of its last four quarters with the loss most recent counts as **zero**, not three.
+
+`extractEarningsData` takes `now` as a parameter. A date helper that reads the clock
+cannot be asserted, and "days to earnings" is exactly the arithmetic that is wrong by one
+and looks right. All four snapshot fields that can carry the date now provably produce the
+same answer, which is the S-17 defect stated as a test.
+
+### P7-51 — a clamp bound in the column where a measurement goes
+
+Written up because an assertion found it, not because anyone was looking there.
+
+`estimatePremium`'s yield is clamped to [0.5, 5]. The floor applies to a row with **no
+inputs at all**: a ticker whose Polygon snapshot carries neither a live close nor a
+previous one arrives with `currentPrice = 0`, fails the volume filter and the
+incomplete-fundamentals filter — two failures, which is a *near miss*, so it is not
+discarded but shown in the relaxed Step 4 table — and renders a $0.00 strike, a $0.00
+premium, and a **0.50% yield**.
+
+That is the audit's third failure shape (a missing value rendered as something
+reassuring), mitigated by the fact that the whole column is labelled an estimate. It is
+left `open` rather than fixed here because changing it changes what a money surface
+displays, and that wants the owner's decision and a UAT rather than a refactor commit. The
+assertion pins the current behaviour so the number is at least written down.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-49 | P3 | docs | Every module-size figure P6-13 carried (19, 25, 27, 26) omitted the directories it counted; 26 and 27 differ only by `scripts/`. Three arithmetic corrections, no scope. The row now carries the command. |
+| P7-50 | P2 | tooling | The ledger's totals line was exempted from the standing-tally ban on the stated ground that `check-backlog-ledger.ts` recomputed it. Nothing read it; it drifted to 251/213 against 252/214 with the suite green. Now derived from the rows. |
+| P7-52 | P2 | SCAN → Sell Put | The Step 3 scan's arithmetic was unassertable inside a three-endpoint fetch loop. Extracted to the import-free `fundamental-metrics.ts` (646 → 496); 54 assertions, negative-tested in three forms. |
+| P7-51 | P3 | SCAN → Sell Put | The premium estimate's 0.5% yield floor applies to a row with no price data at all — a $0.00 strike beside a 0.50% yield, in the relaxed Step 4 table. Pinned by assertion, not fixed: it changes a money surface. |

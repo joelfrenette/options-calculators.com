@@ -25,74 +25,21 @@ import {
   trailingReturnPercent,
 } from "@/lib/trend-filters"
 import { stepLabel } from "./steps"
+// The scan's arithmetic — TTM derivation, the earnings extraction and the
+// premium estimate — lives in the import-free `fundamental-metrics.ts` so that
+// a check script can load and assert it (P6-13). This file keeps the fetching,
+// the batching and the rejection diagnostics.
+import {
+  deriveFundamentals,
+  estimatePremium,
+  extractEarningsData,
+  sortQuarterRows,
+} from "./fundamental-metrics"
 
   // Technical indicators (SMA/RSI/Bollinger/MACD/Stochastic/ATR) now come from
   // the shared lib/indicators.ts (Phase 4 extraction). All of them return null
   // on insufficient history — see the compute site in the fundamental scan for
   // the fail-safe handling.
-
-  // Extract earnings data from Polygon snapshot
-  /**
-   * The earnings date, from the one place that reads it. (S-17)
-   *
-   * THERE WERE TWO OF THESE, AND THEY DISAGREED. An inline block in the scan
-   * loop tried four snapshot fields — `earnings.announcement_date`,
-   * `earnings_date`, `next_earnings_date`, `results.earnings.date` — and
-   * formatted as "Nov 5". This function tried ONLY `next_earnings_date` and
-   * formatted as "11/5/2026". The row then took `inline || fromThisFunction`
-   * for the DISPLAYED date, so the same column rendered two different formats
-   * depending on which field happened to carry the date.
-   *
-   * The part that mattered was downstream. `premiumMultiplier` — the earnings
-   * bump applied to the estimated premium — read the NARROW result, while the
-   * table displayed the WIDE one. A ticker whose date came from
-   * `announcement_date` therefore showed "Earnings in 3d" beside a premium
-   * estimate computed as though there were no earnings at all. Two numbers on
-   * one row, derived from two different answers to the same question.
-   *
-   * One extraction now, one format, one answer.
-   */
-  const extractEarningsData = (snapshot: any) => {
-    const tickerData = snapshot?.ticker
-    const earningsTimestamp =
-      tickerData?.earnings?.announcement_date ||
-      tickerData?.earnings_date ||
-      tickerData?.next_earnings_date ||
-      snapshot?.results?.earnings?.date
-    let earningsDate: string | undefined
-    let daysToEarnings: number | undefined
-
-    if (earningsTimestamp) {
-      const earnDate = new Date(earningsTimestamp)
-      earningsDate = earnDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-      const today = new Date()
-      daysToEarnings = Math.floor((earnDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-
-      // S-10, closed 2026-08-11. This was
-      //   currentPrice × (atrPercent / 100) × √(daysToEarnings / 7) × 1.5
-      // — an ATR-based move with a `1.5` fudge factor that has no reference
-      // anywhere, presented in the table as an expected move. The standard
-      // form is S · σ · √T off IMPLIED volatility, and `expectedMove` in
-      // `lib/black-scholes.ts` has implemented it since Phase 1 — **its own
-      // docstring already claimed it "replaces the ad-hoc ATR × 1.5 fudge",
-      // and the call site was never changed.** A fix that exists, is tested,
-      // and is not wired is not a fix.
-      //
-      // The fundamental scan has no IV: the options chain is not fetched until
-      // enrichment. So this stage supplies the earnings DATE and leaves the
-      // move undefined; `enrichment.ts` fills it from the measured IV it just
-      // read. An unknown move stays undefined rather than falling back to a
-      // volatility proxy wearing the name of an implied one — the whole
-      // labelling problem this audit exists to remove.
-    }
-
-    // No `expectedMove` in this return. It was declared, never assigned, and
-    // returned as `undefined` to every caller — a field that existed only to
-    // carry S-10's absence. The explanation stays above; the empty field does
-    // not, because a returned value nobody can ever read is the shape P7-9 was
-    // about.
-    return { earningsDate, daysToEarnings }
-  }
 
 // Slider values arrive as the same number[] state arrays the component holds,
 // so the filter logic below reads [0] exactly as it did before extraction.
@@ -250,10 +197,7 @@ export const runFundamentalScan = async ({
             const volume = day.v || prevDay.v || 0
             const volumeInMillions = volume / 1000000
 
-            // Quarterly filings, most recent first (sorted defensively by period end)
-            const qRows: any[] = (financialsData.results || [])
-              .filter((r: any) => r?.financials)
-              .sort((a: any, b: any) => String(b.end_date || "").localeCompare(String(a.end_date || "")))
+            const qRows = sortQuarterRows(financialsData.results || [])
 
             const latestFinancials = qRows[0]?.financials || {}
             const income_statement = latestFinancials.income_statement || {}
@@ -268,106 +212,21 @@ export const runFundamentalScan = async ({
               skipBuckets.thinFinancials.push(ticker)
             }
 
-            // Count CONSECUTIVE profitable quarters starting from the most recent
-            // filing — this is what the "Min Profitable Quarters" slider now gates on.
-            let profitableQuarters = 0
-            for (const row of qRows) {
-              const ni = row.financials?.income_statement?.net_income_loss?.value
-              if (typeof ni === "number" && Number.isFinite(ni) && ni > 0) profitableQuarters++
-              else break
-            }
-
-            // TTM figures — FOUR quarters, each of them actually reported.
-            //
-            // This used to read "graceful when fewer exist": `qRows.slice(0, 4)`
-            // summed with `|| 0` per quarter, so a company with two filings on
-            // record produced a TWO-quarter sum labelled trailing-twelve-month.
-            // That understates earnings and inflates every P/E, EPS and ROE
-            // derived from it — and the shorter the history, the more confident
-            // and the more wrong the number looked. A partial year is not a
-            // year, so it is null.
-            const ttmRows = qRows.slice(0, 4)
-            const ttmQuarters = ttmRows.length
-            const quarterlyNetIncome = ttmRows.map(
-              (row: any) => row.financials?.income_statement?.net_income_loss?.value,
-            )
-            const net_income: number | null =
-              ttmQuarters === 4 && quarterlyNetIncome.every((v: any) => typeof v === "number" && Number.isFinite(v))
-                ? quarterlyNetIncome.reduce((sum: number, v: number) => sum + v, 0)
-                : null
-
-            // Balance-sheet legs: absent is unknown, not zero. `total_liabilities
-            // || 0` reported a company with no balance sheet as debt-free.
-            const rawEquity = balance_sheet.equity?.value
-            const rawLiabilities = balance_sheet.liabilities?.value
-            const stockholders_equity: number | null =
-              typeof rawEquity === "number" && Number.isFinite(rawEquity) ? rawEquity : null
-            const total_liabilities: number | null =
-              typeof rawLiabilities === "number" && Number.isFinite(rawLiabilities) ? rawLiabilities : null
-
-            // Extract shares outstanding from multiple possible sources
-            const basic_shares = income_statement.basic_average_shares?.value || 0
-            const shares_outstanding =
-              ticker_data?.shares_outstanding ||
-              ticker_data?.weighted_shares_outstanding ||
-              qRows[0]?.shares_outstanding ||
-              basic_shares ||
-              0
-
-            // TTM EPS = sum of the last 4 quarterly EPS figures. Same rule as
-            // net income: a quarter with no reported EPS used to contribute 0,
-            // turning three quarters of earnings into a "twelve-month" total.
-            const quarterEPS = ttmRows.map((row: any) => {
-              const is = row.financials?.income_statement || {}
-              const v = is.diluted_earnings_per_share?.value ?? is.basic_earnings_per_share?.value
-              return typeof v === "number" && Number.isFinite(v) ? v : null
-            })
-            let eps: number | null =
-              ttmQuarters === 4 && quarterEPS.every((v: number | null) => v !== null)
-                ? (quarterEPS as number[]).reduce((a: number, b: number) => a + b, 0)
-                : null
-            if (eps === null && shares_outstanding > 0 && net_income !== null && net_income !== 0) {
-              // Derivable from a complete TTM net income, which is itself
-              // already gated on four reported quarters.
-              eps = net_income / shares_outstanding
-            }
-
-            // Calculate Market Cap: Price × Shares Outstanding
-            let marketCap: number | null = null
-            if (shares_outstanding > 0) {
-              marketCap = currentPrice * shares_outstanding
-            } else if (ticker_data?.market_cap) {
-              marketCap = ticker_data.market_cap
-            } else {
-              // Fallback: estimate from financials (PE ratio method)
-              // If PE is typically 15-20 for large caps, and we have net income
-              if (net_income !== null && net_income > 0 && eps !== null && eps > 0) {
-                marketCap = (currentPrice / eps) * net_income
-              }
-            }
-
-            // Calculate PE Ratio — null when neither route has complete inputs.
-            let peRatio: number | null = null
-            if (eps !== null && eps > 0) {
-              peRatio = currentPrice / eps
-            } else if (marketCap !== null && marketCap > 0 && net_income !== null && net_income > 0) {
-              // Fallback: use market cap / net income as approximation
-              peRatio = marketCap / net_income
-            }
-
-            // Debt-to-Equity. Unknown equity gave 0, which reads as "no debt" —
-            // the most flattering possible value for a company we know nothing
-            // about.
-            const debtToEquity: number | null =
-              stockholders_equity !== null && stockholders_equity > 0 && total_liabilities !== null
-                ? total_liabilities / stockholders_equity
-                : null
-
-            // ROE needs a complete TTM net income AND positive equity.
-            const roe: number | null =
-              net_income !== null && stockholders_equity !== null && stockholders_equity > 0
-                ? (net_income / stockholders_equity) * 100
-                : null
+            // Every derived fundamental — consecutive profitable quarters, the
+            // four-quarter TTM gate, EPS, market cap, P/E, D/E and ROE — comes
+            // from `fundamental-metrics.ts`, which is import-free and therefore
+            // assertable. See scripts/check-fundamental-metrics.ts for the
+            // null rules each of these encodes.
+            const {
+              profitableQuarters,
+              ttmQuarters,
+              quarterEPS,
+              eps,
+              marketCap,
+              peRatio,
+              debtToEquity,
+              roe,
+            } = deriveFundamentals(qRows, ticker_data, currentPrice)
 
             // S-17: the second, narrower extraction that used to live here is
             // gone. `extractEarningsData` below is the only reader of the
@@ -522,23 +381,14 @@ export const runFundamentalScan = async ({
             // none.
             const finalDaysToEarnings = daysToEarnings
 
-            // Calculate estimated premium and yield
-            const putStrike = currentPrice * 0.95
-            const daysToExpiration = 7
-
-            let premiumMultiplier = 1.0
-            if (finalDaysToEarnings !== undefined && finalDaysToEarnings >= 0 && finalDaysToEarnings <= 14) {
-              premiumMultiplier = 1.5 + ((14 - finalDaysToEarnings) / 14) * 0.3
-            }
-
-            // When ATR is unknown, derive the dollar ATR from the same 2.5%
-            // placeholder atrPercent already falls back to, so the labeled
-            // estimate stays internally consistent (previously null→0 zeroed it).
-            const atrForEstimate = atr ?? (atrPercent / 100) * currentPrice
-            const estimatedPremium = atrForEstimate * 0.4 * Math.sqrt(daysToExpiration / 7) * premiumMultiplier
-            const yieldPercent = putStrike > 0 ? (estimatedPremium / putStrike) * 100 : 0
-            const volatilityAdjustedYield = yieldPercent * (1 + (atrPercent - 2) * 0.1)
-            const finalYield = Math.max(0.5, Math.min(5, volatilityAdjustedYield))
+            // Calculate estimated premium and yield — a labelled ESTIMATE, and
+            // the only place the scan produces a number it did not measure.
+            const { putStrike, estimatedPremium, finalYield } = estimatePremium(
+              currentPrice,
+              atr,
+              atrPercent,
+              finalDaysToEarnings,
+            )
 
             const estimatedDelta = -0.3
 
