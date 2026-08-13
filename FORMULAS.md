@@ -166,6 +166,23 @@
 
 - Live Polygon/Finnhub/FRED behavior: no keys locally + workstation TLS interception;
   every "confirm against a live payload" note needs the preview-deploy pass.
-- `lib/sentiment-sources.ts` scrape internals; Quiver `ExcessReturn` units;
-  Polygon snapshot `shares_outstanding` availability; FMP screener path (403-dormant).
+- `lib/sentiment-sources.ts` scrape internals.
+
+**Three of the original five were answered against production on 2026-08-12**, once it was
+noticed that "needs a live payload" and "needs a deployed site" are the same requirement —
+and the site has been deployed the whole time:
+
+- **Quiver `ExcessReturn` units — RESOLVED, already percent.** `/api/top-performers`
+  returns `avgExcessReturnPct: 16.83` and `bestXrPct: 160.94` over 25 rows. The route's
+  only arithmetic is `Math.round(x * 100) / 100`, which is two-decimal rounding rather than
+  a unit conversion, so the values arrive percent-scaled from Quiver and the `Pct` suffix
+  is honest. A fraction-scaled source would have produced 0.17 and 1.61.
+- **Polygon snapshot `shares_outstanding` — RESOLVED, NOT PRESENT.** A live snapshot for
+  AAPL carries no `shares`-prefixed field at all. That settles §4's market-cap row: falling
+  back to `basic_average_shares` is *necessary*, not lazy, and the deviation note there
+  should be read as a limit of the endpoint rather than a shortcut taken.
+- **FMP screener path — RESOLVED, permanently dormant.** `/v3/stock-screener` is a PAID
+  endpoint; the free tier answers 403 and the route latches on it, reporting
+  `"fmp": { "status": "skipped-latched" }`. It will not be retried on this plan, which is
+  why no market-cap-ranked universe is reachable (P7-41).
 - Toolbox static example setups (labeled "For Learning" — no snapshot to check against).

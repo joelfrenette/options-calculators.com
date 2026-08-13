@@ -474,6 +474,132 @@ fourteen different vocabularies.
 
 ---
 
+---
+
+# PHASE 7 SYNTHESIS — how the audit itself fails
+
+> Written 2026-08-12 when Phase 7 closed, in the shape of the Phase 6 synthesis, and
+> for the same reason: **45 rows are a list, and a list is not a lesson.** Read this
+> instead of the rows.
+>
+> Phase 6 answered "how does this codebase fail". Phase 7 spent most of its time on the
+> checks, the ledger and the plan — so it answers a different question: **how does the
+> apparatus built to catch defects fail?** Every pattern below cost real time in this
+> phase, and every one of them looked like success while it was happening.
+
+## The one sentence
+
+**A check, a status, a count and a comment are all claims — and this phase found that the
+apparatus lies in exactly the ways the product used to.** Phase 6's five shapes were about
+labels the code did not earn. Phase 7's are the same shapes turned inward.
+
+## The five shapes, in measured order of cost
+
+### 1. A check that stops covering is invisible, because the PASS count does not move
+
+The loudest lesson, and the most expensive. A check that halts mid-suite and a check that
+passes print the same exit code; a check whose *scope* silently shrinks prints the same
+count as well.
+
+- `check-open-summaries` shipped scanning **136 lines of a 3,276-line file** — a stray
+  `i >= ledgerStart` skipped everything after the ledger — and printed PASS.
+- `check-orphan-routes` used `src.includes(path)`, so `/api/breadth` read as referenced by
+  anything mentioning `/api/breadth-backtest`. Two such pairs exist here.
+- A `/*` inside a **line** comment ate ~70 lines of `wheel-scanner.tsx` from four checks
+  at once (P7-24).
+- `check-scanner-steps` shipped with six hand-listed files and missed the three results
+  tables and eight labels in `scanner-notices.tsx`.
+
+**The rule that came out of it:** derive the file set from structure, then **assert its
+size**. Every new check in this phase carries a scope assertion, and the one time the
+suite stopped at a subtotal (614 against 760) it was that assertion firing correctly.
+
+### 2. The audit infrastructure makes dead surface look alive
+
+Three instances, and the third is what turned it into a rule:
+
+- `check-dead-exports` reported a **completely clean `lib/`** on its first run, because
+  its own allowlist named all 51 dead symbols as string literals.
+- P7-27's four unreachable components (1,548 lines) were mentioned only in `SITE_MAP.md`
+  and this backlog.
+- P0-1's "orphan" routes are each named by the health check, the contracts table and the
+  remediation map — twelve of them, not the six a grep reported, because grep counts
+  comments.
+
+**A referrer that is itself an audit artefact is not a referrer.** Both dead-code checks
+now exclude the apparatus from their own referrer sets.
+
+### 3. A status is a record, not a fact — and prose about status rots fastest
+
+`check-backlog-ledger` says so in its own header and it is still worth repeating: it
+verifies a status **exists**, never that it is **true**.
+
+- Four rows sat `open` after the work was done: `P4-1` (file deleted), `E-4` (shipped),
+  `P5-1` (delivered by Phase 7.2), and `P6-13`'s note listing a duplication P7-12 removed.
+- The **fourth** hand-maintained open-list summary — written on the same day as the ledger
+  that makes it unnecessary, and after CLAUDE.md forbade exactly that — disagreed with the
+  ledger in six places and **with itself in one**: a P3 heading claiming eleven items above
+  a list of thirteen.
+- Two more open-lists carried no counts at all, so no count-based rule could see them; one
+  named two environment variables **that do not exist**.
+
+**Re-verification is not optional bookkeeping.** Phase 7.4 predicted four items were
+"probably already fixed" and was wrong on two; Phase 7.11 re-checked four open P1s and
+found one already answerable. Both hit rates are about half.
+
+### 4. An untested claim in a comment is a constraint nobody tests
+
+`tsconfig.json` asserted that the Next bundler disallows `.ts` import extensions. It does
+not — Vercel built the change clean. **That sentence blocked AUDIT_PLAN step 7.0, the step
+the plan says to do FIRST, for five phases**, because it had the authority of sitting in a
+config file next to the thing it described.
+
+Same family, opposite direction: P6-42's tabs claimed capabilities the code lacked; this
+claimed an *incapability* the code did not have. **Both are labels nobody checked against
+the thing they describe** — and the config-file one is more dangerous, because a false
+capability gets found by a user and a false incapability gets found by nobody.
+
+### 5. A tolerated error is an unread error
+
+The typecheck baseline sat at 10, then 8, for the whole audit — "known errors, do not add
+new ones". **One of the eight was a live defect.** `risk-calculator.tsx` never imported
+Recharts' `Tooltip`, so the `<Tooltip>` inside its chart resolved to the shadcn/Radix
+component already bound at the top of the file, which renders nothing inside a chart. The
+VIX chart had no hover readout at all.
+
+Seven of the eight were genuinely cosmetic. **That is precisely what made the eighth
+invisible** — a baseline is a place to hide one real thing among several boring ones. The
+baseline is zero now, so any error is a new one.
+
+## What produced findings, in measured order
+
+1. **Asking what a check cannot see** — every scope defect above came from this, and
+   nothing else found any of them.
+2. **Injection-testing per syntactic form.** A check that has never failed is
+   indistinguishable from one that cannot. Three injections in this phase *failed to fail*
+   and each exposed a real defect — in the check, in the injection, or in both.
+3. **Re-verifying a row against the code instead of reading it.** ~50% hit rate, twice.
+4. **Following a claim to the thing it describes.** The tsconfig note, the "188 stored
+   rows" that were 1,111, the "19 modules" that were 25, the six orphan routes that were
+   twelve. **Every count in this file that anyone checked was wrong.**
+
+## What did not
+
+- **Grep as a triage tool.** It counted comments in P0-1 and produced six instead of
+  twelve. It also produced the *right* answer for the wrong reason more than once.
+- **A rule with no check.** CLAUDE.md banned second open-list summaries in writing, and a
+  fourth appeared anyway, from someone who had read the ban.
+- **Reading a check to decide whether it works.**
+
+## The standing warning
+
+**`pnpm check` passing means the ratchet did not catch a regression.** It does not mean
+the code is right, and after this phase it does not even mean the checks looked. Eleven
+new scripts shipped here; four of them had a defect on first run that only appeared when
+someone tried to make them fail.
+
+---
+
 ## Seeded backlog (AUDIT_PLAN.md §6 + §2), file:line verified 2026-08-07
 
 | ID | Sev | Tab / area | File:line | Finding | Fix |
