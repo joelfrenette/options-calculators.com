@@ -298,7 +298,7 @@ recomputes it.
 | P6-10 | P2 | fixed | `100 - x \|\| 50` precedence bug. |
 | P6-11 | P1 | open | **Partial.** The hallucination pipeline is labelled and routed through the guarded chain. **Open decision:** rebuild the sentiment heatmap on real sources or retire the tab. |
 | P6-12 | P1 | fixed | 25+ raw `process.env` key reads routed through `resolveApiKey`. |
-| P6-13 | P3 | open | Module-size debt. **19 was wrong — it is 25 as of 2026-08-12 (P7-45)**, and four of the additions are that day's entry-exclusion work: strategy-scanner/route.ts 1,796, use-wheel-scanner.ts 690, step4-technical-card.tsx 678, fundamental-scan.ts 646. The Black-Scholes duplication half was closed by P7-12. |
+| P6-13 | P3 | open | Module-size debt. 19 was stale; **P7-45 then said 25, which was ALSO wrong — it came off a `head -25` on a sorted list, a display limit read as a count. The true figure was 27, and is 26 after P7-45 split the Step 4 card.** Four of the additions were that day's entry-exclusion work. The Black-Scholes duplication half was closed by P7-12. |
 | P6-14 | P1 | fixed | MMF component normalised against its own history. |
 | P6-15 | P2 | fixed | social-sentiment error banner; decorative 47/54/50 constants removed. |
 | P6-16 | P0 | fixed | `/api/fomc-predictions` nullable end to end; 503 rather than a forecast on a stand-in rate. |
@@ -421,11 +421,12 @@ recomputes it.
 | P7-45 | P3 | fixed | P6-13's module-size count corrected from 19 to 25; four of the additions are this session's entry-exclusion work. |
 | P7-46 | P3 | fixed | The tsconfig note claiming the Next bundler disallows .ts import extensions was FALSE and blocked Phase 7.0 for five phases. Vercel built it clean (chunk changed, /api/ccpi 200, homepage 200). An untested claim in a comment is a claim, not a constraint. |
 | P7-47 | **P1** | fixed | keywordScore matched by substring, so "Death cross forms as S&P 500 breaks support" scored 100/100 BULLISH (ath in death, up in support) and "Ford recalls 100,000 trucks" scored 100/100 (calls in recalls). A live indicator at 0.08 composite weight that could be exactly inverted. Word boundaries; scorer extracted to the import-free lib/headline-sentiment.ts; 14 assertions. |
+| P7-48 | P3 | fixed | P7-45's corrected module count of 25 came off a `head -25`-truncated list — a display limit read as a count. The real figure was 27, and is 26 after the Step 4 split. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-250 findings recorded · **212 fixed · 8 wontfix · 1 verified-ok · 29 open.**
+251 findings recorded · **213 fixed · 8 wontfix · 1 verified-ok · 29 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -3920,3 +3921,24 @@ carries no `shares_outstanding` field at all. **FORMULAS §6 is now empty.**
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-47 | **P1** | ANALYZE → Social Sentiment | `keywordScore` used substring matching, so "Death cross forms as S&P 500 breaks support" scored 100/100 BULLISH and "Ford recalls 100,000 trucks" scored 100/100 BULLISH — a live indicator at 0.08 composite weight, labelled "Market headline pulse", that could be exactly inverted. Word-boundary matching; scorer moved to the import-free `lib/headline-sentiment.ts`; 14 assertions, ten of which fail on the old code. |
+
+### P7-48 — the count I used to correct a stale count was itself off
+
+P7-45 replaced P6-13's stale "19 modules over 600 lines" with 25. **25 was wrong too.** It
+came from a command ending `| sort -rn | head -25`, and I read the number of rows the
+terminal printed as the number of files that matched. The display limit *was* the count.
+
+Measured properly: **27 before the Step 4 split, 26 after.**
+
+This is the smallest finding in the phase and the one most worth keeping, because it is the
+Phase 7 synthesis's shape #3 committed by the person writing the synthesis, in the act of
+fixing an instance of it. **A number read off a truncated view is not a measurement**, and
+neither "19" nor "25" was ever wrong in a way that would show up as an error — both were
+plausible, both were written down with confidence, and both were repeated into a ledger.
+
+The current figure is in the P6-13 row and nowhere else, and the row now says how it was
+obtained.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-48 | P3 | docs | P7-45's corrected module count of 25 was itself taken from a `head -25`-truncated list. The real figure was 27, now 26. A display limit read as a count — the synthesis's own shape #3, committed while fixing an instance of it. |
