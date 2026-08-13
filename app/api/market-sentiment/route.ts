@@ -22,8 +22,22 @@ import { getSeriesHistory } from "@/lib/market-series"
  * component scores would mean inventing a transform CNN has never published
  * and rendering the result alongside CNN's own figures as if it were one.
  *
- * putCallRatio is absent on purpose: nothing in the codebase sources one, and
- * there is no free feed. It stays null and is named in `notTracked`.
+ * putCallRatio is absent from THIS route on purpose. **The reason stated here
+ * used to be false, and P7-57 corrected it**: it read "nothing in the codebase
+ * sources one", and something does — `scrapePutCallRatio` in `/api/ccpi` fetches
+ * the CBOE reading through ScrapingBee, and only a genuine reading is permitted
+ * to claim `live` (P6-72). So this tab renders "—" for a figure the site
+ * actually goes and gets.
+ *
+ * It stays null here for now, and that is a WIRING decision rather than a
+ * sourcing fact: the CCPI scraper is metered, budget-guarded and cached for its
+ * own tab, and pointing a second tab at it is a change with a cost, not a
+ * comment fix. Named in `notTracked` so the null is not read as a bug — but
+ * "not tracked by this route" and "unobtainable" are different claims, and the
+ * old wording made the second one.
+ *
+ * The general shape is P7-55's: two routes making contradictory statements about
+ * the same quantity, each internally consistent, neither reading the other.
  */
 async function fetchStoredRawIndicators(): Promise<{
   vix: number | null
@@ -58,7 +72,12 @@ async function fetchStoredRawIndicators(): Promise<{
   return { vix, vix50DayMA, stockPriceMomentum }
 }
 
-/** Indicators with no source at all — named so a null is not read as a bug. */
+/**
+ * Indicators this route does not carry — named so a null is not read as a bug.
+ *
+ * NOT "indicators with no source at all", which is what this said before P7-57.
+ * `putCallRatio` has a source; it is simply not wired here. See the header.
+ */
 const NOT_TRACKED = ["putCallRatio"]
 
 /**
