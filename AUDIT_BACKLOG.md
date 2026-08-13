@@ -298,7 +298,7 @@ recomputes it.
 | P6-10 | P2 | fixed | `100 - x \|\| 50` precedence bug. |
 | P6-11 | P1 | fixed | **Owner chose: fold the real rows into social-sentiment and retire the rest (2026-08-13).** The measured half of `/api/sentiment-heatmap` — StockTwits author-tagged bullish/bearish counts — **already existed in the social-sentiment tab** as `per_symbol`, scored the same way, null when fewer than 5 tagged messages, rendering "No live data". So the rebuild was a deletion: the route is gone (60 routes → 59), with its contract entry, its health-check entry and its consumer. What went with it was the AI path, which asked a model for its "best general impression" while telling it that it had no live data, and — when even that failed — returned `{bullishScore: 50, bearishScore: 50}` as data, on a scale where 50 is a real neutral reading (P6-18's shape). The consumer made it worse: `market-sentiment.tsx` rendered the rows as gauges under the heading **"Sector Analysis"** — three index ETFs, not sectors — and **discarded the per-row `source` field the route provided**, so an AI impression and a measured reading drew the identical dial (S-7's shape). |
 | P6-12 | P1 | fixed | 25+ raw `process.env` key reads routed through `resolveApiKey`. |
-| P6-13 | P3 | open | Module-size debt. 19 was stale; **P7-45 then said 25, which was ALSO wrong — it came off a `head -25` on a sorted list, a display limit read as a count. The true figure was 27, and 26 after P7-45 split the Step 4 card.** Four of the additions were that day's entry-exclusion work. The Black-Scholes duplication half was closed by P7-12. **Now 18 over `app components lib` and 20 including `scripts` (P7-49 — every earlier figure omitted which directories it counted), after the `use-wheel-scanner.ts`, `fundamental-scan.ts`, `strategy-scanner/route.ts`, `ccpi-audit-admin.tsx`, `market-sentiment.tsx`, `fomc-predictions.tsx`, `trend-analysis.tsx` and `panic-euphoria.tsx` splits.** The scanner route was the site's largest module at 1,808 lines and is now 216, its body in `lib/strategy-scanner/` — see P7-59 and P7-60 for what that did to the checks and to SITE_MAP. `ccpi-audit-admin.tsx` was 1,636 and is now 593, its data-shaping half in `lib/ccpi/audit/` — see P7-61 for the claim that extraction does NOT support. `market-sentiment.tsx` was 1,497 and is now 599, across ten modules under `components/market-sentiment/` — see P7-62. `fomc-predictions.tsx` was 1,460 and is now 549 across eleven modules — see P7-63. `trend-analysis.tsx` went 1,168 to 145 and `panic-euphoria.tsx` 1,163 to 188 — see P7-64. Measured with `find app components lib -type f \( -name "*.ts" -o -name "*.tsx" \) -exec wc -l {} + \| awk '$1>600' \| wc -l`. |
+| P6-13 | P3 | open | Module-size debt. 19 was stale; **P7-45 then said 25, which was ALSO wrong — it came off a `head -25` on a sorted list, a display limit read as a count. The true figure was 27, and 26 after P7-45 split the Step 4 card.** Four of the additions were that day's entry-exclusion work. The Black-Scholes duplication half was closed by P7-12. **Now 17 over `app components lib` and 19 including `scripts` (P7-49 — every earlier figure omitted which directories it counted), after the `use-wheel-scanner.ts`, `fundamental-scan.ts`, `strategy-scanner/route.ts`, `ccpi-audit-admin.tsx`, `market-sentiment.tsx`, `fomc-predictions.tsx`, `trend-analysis.tsx`, `panic-euphoria.tsx` and `market-sentiment/route.ts` splits.** The scanner route was the site's largest module at 1,808 lines and is now 216, its body in `lib/strategy-scanner/` — see P7-59 and P7-60 for what that did to the checks and to SITE_MAP. `ccpi-audit-admin.tsx` was 1,636 and is now 593, its data-shaping half in `lib/ccpi/audit/` — see P7-61 for the claim that extraction does NOT support. `market-sentiment.tsx` was 1,497 and is now 599, across ten modules under `components/market-sentiment/` — see P7-62. `fomc-predictions.tsx` was 1,460 and is now 549 across eleven modules — see P7-63. `trend-analysis.tsx` went 1,168 to 145 and `panic-euphoria.tsx` 1,163 to 188 — see P7-64, and the market-sentiment route went 1,140 to 351. Measured with `find app components lib -type f \( -name "*.ts" -o -name "*.tsx" \) -exec wc -l {} + \| awk '$1>600' \| wc -l`. |
 | P6-14 | P1 | fixed | MMF component normalised against its own history. |
 | P6-15 | P2 | fixed | social-sentiment error banner; decorative 47/54/50 constants removed. |
 | P6-16 | P0 | fixed | `/api/fomc-predictions` nullable end to end; 503 rather than a forecast on a stand-in rate. |
@@ -4643,3 +4643,29 @@ Both came back with nothing missing.
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-64 | P2 | tooling | Two splits broke three checks — two pinned-claim registry entries whose sentences moved into child components, and `check-panic-composite.ts` reporting `scope: 0 score bar(s)` when every bar it reads moved out of the one file it was pinned to. All three failed loudly rather than passing on nothing. Registry repointed; the composite check now reads `components/panic/**` and asserts its scope. |
+
+## 2026-08-14 — the market-sentiment route, and a third repointed registry entry
+
+`app/api/market-sentiment/route.ts` was 1,140 lines and is now **351**, its body in
+`lib/market-sentiment/`: `stored-indicators.ts` (what this site computes from its own
+stored closes, plus the `NOT_TRACKED` list P7-57 corrected), `upstream.ts` (Yahoo, the
+NYSE highs/lows scrape, chart history, and the `DATA_SOURCES` record of which provider
+backs which indicator), `scoring.ts` (the seven component scores), `fallback-index.ts`
+(this site's own Fear & Greed, used when the scrape fails) and `cnn-scrape.ts`. What is
+left in the route is the cache policy and `GET`.
+
+`scoring.ts` is the piece worth having on its own: seven pure functions, no network, so
+what each score does at a boundary or an extreme can be read without tracing a fetch.
+
+**Third registry entry repointed today.** P6-58 pins the banner "Components with no data
+are excluded" to a dependency on `excludedComponents`, which moved with the fallback
+calculation that builds it. Like P6-66 and P6-61 before it, `check-provenance` FAILED
+rather than passing on a file that no longer held the dependency. Three path-keyed
+registry entries broken by three refactors in one day, three loud failures, zero silent
+ones — which is the argument for keeping the registry keyed by path rather than by
+something cleverer that would fail open.
+
+**Seven modules over 600 lines removed today:** the strategy-scanner route, the CCPI audit
+panel, the market-sentiment tab, the FOMC tab, trend-analysis, panic-euphoria and the
+market-sentiment route. The count is **17** over `app components lib` and **19** including
+`scripts/`, from 24 and 26 this morning.

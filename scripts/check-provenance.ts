@@ -559,7 +559,11 @@ const PINNED: PinnedClaim[] = [
     finding: "P6-58",
     claimFile: "components/market-sentiment.tsx",
     claim: "Components with no data are excluded",
-    dependsOnFile: "app/api/market-sentiment/route.ts",
+    // P6-13 split the 1,140-line route into `lib/market-sentiment/`, and the
+    // exclusion list moved with the fallback calculation that builds it. Third
+    // registry entry repointed by today's splits (P6-66, P6-61, and this),
+    // every one of them by a FAIL rather than a silent pass.
+    dependsOnFile: "lib/market-sentiment/fallback-index.ts",
     dependsOn: /excludedComponents/,
     why: "the banner promises exclusion; a return to neutral-50 defaults would make it false",
   },
