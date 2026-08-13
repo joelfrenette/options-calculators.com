@@ -169,6 +169,75 @@ check(
   "the reader's only signal that a bar carries no weight",
 )
 
+// ---------------------------------------------------------------------------
+// P7-54: the row measures the VIX term structure and says so.
+// ---------------------------------------------------------------------------
+
+/**
+ * This one is a NAME, not a number, and the number was always right. The value
+ * is `vixShortTerm / vixLongTerm` — real measured VIX history, scored as curve
+ * SHAPE, which is exactly why it survived P6-8 while `investorIntelligence` did
+ * not: shape can disagree with level.
+ *
+ * It was called `putCallRatio`, and the site contradicted itself about that.
+ * `/api/market-sentiment` states in its own header that nothing in the codebase
+ * sources a put/call ratio, lists it in `NOT_TRACKED`, and returns null — while
+ * this route scored one. Two routes, two answers to "does this site have a
+ * put/call feed", and the one that said yes was the one publishing a number.
+ */
+check(
+  "the route publishes vixTermRatio",
+  /vixTermRatio: Math\.round\(vixTermRatio \* 100\) \/ 100/.test(routeSrc),
+)
+check(
+  "no putCallRatio field is emitted from this route",
+  !/^\s*putCallRatio:/m.test(routeSrc),
+  "CCPI has its own putCallRatio from a different source; this route must not add a second answer",
+)
+check(
+  "vixTermScore votes in the composite",
+  members.includes("vixTermScore"),
+  "the rename must not quietly drop a real measured input",
+)
+check(
+  "the term-structure row is no longer listed as a synthetic proxy",
+  !/"putCallRatio",/.test(routeSrc),
+  "a direct reading of the VIX curve is not a proxy for anything",
+)
+
+/**
+ * FIFTH INSTANCE of "a check that names its own findings will match itself",
+ * and the first where stripping comments does not save it.
+ *
+ * The previous four were comments. This one was a USER-FACING STRING: the
+ * corrected tooltip read "no options flow ... is involved", and the rule banning
+ * the phrase "options flow" caught the sentence written to deny it.
+ *
+ * Comments are still stripped, because this file has plenty. But the fix was to
+ * reword the tooltip, NOT to weaken the rule into an attribution-context match —
+ * a blunt rule a reader can hold in their head is worth more than a clever one,
+ * and "this tab must not contain the words options flow" is a sentence anyone
+ * can check by eye.
+ */
+const viewNoComments = viewSrc.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/[^\n]*/g, (m, pre) =>
+  m.startsWith("/*") ? " " : (pre ?? ""),
+)
+check(
+  'no rendered label reads "Put/Call Ratio"',
+  !/>Put\/Call Ratio</.test(viewNoComments),
+  (/>Put\/Call Ratio</.exec(viewNoComments) ?? ["none"])[0],
+)
+check(
+  "the tab does not claim options flow data",
+  !/options flow/i.test(viewNoComments),
+  "there is no options flow feed on this site",
+)
+check(
+  "the tab does not name the CBOE put/call ratio",
+  !/CBOE equity put\/call/i.test(viewNoComments),
+  "a second tooltip named a source the site has never had",
+)
+
 if (failures > 0) {
   console.error(`\n${failures} panic-composite check(s) failed.`)
   process.exit(1)

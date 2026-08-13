@@ -238,7 +238,7 @@ async function calculatePanicEuphoria() {
     // `putCallRatio`, so VIX level carried at least 2/8 of the composite
     // through components that read as independent sentiment sources.
     //
-    // What remains VIX-derived and still scores is `pcScore`, and that is
+    // What remains VIX-derived and still scores is `vixTermScore`, and that is
     // deliberate: it reads the 5-day against the 50-day VIX, so it measures the
     // SHAPE of the curve rather than its level and can genuinely disagree with
     // a level reading. Its NAME is a separate defect — see P7-54.
@@ -258,9 +258,16 @@ async function calculatePanicEuphoria() {
     // not. Same defect as P6-54 (stability restating beta) and P6-58 (NYSE
     // highs/lows restating SPY momentum): a derived value is not an input.
     //
-    // Kept as a DISPLAY field, dropped from the score. The VIX components that
-    // remain are investorIntelligence (level) and putCallRatio (5-day vs 50-day
-    // term structure), which can and do disagree with each other.
+    // Kept as a DISPLAY field, dropped from the score.
+    //
+    // This sentence used to end "the VIX components that remain are
+    // investorIntelligence (level) and putCallRatio (5-day vs 50-day term
+    // structure), which can and do disagree with each other" — accurate when
+    // written and stale two commits later, because P6-8 dropped
+    // investorIntelligence from the score as well. **Exactly ONE VIX-derived
+    // component still votes: `vixTermScore`**, and it votes because curve shape
+    // is not curve level. A comment that enumerates a set is a claim with an
+    // expiry date.
     const aaiiBullish = Math.max(25, Math.min(65, investorIntelligence * 0.9))
 
     // FRED helper: latest value + its percentile within ~5y of history. The
@@ -318,8 +325,25 @@ async function calculatePanicEuphoria() {
     const vix50DayMA = smaOrThrow(vixPrices, 50, "VIX 50-day MA")
     const vixShortTerm = smaOrThrow(vixPrices.slice(-5), 5, "VIX 5-day MA")
     const vixLongTerm = vix50DayMA
-    const putCallRatio = Math.max(0.8, Math.min(1.3, vixShortTerm / vixLongTerm))
-    const pcScore = Math.max(-1, Math.min(1, normalize(putCallRatio, 0.8, 1.3, 1.0))) * -1
+    // P7-54. THIS WAS CALLED `putCallRatio`, AND IT IS NOT ONE.
+    //
+    // The value is the 5-day VIX over the 50-day VIX: the SHAPE of the
+    // volatility curve. That is real measured data and it is scored correctly —
+    // it survived P6-8's cull precisely because shape can disagree with level,
+    // unlike `investorIntelligence`, which could not disagree with VIX at all.
+    //
+    // The name was the defect, and the site contradicted itself about it:
+    // `/api/market-sentiment` states in its own header that "putCallRatio is
+    // absent on purpose: nothing in the codebase sources one", lists it in
+    // `NOT_TRACKED` and returns null — while this route scored a number under
+    // that name and the tab's tooltip attributed it to "options flow data" and,
+    // one panel lower, to the "CBOE equity put/call ratio". Neither exists here.
+    //
+    // Renamed to what it measures. It also LEAVES `syntheticComponents`: it was
+    // listed there as a proxy for a put/call ratio, and a direct reading of the
+    // VIX term structure is not a proxy for anything — it is the measurement.
+    const vixTermRatio = Math.max(0.8, Math.min(1.3, vixShortTerm / vixLongTerm))
+    const vixTermScore = Math.max(-1, Math.min(1, normalize(vixTermRatio, 0.8, 1.3, 1.0))) * -1
 
     // Real series, not SPX echoes (P6-8). These were `280 + spxMomentum * 2`
     // and `3.2 + spxMomentum * 0.01` — zero independent information, presented
@@ -364,7 +388,7 @@ async function calculatePanicEuphoria() {
       marginScore,
       volumeScore,
       mmfScore,
-      pcScore,
+      vixTermScore,
       commodityScore,
       gasScore,
     ].filter((s): s is number => s !== null)
@@ -377,7 +401,7 @@ async function calculatePanicEuphoria() {
       marginScore,
       volumeScore,
       mmfScore,
-      pcScore,
+      vixTermScore,
       commodityScore,
       gasScore,
       overallScore: clampedScore,
@@ -428,7 +452,7 @@ async function calculatePanicEuphoria() {
       investorIntelligence: Math.round(investorIntelligence),
       aaiiBullish: Math.round(aaiiBullish),
       moneyMarketFunds,
-      putCallRatio: Math.round(putCallRatio * 100) / 100,
+      vixTermRatio: Math.round(vixTermRatio * 100) / 100,
       commodityPrices: commodityPrices !== null ? Math.round(commodityPrices * 10) / 10 : null,
       gasPrices: gasPrices !== null ? Math.round(gasPrices * 100) / 100 : null,
       // Which components are synthetic proxies (derived from SPX/VIX or AI
@@ -436,13 +460,13 @@ async function calculatePanicEuphoria() {
       // list when their FRED series fetched (P6-8/P6-14).
       syntheticComponents: [
         ...(shortInterestIsLive ? [] : ["nyseShortInterest"]),
-        // These three are DISPLAY-ONLY: they are listed as synthetic and none
-        // of them casts a vote in the composite (P6-61 for aaiiBullish, P6-8
-        // for investorIntelligence). `putCallRatio` DOES score — it is real VIX
-        // term structure under a false name, which is P7-54, not P6-8.
+        // Both are DISPLAY-ONLY: listed as synthetic, neither casts a vote in
+        // the composite (P6-61 for aaiiBullish, P6-8 for investorIntelligence).
+        // `putCallRatio` used to sit here too; P7-54 renamed it to
+        // `vixTermRatio` and took it OUT, because a direct reading of the VIX
+        // term structure is not a proxy for anything.
         "investorIntelligence",
         "aaiiBullish",
-        "putCallRatio",
         ...(marginIsLive ? [] : ["marginDebt"]),
         ...(mmfIsLive ? [] : ["moneyMarketFunds"]),
       ],

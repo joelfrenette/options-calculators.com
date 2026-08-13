@@ -51,7 +51,7 @@ interface PanicEuphoriaData {
   aaiiBullish: number
   // Null when FRED WRMFSL is unavailable — rendered as "—".
   moneyMarketFunds: number | null
-  putCallRatio: number
+  vixTermRatio: number
   // Null when FRED (PPIACO / GASREGW) is unavailable — rendered as "—".
   commodityPrices: number | null
   gasPrices: number | null
@@ -614,12 +614,12 @@ export function PanicEuphoria() {
                   }
                 />
                 <PanicIndicator
-                  label="Put/Call Ratio"
-                  value={(1.0 - data.putCallRatio) / 0.3}
-                  rawValue={`${data.putCallRatio.toFixed(2)}`}
+                  label="VIX Term Structure (5d/50d)"
+                  value={(1.0 - data.vixTermRatio) / 0.3}
+                  rawValue={`${data.vixTermRatio.toFixed(2)}`}
                   tooltip={
                     tooltipsEnabled
-                      ? "Put/Call Ratio measures hedging activity via options markets. SOURCE: Derived from VIX term structure and options flow data. INTERPRETATION: High ratio (>1.1) indicates heavy put buying/hedging—fear and panic, which is contrarian bullish. Low ratio (<0.8) indicates complacency—no one is hedging, euphoria signal. Current range: 0.8-1.3."
+                      ? "The 5-day VIX divided by the 50-day VIX — the SHAPE of the volatility curve, not its level. SOURCE: measured VIX history from Yahoo — no options data of any kind (this row was previously labelled 'Put/Call Ratio', naming an instrument this site does not source). INTERPRETATION: above 1.0 means near-term volatility is bid above longer-dated — fear and hedging demand, contrarian bullish. Below 1.0 is a calm front end — complacency. Clamped to 0.8-1.3. It IS scored: shape can disagree with level, which is why it survived the cull that removed the VIX-derived sentiment proxies."
                       : ""
                   }
                 />
@@ -874,15 +874,15 @@ export function PanicEuphoria() {
 
                   <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-700">Put/Call Ratio</span>
+                      <span className="text-sm font-medium text-gray-700">VIX Term Structure</span>
                       <div className="relative group/tooltip">
                         <Info className="h-3 w-3 text-gray-400 cursor-help" />
                         <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                          CBOE equity put/call ratio. High = fear (contrarian bullish).
+                          VIX 5-day / 50-day. Above 1.0 = fear bid into the front end (contrarian bullish).
                         </div>
                       </div>
                     </div>
-                    <span className="text-sm font-bold text-gray-900">{data.putCallRatio.toFixed(2)}</span>
+                    <span className="text-sm font-bold text-gray-900">{data.vixTermRatio.toFixed(2)}</span>
                   </div>
 
                   <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">
