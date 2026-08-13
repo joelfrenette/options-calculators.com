@@ -237,11 +237,11 @@ recomputes it.
 | P3-25 | P2 | fixed | Planner "% of stock price" 100× fix. |
 | P3-26 | P2 | fixed | learn-pmcc worked example. |
 | P3-27 | P2 | fixed | Iron condors render all four legs. |
-| P4-1 | P3 | open | `components/wheel-strategy-planner.tsx` is dead UI with correct math. Wire it to a LEARN tab or delete it — still undecided. |
+| P4-1 | P3 | fixed | `components/wheel-strategy-planner.tsx` was dead UI with correct math awaiting a wire-or-delete call. P7-27 found it again from the other direction — unreachable by any import — and the owner chose delete. File gone 2026-08-12. |
 | P4-2 | P1 | fixed | Reset endpoint returns 501 with the real recovery procedure. |
 | P4-3 | P1 | fixed | Rate limiting + constant-time comparison + `ADMIN_PASSWORD_HASH`. |
 | P4-4 | — | open | Admin-managed API keys. Design agreed, unblocked by P4-3, not built. |
-| P5-1 | P1 | open | Legacy Full Audit retired (A-1…A-3), but the second half — Phase-6-style sign-off of **every** admin tab — has not happened. **This is Phase 7.2.** |
+| P5-1 | P1 | fixed | Legacy Full Audit retired (A-1…A-3); the second half, a Phase-6-style sign-off of every admin tab, was Phase 7.2 and shipped as P7-1…P7-7 on 2026-08-11. **This row said `open` for two days while the prose eight lines below it said "P5-1 closed with Phase 7.2" — the drift that retired that prose section.** |
 | A-1 | P0 | fixed | `full-system-audit` route and component retired (verified 2026-08-11). |
 | A-2 | P0 | fixed | Died with A-1. |
 | A-3 | P0 | fixed | Died with A-1. |
@@ -260,7 +260,7 @@ recomputes it.
 | E-1 | — | open | Excel export. Needs the one `CriteriaCodes` spec answer. |
 | E-2 | — | open | "Ask AI" popover. Needs a planning session — cost, trigger design, verdict liability, grounding. |
 | E-3 | — | open | POP column. Buildable now; needs the strike-vs-breakeven decision. |
-| E-4 | — | open | Yahoo advanced-chart link. Needs the (a)/(b)/(c) decision. |
+| E-4 | — | fixed | Yahoo advanced-chart link. The owner made the call on 2026-08-12 and P7-28 delivered it: all fifteen ticker links go to `/chart/<TICKER>` from `lib/ticker-links.ts`, which also fixed a class-share 404 that had been live in fourteen of them. |
 | E-5 | — | fixed | Budget guard built. Deploy prereqs listed on the row. |
 | E-5a | P1 | fixed | `recordAiCall()` — the ledger now sees the pay-per-use providers. |
 | E-5b | P1 | fixed | Five direct-provider libs routed through `resolveApiKey`. |
@@ -298,7 +298,7 @@ recomputes it.
 | P6-10 | P2 | fixed | `100 - x \|\| 50` precedence bug. |
 | P6-11 | P1 | open | **Partial.** The hallucination pipeline is labelled and routed through the guarded chain. **Open decision:** rebuild the sentiment heatmap on real sources or retire the tab. |
 | P6-12 | P1 | fixed | 25+ raw `process.env` key reads routed through `resolveApiKey`. |
-| P6-13 | P3 | open | Module-size debt: 19 modules over 600 lines. Also the duplicated Black-Scholes in `greeks-calculator`. |
+| P6-13 | P3 | open | Module-size debt: 19 modules over 600 lines. **The Black-Scholes duplication half is done** — P7-12 folded `greeks-calculator`'s copy into `lib/black-scholes.ts` on 2026-08-11, and this note went on listing it as outstanding until 2026-08-12. |
 | P6-14 | P1 | fixed | MMF component normalised against its own history. |
 | P6-15 | P2 | fixed | social-sentiment error banner; decorative 47/54/50 constants removed. |
 | P6-16 | P0 | fixed | `/api/fomc-predictions` nullable end to end; 503 rather than a forecast on a stand-in rate. |
@@ -408,11 +408,13 @@ recomputes it.
 | P7-32 | P3 | fixed | Sweep of the other six scanners. Big-up-day applies to all seven; the year-long gates apply to LEAPS, ZEBRA and the bull-put half of credit spreads, are INVERTED for bear-call, and are wrong for the three neutral strategies. Owner approved; applied with the per-strategy split, one memoised year-of-bars call per ticker per request. |
 | P7-33 | — | fixed | The six server-driven scanner tabs render the shared entry-exclusion notice and set the threshold via ?maxDayMove= (clamped 3-25 server-side). A stale-closure bug that would have rescanned with the previous threshold was caught before commit. |
 | P7-34 | P3 | fixed | The big-up-day threshold was written in three places — a route clamp, a slider range and a dropdown of eight fixed steps. lib/trend-filters.ts owns the range, default and clamp now, and the six tabs use the same slider as the Sell Put scanner. |
+| P7-35 | P3 | fixed | Three open rows were already fixed (P4-1 deleted by P7-27, E-4 shipped by P7-28, P5-1 delivered by Phase 7.2) and P6-13 note listed a duplication P7-12 had removed. The ledger check verifies a status exists, never that it is true. |
+| P7-36 | P2 | fixed | The fourth banned open-list summary disagreed with the ledger in six places and with itself in one. Deleted; check-open-summaries.ts guards against a fifth. Two more undated open-lists found, one naming two environment variables that do not exist. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-237 findings recorded · **190 fixed · 8 wontfix · 1 verified-ok · 38 open.**
+239 findings recorded · **195 fixed · 8 wontfix · 1 verified-ok · 35 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -425,37 +427,39 @@ finding of its own. P7-29 is a sweep that stands alone — the outbound-link fam
 did *not* touch — so it gets its own row, because an unrecorded clean sweep is one the
 next pass repeats.
 
-**P1 — 4.**
-`P3-16` — Panic/Euphoria; the same open remainder as `P6-8`, under two IDs.
-`P6-8` · `P6-11` — both need an owner rebuild-or-retire decision, not code.
-`P6-27` — needs one live grouped Polygon call.
+### The by-severity list that used to sit here — deleted 2026-08-12, and why
 
-_(`P3-15`, `P3-17` and `P3-18` were confirmed and closed on 2026-08-11 — see below.
-`P5-1` closed with Phase 7.2. The prediction that "three of the four are probably
-already done" was **wrong on two of them**, which is the point of confirming.)_
+**It was the fourth hand-maintained summary of what is open in this file, and like the
+other three it drifted.** CLAUDE.md forbids exactly this, in writing, and the ban was
+added *because* of the previous three. It was written anyway, on the same day the ledger
+that makes it unnecessary was created.
 
-**P2 — 6.**
-`S-18` (the scanner's hidden gates, estimate badges, expected
-move and step-number drift) · `P6-31` · `P6-65` **— Joel's weight decision** · `P6-85` **— Phase 7.0** ·
-`P7-7` **— `next build` runs on neither bundler here; the second blocker on Phase 7.0** ·
-`P7-10`.
+Measured against the ledger before deletion, in one pass:
 
-**P3 — 11.**
-`S-5` · `S-7` · `S-13` **— Joel's Vercel action** · `S-16` · `S-17` · `P0-1` · `P0-6` ·
-`P2-3` · `P4-1` · `P6-13` · `P6-87` **— Phase 7.0** · `E-8i` · `P7-9`.
+- **P1** claimed 4 and the ledger held 5. The extra was `P5-1` — which a parenthetical
+  *in the same paragraph* declared "closed with Phase 7.2" while its ledger row said
+  `open`. One record contradicting another eight lines away.
+- **P2** claimed 6, listed `S-18` and `P7-10` (both `fixed`), and omitted `P7-21`
+  (`open`). Three errors in six entries.
+- **P3** claimed **11** and then listed **13**, one of which (`P7-9`) was `fixed`. It did
+  not agree with the ledger *or with its own stated count*.
+- `P4-1` was listed as open while the file it describes had been deleted, and `E-4` was
+  listed as an unbuilt enhancement after P7-28 shipped it.
 
-**Enhancements and unbuilt features — 16.**
-`E-1` · `E-2` · `E-3` · `E-4` · `P4-4` · `E-6` (+ `E-6b`, `E-6c`, `E-6d`) ·
-`E-7` (+ `E-7a`, `E-7d`) · `E-8` (+ `E-8c`, `E-8d`, `E-8h`).
+The value it claimed to add — "the real defect list is 24 items, not the 213 the file's
+length suggests" — is a query, not a document. Run it against the ledger and it is right
+by construction; write it down and it is wrong within a day.
 
-**Closed on rationale rather than a change — 7.**
-`S-4` · `P0-7` · `P2-6` · `E-8b` · `E-8e` · `E-8f` · `P6-35`.
+**The ledger is the answer to "what is open".** It is machine-checked, it is the only
+place a status lives, and `scripts/check-backlog-ledger.ts` fails the suite if a finding
+has no row or a row has no finding. `scripts/check-open-summaries.ts` now fails the suite
+if a fifth one of these appears.
 
-**What this changes about "work the backlog by severity".** The real defect list is 24
-items, not the 213 the file's length suggests — and half the P1s on it are bookkeeping,
-not work. Nobody could see that before, which is the point of this section: closure was
-recorded in fourteen vocabularies, and the file's own summary line was still calling
-three items "remaining" (P6-29, S-11, S-14) that had each been fixed the day before.
+**The one genuinely non-derivable observation is worth keeping**, so it stays as prose
+with no counts in it: *half the open P1s are bookkeeping rather than work* — one finding
+recorded under two IDs, one closed-but-unmarked, and two awaiting an owner decision rather
+than an implementation. That was invisible before Phase 7.1, when closure was recorded in
+fourteen different vocabularies.
 
 
 ---
@@ -938,10 +942,16 @@ because `pnpm check` chains on typecheck and short-circuits before the other thr
 SPY/QQQ capture, and the store-first VIX term structure. All three are deployed and
 inert; nothing on the site changes until that job runs.
 
-**Open, in priority order:** P6-29 (delete the eight dead CCPI duplicate components
-nothing imports), S-11 and S-14, re-locating the seven stale wheel-scanner references,
-and the 16 modules still over the 600-line budget. Ledger stands at 98/336 cells with
-`fb` and `size` at 0/42 and `mob` needing a real device.
+**Open as of 2026-08-10, in priority order — historical, superseded by the §STATUS
+LEDGER:** P6-29 (delete the eight dead CCPI duplicate components nothing imports), S-11
+and S-14, re-locating the seven stale wheel-scanner references, and the 16 modules still
+over the 600-line budget. Sign-off ledger stood at 98/336 cells with `fb` and `size` at
+0/42 and `mob` needing a real device.
+
+_(All three findings named above were fixed the following day. This paragraph is left in
+place, dated, because deleting it would erase the record of what the phase actually faced
+— but it was written in the present tense and stayed that way, which is how CLAUDE.md's
+own example of a drifted summary came to be quoting it.)_
 
 ---
 
@@ -1197,10 +1207,18 @@ transfers to Phase 7.
 publishing invented trades attributed to named real people) and P6-52 (the seed data
 that fed it, served at HTTP 200 with a fresh timestamp).
 
-**Open and owned by Joel:** the P6-65 weight decision (should 0.19 of
-social-sentiment's composite rest on one Finnhub corpus?), UAT, the `mob` column
-across 42 tabs, and clearing any blank `DAILY_HARD_STOP` / `MONTHLY_HARD_STOP` /
-`MONTHLY_BUDGET_TARGET` in Vercel (P6-86).
+**Open and owned by Joel as of 2026-08-11 — historical; the §STATUS LEDGER is the current
+record:** the P6-65 weight decision (should 0.19 of social-sentiment's composite rest on
+one Finnhub corpus?), UAT, the `mob` column across 42 tabs, and clearing any blank
+`DAILY_BUDGET_HARD_STOP` / `MONTHLY_BUDGET_HARD_STOP` / `MONTHLY_BUDGET_TARGET` in Vercel
+(P6-86).
+
+_(**The first two variable names in that list were wrong** until 2026-08-12: they were
+written `DAILY_HARD_STOP` and `MONTHLY_HARD_STOP`, without the `_BUDGET_` the real
+variables carry. A handoff note had shortened them the same way. An owner action item
+naming a variable that does not exist sends you looking in Vercel for something that was
+never there — and finding nothing reads exactly like finding it already unset, which is
+the answer P6-86 needs to be certain about.)_
 
 **Phase 7 is planned in [AUDIT_PLAN.md](AUDIT_PLAN.md) as six ordered steps.** It
 starts at **7.0 — make the unverifiable verifiable**, which needs a `next build` and
@@ -3257,3 +3275,67 @@ returned 7 ZEBRA rows; `maxDayMove=25` excluded 11 and returned 8. The clamp ans
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-34 | P3 | SCAN / lib | The big-up-day threshold was written in three places — a route clamp, a slider range and a dropdown. `lib/trend-filters.ts` owns the range, default and clamp now; the six tabs use the same slider as the Sell Put scanner. Five assertions, negative-tested twice. |
+
+---
+
+## Phase 7.9 (twenty-second pass) — working the open list (2026-08-12)
+
+The task was "which of the 37 open items are genuinely blocked on the owner, and which can
+I close myself". Four closed on inspection. The fifth thing found was that the question was
+being answered by a document that had been wrong for two days.
+
+### P7-35 — three findings were already fixed, and one note was stale
+
+- **`P4-1`** — "`components/wheel-strategy-planner.tsx` is dead UI, wire it or delete it,
+  still undecided". P7-27 found the same file from the other direction (unreachable by any
+  import) and the owner chose delete. The file was gone; the row still said `open`.
+- **`E-4`** — "Yahoo advanced-chart link. Needs the (a)/(b)/(c) decision." The decision was
+  made and P7-28 shipped it the same day.
+- **`P5-1`** — "the second half, a Phase-6-style sign-off of every admin tab, has not
+  happened. **This is Phase 7.2.**" Phase 7.2 shipped as P7-1…P7-7 on 2026-08-11.
+- **`P6-13`** stays open for its module-size half, but its note listed the duplicated
+  Black-Scholes in `greeks-calculator` as outstanding; P7-12 folded that into
+  `lib/black-scholes.ts` a day earlier.
+
+Ledger: 38 open → 35.
+
+### P7-36 — the fourth banned summary, and the two that carried no count
+
+**CLAUDE.md forbids a second summary of what is open, in writing, because three had
+already drifted. A fourth was written anyway** — on the same day as the ledger that makes
+it unnecessary — and by 2026-08-12 it disagreed with the ledger in six places and with
+itself in one. Measured before deletion:
+
+- **P1** claimed 4 against the ledger's 5. The extra was `P5-1`, which a parenthetical
+  *in the same paragraph* called "closed with Phase 7.2" while its ledger row said `open`.
+- **P2** claimed 6, listed two `fixed` items (`S-18`, `P7-10`), and omitted an `open` one
+  (`P7-21`).
+- **P3** claimed **11** and listed **13**, one of them `fixed`.
+
+It is deleted, with a note in its place saying what it was and why — a rule whose rationale
+lives only in a script is a rule that gets argued with.
+
+`scripts/check-open-summaries.ts` now fails the suite on a fifth. **Building it found two
+more that no count-based rule could see**, because they carry no numbers at all: a
+2026-08-10 "**Open, in priority order:**" listing three findings fixed the next day, and a
+2026-08-11 "**Open and owned by Joel:**". Both sit inside dated phase narratives, where a
+record of what was open *at the time* is legitimate history — so the rule is not deletion
+but DATING. Both now say when they were true.
+
+**And that second block named two environment variables that do not exist**:
+`DAILY_HARD_STOP` / `MONTHLY_HARD_STOP`, missing the `_BUDGET_` the real variables carry.
+A handoff note had shortened them the same way. An owner action item naming a variable that
+does not exist sends you looking in Vercel for something that was never there — and finding
+nothing reads exactly like finding it already unset, which is the answer P6-86 needs to be
+certain about.
+
+**The check nearly shipped covering five percent of its subject.** Its first version
+skipped `i >= ledgerStart` — meaning everything after line 136 of a 2,900-line file — and
+printed PASS. The scope size is asserted now (P6-77): 2,947 of 3,276 lines. Negative-tested
+three ways: a fifth by-severity tally, an undated present-tense open list, and deletion of
+the rationale note.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-35 | P3 | bookkeeping | Three open rows were already fixed (`P4-1` deleted by P7-27, `E-4` shipped by P7-28, `P5-1` delivered by Phase 7.2) and `P6-13`'s note listed a duplication P7-12 had removed. The ledger check cannot see this — it verifies a status exists, never that it is true. |
+| P7-36 | P2 | tooling / docs | The fourth banned open-list summary disagreed with the ledger in six places and with itself in one. Deleted; `check-open-summaries.ts` guards against a fifth. Two more undated open-lists were found in the process, one naming two environment variables that do not exist. |
