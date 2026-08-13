@@ -32,6 +32,8 @@ interface Step2PreFilterCardProps {
   preFilterProgress: number
   preFilterCurrentTicker: string
   preFilterCount: number
+  /** Which universe /api/polygon-tickers actually used (S-7). */
+  universeSource: string | null
   onScan: () => void
 }
 
@@ -51,6 +53,7 @@ export function Step2PreFilterCard({
   preFilterProgress,
   preFilterCurrentTicker,
   preFilterCount,
+  universeSource,
   onScan,
 }: Step2PreFilterCardProps) {
   return (
@@ -334,6 +337,26 @@ export function Step2PreFilterCard({
               ✅ {preFilterCount} tickers loaded and ready for {stepLabel("fundamentals")} scan
             </p>
           )}
+
+          {/* S-7. WHICH universe answered. `/api/polygon-tickers` has always
+              returned this and the client discarded it, so a silent fall back
+              to the route's fixed 100-name list rendered exactly like a live
+              screener returning 100 — the count is the same and nothing else
+              was shown. The fallback is called out in amber because it is the
+              one case where the filters above did not decide the universe. */}
+          {preFilterCount > 0 && universeSource ? (
+            universeSource === "polygon-hardcoded-fallback" ? (
+              <p className="mt-1 text-center text-xs text-amber-800">
+                ⚠️ Universe came from the <strong>built-in fallback list</strong>, not a live screener — your market-cap,
+                volume and volatility filters above did <strong>not</strong> select it. The list is a fixed set of large
+                caps maintained in the route.
+              </p>
+            ) : (
+              <p className="mt-1 text-center text-xs text-gray-600">
+                Universe source: <span className="font-mono">{universeSource}</span>
+              </p>
+            )
+          ) : null}
     </>
   )
 }

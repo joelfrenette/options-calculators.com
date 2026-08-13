@@ -66,6 +66,68 @@ export const generateCacheKey = (params: {
   return `fundamental_scan_${CACHE_VERSION}_${params.minVolume}_${params.maxDebtToEquity}_${params.minROE}_${params.minProfitableQuarters}_${params.minMarketCapCategory}_${params.tickers.replace(/[^a-zA-Z,]/g, "").substring(0, 50)}`
 }
 
+/**
+ * Cache keys this module owns, by prefix.
+ *
+ * Listed rather than pattern-matched on `_scan_` alone, so a future key named
+ * `something_scan_…` cannot be swept away by a helper that never heard of it.
+ * The per-tab caches (`leaps-scanner-cache` and friends) are NOT here: they are
+ * written by the scanner tabs, carry no version segment, and are none of this
+ * module's business.
+ */
+const OWNED_PREFIXES = ["fundamental_scan_", "technical_scan_"] as const
+
+/**
+ * Is this a cache key from a SUPERSEDED version of the scanner? (S-16)
+ *
+ * `loadFromCache` evicts only the key it just missed on, so every bump of
+ * `CACHE_VERSION` orphans the previous version's entries — they are never read
+ * again, never expire, and never get removed. A full scan result is large and
+ * localStorage is a ~5MB budget shared with everything else on the origin, so
+ * the accumulation ends in a quota error on an unrelated write.
+ *
+ * Pure and exported so `scripts/check-scan-cache.ts` can assert it without a
+ * browser. The version segment is matched structurally — `v` followed by
+ * digits, immediately after a known prefix — never by string-containment,
+ * because `v3` appears inside plenty of ticker lists.
+ */
+export const isSupersededCacheKey = (key: string, currentVersion: string = CACHE_VERSION): boolean => {
+  for (const prefix of OWNED_PREFIXES) {
+    if (!key.startsWith(prefix)) continue
+    const rest = key.slice(prefix.length)
+    const m = /^v(\d+)_/.exec(rest)
+    if (!m) return false // owned prefix but no version segment: not ours to judge
+    return `v${m[1]}` !== currentVersion
+  }
+  return false
+}
+
+/**
+ * Remove every superseded-version entry this module owns.
+ *
+ * Called once when the scanner mounts. Reads the key list first and deletes
+ * afterwards, because `localStorage.removeItem` during a `key(i)` walk
+ * reindexes the store and silently skips entries.
+ */
+export const pruneSupersededCaches = (): number => {
+  if (typeof window === "undefined" || !window.localStorage) return 0
+  try {
+    const doomed: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && isSupersededCacheKey(key)) doomed.push(key)
+    }
+    for (const key of doomed) localStorage.removeItem(key)
+    if (doomed.length > 0) {
+      console.log(`[v0] Pruned ${doomed.length} scan cache entr(ies) from superseded versions: ${doomed.join(", ")}`)
+    }
+    return doomed.length
+  } catch (err) {
+    console.error("[v0] Error pruning superseded caches:", err)
+    return 0
+  }
+}
+
 export const saveToCache = (key: string, data: any): void => {
   try {
     const cacheData = {

@@ -5,8 +5,14 @@
 // The component composes the step cards/tables; this hook owns the pipeline.
 
 import React from "react"
-import { useState } from "react"
-import { CACHE_VERSION, generateCacheKey, saveToCache, loadFromCache } from "./scan-cache"
+import { useEffect, useState } from "react"
+import {
+  CACHE_VERSION,
+  generateCacheKey,
+  saveToCache,
+  loadFromCache,
+  pruneSupersededCaches,
+} from "./scan-cache"
 import {
   PRE_FILTER_MARKET_CAP_TIERS,
   PRE_FILTER_VOLATILITY_TIERS,
@@ -133,6 +139,17 @@ export function useWheelScanner() {
   // What the exclusions removed, with reasons, so an empty Step 4 is explicable
   // rather than just empty.
   const [entryExclusionSummary, setEntryExclusionSummary] = useState<EntryExclusion[]>([])
+  // Which universe Step 2 actually loaded (S-7).
+  const [universeSource, setUniverseSource] = useState<string | null>(null)
+
+  // S-16. Every bump of CACHE_VERSION orphans the previous version's entries —
+  // never read, never expired, never removed, because loadFromCache only evicts
+  // the key it just missed on. Once per mount is the right cadence: it is a few
+  // string comparisons against localStorage's key list, and the alternative
+  // (sweeping on every read) pays that cost per scan step.
+  useEffect(() => {
+    pruneSupersededCaches()
+  }, [])
 
   const [cacheStatus, setCacheStatus] = useState<string>("")
 
@@ -477,6 +494,13 @@ export function useWheelScanner() {
         const tickers = data.tickers.sort((a: string, b: string) => a.localeCompare(b))
         setTickersToScan(tickers.join(", "))
         setPreFilterCount(tickers.length)
+        // S-7. `/api/polygon-tickers` has always returned which universe it
+        // actually used — `fmp-screener`, `polygon-grouped-bars`, or
+        // `polygon-hardcoded-fallback`, a fixed list of 100 names kept in the
+        // route. The client threw that field away, so a silent degradation to
+        // the hardcoded list rendered as "100 tickers loaded", identical to a
+        // live screener returning 100. Kept and shown now.
+        setUniverseSource(typeof data.source === "string" ? data.source : null)
         setPreFilterProgress(100)
         setPreFilterCurrentTicker("")
         console.log(`[v0] ✅ ${stepLabel("preFilter")} Complete: Loaded ${tickers.length} tickers`)
@@ -643,6 +667,7 @@ export function useWheelScanner() {
     excludeBenchmarkLaggard, setExcludeBenchmarkLaggard,
     excludeStage4, setExcludeStage4,
     entryExclusionSummary,
+    universeSource,
     technicalFilterSettings,
     scanTechnicals,
     // Pipeline state

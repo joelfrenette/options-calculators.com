@@ -178,7 +178,7 @@ recomputes it.
 | S-4 | P3 | wontfix | Finnhub's calendar was never adopted. The publication *rule* is the fact, so the rule-derived events stay and their invented figures were nulled instead. |
 | S-5 | P3 | open | 21 → 10 TypeScript errors. The 10 are the standing baseline. |
 | S-6 | P3 | fixed | wheel-scanner 4,439 → 386 lines. General module-size debt is P6-13, not this. |
-| S-7 | P3 | open | Both `MEGA_CAP_STOCKS` tables deleted; `MAJOR_INDEX_TICKERS` fallback survives and is still unlabelled when it is the universe actually used (verified 2026-08-11). |
+| S-7 | P3 | fixed | **FIXED 2026-08-12** by P7-37: the client discarded the route's own `source` field, so the hardcoded fallback universe rendered identically to a live screener. Step 2 shows it now. |
 | S-8 | P2 | fixed | **Closed 2026-08-11.** Dead `maxPE` deleted with its "FIX: Declare maxPE state variable" comment. The two hidden gates are now stated on the Step 4 card — 1% minimum yield, 2M minimum volume — and the false comment calling `minVolumeTechnicals` unused is replaced. **Sliders remain unbuilt**; naming a gate the user cannot adjust is the honest half, not the whole fix. |
 | S-9 | P2 | fixed | **Verified 2026-08-11**, which is what the row asked for. P6-43 satisfied it and nobody re-marked: both results tables mark every affected cell `est.`, each carries a title naming the fixed 35% IV assumption, and the header states how many of N rows have no live quote and warns that sorting by yield ranks them against real quotes. The estimate constants are cited, not merely flagged. |
 | S-10 | P2 | fixed | **Closed 2026-08-11.** Now `S · σ · √T` off measured IV, computed in `enrichment.ts` where an IV exists, and withheld when the IV is synthesized. The `lib/black-scholes.ts` docstring had claimed this fix since Phase 1 while the call site kept the fudge. |
@@ -187,12 +187,12 @@ recomputes it.
 | S-13 | P3 | open | Zero `REDDIT_CLIENT` references remain in code; the Vercel env deletion is Joel's and is outstanding. |
 | S-14 | P3 | fixed | FMP screener path gated on plan detection with a named status. |
 | S-15 | P2 | fixed | Closed by P6-26 — thin financials yield null, not 0. |
-| S-16 | P3 | open | `scan-cache.ts` still removes only the key it just missed on; `v1`/`v2` keys persist (verified 2026-08-11). |
-| S-17 | P3 | open | Redundant earnings-date extraction still at `fundamental-scan.ts:290` (verified 2026-08-11). |
+| S-16 | P3 | fixed | **FIXED 2026-08-12** by P7-37: pruneSupersededCaches() sweeps other-version keys once on mount; the predicate is pure and asserted, including that it never touches a per-tab cache. |
+| S-17 | P3 | fixed | **FIXED 2026-08-12** by P7-37. Worse than redundant: the two extractions disagreed, and the premium bump read the narrow one while the table displayed the wide one. |
 | S-18 | P2 | fixed | **CLOSED.** Every step label a user or log reader sees derives from components/scanner/steps.ts; the guard scope is derived, which exposed four unguarded files and a second drifting one. Comments verified by hand — a comment cannot interpolate a constant. |
 | S-19 | P1 | fixed | `lib/metered-fetch.ts` — real per-call metering. |
 | S-20 | P3 | fixed | Both TwelveData proxies retired. |
-| P0-1 | P3 | open | 15 orphan routes → **6 remain**: `yahoo-proxy`, `apify-proxy`, `google-trends`, `serper-finance`, `macro-indicators`, `scraping-bee/diagnostics` (verified 2026-08-11). Each still needs a keep-or-delete verdict. |
+| P0-1 | P3 | fixed | **FIXED 2026-08-12** by P7-38 as a standing rule rather than a triage. Twelve orphaned routes, not six — the grep count included comments. Deleting any of them remains the owner's call. |
 | P0-2 | P1 | fixed | Breadth route and lib deleted. |
 | P0-3 | P3 | fixed | `/api/qqq-technicals` route gone, `lib/qqq-technicals.ts` kept (verified 2026-08-11). |
 | P0-4 | P2 | fixed | **Re-measured 2026-08-11 and the row was wrong: 9 of 35 outbound routes unwired, not 40 of 61.** `lib/fetch-timeout.ts` built, all 9 wired, `check-route-timeouts.ts` keeps it at zero. |
@@ -410,11 +410,13 @@ recomputes it.
 | P7-34 | P3 | fixed | The big-up-day threshold was written in three places — a route clamp, a slider range and a dropdown of eight fixed steps. lib/trend-filters.ts owns the range, default and clamp now, and the six tabs use the same slider as the Sell Put scanner. |
 | P7-35 | P3 | fixed | Three open rows were already fixed (P4-1 deleted by P7-27, E-4 shipped by P7-28, P5-1 delivered by Phase 7.2) and P6-13 note listed a duplication P7-12 had removed. The ledger check verifies a status exists, never that it is true. |
 | P7-36 | P2 | fixed | The fourth banned open-list summary disagreed with the ledger in six places and with itself in one. Deleted; check-open-summaries.ts guards against a fifth. Two more undated open-lists found, one naming two environment variables that do not exist. |
+| P7-37 | P3 | fixed | S-16, S-17 and S-7 closed: superseded scan caches pruned, two disagreeing earnings extractions collapsed to one (the premium bump and the displayed date came from different answers), and Step 2 shows which universe it loaded. |
+| P7-38 | P3 | fixed | P0-1 became a rule: check-orphan-routes.ts excludes audit artefacts from the referrer set and finds twelve orphaned routes, not six. Two defects in the check were found by running it. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-239 findings recorded · **195 fixed · 8 wontfix · 1 verified-ok · 35 open.**
+241 findings recorded · **201 fixed · 8 wontfix · 1 verified-ok · 31 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -3339,3 +3341,86 @@ the rationale note.
 |----|-----|------|---------|
 | P7-35 | P3 | bookkeeping | Three open rows were already fixed (`P4-1` deleted by P7-27, `E-4` shipped by P7-28, `P5-1` delivered by Phase 7.2) and `P6-13`'s note listed a duplication P7-12 had removed. The ledger check cannot see this — it verifies a status exists, never that it is true. |
 | P7-36 | P2 | tooling / docs | The fourth banned open-list summary disagreed with the ledger in six places and with itself in one. Deleted; `check-open-summaries.ts` guards against a fifth. Two more undated open-lists were found in the process, one naming two environment variables that do not exist. |
+
+---
+
+## Phase 7.10 (twenty-third pass) — four self-contained P3s (2026-08-12)
+
+### S-16 — superseded scan caches were never removed
+
+`loadFromCache` evicts only the key it just missed on, so every bump of `CACHE_VERSION`
+orphaned the previous version's entries: never read, never expired, never deleted. A full
+scan result is large and localStorage is a ~5MB budget shared across the whole origin, so
+the accumulation surfaces as a quota error on some unrelated write — a failure with no
+visible connection to the code that caused it.
+
+`pruneSupersededCaches()` runs once on mount. The predicate behind it is pure and exported
+so it can be asserted without a browser, and the version is matched **structurally** —
+`v<digits>` immediately after a known prefix — never by containment, because `v3` appears
+inside ticker lists.
+
+**The dangerous failure for a sweep is deleting a live key, not missing a dead one**, so
+both directions are asserted: `leaps-scanner-cache` and friends are named explicitly as
+keys it must never touch.
+
+**A limit found by negative-testing and recorded rather than hidden:** changing
+`startsWith` to `includes` does not fail the check and no assertion can make it. The slice
+that follows uses `prefix.length` from index 0, so an unanchored match yields a remainder
+that fails the version test and the predicate returns "keep". It fails CLOSED, which for a
+delete-sweep is the right direction — but claiming the anchoring is covered would be false.
+
+### S-17 — two earnings extractions that disagreed
+
+Not merely redundant. The inline block read four snapshot fields and formatted `"Nov 5"`;
+`extractEarningsData` read one and formatted `"11/5/2026"`. The row took `inline || fn` for
+the displayed date, so the same column rendered two formats depending on which field
+carried the value.
+
+**The part that mattered was downstream.** `premiumMultiplier` — the earnings bump on the
+estimated premium — read the NARROW result while the table displayed the WIDE one. A
+ticker whose date came from `announcement_date` showed *"Earnings in 3d"* beside a premium
+computed as though there were no earnings at all. Two numbers on one row, from two
+different answers to the same question.
+
+One extraction now. Its `expectedMove` return went too: declared, never assigned, returned
+as `undefined` to every caller — a field that existed only to carry S-10's absence.
+
+### S-7 — the client threw away which universe it got
+
+`/api/polygon-tickers` has always returned `source`: `fmp-screener`,
+`polygon-grouped-bars`, or `polygon-hardcoded-fallback`, a fixed 100-name list kept in the
+route. **The client discarded the field**, so a silent degradation to the hardcoded list
+rendered as "100 tickers loaded", identical to a live screener returning 100. Step 2 now
+shows the source and calls out the fallback in amber, because it is the one case where the
+filters above did not select the universe.
+
+### P0-1 — the triage said six; there are twelve
+
+Every mention of the six "orphan" routes is one of four infrastructure lists: the health
+check, the contracts table, the remediation map, or a comment. **The audit infrastructure
+is what makes the dead surface look alive** — the third instance of that shape, after
+`check-dead-exports` reporting a clean `lib/` because its own allowlist named all 51 dead
+symbols, and P7-27's components whose only mentions were in SITE_MAP and the backlog.
+
+So it became a rule. `scripts/check-orphan-routes.ts` excludes audit artefacts from the
+referrer set and found **twelve**, not six — the grep triage had counted comments.
+"Orphan" here means "no feature calls it", **not** "dead": several are operator tools
+invoked by typing a URL with a query string, which is legitimate and which this check
+cannot distinguish from abandonment. Each is recorded with what it is; the keep-or-delete
+call stays the owner's.
+
+**Two defects in the check itself, both found by running it rather than reading it:**
+
+1. `vercel.json` was missing from the referrer set, so live scheduled jobs reported as
+   orphans. A cron entry is the only thing that ever calls `/api/cron/*`.
+2. `src.includes(path)` scored `/api/breadth` as referenced by any file mentioning
+   `/api/breadth-backtest`, and `/api/scraping-bee` by `/api/scraping-bee/diagnostics`.
+   **Both pairs exist here**, so the naive form excused two routes on the strength of their
+   own siblings. Found by an injection that failed to fail: renaming the sole caller of
+   `/api/federal-money` to `…XX` left the substring intact, so the injection was useless
+   AND the check was wrong. Matching is boundary-aware now.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-37 | P3 | SCAN / scanner | S-16, S-17 and S-7 closed: superseded scan caches are pruned, the two disagreeing earnings extractions became one, and Step 2 shows which universe it actually loaded. |
+| P7-38 | P3 | ops / routes | P0-1 re-verified as a standing rule rather than a triage. Twelve orphaned routes, not the six grep reported. Two defects in the check were found by running it. |

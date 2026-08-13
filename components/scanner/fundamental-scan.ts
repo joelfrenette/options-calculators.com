@@ -32,15 +32,39 @@ import { stepLabel } from "./steps"
   // the fail-safe handling.
 
   // Extract earnings data from Polygon snapshot
-  const extractEarningsData = (tickerData: any, currentPrice: number, atrPercent: number) => {
-    const earningsTimestamp = tickerData?.next_earnings_date
+  /**
+   * The earnings date, from the one place that reads it. (S-17)
+   *
+   * THERE WERE TWO OF THESE, AND THEY DISAGREED. An inline block in the scan
+   * loop tried four snapshot fields — `earnings.announcement_date`,
+   * `earnings_date`, `next_earnings_date`, `results.earnings.date` — and
+   * formatted as "Nov 5". This function tried ONLY `next_earnings_date` and
+   * formatted as "11/5/2026". The row then took `inline || fromThisFunction`
+   * for the DISPLAYED date, so the same column rendered two different formats
+   * depending on which field happened to carry the date.
+   *
+   * The part that mattered was downstream. `premiumMultiplier` — the earnings
+   * bump applied to the estimated premium — read the NARROW result, while the
+   * table displayed the WIDE one. A ticker whose date came from
+   * `announcement_date` therefore showed "Earnings in 3d" beside a premium
+   * estimate computed as though there were no earnings at all. Two numbers on
+   * one row, derived from two different answers to the same question.
+   *
+   * One extraction now, one format, one answer.
+   */
+  const extractEarningsData = (snapshot: any) => {
+    const tickerData = snapshot?.ticker
+    const earningsTimestamp =
+      tickerData?.earnings?.announcement_date ||
+      tickerData?.earnings_date ||
+      tickerData?.next_earnings_date ||
+      snapshot?.results?.earnings?.date
     let earningsDate: string | undefined
     let daysToEarnings: number | undefined
-    let expectedMove: number | undefined
 
     if (earningsTimestamp) {
       const earnDate = new Date(earningsTimestamp)
-      earningsDate = earnDate.toLocaleDateString()
+      earningsDate = earnDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })
       const today = new Date()
       daysToEarnings = Math.floor((earnDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 
@@ -62,7 +86,12 @@ import { stepLabel } from "./steps"
       // labelling problem this audit exists to remove.
     }
 
-    return { earningsDate, daysToEarnings, expectedMove }
+    // No `expectedMove` in this return. It was declared, never assigned, and
+    // returned as `undefined` to every caller — a field that existed only to
+    // carry S-10's absence. The explanation stays above; the empty field does
+    // not, because a returned value nobody can ever read is the shape P7-9 was
+    // about.
+    return { earningsDate, daysToEarnings }
   }
 
 // Slider values arrive as the same number[] state arrays the component holds,
@@ -340,21 +369,11 @@ export const runFundamentalScan = async ({
                 ? (net_income / stockholders_equity) * 100
                 : null
 
-            const earningsTimestamp =
-              snapshotData.ticker?.earnings?.announcement_date ||
-              snapshotData.ticker?.earnings_date ||
-              ticker_data?.next_earnings_date ||
-              snapshotData.results?.earnings?.date
-
-            let earningsDate: string | undefined
-            let daysToEarnings: number | undefined
-
-            if (earningsTimestamp) {
-              const earnDate = new Date(earningsTimestamp)
-              earningsDate = earnDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-              const today = new Date()
-              daysToEarnings = Math.floor((earnDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-            }
+            // S-17: the second, narrower extraction that used to live here is
+            // gone. `extractEarningsData` below is the only reader of the
+            // earnings fields, so the displayed date and the premium bump can
+            // no longer come from different answers.
+            const { earningsDate, daysToEarnings } = extractEarningsData(snapshotData)
 
             console.log(
               `[v0] ${ticker}: Price=$${currentPrice.toFixed(2)}, EPS(TTM)=${eps === null ? "n/a" : `$${eps.toFixed(4)}`}, PE=${peRatio === null ? "n/a" : peRatio.toFixed(1)}, MarketCap=${marketCap === null ? "n/a" : `$${(marketCap / 1e9).toFixed(1)}B`}, Vol=${volumeInMillions.toFixed(1)}M, D/E=${debtToEquity === null ? "n/a" : debtToEquity.toFixed(2)}, ROE=${roe === null ? "n/a" : `${roe.toFixed(1)}%`}, TTMQtrs=${ttmQuarters}/4, ProfitQtrs=${profitableQuarters}/${qRows.length}${earningsDate ? `, Earnings: ${earningsDate} (${daysToEarnings}d)` : " (no earnings date)"}`,
@@ -490,11 +509,18 @@ export const runFundamentalScan = async ({
 
             const relativeReturn12m = relativeReturnPoints(return12m, benchmarkReturn12m)
 
-            const {
-              earningsDate: finalEarningsDate,
-              daysToEarnings: finalDaysToEarnings,
-              expectedMove: fundamentalExpectedMove,
-            } = extractEarningsData(ticker_data, currentPrice, atrPercent)
+            // Always undefined at this stage, and that is S-10's decision rather
+            // than an oversight: the fundamental scan has no implied volatility
+            // — the options chain is not fetched until enrichment — so the
+            // expected move is left unset instead of being filled from an ATR
+            // proxy wearing an implied-volatility label. Enrichment supplies it.
+            const fundamentalExpectedMove: number | undefined = undefined
+            // The premium bump now reads the SAME days-to-earnings the row
+            // displays. It used to read the narrow extraction's, so a ticker
+            // whose date came from `announcement_date` showed an imminent-
+            // earnings warning beside a premium computed as though there were
+            // none.
+            const finalDaysToEarnings = daysToEarnings
 
             // Calculate estimated premium and yield
             const putStrike = currentPrice * 0.95
@@ -516,8 +542,9 @@ export const runFundamentalScan = async ({
 
             const estimatedDelta = -0.3
 
-            const stockEarningsDate = earningsDate || finalEarningsDate
-            const stockDaysToEarnings = daysToEarnings !== undefined ? daysToEarnings : finalDaysToEarnings
+            // One extraction, so no `a || b` reconciliation is needed (S-17).
+            const stockEarningsDate = earningsDate
+            const stockDaysToEarnings = daysToEarnings
 
             return {
               ticker,

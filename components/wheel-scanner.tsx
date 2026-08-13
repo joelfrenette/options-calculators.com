@@ -59,6 +59,7 @@ export function WheelScanner() {
     excludeBenchmarkLaggard, setExcludeBenchmarkLaggard,
     excludeStage4, setExcludeStage4,
     entryExclusionSummary,
+    universeSource,
     technicalFilterSettings,
     scanTechnicals,
     step, loading, isScanning, isScanningTechnicals, error, cacheStatus,
@@ -150,6 +151,7 @@ export function WheelScanner() {
             preFilterProgress={preFilterProgress}
             preFilterCurrentTicker={preFilterCurrentTicker}
             preFilterCount={preFilterCount}
+            universeSource={universeSource}
             onScan={loadPreFilteredTickers}
           />
         </CardContent>

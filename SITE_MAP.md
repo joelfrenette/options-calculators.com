@@ -26,7 +26,7 @@
 
 | Tab id | Label | Component | File | Lines | Internal APIs |
 |---|---|---|---|---|---|
-| `wheel-scanner` | Sell Put Scanner | `WheelScanner` | `components/wheel-scanner.tsx` | 412 | none (static) |
+| `wheel-scanner` | Sell Put Scanner | `WheelScanner` | `components/wheel-scanner.tsx` | 414 | none (static) |
 | `calendar-spread-scanner` | Calendar Spreads | `CalendarSpreadScanner` | `components/calendar-spread-scanner.tsx` | 590 | `/api/strategy-scanner` |
 | `credit-spread-scanner` | Credit Spreads | `CreditSpreadScanner` | `components/credit-spread-scanner.tsx` | 428 | `/api/strategy-scanner` |
 | `iron-condor-scanner` | Iron Condors | `IronCondorScanner` | `components/iron-condor-scanner.tsx` | 429 | `/api/strategy-scanner` |
@@ -120,7 +120,7 @@ Every route: HTTP verbs, segment config, upstream hosts, env keys, timeout wirin
 | `/api/panic-euphoria` | GET | — | api.groq.com<br>api.quiverquant.com<br>api.stlouisfed.org<br>api.x.ai<br>app.scrapingbee.com<br>query1.finance.yahoo.com | FRED_API_KEY<br>GROK_XAI_API_KEY<br>GROQ_API_KEY<br>QUIVER_API_KEY<br>SCRAPINGBEE_API_KEY<br>XAI_API_KEY | yes | `components/panic-euphoria.tsx`<br>`lib/api-contracts.ts`<br>`lib/remediation.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/politician-spotlight` | GET | dynamic="force-dynamic" | — | — | **no** | `components/politician-spotlight.tsx`<br>`lib/api-contracts.ts`<br>`lib/remediation.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/polygon-proxy` | GET | runtime="edge" | api.polygon.io | POLYGON_API_KEY | yes | `components/scanner/enrichment.ts`<br>`components/scanner/fundamental-scan.ts`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
-| `/api/polygon-tickers` | GET | runtime="edge"<br>dynamic="force-dynamic" | api.polygon.io<br>financialmodelingprep.com | FMP_API_KEY<br>POLYGON_API_KEY | yes | `components/scanner/use-wheel-scanner.ts`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
+| `/api/polygon-tickers` | GET | runtime="edge"<br>dynamic="force-dynamic" | api.polygon.io<br>financialmodelingprep.com | FMP_API_KEY<br>POLYGON_API_KEY | yes | `components/scanner/step2-prefilter-card.tsx`<br>`components/scanner/use-wheel-scanner.ts`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/scenario-analysis` | POST | — | — | — | **no** | `components/run-scenario-ai-dialog.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/scraping-bee` | GET, POST | — | app.scrapingbee.com | SCRAPINGBEE_API_KEY | **no** | `lib/api-contracts.ts`<br>`lib/remediation.ts`<br>`lib/scraping-bee.tsx`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/scraping-bee/diagnostics` | GET | — | app.scrapingbee.com<br>www.example.com | NODE_ENV<br>SCRAPINGBEE_API_KEY | yes | `lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
@@ -232,12 +232,12 @@ _None._
 | `lib/remediation.ts` | 756 | 156 |
 | `components/jobs-report-dashboard.tsx` | 751 | 151 |
 | `app/page.tsx` | 697 | 97 |
+| `components/scanner/use-wheel-scanner.ts` | 691 | 91 |
 | `components/scanner/step4-technical-card.tsx` | 679 | 79 |
 | `components/cpi-inflation-analysis.tsx` | 669 | 69 |
-| `components/scanner/use-wheel-scanner.ts` | 666 | 66 |
+| `components/scanner/fundamental-scan.ts` | 647 | 47 |
 | `components/admin/health-check-panel.tsx` | 622 | 22 |
 | `lib/api-contracts.ts` | 621 | 21 |
-| `components/scanner/fundamental-scan.ts` | 620 | 20 |
 | `components/earnings-economic-calendar.tsx` | 604 | 4 |
 
 ## 6. PHASE 6 SIGN-OFF LEDGER
