@@ -51,7 +51,7 @@ interface PanicEuphoriaData {
   aaiiBullish: number
   // Null when FRED WRMFSL is unavailable — rendered as "—".
   moneyMarketFunds: number | null
-  vixTermRatio: number
+  vixMomentumRatio: number
   // Null when FRED (PPIACO / GASREGW) is unavailable — rendered as "—".
   commodityPrices: number | null
   gasPrices: number | null
@@ -614,12 +614,12 @@ export function PanicEuphoria() {
                   }
                 />
                 <PanicIndicator
-                  label="VIX Term Structure (5d/50d)"
-                  value={(1.0 - data.vixTermRatio) / 0.3}
-                  rawValue={`${data.vixTermRatio.toFixed(2)}`}
+                  label="VIX Momentum (5d vs 50d avg)"
+                  value={(1.0 - data.vixMomentumRatio) / 0.3}
+                  rawValue={`${data.vixMomentumRatio.toFixed(2)}`}
                   tooltip={
                     tooltipsEnabled
-                      ? "The 5-day VIX divided by the 50-day VIX — the SHAPE of the volatility curve, not its level. SOURCE: measured VIX history from Yahoo — no options data of any kind (this row was previously labelled 'Put/Call Ratio', naming an instrument this site does not source). INTERPRETATION: above 1.0 means near-term volatility is bid above longer-dated — fear and hedging demand, contrarian bullish. Below 1.0 is a calm front end — complacency. Clamped to 0.8-1.3. It IS scored: shape can disagree with level, which is why it survived the cull that removed the VIX-derived sentiment proxies."
+                      ? "The 5-day average of VIX divided by its 50-day average — how stretched fear is against its own recent norm. NOT a term structure: that compares different MATURITIES (VIX3M vs VIX, shown on the CCPI tab), and this compares two lookbacks of the same spot series. SOURCE: measured VIX history from Yahoo — no options data of any kind (this row was previously labelled 'Put/Call Ratio', naming an instrument this site does not source). INTERPRETATION: above 1.0 means near-term volatility is bid above longer-dated — fear and hedging demand, contrarian bullish. Below 1.0 is a calm front end — complacency. Clamped to 0.8-1.3. It IS scored: shape can disagree with level, which is why it survived the cull that removed the VIX-derived sentiment proxies."
                       : ""
                   }
                 />
@@ -874,15 +874,15 @@ export function PanicEuphoria() {
 
                   <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-700">VIX Term Structure</span>
+                      <span className="text-sm font-medium text-gray-700">VIX Momentum</span>
                       <div className="relative group/tooltip">
                         <Info className="h-3 w-3 text-gray-400 cursor-help" />
                         <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                          VIX 5-day / 50-day. Above 1.0 = fear bid into the front end (contrarian bullish).
+                          VIX 5-day average / 50-day average. Above 1.0 = fear elevated against its own recent norm (contrarian bullish). Note this runs OPPOSITE to the CCPI tab's VIX term structure, where above 1.0 means calm.
                         </div>
                       </div>
                     </div>
-                    <span className="text-sm font-bold text-gray-900">{data.vixTermRatio.toFixed(2)}</span>
+                    <span className="text-sm font-bold text-gray-900">{data.vixMomentumRatio.toFixed(2)}</span>
                   </div>
 
                   <div className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded group hover:border-purple-500 transition-colors">

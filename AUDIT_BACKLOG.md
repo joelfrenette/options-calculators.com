@@ -422,6 +422,7 @@ recomputes it.
 | P7-46 | P3 | fixed | The tsconfig note claiming the Next bundler disallows .ts import extensions was FALSE and blocked Phase 7.0 for five phases. Vercel built it clean (chunk changed, /api/ccpi 200, homepage 200). An untested claim in a comment is a claim, not a constraint. |
 | P7-47 | **P1** | fixed | keywordScore matched by substring, so "Death cross forms as S&P 500 breaks support" scored 100/100 BULLISH (ath in death, up in support) and "Ford recalls 100,000 trucks" scored 100/100 (calls in recalls). A live indicator at 0.08 composite weight that could be exactly inverted. Word boundaries; scorer extracted to the import-free lib/headline-sentiment.ts; 14 assertions. |
 | P7-48 | P3 | fixed | P7-45's corrected module count of 25 came off a `head -25`-truncated list — a display limit read as a count. The real figure was 27, and is 26 after the Step 4 split. |
+| P7-56 | P2 | fixed | **The site computes "VIX term structure" TWICE, with opposite directions — and P7-54's rename made it worse before it made it better.** `lib/vix-term.ts` (CCPI, the cron, `data-source-status`) computes **VIX3M ÷ spot VIX**, where above 1 = contango = CALM. `/api/panic-euphoria` computes the **5-day VIX average ÷ its 50-day average**, where above 1 = near-term elevated = STRESS. One published concept name, two quantities, inverted meanings. Third convention defect on this exact figure (P3-14 was point-spread-vs-ratio). **And P7-54, hours earlier, renamed the second one `vixTermRatio` / "VIX Term Structure (5d/50d)" — a term structure compares MATURITIES, not two lookbacks of one spot series.** A more precise false noun is still a false noun, and harder to catch because it reads like expertise. Now `vixMomentumRatio` / "VIX Momentum (5d vs 50d avg)", with both tooltips stating that it runs opposite to the CCPI tab's term structure. |
 | P7-55 | **P1** | fixed | **`compute_breadth` counted a delisted member on a seven-month-old price, every day, in one direction.** The daily cron's function ranked `row_number() ... order by day desc` and qualified any ticker with 200 stored rows **with no date constraint at all**, so MMC (1,111 rows ending 2026-01-13) qualified on every run: January close 182.70 against its own January 200-day average of 205.44, voting "below" in a reading published for August. **The sibling function was right the whole time** — `compute_breadth_range` windows by date — so `/api/breadth` returned `sample: 99` for every historical day and `sampleSize: 100` for today **in the same payload**, and nobody read down the column. Two definitions of one number on one table. Migration `20260813164047` applied to production on the owner's authorisation: freshness (latest row within 6 days) plus a 400-day span bound; `universe_size` now reports the qualified set rather than every ticker ever stored. Production verified before/after: 69/100/100 → 69.70/99/99, and the daily row now agrees with the history. 11 assertions. **Found only because the owner ran a backfill for an unrelated build.** |
 | P7-54 | P2 | fixed | **Owner chose: rename it to what it is (2026-08-13).** `/api/panic-euphoria` scored `putCallRatio`, and the value is `vixShortTerm / vixLongTerm` — the 5-day VIX over the 50-day. Real measured data, correctly scored as curve SHAPE, which is exactly why it survived P6-8 where `investorIntelligence` did not: shape can disagree with level. **The site contradicted itself about it** — `/api/market-sentiment` states in its own header that "nothing in the codebase sources one", lists it in `NOT_TRACKED` and returns null, while this route published a number under that name. Two routes, two answers to "does this site have a put/call feed", and the one saying yes was the one publishing. The tab was worse than the route: the tooltip attributed the row to "options flow data" and a second panel called it the "CBOE equity put/call ratio" — a named exchange product the site has never had. Now `vixTermRatio` / `vixTermScore`, labelled "VIX Term Structure (5d/50d)", and OUT of `syntheticComponents`, because a direct reading of the curve is not a proxy for anything. 7 assertions. |
 | P7-53 | P2 | fixed | The scan built its rejection/skip buckets as an object literal while the notice card rendered their names as a `reason === "x" &&` chain in another file, connected by nothing. BOTH directions were broken: a bucket with no label rendered a BLANK heading beside a live count, and `fundamentalsIncomplete` had a written label that was unreachable because it is a `failedFilters` tag and never a bucket key. So an unknown ROE went into the `roe` bucket and the user was told **"ROE below Min ROE %"** about a company whose earnings never reported — P6-24 fixed that sentence in the log line and left the bucket. Keys and labels now come from `scan-diagnostics.ts`; 51 assertions. |
@@ -433,7 +434,7 @@ recomputes it.
 
 ### The open list, by severity
 
-258 findings recorded · **225 fixed · 8 wontfix · 1 verified-ok · 24 open.**
+259 findings recorded · **226 fixed · 8 wontfix · 1 verified-ok · 24 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -4091,6 +4092,41 @@ And the tooltip on the Investor Intelligence row ended with the sentence *"It IS
 the composite."* — accurate when written, false the moment the row stopped scoring, and it
 would have survived as a confident claim about the opposite of the truth. It is asserted
 now too.
+
+### P7-56 — the sweep for P7-55's shape found it immediately, in my own rename
+
+P7-55 was "one figure derived twice, disagreeing". Sweeping for that shape took one grep.
+
+The site computes **"VIX term structure" two ways, running in opposite directions**:
+
+| where | formula | above 1 means |
+|---|---|---|
+| `lib/vix-term.ts`, CCPI, the cron, `data-source-status` | VIX3M ÷ spot VIX | **contango — CALM** |
+| `/api/panic-euphoria` | 5-day VIX avg ÷ 50-day VIX avg | **near-term elevated — STRESS** |
+
+The backfill response shows the first: `ratio 1.274 (contango)`, spot 14.55 against VIX3M
+18.53. `data-source-status` publishes the concept as "VIX Term Structure (VIX3M ÷ VIX)".
+The panic tab's number is a different quantity wearing that name and pointing the other
+way. This is the **third** convention defect on this one figure — P3-14 was the
+point-spread-versus-ratio one.
+
+**The part worth recording is that P7-54 made it worse first.** Hours earlier I renamed the
+panic field from `putCallRatio` to `vixTermRatio`, labelled "VIX Term Structure (5d/50d)",
+and wrote a tooltip explaining it as "the SHAPE of the volatility curve". A term structure
+compares different **maturities**. This compares two **lookbacks of the same spot series**.
+It is VIX momentum — how stretched fear is against its own recent norm — and that is a
+perfectly good thing to score, which is why it survived P6-8. I replaced a false noun with
+a *more precise* false noun, and the second kind is harder to catch **because it reads like
+expertise**. The first name was obviously wrong to anyone who looked; the second invited
+the reader to stop looking.
+
+Now `vixMomentumRatio` / "VIX Momentum (5d vs 50d avg)", with both tooltips stating
+outright that it runs opposite to the CCPI tab's term structure, so a reader comparing the
+two tabs is not left to reconcile them.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-56 | P2 | Panic/Euphoria + CCPI | "VIX term structure" is computed two ways with inverted meanings (VIX3M÷VIX = calm above 1; 5d÷50d VIX = stress above 1). P7-54's rename introduced the second, more plausible, false noun. Renamed to VIX Momentum and the opposition stated in the UI. |
 
 ### P7-55 — two definitions of one number, disagreeing in the same payload
 

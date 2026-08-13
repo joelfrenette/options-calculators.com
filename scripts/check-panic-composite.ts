@@ -186,8 +186,8 @@ check(
  * put/call feed", and the one that said yes was the one publishing a number.
  */
 check(
-  "the route publishes vixTermRatio",
-  /vixTermRatio: Math\.round\(vixTermRatio \* 100\) \/ 100/.test(routeSrc),
+  "the route publishes vixMomentumRatio",
+  /vixMomentumRatio: Math\.round\(vixMomentumRatio \* 100\) \/ 100/.test(routeSrc),
 )
 check(
   "no putCallRatio field is emitted from this route",
@@ -195,8 +195,8 @@ check(
   "CCPI has its own putCallRatio from a different source; this route must not add a second answer",
 )
 check(
-  "vixTermScore votes in the composite",
-  members.includes("vixTermScore"),
+  "vixMomentumScore votes in the composite",
+  members.includes("vixMomentumScore"),
   "the rename must not quietly drop a real measured input",
 )
 check(
@@ -221,6 +221,11 @@ check(
  */
 const viewNoComments = viewSrc.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/[^\n]*/g, (m, pre) =>
   m.startsWith("/*") ? " " : (pre ?? ""),
+)
+check(
+  "the row is not called a term structure — it compares lookbacks, not maturities (P7-56)",
+  !/VIX Term Structure/.test(viewNoComments),
+  "the site's real term structure is VIX3M ÷ VIX on the CCPI tab, and it runs the OPPOSITE way",
 )
 check(
   'no rendered label reads "Put/Call Ratio"',
