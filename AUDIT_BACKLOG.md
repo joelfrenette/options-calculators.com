@@ -445,11 +445,14 @@ recomputes it.
 | P7-69 | P2 | open | **The CCPI is running on two of four pillars, and the only signal is a number nobody reads.** Measured on staging 2026-08-14: Valuation `scoredMax=0`, Risk Appetite `scoredMax=24` — both under `MIN_SCORED_MAX`, both dropped, so the headline 14 is computed over 55% of the pillar weight. The scoring is behaving exactly as designed; the causes are operational and named in the payload itself: `apify: live=false, source="baseline-no-token"` (APIFY_API_TOKEN unset — kills spxPE 18, spxPS 12 and equityRiskPremium 10 by derivation) and `buffett/putCall/aaii: live=false, source="groq"` (the three ScrapingBee scrapes fell through to the LLM — 16 more in Valuation, 55 in Risk Appetite). **What is missing is not honesty but ALERTING**: nothing fails, nothing warns, and `certainty: 56` is the whole signal. P6-35 predicted Valuation at 40 with everything up and 28 on an FMP hiccup; the real figure is 0, because it never modelled two providers down at once. |
 | P7-70 | **P1** | fixed | **An unauthenticated route published the first 15 characters of a live API key.** `/api/scraping-bee/diagnostics` carries no `needsAuth` and checks no session, and returned `apiKeyPreview: apiKey.substring(0, 15)`. It was harmless ONLY because `SCRAPINGBEE_API_KEY` is unset in both environments, so the field read "NOT CONFIGURED" — **the leak would have begun the moment the key was set, which is exactly the action P7-69 was about to recommend.** A defect that arms itself when someone follows your advice is the worst shape one can have. Field removed; `apiKeyConfigured` already carried everything actionable, the rule `budgetEnvReport` follows. The error path also echoed ScrapingBee's response body, which can contain the request — and the request carries `api_key` in its query string; now the status only. New provenance rule 12 bans slicing any identifier assigned from a key resolver, structurally rather than by field name, and was negative-tested by reintroducing the line. |
 | P7-71 | P2 | fixed | **P7-70's shape one step out, found by sweeping for it: two more routes echo an upstream error body while the key rides in the URL's query string.** `/api/polygon-proxy` returns `details: errorText.substring(0, 200)` and `/api/scraping-bee` returns the WHOLE body as `message`; both build `?apiKey=` / `?api_key=` URLs, and an upstream that quotes the request quotes the credential. polygon-proxy is the one that names the defect — it already had `url.replace(apiKey, "API_KEY")` on its CONSOLE line, so the author knew, and **redacted the surface nobody reads while leaving the one the public gets**. `redactCredentials` added to `lib/api-keys.ts`, redacting by VALUE across every configured key so a route cannot forget to name its own. Rule 13 fires on the COMBINATION and took two corrections to be worth anything: scoped first to the name `redactCredentials`, it false-positived on `/api/admin/api-status`, which was already correct with its own `redact(raw, key)`; then, matching line-wise, it PASSED on the very leak it was written for, because scraping-bee's ternary spans four lines — proved by a negative test that changed nothing. Now matches balanced `NextResponse.json(...)` calls and accepts any `redact*` wrapper; negative-tested in both the single-line and multi-line shapes. |
+| P7-72 | **P1** | fixed | **An LLM was asked for the put/call ratio BEFORE the real source, so the real source was only ever reached when the guess failed.** `scrapePutCallRatio` called Grok first and returned any answer between 0.3 and 3 immediately as `ai-estimate`; the CBOE scrape ran only on failure. P6-72 had correctly stopped that guess from SCORING, which is exactly what made the ordering look harmless — and it was not: since `ai-estimate` does not score, a model answering first meant `putCallRatio` contributed **nothing on almost every request**, and the 29 points it is worth were excluded by a CALL ORDER rather than by any absence of data. Reversed: a measurement is tried before a recollection of one. Same function's baseline return was `ratio: 0.95` — a plausible reading handed to the payload as `putCallRatio` — now `null`, per P6-34: the tier says how good a number is, it cannot say there is no number. |
+| P7-73 | P2 | open | **The Buffett Indicator can come from FRED, but not for free, and the reason is a threshold.** `/api/ccpi` scrapes it from GuruFocus via ScrapingBee, which is unset in both environments (P7-69). FRED publishes both halves and the site already reads FRED — so this looked like a straight substitution, and it is not. Measured, not recalled: `NCBEILQ027S`/1000 ÷ `GDP` at 2026-01 is **218.1%**; the GuruFocus figure on staging the same week read **183.8%**. `NCBEILQ027S` is NONFINANCIAL corporate equities, GuruFocus uses TOTAL market cap. The CCPI's bands (>200/>180/>150/>120) are calibrated for the second, so swapping sources moves the indicator 13 → 16 points and reads as the market moving. Both series are now STORED (a quarterly series must accumulate before any backtest can measure it) and the ratio is computed in an import-free module with 15 assertions, including the 1000× unit trap — but it is deliberately NOT wired into scoring. Recalibrating the bands against this series' own history is the open half, and it is the same question CCPI_DESIGN.md already has open. |
+| P7-74 | P3 | fixed | `APIFY_API_TOKEN` is redundant. Its only scoring use is `spxPE`/`spxPS` in `/api/ccpi`, and `fetchFMPValuation("SPY")` already returns exactly those two from FMP `key-metrics`, wired as the fallback in the same expression; `/api/apify-proxy` exists as a route no component fetches. Recorded so the next spend question does not re-derive it: check `FMP_API_KEY` and whether `key-metrics` is on the plan (P7-41 established the SCREENER is paid-tier) before adding a second provider for the same two numbers. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-274 findings recorded · **238 fixed · 9 wontfix · 2 verified-ok · 25 open.**
+277 findings recorded · **240 fixed · 9 wontfix · 2 verified-ok · 26 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -4955,3 +4958,77 @@ each failing when reintroduced and passing when restored.
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-71 | P2 | security | Two more routes echoed an upstream error body while the key rode in the query string; polygon-proxy had already redacted its console line and not its response. `redactCredentials` added and applied. Rule 13 needed two corrections — scoped first to a function name, then to a line, where it passed on the leak it was written for until a negative test exposed it. |
+
+## 2026-08-14 — a spend question, and what checking it turned up
+
+The owner asked, before going to buy keys: **are `SCRAPINGBEE_API_KEY` and `APIFY_API_TOKEN`
+even used, and do they provide anything the already-purchased APIs cannot?** Tracing the
+answer produced three findings, one of them a P1.
+
+### P7-74 — Apify is redundant with FMP
+
+Its only scoring use is `spxPE` and `spxPS` in `/api/ccpi`. `fetchFMPValuation("SPY")`
+already returns exactly those two from FMP `key-metrics`, wired as the fallback **in the
+same expression**:
+
+```ts
+const spxPE = (apifyLive ? apifyRaw?.data?.forwardPE || apifyRaw?.data?.trailingPE : undefined) || fmpVal?.spxPE || null
+```
+
+`/api/apify-proxy` exists as a route no component fetches. So the recommendation is to
+check `FMP_API_KEY` — and whether `key-metrics` is on the plan, since P7-41 established the
+FMP *screener* is paid-tier — before adding a second provider for the same two numbers.
+
+### P7-72 — an LLM was asked for the put/call ratio BEFORE the real source
+
+`scrapePutCallRatio` called Grok first and returned any answer between 0.3 and 3
+immediately as `ai-estimate`. **The CBOE scrape ran only when the guess failed.**
+
+P6-72 had correctly stopped that guess from SCORING, and that is exactly what made the
+ordering look harmless. It was not. Since `ai-estimate` does not score, a model answering
+first meant `putCallRatio` contributed **nothing on almost every request** — the 29 points
+it is worth were excluded by a *call order*, not by any absence of data. The fix P6-72
+applied was real and it hid the larger problem underneath it.
+
+Reversed: a measurement is tried before a recollection of one. The same function's baseline
+return was `ratio: 0.95`, a perfectly ordinary put/call reading handed to the payload; now
+`null`. The tier says how good a number is, it cannot say there is no number (P6-34).
+
+### P7-73 — the Buffett Indicator can come from FRED, but not for free
+
+This is the one that had to be measured rather than reasoned about, and the first answer
+given to the owner was wrong.
+
+FRED publishes both halves of a Buffett Indicator and the site already reads FRED, so the
+substitution looked straight. **It is not the same measurement.** Read from FRED on
+2026-08-14 rather than recalled:
+
+| basis | value |
+|---|---|
+| `NCBEILQ027S`/1000 ÷ `GDP` (nonfinancial corporate equities) | **218.1%** |
+| GuruFocus on staging the same week (total market cap) | **183.8%** |
+
+The CCPI's bands are `>200 / >180 / >150 / >120`, calibrated for the total-market-cap
+basis. Swapping sources moves the indicator from **13 points to 16** — and that move would
+read as the market moving, not as the source changing. *A number that is fine and a noun
+that is false*, arriving through a threshold rather than through a label.
+
+**The initial answer to the owner said the FRED basis would read LOWER. It reads higher.**
+Corrected here because a spend decision was about to rest on it.
+
+Both series are now stored, for the same reason the Trigger candidates were: a quarterly
+series must accumulate before any backtest can measure it, and that lead time starts when
+the cron does. The ratio is computed in `lib/ccpi/buffett-indicator.ts` — import-free, so a
+check script can load it (P7-67) — with 15 assertions. The sharpest is the unit trap:
+`NCBEILQ027S` is in millions and `GDP` in billions, so an unconverted ratio gives
+**218,139%**, which a ladder topping out at ">200" scores at full marks.
+
+It is deliberately **not** wired into scoring. Recalibrating the bands against this series'
+own history is the open half, and it is the same "does this indicator earn its weight"
+question `CCPI_DESIGN.md` already has open.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-72 | P1 | ANALYZE → CCPI | Grok was asked for the put/call ratio before CBOE, so the real source was reached only when the guess failed — and since `ai-estimate` does not score, 29 points were excluded by call order rather than by missing data. Reversed; the `0.95` baseline constant is now null. |
+| P7-73 | P2 | ANALYZE → CCPI | The FRED Buffett Indicator is a different measurement from the scraped one — 218.1% vs 183.8%, crossing a band boundary. Series stored and the ratio computed with 15 assertions including the 1000× unit trap, but not wired into scoring until the bands are recalibrated. |
+| P7-74 | P3 | tooling | `APIFY_API_TOKEN` is redundant: FMP `key-metrics` already supplies the same `spxPE`/`spxPS`, and `/api/apify-proxy` has no consumer. Check FMP before adding a provider. |

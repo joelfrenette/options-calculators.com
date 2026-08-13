@@ -181,7 +181,8 @@ export async function scrapeBuffettIndicator(): Promise<{
 }
 
 export async function scrapePutCallRatio(): Promise<{
-  ratio: number
+  /** NULL when nothing measured or estimated one. Never a stand-in number. */
+  ratio: number | null
   // "ai-estimate" added. This function had only "live" and "baseline", and it
   // returned "live" for two things that are not a measured put/call ratio:
   // an LLM's recollection, and `0.6 + vix / 50`. `/api/ccpi` maps
@@ -190,33 +191,16 @@ export async function scrapePutCallRatio(): Promise<{
   // `putCallRatio`, worth 29 of Risk Appetite's 100 points, by a self-report.
   status: "live" | "ai-estimate" | "baseline"
 }> {
-  // Was "Trying Grok AI first for reliability". An LLM's recollection of the
-  // CBOE put/call ratio was tried BEFORE any real source and returned as live.
-  console.log("[v0] Put/Call: trying Grok (tiered ai-estimate, does not score)...")
-  try {
-    const grokValue = await fetchMarketDataWithGrok(
-      "CBOE equity put/call ratio",
-      "Current CBOE total equity put/call ratio (CPCE index). Return just the decimal number like 0.85 or 1.05",
-    )
-
-    if (grokValue && grokValue > 0.3 && grokValue < 3) {
-      console.log(`[v0] Put/Call: Grok value ${grokValue} (ai-estimate — excluded from scoring)`)
-      return { ratio: grokValue, status: "ai-estimate" }
-    }
-  } catch (grokError) {
-    console.log("[v0] Grok Put/Call fetch failed, trying other sources:", grokError)
-  }
-
-  // The Alpha Vantage branch that used to sit here computed
-  // `estimatedPutCall = 0.6 + vix / 50` and returned it as `status: "live"`.
-  // Three things wrong at once: it is not a put/call ratio, it is VIX; the CCPI
-  // already scores `vix` as its own indicator, so this made two "independent"
-  // Risk Appetite and Momentum inputs the same instrument (the P6-61 defect
-  // inside the CCPI); and the variable was named `estimatedPutCall` with a log
-  // line reading "estimated from VIX" while the status claimed live. Removed
-  // rather than re-tiered — a derived value is not an input, and there is no
-  // honest tier for a number that is not the thing it is named after.
-
+  // CBOE FIRST (P7-72). Grok used to run before it: the model was asked to
+  // recall the CBOE put/call ratio, and any answer between 0.3 and 3 was
+  // returned immediately as `ai-estimate` — so the REAL source was only ever
+  // reached when the guess failed. P6-72 had correctly stopped that guess from
+  // SCORING, which made the ordering look harmless; it was not. `ai-estimate`
+  // does not score, so an LLM answering first meant `putCallRatio` contributed
+  // nothing on almost every request, and the 29 points it is worth were
+  // excluded by a call order rather than by any absence of data.
+  //
+  // Reversed. A measurement is tried before a recollection of one.
   try {
     const cboeResult = await scrapeUrl("https://www.cboe.com/us/options/market_statistics/daily/", {
       renderJs: true,
@@ -246,12 +230,43 @@ export async function scrapePutCallRatio(): Promise<{
       }
     }
   } catch (cboeError) {
-    console.log("[v0] CBOE scraping failed:", cboeError)
+    console.log("[v0] CBOE scraping failed, falling back to an AI estimate:", cboeError)
   }
 
-  console.log("[v0] Put/Call: All sources failed, using baseline")
+  // Only now the model, and only ever as `ai-estimate`, which does not score.
+  console.log("[v0] Put/Call: CBOE unavailable, trying Grok (ai-estimate, does not score)...")
+  try {
+    const grokValue = await fetchMarketDataWithGrok(
+      "CBOE equity put/call ratio",
+      "Current CBOE total equity put/call ratio (CPCE index). Return just the decimal number like 0.85 or 1.05",
+    )
+
+    if (grokValue && grokValue > 0.3 && grokValue < 3) {
+      console.log(`[v0] Put/Call: Grok value ${grokValue} (ai-estimate — excluded from scoring)`)
+      return { ratio: grokValue, status: "ai-estimate" }
+    }
+  } catch (grokError) {
+    console.log("[v0] Grok Put/Call fetch failed:", grokError)
+  }
+
+  // The Alpha Vantage branch that used to sit here computed
+  // `estimatedPutCall = 0.6 + vix / 50` and returned it as `status: "live"`.
+  // Three things wrong at once: it is not a put/call ratio, it is VIX; the CCPI
+  // already scores `vix` as its own indicator, so this made two "independent"
+  // Risk Appetite and Momentum inputs the same instrument (the P6-61 defect
+  // inside the CCPI); and the variable was named `estimatedPutCall` with a log
+  // line reading "estimated from VIX" while the status claimed live. Removed
+  // rather than re-tiered — a derived value is not an input, and there is no
+  // honest tier for a number that is not the thing it is named after.
+
+  // Was `ratio: 0.95` (P7-72). A baseline tier keeps a number out of SCORING,
+  // and this one was never scored — but it was still handed to the payload as
+  // `putCallRatio`, where 0.95 is a perfectly ordinary reading. The rule from
+  // P6-34 is that a missing value is null, not a plausible constant; the tier
+  // says how good a number is, it cannot say that there is no number.
+  console.log("[v0] Put/Call: all sources failed, returning null")
   return {
-    ratio: 0.95,
+    ratio: null,
     status: "baseline",
   }
 }
