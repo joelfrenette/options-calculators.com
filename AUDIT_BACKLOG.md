@@ -394,7 +394,7 @@ recomputes it.
 | P7-18 | P1 | fixed | The four QQQ pairs defaulted to false/0, and smaPoints(false, 0) returns 0 risk points — the score a calm market earns. An unavailable QQQ counted 41 of the momentum pillar as a measured all-clear. |
 | P7-19 | P2 | fixed | check-null-guards.ts added: no formatter may be guarded only by !== undefined, the idiom behind P7-17. The four sites it found were conformance, not crashes. |
 | P7-20 | P1 | fixed | /api/ccpi/executive-summary narrated an unscoreable composite to the model as "CCPI Score: 0/100" under its own "0-19: Low Risk" legend. Three layers produced the zero. |
-| P7-21 | P2 | open | Two of four groups fixed (trend-analysis price, polygon-tickers filter zeros). Still open: sentiment-heatmap 50/50 (blocked on P6-11) and strategy-scanner static betas — both need a decision, not code. |
+| P7-21 | P2 | fixed | **Both remaining halves closed 2026-08-13.** The `/api/sentiment-heatmap` 50/50 fabrication went with the route itself when P6-11 retired it — closed by deletion, not by a fix. The betas: **owner chose compute-from-stored-closes, full-history window.** `/api/strategy-scanner` shipped **exactly 25** hand-typed betas with no source and no as-of date, plus `|| 0.7` for anything absent, driving three things: the strategy branch, the ranking score and the reason string users read. Beta needed no new API — it is the regression slope of daily returns on SPY, and E-7b/E-7c already store the closes. **Verified against the real store, which changed the design twice.** (1) The regressions are textbook over full history — QQQ 1.263 R² 0.90, AAPL 1.172, NVDA 2.128, MSFT 1.125 — but KO is 0.257 over five years and **−0.022 over two**, both correct; the window IS the answer, and the spread is widest for exactly the low-beta names this scanner selects. The hardcoded 0.55 matched neither. (2) My first design suppressed any beta with R² < 0.1; against real data that hides the most useful thing a stability screen can learn, so the beta always shows and its R² is disclosed beside it. Alignment is by DATE (P6-16's rule for prices). 36 assertions; negative-tested by restoring the 0.7 default and by letting the score reward a null beta. |
 | P7-22 | P2 | fixed | Phase 7.5 standing guard: check-doc-figures.ts. CLAUDE.md carried "formulas 514" against a suite at 581 — the stale figure was inside the rule about staleness. |
 | P7-23 | P2 | fixed | The P7-10/P7-17/P7-18 class had no standing guard — re-verification put tedSpread ?? 0.25 back and the whole suite passed. check-ccpi-defaults.ts closes it, negative-tested in all three forms. |
 | P7-24 | P2 | fixed | check-house-libs.ts added — CLAUDE.md's "never re-implement locally" rule had no enforcement. Building it exposed a stripComments bug that hid ~70 lines of wheel-scanner.tsx from four checks. |
@@ -433,7 +433,7 @@ recomputes it.
 
 ### The open list, by severity
 
-258 findings recorded · **224 fixed · 8 wontfix · 1 verified-ok · 25 open.**
+258 findings recorded · **225 fixed · 8 wontfix · 1 verified-ok · 24 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule

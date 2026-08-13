@@ -1,4 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { betasForTickers, BETA_BENCHMARK } from "@/lib/beta-store"
+import { R_SQUARED_NEEDS_DISCLOSURE } from "@/lib/beta"
 import { resolveApiKey } from "@/lib/api-keys"
 import {
   calculateDelta as bsDelta,
@@ -1010,40 +1012,17 @@ const CALENDAR_COMPANY_NAMES: Record<string, string> = {
   IYR: "iShares U.S. Real Estate ETF",
 }
 
-// Beta values for calendar spread candidates (lower = more stable)
-const STOCK_BETAS: Record<string, number> = {
-  KO: 0.55,
-  PG: 0.42,
-  JNJ: 0.52,
-  VZ: 0.38,
-  PEP: 0.52,
-  WMT: 0.48,
-  XLU: 0.45,
-  XLP: 0.55,
-  MCD: 0.62,
-  CL: 0.48,
-  SO: 0.42,
-  DUK: 0.45,
-  T: 0.65,
-  UNH: 0.72,
-  SPY: 1.0,
-  MO: 0.58,
-  PM: 0.56,
-  MDLZ: 0.5,
-  MRK: 0.4,
-  ABBV: 0.58,
-  COST: 0.78,
-  HD: 0.95,
-  LMT: 0.45,
-  XLV: 0.6,
-  IYR: 0.85,
-}
 
 async function generateCalendarSpreads(tickers: string[] = CALENDAR_SPREAD_TICKERS, ctx: ExclusionContext): Promise<any[]> {
   const calendarSpreads: any[] = []
 
   // One Finnhub call for the whole batch rather than one per ticker.
   const earningsByTicker = await getEarningsDateMap(tickers.slice(0, 25))
+
+  // P7-21: beta is now REGRESSED on SPY from stored closes, not read from a
+  // table of ~25 hand-typed constants with no source and a `|| 0.7` for
+  // anything absent. One benchmark fetch for the whole batch.
+  const betaByTicker = await betasForTickers(tickers.slice(0, 25))
 
   for (const ticker of tickers.slice(0, 25)) {
     try {
@@ -1069,7 +1048,12 @@ async function generateCalendarSpreads(tickers: string[] = CALENDAR_SPREAD_TICKE
       const nearExp = getNextFriday(nearDte)
       const farExp = getNextFriday(farDte)
 
-      const beta = STOCK_BETAS[ticker] || 0.7
+      // P7-21. Was `STOCK_BETAS[ticker] || 0.7` — a hand-typed constant with no
+      // source, and for anything not in the table, the invented 0.7. Now the
+      // regression slope against SPY over the stored history, or NULL. Null
+      // means not computable; it must never become a number on the way down.
+      const betaResult = betaByTicker[ticker] ?? null
+      const beta = betaResult?.beta ?? null
 
       // Both legs are priced off the single measured ATM IV. The previous code
       // manufactured a term structure by multiplying that IV by 1.05 and 0.95,
@@ -1130,6 +1114,11 @@ async function generateCalendarSpreads(tickers: string[] = CALENDAR_SPREAD_TICKE
       let signal: "strong" | "moderate" | "speculative"
       if (earningsInsideNearLeg) {
         signal = "speculative"
+      } else if (beta === null) {
+        // An unmeasurable beta is not a low one. `null < 0.6` is false in JS, so
+        // this branch would have produced "speculative" by coercion anyway —
+        // written out so it is a decision rather than a coincidence.
+        signal = "speculative"
       } else if (beta < 0.6 && returnOnCapital >= 20) {
         signal = "strong"
       } else if (beta < 0.8 && returnOnCapital >= 10) {
@@ -1144,7 +1133,16 @@ async function generateCalendarSpreads(tickers: string[] = CALENDAR_SPREAD_TICKE
           : earningsInsideNearLeg
             ? `Earnings in ${daysNoEarnings}d — inside the ${nearDte}d short leg.`
             : `Earnings in ${daysNoEarnings}d — clear of the ${nearDte}d short leg.`
-      const reason = `${returnOnCapital.toFixed(0)}% return on capital at ${(iv * 100).toFixed(0)}% ATM IV, beta ${beta.toFixed(2)}. ${earningsNote}`
+      // The beta clause disappears when there is no beta, rather than printing
+      // "beta 0.00" — which on this scale reads as a perfectly market-neutral
+      // stock, the most attractive thing a calendar-spread candidate can be.
+      const betaClause =
+        beta === null
+          ? "beta unavailable"
+          : betaResult !== null && betaResult.rSquared < R_SQUARED_NEEDS_DISCLOSURE
+            ? `beta ${beta.toFixed(2)} (SPY explains only ${(betaResult.rSquared * 100).toFixed(0)}% of its moves)`
+            : `beta ${beta.toFixed(2)}`
+      const reason = `${returnOnCapital.toFixed(0)}% return on capital at ${(iv * 100).toFixed(0)}% ATM IV, ${betaClause}. ${earningsNote}`
 
       // Type is driven by trend, not chance: a stock trading above its ATM strike leans
       // bullish (call calendar); at/below leans defensive (put calendar).
@@ -1155,7 +1153,7 @@ async function generateCalendarSpreads(tickers: string[] = CALENDAR_SPREAD_TICKE
       const qualityScore =
         Math.min(returnOnCapital, 100) * 0.6 + // profitability, capped so outliers don't dominate
         thetaAdvantage * 8 + // time-decay edge
-        (1.5 - beta) * 20 - // lower beta rewarded
+        (beta === null ? 0 : (1.5 - beta) * 20) - // lower beta rewarded; no beta earns no bonus rather than the 30 points `1.5 - 0` would grant
         (earningsInsideNearLeg ? 40 : 0) // event risk inside the short leg
 
       calendarSpreads.push({
@@ -1177,6 +1175,20 @@ async function generateCalendarSpreads(tickers: string[] = CALENDAR_SPREAD_TICKE
           high: Math.round((price + breakevenRange) * 100) / 100,
         },
         beta,
+        // Provenance travels with the number (P7-21). A beta is a regression
+        // over a window, and the window is the answer for exactly these
+        // low-beta names: KO measures 0.257 over five years and −0.022 over
+        // two, both correctly.
+        betaProvenance:
+          betaResult === null
+            ? null
+            : {
+                benchmark: BETA_BENCHMARK,
+                observations: betaResult.observations,
+                rSquared: Math.round(betaResult.rSquared * 1000) / 1000,
+                from: betaResult.from,
+                to: betaResult.to,
+              },
         atmIV: Math.round(iv * 1000) / 10,
         historicalVolatility,
         ivSkew,

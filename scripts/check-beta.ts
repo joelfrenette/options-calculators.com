@@ -15,12 +15,17 @@
  * consistent one.
  */
 
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 import {
   computeBeta,
   dailyReturns,
   DEFAULT_BETA_WINDOW_DAYS,
   R_SQUARED_NEEDS_DISCLOSURE,
 } from "../lib/beta.ts"
+
+const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..")
 
 let failures = 0
 function check(name: string, passed: boolean, detail = ""): void {
@@ -207,6 +212,74 @@ check(
   "…and its low R² is reported so the caller can disclose it",
   decoupled !== null && decoupled.rSquared < R_SQUARED_NEEDS_DISCLOSURE,
   decoupled ? decoupled.rSquared.toFixed(4) : "n/a",
+)
+
+// ------------------------------------------------- the call site (P7-21)
+
+/**
+ * The arithmetic being right is half of it. The other half is that the route
+ * stopped carrying 25 hand-typed constants, and that the NULL a regression
+ * returns does not become a number on the way to the screen.
+ *
+ * `beta` fed three things: the strategy branch, the ranking score, and the
+ * reason string. Each had to learn about absence separately — P6-34's rule that
+ * introducing a null is half a change, arriving for the fourth time.
+ */
+/**
+ * Comments stripped before scanning. SIXTH instance of "a check that names its
+ * own findings will match itself": the rule banning `STOCK_BETAS[ticker] ||`
+ * matched the comment written to record that the idiom was removed. One
+ * alternation pass, ordered by position — block-then-line eats a line comment
+ * containing a glob and everything after it.
+ */
+const routeRaw = readFileSync(join(ROOT, "app/api/strategy-scanner/route.ts"), "utf8")
+const routeSrc = routeRaw.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/[^\n]*/g, (m, pre) =>
+  m.startsWith("/*") ? " " + "\n".repeat((m.match(/\n/g) || []).length) : (pre ?? ""),
+)
+
+check(
+  "the hardcoded beta table is gone",
+  !/const STOCK_BETAS/.test(routeSrc),
+  "25 hand-typed constants with no source and no as-of date",
+)
+check(
+  "no `|| 0.7` beta fallback survives",
+  !/STOCK_BETAS\[ticker\]\s*\|\|/.test(routeSrc),
+  "the invented default for any ticker not in the table",
+)
+check(
+  "the route computes betas from the store",
+  /betasForTickers\(tickers\.slice\(0, 25\)\)/.test(routeSrc),
+  "one benchmark fetch for the batch",
+)
+check(
+  "an unmeasurable beta stays null rather than defaulting",
+  /const beta = betaResult\?\.beta \?\? null/.test(routeSrc),
+)
+check(
+  "the signal branch handles a null beta explicitly",
+  /} else if \(beta === null\) \{/.test(routeSrc),
+  "`null < 0.6` is false, so the right answer by coercion is still not a decision",
+)
+check(
+  "the quality score does not award points for an absent beta",
+  /beta === null \? 0 : \(1\.5 - beta\) \* 20/.test(routeSrc),
+  "`1.5 - 0` would have granted 30 points to a stock with no measurable beta",
+)
+check(
+  "the reason string omits the beta clause rather than printing 0.00",
+  /beta === null\s*\n\s*\? "beta unavailable"/.test(routeSrc),
+  "on this scale 0.00 reads as perfectly market-neutral — the best thing a candidate can be",
+)
+check(
+  "a low R² is disclosed in the reason the user reads",
+  /SPY explains only/.test(routeSrc),
+  "0.26 must not read as 'a quarter of the market's amplitude' when it means 'mostly does its own thing'",
+)
+check(
+  "every beta ships with its window and benchmark",
+  /betaProvenance:/.test(routeSrc) && /observations: betaResult\.observations/.test(routeSrc),
+  "a beta without its window is the same claim the hardcoded table was making",
 )
 
 if (failures > 0) {
