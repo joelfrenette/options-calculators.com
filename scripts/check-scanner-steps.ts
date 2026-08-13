@@ -73,10 +73,15 @@ const GUARDED = [
     .map((f) => `components/scanner/${f}`),
   "components/wheel-scanner.tsx",
 ]
-// 17 → 18 when P7-32 added `entry-exclusion-notice.tsx`. The bump is the guard
-// working as designed: a new file in this directory enters scope silently, and
-// the assertion is what makes "silently" mean "with a deliberate edit here".
-const EXPECTED_GUARDED = 18
+// 17 → 18 when P7-32 added `entry-exclusion-notice.tsx`, → 19 when P7-45 split
+// `entry-exclusion-controls.tsx` out of the Step 4 card. Both bumps are the
+// guard working as designed: a new file in this directory enters scope
+// silently, and the assertion is what makes "silently" mean "with a deliberate
+// edit here". The second fired on a REFACTOR, which is the case worth noting —
+// **to a size check, moving code is indistinguishable from adding it**, so a
+// module-size cleanup will trip every derived-set assertion it touches. That is
+// the cost of the guard, and it is the right cost.
+const EXPECTED_GUARDED = 19
 
 check(
   `scope: ${GUARDED.length} file(s) guarded`,

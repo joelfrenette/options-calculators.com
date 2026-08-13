@@ -32,7 +32,21 @@ const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..")
 
 const IMPL = "components/scanner/technical-criteria.ts"
 const PAGE = "components/learn-csp.tsx"
-const CARD = "components/scanner/step4-technical-card.tsx"
+/**
+ * The Step 4 surface, which is now TWO files.
+ *
+ * P7-45's module-size work moved the entry-exclusion block out of the card into
+ * `entry-exclusion-controls.tsx`, and this check failed on all four controls
+ * the moment it did — correctly. **A refactor that relocates a user-facing
+ * label is indistinguishable from one that deletes it, to any check pinned to a
+ * single path.** So the set is a list, and its size is asserted: adding a third
+ * file must be deliberate, and dropping to one must be too.
+ */
+const CARD_FILES = [
+  "components/scanner/step4-technical-card.tsx",
+  "components/scanner/entry-exclusion-controls.tsx",
+]
+const EXPECTED_CARD_FILES = 2
 
 let failures = 0
 function check(name: string, passed: boolean, detail = ""): void {
@@ -40,9 +54,15 @@ function check(name: string, passed: boolean, detail = ""): void {
   if (!passed) failures++
 }
 
+check(
+  `scope: ${CARD_FILES.length} Step 4 file(s)`,
+  CARD_FILES.length === EXPECTED_CARD_FILES,
+  CARD_FILES.join(", "),
+)
+
 const implSrc = readFileSync(join(ROOT, IMPL), "utf8")
 const pageSrc = readFileSync(join(ROOT, PAGE), "utf8")
-const cardSrc = readFileSync(join(ROOT, CARD), "utf8")
+const cardSrc = CARD_FILES.map((f) => readFileSync(join(ROOT, f), "utf8")).join("\n")
 
 /**
  * The gate keys, read out of `cspEntryGates` itself rather than out of the
@@ -116,7 +136,7 @@ check(
 )
 
 for (const control of enforcedBy) {
-  check(`"${control}" exists in the Step 4 card`, cardSrc.includes(control))
+  check(`"${control}" exists in the Step 4 surface`, cardSrc.includes(control))
 }
 
 /**
@@ -323,7 +343,7 @@ check(
 )
 
 for (const [label, file] of [
-  ["the Sell Put slider", "components/scanner/step4-technical-card.tsx"],
+  ["the Sell Put slider", "components/scanner/entry-exclusion-controls.tsx"],
   ["the shared tab notice", "components/scanner/entry-exclusion-notice.tsx"],
 ] as const) {
   const src = readFileSync(join(ROOT, file), "utf8")
