@@ -8,6 +8,14 @@ import {
   expectedMove as bsExpectedMove,
 } from "@/lib/black-scholes"
 import { meteredFetch } from "@/lib/metered-fetch"
+import { sma } from "@/lib/indicators"
+import {
+  SESSIONS_PER_MONTH,
+  isStage4Decline,
+  relativeReturnPoints,
+  sessionMovePercent,
+  trailingReturnPercent,
+} from "@/lib/trend-filters"
 
 // Resolved through lib/api-keys so the DISABLED_APIS kill switch and the
 // alias-aware lookup apply to this route too (AUDIT_BACKLOG P1-12).
@@ -55,6 +63,198 @@ async function getStockPrice(ticker: string): Promise<{ price: number; asOf: str
   } catch {
     return null
   }
+}
+
+// ========== ENTRY EXCLUSIONS (P7-32) ==========
+
+/**
+ * A ticker's trailing year, fetched once per request.
+ *
+ * WHY THIS EXISTS AND WHY IT IS NOT `getStockPrice`. That helper fetches
+ * `aggs/<T>/prev` — a single bar. It is enough to price a spread and not enough
+ * to know whether the stock just ripped or has fallen all year, which is what
+ * the owner's entry rules ask (P7-30, built first in the Sell Put scanner where
+ * Step 3 already had the history).
+ *
+ * ONE CALL PER TICKER PER REQUEST, and the memo below is the whole reason that
+ * is true: nine generators share overlapping ticker lists, so without it a scan
+ * of `type=all` would re-fetch the same year several times. Polygon is metered
+ * against a flat monthly plan (E-5 budget guard), so a helper that quietly
+ * multiplies calls is a spend defect, not just a slow one.
+ *
+ * The memo is module-scoped but request-scoped in effect: this route runs in a
+ * fresh isolate per invocation. It is deliberately NOT a cross-request cache —
+ * `lib/market-closes.ts` is the place for that, and inventing a second one here
+ * with its own staleness rules is how two sources of truth start.
+ */
+interface TrendProfile {
+  /** Percent move of the session named by `dayMoveSource`. */
+  dayMovePercent: number | null
+  /**
+   * WHICH session `dayMovePercent` measures. A daily-aggregates request that
+   * runs to today includes today's PARTIAL bar while the market is open. That
+   * bar is exactly what the big-up-day rule wants, and exactly what a
+   * "previous close" must not be, so the two are separated rather than sharing
+   * a number.
+   */
+  dayMoveSource: "today" | "last_session" | "unknown"
+  /** Trailing 252-session return, percent. */
+  return12m: number | null
+  /** Weinstein Stage 4 — price below a FALLING 150-session average. */
+  stage4: boolean | null
+}
+
+const trendProfileMemo = new Map<string, Promise<TrendProfile | null>>()
+
+async function fetchTrendProfile(ticker: string): Promise<TrendProfile | null> {
+  if (!POLYGON_API_KEY) return null
+  const memoized = trendProfileMemo.get(ticker)
+  if (memoized) return memoized
+
+  const work = (async (): Promise<TrendProfile | null> => {
+    try {
+      const to = new Date()
+      const from = new Date(to.getTime() - 400 * 24 * 60 * 60 * 1000)
+      const iso = (d: Date) => d.toISOString().split("T")[0]
+      // 400 calendar days, limit 400: ~275 sessions, comfortably more than the
+      // 252 the trailing-year window needs plus the 21 the Stage 4 slope reads
+      // back. A window sized exactly to 252 sessions would come up short across
+      // any holiday-heavy stretch and the return would go null for no reason.
+      const res = await meteredFetch(
+        "polygon",
+        `https://api.polygon.io/v2/aggs/ticker/${ticker}/range/1/day/${iso(from)}/${iso(to)}?adjusted=true&sort=asc&limit=400&apiKey=${POLYGON_API_KEY}`,
+        { next: { revalidate: 3600 }, signal: AbortSignal.timeout(10000), routeTag: "strategy-scanner" },
+      )
+      if (!res.ok) return null
+      const data = await res.json()
+      const bars: any[] = Array.isArray(data.results) ? data.results : []
+      const closes = bars.map((b) => b?.c).filter((c: unknown): c is number => typeof c === "number" && c > 0)
+      if (closes.length < 2) return null
+
+      const lastBarDay = new Date(bars[bars.length - 1]?.t ?? 0).toISOString().split("T")[0]
+      const isToday = lastBarDay === iso(to)
+
+      return {
+        dayMovePercent: sessionMovePercent(closes[closes.length - 1], closes[closes.length - 2]),
+        dayMoveSource: isToday ? "today" : "last_session",
+        return12m: trailingReturnPercent(closes),
+        stage4: isStage4Decline(
+          closes[closes.length - 1],
+          sma(closes, 150),
+          closes.length > SESSIONS_PER_MONTH ? sma(closes.slice(0, -SESSIONS_PER_MONTH), 150) : null,
+        ),
+      }
+    } catch {
+      return null
+    }
+  })()
+
+  trendProfileMemo.set(ticker, work)
+  return work
+}
+
+/**
+ * Which exclusions a strategy is subject to.
+ *
+ * NOT one shared flag across all nine generators, and that is the finding
+ * P7-32 recorded rather than the convenience it looked like. The strategies do
+ * not share a direction:
+ *
+ *   - `trend: true` — the position is LONG the stock in substance. A short put
+ *     ends in ownership; a deep-ITM LEAPS call and a ZEBRA are stock
+ *     replacements; a bull put spread is a bullish bet. A year of decline is a
+ *     year of the market disagreeing with all four.
+ *   - `trend: false` — a bear call spread PROFITS from that decline, so the
+ *     same gate would remove exactly the candidates it wants; and iron condors,
+ *     butterflies and calendars are neutral, where a downtrend is not
+ *     disqualifying at all.
+ *
+ * The big-up-day rule is the one that applies everywhere, for a different
+ * reason in each case: it inflates the reference price for a short put, and it
+ * breaks the range premise and distorts near-term implied volatility for the
+ * neutral structures.
+ */
+/**
+ * Per-request exclusion state, created once in the handler and threaded into
+ * every gated generator.
+ *
+ * THREADED RATHER THAN MODULE-SCOPED, and the distinction is not stylistic. The
+ * trend memo above can safely be module-scoped because its values are keyed by
+ * ticker and identical for any caller — a bleed between concurrent requests in
+ * the same isolate reuses a fetch, which is the point. An accumulating list of
+ * exclusions has no such property: bleed there would report one caller's
+ * rejected tickers to another. So it is passed, not shared.
+ *
+ * `generateHighIVWatchlist` and `generateEarningsPlays` are deliberately NOT
+ * gated. Their tabs were deleted in P7-27 as unreachable components, and adding
+ * a rule to a generator with no reader is the dead-code trap that finding was
+ * about. They still answer `type=all` and are left exactly as they were.
+ */
+interface ExclusionContext {
+  benchmarkReturn12m: number | null
+  excluded: Array<{ ticker: string; reasons: string[] }>
+}
+
+interface ExclusionPolicy {
+  /** Big-up-day gate. Every strategy uses it. */
+  spike: boolean
+  /** The year-long trend gates. Long-the-stock strategies only. */
+  trend: boolean
+}
+
+/** The owner's number (P7-30). Same 10% as the Sell Put scanner's default. */
+const MAX_DAY_MOVE_PERCENT = 10
+
+/** The benchmark the relative-strength gate compares against. Matches the Sell Put scanner. */
+const BENCHMARK_TICKER = "SPY"
+
+/**
+ * The benchmark's own trailing year — one fetch for the whole request.
+ *
+ * It goes through the same memo as every other ticker, so a scan that also
+ * screens SPY does not fetch it twice.
+ */
+async function getBenchmarkReturn12m(): Promise<number | null> {
+  const profile = await fetchTrendProfile(BENCHMARK_TICKER)
+  return profile?.return12m ?? null
+}
+
+/**
+ * @returns the exclusion reasons, or an empty array to keep the candidate.
+ *
+ * A null profile — no history, or the fetch failed — returns "history
+ * unavailable" and therefore EXCLUDES. That is the same fail-safe convention
+ * the Sell Put scanner uses: a stock whose trailing year cannot be measured
+ * must not pass a filter that exists to measure it. It is stricter than the
+ * route's older habit of skipping a check when data is missing, and stricter is
+ * the correct direction for a rule whose whole purpose is to keep candidates
+ * out.
+ */
+function entryExclusionReasons(
+  profile: TrendProfile | null,
+  policy: ExclusionPolicy,
+  benchmarkReturn12m: number | null,
+): string[] {
+  if (!policy.spike && !policy.trend) return []
+  if (profile === null) return ["history unavailable"]
+
+  const reasons: string[] = []
+  if (policy.spike) {
+    if (profile.dayMovePercent === null) reasons.push("session move unavailable")
+    else if (profile.dayMovePercent >= MAX_DAY_MOVE_PERCENT) reasons.push("big up day")
+  }
+  if (policy.trend) {
+    if (profile.return12m === null) reasons.push("12-month return unavailable")
+    else if (profile.return12m < 0) reasons.push("down on the year")
+
+    const relative = relativeReturnPoints(profile.return12m, benchmarkReturn12m)
+    if (relative === null) reasons.push("relative strength unavailable")
+    else if (relative < 0) reasons.push("trailed SPY")
+
+    if (profile.stage4 === null) reasons.push("trend unavailable")
+    else if (profile.stage4) reasons.push("Stage 4 decline")
+  }
+  return reasons
 }
 
 export interface IVSnapshot {
@@ -361,12 +561,19 @@ function formatDate(dateStr: string): string {
 
 // ========== SCANNER GENERATORS ==========
 
-async function generateCreditSpreads(tickers: string[]) {
+async function generateCreditSpreads(tickers: string[], ctx: ExclusionContext) {
   const setups = []
 
   for (const ticker of tickers) {
     const quote = await getStockPrice(ticker)
     if (!quote) continue // no verified price → no row (P1-9)
+    // Entry exclusions (P7-32) — spike only at loop level; the bull-put branch adds the trend gates below, and the bear-call branch must NOT have them.
+    const trend = await fetchTrendProfile(ticker)
+    const excluded = entryExclusionReasons(trend, { spike: true, trend: false }, ctx.benchmarkReturn12m)
+    if (excluded.length > 0) {
+      ctx.excluded.push({ ticker, reasons: excluded })
+      continue
+    }
     const price = quote.price
 
     const [ivData, profile] = await Promise.all([getIVData(ticker, price), getCompanyProfile(ticker)])
@@ -377,7 +584,21 @@ async function generateCreditSpreads(tickers: string[]) {
     const putLongStrike = putShortStrike - 5
     const putSpread = priceCreditSpread(price, putShortStrike, putLongStrike, 30, ivData.atmIV, true)
 
-    if (putSpread && putSpread.probability >= 65) {
+    // THE TREND GATES APPLY TO THIS LEG AND NOT THE ONE BELOW.
+    //
+    // A bull put spread is a bullish bet: it pays if the stock holds above the
+    // short strike, and the loss case is the stock falling. That is the same
+    // exposure a cash-secured put has, so the same year-long exclusions apply.
+    // The bear call spread further down profits from exactly the decline these
+    // gates reject, so applying them there would remove the candidates that
+    // strategy wants — the reason P7-32 refused a single shared flag across all
+    // nine generators.
+    const bullPutExcluded = entryExclusionReasons(trend, { spike: false, trend: true }, ctx.benchmarkReturn12m)
+    if (bullPutExcluded.length > 0) {
+      ctx.excluded.push({ ticker, reasons: bullPutExcluded.map((r) => `${r} (bull-put leg)`) })
+    }
+
+    if (bullPutExcluded.length === 0 && putSpread && putSpread.probability >= 65) {
       setups.push({
         ticker,
         company: profile?.name || ticker,
@@ -436,12 +657,19 @@ async function generateCreditSpreads(tickers: string[]) {
   return setups.sort((a, b) => b.probability - a.probability)
 }
 
-async function generateIronCondors(tickers: string[]) {
+async function generateIronCondors(tickers: string[], ctx: ExclusionContext) {
   const setups = []
 
   for (const ticker of tickers) {
     const quote = await getStockPrice(ticker)
     if (!quote) continue
+    // Entry exclusions (P7-32) — neutral: a fresh 10% move breaks the range premise; a year-long downtrend does not disqualify a range trade.
+    const trend = await fetchTrendProfile(ticker)
+    const excluded = entryExclusionReasons(trend, { spike: true, trend: false }, ctx.benchmarkReturn12m)
+    if (excluded.length > 0) {
+      ctx.excluded.push({ ticker, reasons: excluded })
+      continue
+    }
     const price = quote.price
 
     const [ivData, profile] = await Promise.all([getIVData(ticker, price), getCompanyProfile(ticker)])
@@ -635,12 +863,19 @@ async function generateEarningsPlays() {
   return plays.sort((a, b) => a.daysToEarnings - b.daysToEarnings)
 }
 
-async function generateWheelCandidates(tickers: string[]) {
+async function generateWheelCandidates(tickers: string[], ctx: ExclusionContext) {
   const candidates = []
 
   for (const ticker of tickers) {
     const quote = await getStockPrice(ticker)
     if (!quote) continue
+    // Entry exclusions (P7-32) — short put — assignment means ownership.
+    const trend = await fetchTrendProfile(ticker)
+    const excluded = entryExclusionReasons(trend, { spike: true, trend: true }, ctx.benchmarkReturn12m)
+    if (excluded.length > 0) {
+      ctx.excluded.push({ ticker, reasons: excluded })
+      continue
+    }
     const price = quote.price
 
     const [ivData, profile] = await Promise.all([getIVData(ticker, price), getCompanyProfile(ticker)])
@@ -798,7 +1033,7 @@ const STOCK_BETAS: Record<string, number> = {
   IYR: 0.85,
 }
 
-async function generateCalendarSpreads(tickers: string[] = CALENDAR_SPREAD_TICKERS): Promise<any[]> {
+async function generateCalendarSpreads(tickers: string[] = CALENDAR_SPREAD_TICKERS, ctx: ExclusionContext): Promise<any[]> {
   const calendarSpreads: any[] = []
 
   // One Finnhub call for the whole batch rather than one per ticker.
@@ -808,6 +1043,13 @@ async function generateCalendarSpreads(tickers: string[] = CALENDAR_SPREAD_TICKE
     try {
       const quote = await getStockPrice(ticker)
       if (!quote) continue // was: a price table frozen at authoring time, else $100
+      // Entry exclusions (P7-32) — neutral: a pop distorts near-term IV, which is the whole trade; the trend is not the thesis.
+      const trend = await fetchTrendProfile(ticker)
+      const excluded = entryExclusionReasons(trend, { spike: true, trend: false }, ctx.benchmarkReturn12m)
+      if (excluded.length > 0) {
+        ctx.excluded.push({ ticker, reasons: excluded })
+        continue
+      }
       const price = quote.price
 
       const ivData = await getIVData(ticker, price)
@@ -995,7 +1237,7 @@ const COMPANY_NAMES: Record<string, string> = {
   NFLX: "Netflix, Inc.",
 }
 
-async function generateButterflies(tickers: string[]): Promise<any[]> {
+async function generateButterflies(tickers: string[], ctx: ExclusionContext): Promise<any[]> {
   const butterflies: any[] = []
   const expDate = getNextFriday(35)
 
@@ -1005,6 +1247,13 @@ async function generateButterflies(tickers: string[]): Promise<any[]> {
     try {
       const quote = await getStockPrice(ticker)
       if (!quote) continue
+      // Entry exclusions (P7-32) — neutral, pinning.
+      const trend = await fetchTrendProfile(ticker)
+      const excluded = entryExclusionReasons(trend, { spike: true, trend: false }, ctx.benchmarkReturn12m)
+      if (excluded.length > 0) {
+        ctx.excluded.push({ ticker, reasons: excluded })
+        continue
+      }
       const price = quote.price
       // Previously called as getIVData(ticker) — the price argument was omitted,
       // so the ATM strike came out NaN and this generator ALWAYS took the
@@ -1168,7 +1417,7 @@ const fundamentals: Record<
   HD: { epsGrowth: 9.8, debtEquity: 0.95, priceBook: 18, sector: "Consumer Discretionary", rating: "Buy" },
 }
 
-async function generateLEAPS(tickers: string[]): Promise<any[]> {
+async function generateLEAPS(tickers: string[], ctx: ExclusionContext): Promise<any[]> {
   const leaps: any[] = []
   const expDate = getNextFriday(400) // ~13 months out
 
@@ -1178,6 +1427,13 @@ async function generateLEAPS(tickers: string[]): Promise<any[]> {
     try {
       const quote = await getStockPrice(ticker)
       if (!quote) continue
+      // Entry exclusions (P7-32) — deep-ITM long calls are stock replacement — you are buying the year.
+      const trend = await fetchTrendProfile(ticker)
+      const excluded = entryExclusionReasons(trend, { spike: true, trend: true }, ctx.benchmarkReturn12m)
+      if (excluded.length > 0) {
+        ctx.excluded.push({ ticker, reasons: excluded })
+        continue
+      }
       const price = quote.price
       const ivData = await getIVData(ticker, price)
       if (!ivData) continue
@@ -1267,7 +1523,7 @@ const ZEBRA_TICKERS = [
   "WMT",
 ]
 
-async function generateZEBRA(tickers: string[]): Promise<any[]> {
+async function generateZEBRA(tickers: string[], ctx: ExclusionContext): Promise<any[]> {
   const zebras: any[] = []
   const expDate = getNextFriday(90)
 
@@ -1277,6 +1533,13 @@ async function generateZEBRA(tickers: string[]): Promise<any[]> {
     try {
       const quote = await getStockPrice(ticker)
       if (!quote) continue
+      // Entry exclusions (P7-32) — 2 long ITM calls minus 1 short ATM is roughly +100 delta: synthetic long stock.
+      const trend = await fetchTrendProfile(ticker)
+      const excluded = entryExclusionReasons(trend, { spike: true, trend: true }, ctx.benchmarkReturn12m)
+      if (excluded.length > 0) {
+        ctx.excluded.push({ ticker, reasons: excluded })
+        continue
+      }
       const price = quote.price
       const ivData = await getIVData(ticker, price)
       if (!ivData) continue
@@ -1394,28 +1657,37 @@ export async function GET(request: NextRequest) {
       incomplete: !POLYGON_API_KEY,
     }
 
+    // Entry exclusions (P7-30/P7-32). The benchmark's trailing year is fetched
+    // once here — every generator that needs relative strength reads the same
+    // number, and the trend memo means SPY is not fetched twice even when it is
+    // also a candidate.
+    const ctx: ExclusionContext = {
+      benchmarkReturn12m: await getBenchmarkReturn12m(),
+      excluded: [],
+    }
+
     if (type === "all" || type === "credit-spreads") {
-      results.creditSpreads = await generateCreditSpreads(tickers)
+      results.creditSpreads = await generateCreditSpreads(tickers, ctx)
     }
 
     if (type === "all" || type === "iron-condors") {
-      results.ironCondors = await generateIronCondors(tickers)
+      results.ironCondors = await generateIronCondors(tickers, ctx)
     }
 
     if (type === "all" || type === "calendar-spreads") {
-      results.calendarSpreads = await generateCalendarSpreads(CALENDAR_SPREAD_TICKERS)
+      results.calendarSpreads = await generateCalendarSpreads(CALENDAR_SPREAD_TICKERS, ctx)
     }
 
     if (type === "all" || type === "butterflies") {
-      results.butterflies = await generateButterflies(BUTTERFLY_TICKERS)
+      results.butterflies = await generateButterflies(BUTTERFLY_TICKERS, ctx)
     }
 
     if (type === "all" || type === "leaps") {
-      results.leaps = await generateLEAPS(LEAPS_TICKERS)
+      results.leaps = await generateLEAPS(LEAPS_TICKERS, ctx)
     }
 
     if (type === "all" || type === "zebra") {
-      results.zebra = await generateZEBRA(ZEBRA_TICKERS)
+      results.zebra = await generateZEBRA(ZEBRA_TICKERS, ctx)
     }
 
     if (type === "all" || type === "high-iv") {
@@ -1427,7 +1699,30 @@ export async function GET(request: NextRequest) {
     }
 
     if (type === "all" || type === "wheel") {
-      results.wheelCandidates = await generateWheelCandidates(tickers)
+      results.wheelCandidates = await generateWheelCandidates(tickers, ctx)
+    }
+
+    // What the exclusions removed, with reasons. Reported rather than swallowed:
+    // a scanner that silently returns fewer rows is indistinguishable from a
+    // market with fewer candidates, and an empty array here means nothing was
+    // excluded — not that nothing was checked, which `entryExclusionPolicy`
+    // below makes explicit.
+    results.entryExclusions = ctx.excluded
+    results.entryExclusionPolicy = {
+      maxDayMovePercent: MAX_DAY_MOVE_PERCENT,
+      benchmark: BENCHMARK_TICKER,
+      benchmarkReturn12m: ctx.benchmarkReturn12m,
+      trendGatedStrategies: ["wheel", "leaps", "zebra", "credit-spreads (bull-put leg only)"],
+      spikeGatedStrategies: [
+        "credit-spreads",
+        "iron-condors",
+        "calendar-spreads",
+        "butterflies",
+        "leaps",
+        "zebra",
+        "wheel",
+      ],
+      ungated: ["high-iv", "earnings"],
     }
 
     return NextResponse.json(results)

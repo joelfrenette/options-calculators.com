@@ -134,6 +134,120 @@ check(
   `${defaultsOn.length} of ${EXPECTED_GATES} — the page tells the reader the scanner applies these for them`,
 )
 
+// ---------------------------------------------------------------------------
+// The server scanner's policy table describes its own call sites (P7-32).
+// ---------------------------------------------------------------------------
+//
+// `/api/strategy-scanner` publishes `entryExclusionPolicy` — which strategies
+// are trend-gated, which are spike-gated, which are ungated. That is a CLAIM
+// about the code in the same file, and the audit's first failure shape is a
+// label naming something the code does not do. The claim is also the one most
+// likely to rot: adding a gate to a generator is a two-line edit that leaves
+// the published list stale and every test passing.
+//
+// So the lists are compared against the actual `entryExclusionReasons(...)`
+// call sites, derived from the generator each one sits in.
+
+const routeSrc = readFileSync(join(ROOT, "app/api/strategy-scanner/route.ts"), "utf8")
+
+/** Generator function name → the policy literal at its exclusion call site. */
+const callSites = new Map<string, { spike: boolean; trend: boolean }>()
+{
+  const genRe = /async function (generate\w+)\(/g
+  const bounds: Array<{ name: string; at: number }> = []
+  for (const m of routeSrc.matchAll(genRe)) bounds.push({ name: m[1], at: m.index ?? 0 })
+  for (let i = 0; i < bounds.length; i++) {
+    const start = bounds[i].at
+    const end = i + 1 < bounds.length ? bounds[i + 1].at : routeSrc.length
+    const body = routeSrc.slice(start, end)
+    // The loop-level gate only. The bull-put leg's second call inside
+    // generateCreditSpreads is asserted separately below, because a policy
+    // table that flattened a two-leg strategy to one row would be the thing
+    // this check exists to catch.
+    const m = /entryExclusionReasons\(\s*trend,\s*\{\s*spike:\s*(true|false),\s*trend:\s*(true|false)\s*\}/.exec(body)
+    if (m) callSites.set(bounds[i].name, { spike: m[1] === "true", trend: m[2] === "true" })
+  }
+}
+
+const EXPECTED_GATED_GENERATORS = 7
+check(
+  `scope: ${callSites.size} gated generator(s) in the scanner route`,
+  callSites.size === EXPECTED_GATED_GENERATORS,
+  callSites.size ? [...callSites.keys()].join(", ") : "none — the derivation collapsed",
+)
+
+/** Published strategy key → the generator that serves it. */
+const STRATEGY_TO_GENERATOR: Record<string, string> = {
+  "credit-spreads": "generateCreditSpreads",
+  "iron-condors": "generateIronCondors",
+  "calendar-spreads": "generateCalendarSpreads",
+  butterflies: "generateButterflies",
+  leaps: "generateLEAPS",
+  zebra: "generateZEBRA",
+  wheel: "generateWheelCandidates",
+  "high-iv": "generateHighIVWatchlist",
+  earnings: "generateEarningsPlays",
+}
+
+const listFromPolicy = (field: string): string[] => {
+  const m = new RegExp(`${field}:\\s*\\[([^\\]]*)\\]`).exec(routeSrc)
+  if (!m) return []
+  return [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1])
+}
+
+const spikeClaimed = listFromPolicy("spikeGatedStrategies")
+const ungatedClaimed = listFromPolicy("ungated")
+
+check(
+  `the policy claims ${spikeClaimed.length} spike-gated strategy(ies)`,
+  spikeClaimed.length > 0,
+  spikeClaimed.join(", "),
+)
+
+for (const strategy of spikeClaimed) {
+  const gen = STRATEGY_TO_GENERATOR[strategy.split(" ")[0]]
+  const site = gen ? callSites.get(gen) : undefined
+  check(`"${strategy}" is spike-gated in code`, site?.spike === true, gen ? `${gen} → ${JSON.stringify(site)}` : "unmapped")
+}
+
+for (const strategy of ungatedClaimed) {
+  const gen = STRATEGY_TO_GENERATOR[strategy]
+  const isUngated = gen !== undefined && !callSites.has(gen)
+  check(
+    `"${strategy}" is genuinely ungated`,
+    isUngated,
+    gen === undefined ? "unmapped" : isUngated ? `${gen} has no exclusion call site` : `${gen} HAS a gate the policy denies`,
+  )
+}
+
+/**
+ * The trend list is checked in the strict direction: every generator the code
+ * trend-gates must be claimed, and nothing else may be. Claiming MORE than the
+ * code does is the failure that matters — it tells a reader a dog was filtered
+ * out when it was not.
+ */
+const trendInCode = [...callSites.entries()].filter(([, p]) => p.trend).map(([name]) => name)
+const trendClaimedGenerators = listFromPolicy("trendGatedStrategies")
+  .map((s) => STRATEGY_TO_GENERATOR[s.split(" ")[0]])
+  .filter((g): g is string => g !== undefined)
+
+check(
+  "every trend-gated generator is claimed by the policy",
+  trendInCode.every((g) => trendClaimedGenerators.includes(g)),
+  `code: ${trendInCode.join(", ")} | claimed: ${trendClaimedGenerators.join(", ")}`,
+)
+check(
+  "the policy claims no trend gate the code does not have",
+  trendClaimedGenerators.every((g) => trendInCode.includes(g) || g === "generateCreditSpreads"),
+  "credit-spreads is exempt here because its trend gate is on the bull-put LEG, asserted next",
+)
+
+check(
+  "the bull-put leg carries its own trend gate",
+  /bullPutExcluded\s*=\s*entryExclusionReasons\(\s*trend,\s*\{\s*spike:\s*false,\s*trend:\s*true\s*\}/.test(routeSrc),
+  "a bear call profits from the decline these gates reject — the legs cannot share one policy",
+)
+
 if (failures > 0) {
   console.error(`\n${failures} playbook-rule check(s) failed.`)
   process.exit(1)

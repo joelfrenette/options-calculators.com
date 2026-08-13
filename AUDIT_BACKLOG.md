@@ -405,12 +405,12 @@ recomputes it.
 | P7-29 | P3 | verified-ok | Swept the other 6 outbound-link families after P7-28: no duplication, no hand-built interpolation, `rel="noopener noreferrer"` on all 21 `target="_blank"` sites. Recorded so the sweep is not repeated. |
 | P7-30 | — | fixed | Owner feature: four CSP entry exclusions in Step 4 (big up day, down on the year, trailed SPY, Weinstein Stage 4), all defaulting on, applied before options enrichment so an excluded stock reaches neither results table. Built, checked with 29 assertions, negative-tested four ways. |
 | P7-31 | — | fixed | The CSP playbook states the four entry exclusions with the control enforcing each; check-playbook-rules.ts derives the gate list from the implementation so a gate cannot be removed while the page keeps teaching it. Negative-tested three ways. |
-| P7-32 | P3 | open | Sweep of the other six scanners. Big-up-day applies to all seven; the year-long gates apply to LEAPS, ZEBRA and the bull-put half of credit spreads, are INVERTED for bear-call, and are wrong for the three neutral strategies. Blocked on the owner: /api/strategy-scanner fetches one bar per ticker, so this is new metered Polygon traffic. |
+| P7-32 | P3 | fixed | Sweep of the other six scanners. Big-up-day applies to all seven; the year-long gates apply to LEAPS, ZEBRA and the bull-put half of credit spreads, are INVERTED for bear-call, and are wrong for the three neutral strategies. Owner approved; applied with the per-strategy split, one memoised year-of-bars call per ticker per request. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-235 findings recorded · **187 fixed · 8 wontfix · 1 verified-ok · 39 open.**
+235 findings recorded · **188 fixed · 8 wontfix · 1 verified-ok · 38 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -3142,3 +3142,44 @@ composite-counting-one-input-twice shape in a new place.
 |----|-----|------|---------|
 | P7-31 | — | LEARN / learn-csp | The CSP playbook states the four entry exclusions with the control that enforces each, and `check-playbook-rules.ts` derives the gate list from the implementation so a gate cannot be removed while the page keeps teaching it. |
 | P7-32 | P3 | SCAN / strategy-scanner | Sweep of the other six scanners: big-up-day applies to all seven; the year-long trend gates apply to LEAPS, ZEBRA and the bull-put half of credit spreads, and would be INVERTED for bear-call and wrong for the three neutral strategies. Blocked on the owner: `/api/strategy-scanner` fetches one bar per ticker, so this is new metered Polygon traffic. |
+
+### P7-32 closed — the gates land on the six other scanners, per strategy
+
+Applied, with the split the sweep argued for rather than one shared flag.
+
+**Big-up-day: all seven.** For a short put it inflates the reference the strike is chosen
+from; for the three neutral structures it breaks the range premise and distorts near-term
+implied volatility. Different reason, same exclusion.
+
+**Trend gates: wheel, LEAPS, ZEBRA, and the bull-put LEG of credit spreads.** LEAPS are
+deep-ITM long calls and ZEBRA is two long ITM calls against one short ATM — roughly +100
+delta, a synthetic long. Both are stock replacement: you are buying the year. A bull put
+spread has a cash-secured put's exposure. **The bear call leg of the same generator does
+not get them**, because it profits from exactly the decline they reject — a single shared
+flag would have deleted the candidates that half of the strategy exists to find.
+
+**Iron condors, butterflies and calendars get spike only.** A trending-down stock is not
+disqualifying for a neutral position.
+
+**`generateHighIVWatchlist` and `generateEarningsPlays` are deliberately left alone.**
+Their tabs were deleted in P7-27 as unreachable; adding a rule to a generator with no
+reader is the dead-code trap that finding was about. The published policy names them as
+ungated rather than leaving the omission to be inferred.
+
+**Cost: no increase per gated ticker beyond one call.** `fetchTrendProfile` memoises by
+ticker for the life of the request, so a `type=all` scan — nine generators over
+overlapping lists — fetches each ticker's year once, and SPY once. Without the memo the
+same year would be re-fetched per generator, which on a metered flat plan is a spend
+defect rather than a slow path.
+
+A null profile EXCLUDES rather than passing, the same fail-safe the Sell Put scanner uses.
+The response carries `entryExclusions` (ticker + reasons) and `entryExclusionPolicy`
+(thresholds, benchmark, and which strategies are gated how), so an empty result set is
+explicable and the policy is inspectable.
+
+`scripts/check-playbook-rules.ts` grew 14 assertions that compare that published policy
+against the actual call sites, derived per generator — because the policy is a claim about
+code in the same file, and adding a gate is a two-line edit that leaves the list stale with
+every test still green. Negative-tested three ways: a policy claiming a trend gate the code
+lacks, a gate landing on a strategy the policy calls ungated, and the bear-call leg
+acquiring the trend gate.
