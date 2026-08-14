@@ -294,6 +294,15 @@ const RETIRED: ReadonlyArray<[string, string]> = [
   // ("UNRATE (AI Forecast)") and the hover chip.
   ["AI Forecast", "P7-83 — the projection is a trend read on FRED series; no model is on that path"],
   ["AI Trading Implications", "P7-83 — the bullets are hardcoded arrays chosen by an if/else on the trend"],
+  // P7-85. The CPI tab's "Show Calculations" panel — the panel that exists to
+  // earn trust by disclosure — described a consensus of Fed SEP projections,
+  // Blue Chip and SPF surveys with named weights, smoothing constants and
+  // confidence bands. The route reads ONE FRED series and runs a two-term
+  // recurrence; none of those inputs is fetched anywhere in the repo. Two
+  // spellings carried the claim: the methodology prose and the chart's series
+  // name.
+  ["Consensus forecast combining Fed projections", "P7-85 — the route fetches no Fed projection and no survey"],
+  ["Consensus Inflation Model", "P7-85 — the dashed line is the site's own recurrence, nobody's consensus"],
   ["AI-powered predictions using Fed Funds futures", "P6-45 — no model and no futures"],
   ["Sell cash-secured puts on quality stocks", "P6-47 — the CCPI reads nothing about any ticker"],
 ]
@@ -641,6 +650,20 @@ const PINNED: PinnedClaim[] = [
     dependsOn: /^(?![\s\S]*aaiiScore)[\s\S]*$/,
     why: "the row says it is unscored; putting it back into componentScores would make that false",
   },
+  {
+    finding: "P7-85",
+    // The corrected methodology panel discloses the projection's exact
+    // arithmetic — 15% pull to target, 70% of the recent slope, clamped to
+    // 1.5–5.0. A disclosure of constants rots the moment the constants move,
+    // so the three numbers the card renders are pinned to the three the route
+    // computes with. Change the recurrence and this fails until the panel is
+    // rewritten with it.
+    claimFile: "components/cpi-inflation/methodology-card.tsx",
+    claim: "0.15 × (FedTarget − current) + 0.70 × recentSlope",
+    dependsOnFile: "app/api/cpi-inflation/route.ts",
+    dependsOn: /\(fedTarget - lastCPI\) \* 0\.15[\s\S]*avgChange \* 0\.7\b[\s\S]*Math\.max\(1\.5, Math\.min\(5\.0/,
+    why: "the panel exists to earn trust by disclosure; its previous version described a consensus model the route never ran, and a disclosed constant that drifts is the same defect smaller",
+  },
 ]
 
 /**
@@ -662,7 +685,7 @@ const PINNED: PinnedClaim[] = [
  * would be satisfied by swapping one finding for another. Removing a pin now
  * means deleting its entry AND its ID here, in the same commit, on purpose.
  */
-const PINNED_FINDINGS = ["P6-34", "P6-43", "P6-45", "P6-58", "P6-47", "P6-53", "P6-66", "P6-61"] as const
+const PINNED_FINDINGS = ["P6-34", "P6-43", "P6-45", "P6-58", "P6-47", "P6-53", "P6-66", "P6-61", "P7-85"] as const
 const pinnedIds = PINNED.map((p) => p.finding)
 check(
   `scope: ${PINNED.length} pinned claim(s), covering ${PINNED_FINDINGS.length} finding(s)`,

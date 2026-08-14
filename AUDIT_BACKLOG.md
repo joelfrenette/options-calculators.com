@@ -458,11 +458,12 @@ recomputes it.
 | P7-82 | P3 | fixed | `lib/remediation.ts` 755 → 124 lines across four modules in `lib/remediation/`. The node-loadability constraint that made P7-67 a wontfix does not bind: relative imports here take explicit `.ts` extensions, which plain node resolves. Proven by running the check script through the split chain — 31/31. The module header's "no imports" purity claim narrowed to "none from outside lib/remediation/", and `routeFile`'s P7-9 "deliberately un-exported" comment rewritten rather than carried across false. |
 | P7-83 | P2 | fixed | The Jobs Report tab said AI in six places — header, summary card, chart title, two series names, hover chip, implications card — over a forecast that is a trend read on FRED series and trading bullets that are hardcoded arrays picked by an if/else. P6-48 retired the header string FROM THIS FILE and the other five, differently worded, passed the same phrase-pinned list. All six corrected to what the code does; two substring pins added to RETIRED and negative-tested in both directions. |
 | P7-84 | P3 | open | check-provenance rule 2 passes any component embedding RunScenarioInAIDialog. That is correct for what it tests and structurally cannot tell "there is an AI dialog here" from "this number is AI-generated" — P7-83 sat green under it. Recorded rather than fixed; attributing a claim to the element it labels is a different rule. |
+| P7-85 | P2 | fixed | The CPI tab's "Show Calculations" panel — the transparency feature — described a consensus forecast (Fed SEP, Blue Chip, SPF, weighted formula, smoothing constants, confidence bands) that exists nowhere: the route reads one FRED series and runs `next = clamp(current + 0.15·(target−current) + 0.70·slope, 1.5, 5.0)`. Chart series renamed from "Consensus Inflation Model"; panel rewritten to the real recurrence with the clamp disclosed, since the Y axis is drawn to the clamp bounds. Two retired phrases + a pinned claim on the three constants, negative-tested. Split 669 → 157 in the same commit; a dead unreachable error card deleted. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-287 findings recorded · **249 fixed · 9 wontfix · 2 verified-ok · 27 open.**
+288 findings recorded · **250 fixed · 9 wontfix · 2 verified-ok · 27 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -5388,3 +5389,49 @@ PASS for evidence that a tab's numbers are AI-generated.
 |----|-----|------|---------|
 | P7-83 | P2 | LEARN → Jobs Report | The tab claimed AI six times over a forecast that is deterministic arithmetic on FRED series with hardcoded trading bullets. P6-48 had retired one of the six strings from this very file; the other five used different wordings and passed the same list. All corrected, two substring pins added and negative-tested. |
 | P7-84 | P3 | tooling | check-provenance rule 2 accepts any component embedding the AI dialog, which is right for what it tests and cannot tell an AI dialog from an AI-generated number. Recorded, not fixed: P7-83's six false labels sat beside a genuine dialog with the rule green. |
+
+## 2026-08-14 — the CPI tab's transparency panel, and what it was transparent about
+
+`components/cpi-inflation-analysis.tsx` was 669 lines and is now 157, across seven modules
+in `components/cpi-inflation/`. Debt 8 → 7. The multiset comparison's only absences are the
+corrected strings below and one dead error card — an inline `{error && ...}` block that an
+unconditional early-return above it made unreachable.
+
+### P7-85 — a methodology card describing a model that does not exist
+
+The tab has a "Show Calculations" button. The panel behind it — the panel whose whole
+purpose is to earn trust by disclosure — described the 24-month forecast as a **"consensus
+forecast combining Fed projections, economic surveys (Blue Chip, SPF), and exponential
+smoothing"**, gave the formula `Forecast(t) = α·FedProjection + β·SurveyConsensus +
+γ·TrendModel` with α=0.5/β=0.3/γ=0.2, listed four named inputs with their update cadences,
+smoothing constants α=0.3/β=0.1, and confidence bands of ±0.5/±1.0/±1.5pp. The chart named
+its dashed line **"Consensus Inflation Model"**.
+
+`/api/cpi-inflation` reads **one FRED series** and runs a two-term recurrence:
+`next = clamp(current + 0.15·(target − current) + 0.70·recentSlope, 1.5, 5.0)`. It fetches
+no Fed projection, no survey, no consensus of any kind; no smoothing exists and no
+confidence band is computed or drawn. Every named number in the panel was invented. Its
+closing line — "No proprietary or opaque models" — was the only claim a reader could not
+check from the panel itself, and the only one that mattered.
+
+This is the audit's first shape (a label naming a provenance the code lacks) at its most
+deliberate: not a stray adjective but **five paragraphs of fabricated methodology inside
+the feature that exists to disclose methodology**. P6-58's lesson applies squarely — the
+tab's numbers were fine; the prose about where they come from was the defect.
+
+The panel now states the actual recurrence including the clamp, and the clamp disclosure
+earns its place: **the chart's Y axis is drawn to the same 1.5–5.0 bounds the projection is
+clamped to**, so a dashed line resting on the axis edge has been cut off, not levelled.
+The bounds live once in `cpi-types.ts` and both surfaces read them.
+
+Guarded three ways, each negative-tested: two RETIRED phrases ("Consensus forecast
+combining Fed projections", "Consensus Inflation Model" — both FAIL when reintroduced),
+and a ninth pinned-claim entry tying the card's disclosed constants
+`0.15 × (FedTarget − current) + 0.70 × recentSlope` to the route's
+`(fedTarget - lastCPI) * 0.15`, `avgChange * 0.7` and `Math.max(1.5, Math.min(5.0` —
+changing the route's 0.15 to 0.25 fails the pin until the panel is rewritten with it.
+A disclosure of constants rots the moment the constants move; now it rots loudly.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-85 | P2 | LEARN → CPI | The "Show Calculations" panel described a consensus model — Fed SEP + Blue Chip + SPF with named weights, smoothing constants and confidence bands — while the route reads one FRED series and runs a two-term clamped recurrence. Every number in the disclosure was invented, and the chart called the line "Consensus Inflation Model". Rewritten to the actual arithmetic with the clamp disclosed (the Y axis IS the clamp); guarded by two retired phrases and a pinned-claim entry on the three real constants, all negative-tested. |
