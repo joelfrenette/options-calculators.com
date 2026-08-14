@@ -7,6 +7,11 @@
  * `tooltipsEnabled` from the component's closure and now takes it as a prop,
  * which is the only change: the disabled branch still renders the children bare
  * rather than an empty tooltip wrapper.
+ *
+ * Promoted to ui/ when the social-sentiment split (P7-81) found that tab
+ * carrying its own copy whose `enabled` came from a local useState(true) no
+ * setter ever wrote — so its Tooltips toggle silenced nothing. One shared
+ * component, wired to the toggle, replaces both.
  */
 import type React from "react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"

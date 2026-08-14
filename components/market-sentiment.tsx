@@ -44,7 +44,7 @@ import { getChartDataForIndicator } from "@/components/market-sentiment/chart-da
 import { getTradeRecommendations } from "@/components/market-sentiment/trade-recommendations"
 import { buildIndicatorCards } from "@/components/market-sentiment/indicator-cards"
 import { getScoreBackground, getScoreColor } from "@/components/market-sentiment/score-colors"
-import { ConditionalTooltip } from "@/components/market-sentiment/conditional-tooltip"
+import { ConditionalTooltip } from "@/components/ui/conditional-tooltip"
 import { HistoricalScaleCard } from "@/components/market-sentiment/historical-scale-card"
 import { TradeRecommendationsCard } from "@/components/market-sentiment/trade-recommendations-card"
 

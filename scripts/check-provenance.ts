@@ -182,8 +182,13 @@ function fetchedRoutes(src: string): string[] {
 }
 
 /** Can this route reach a model, following one hop into lib/? */
+// P7-80: this path was built WITHOUT the "app" segment for as long as the rule
+// existed, so it named a file that is not there and the function returned false
+// for every route — the "one hop" half of this rule had never proven anything,
+// and every AI claim passed solely via the dialog embed. Surfaced the first
+// time a split moved the dialog out of the claiming file.
 function routeReachesModel(apiPath: string): boolean {
-  const routeFile = join(ROOT, apiPath.replace(/^\//, "").split("/").join(sep), "route.ts")
+  const routeFile = join(ROOT, "app", apiPath.replace(/^\//, "").split("/").join(sep), "route.ts")
   let src: string
   try {
     src = code(routeFile)

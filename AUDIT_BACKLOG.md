@@ -453,11 +453,13 @@ recomputes it.
 | P7-77 | P2 | fixed | **The Risk Calculator's VIX cash bands now match the framework they cite, and five threshold ladders became one.** Owner decision 2026-08-14: adopt Ryan Hildreth's four published bands (25-50 / 15-25 / 5-10 / 0-5) in place of the site's six, which were more defensive at VIX 15-25 and cited nobody. The tab now names the framework where the numbers render. **Cutting the library to four bands was HALF A CHANGE**: three more ladders lived outside it — a hardcoded six-row range list in the allocation section, a nested-ternary boundary ladder computing which row is CURRENT, and a five-rung sentiment ternary in the calculator — so the tab would have rendered six rows, two of them duplicates, with the badge on the old boundaries. All now read `getVixLevel`. `invested` is derived as `100 − cash` because the source states 15-25% cash AND "deploying roughly 50% to 75%" for the same band, which do not sum to 100. The >30 guidance to add outside capital is deliberately NOT implemented and pinned as a negative assertion. 31 checks. |
 | P7-78 | **P1** | fixed | **A generator script wrote a literal BACKSPACE byte into a check's regex, and the rule passed on code that visibly violated it.** `` was written through a language that interpreted the escape, so the pattern asked for a control character appearing in no source file. The rule reported clean while the ladder it was written to catch sat three lines from the top of the scanned file. TWO rewrites of the scanning logic were spent chasing it — a whole-file regex strip, then a block-comment state machine — and a wrong diagnosis in between (node's TypeScript stripper mis-lexing `<`) before `cat -A` showed `^H` in the source. The pattern is now built with `String.raw` from a string. **The only thing that ever surfaced it was the negative test refusing to fail**, which is the project's standing rule arriving as its own demonstration: same session, the same escaping mistake also produced a literal newline inside a regex twice. |
 | P7-79 | P2 | fixed | **The Risk Calculator produced a target and never a measurement.** It took one input — portfolio value — multiplied it by the band percentage, and never asked what the user holds, so it could not say whether they were on it. The cited framework's own ratio is `Free Liquid Cash ÷ Account Value`, where free EXCLUDES collateral pledged against open cash-secured puts, and that exclusion is the whole point: $30k cash against $20k pledged is $10k free — the account reads 30% and the deployable figure is 10%, which against a 15-25% target is the difference between "comfortably on target" and "well under". Two optional inputs added; the tab now shows free cash against the band with the over/under. **A blank field stays NULL rather than becoming 0** — `\|\| 0` would render a confident "badly under" from no data, the audit's third failure shape — and each of the three fields is asserted separately, because one coercion would have made them look identical. Over-commitment reports a NEGATIVE percentage rather than clamping to a calm 0%. 14 assertions, negative-tested by reintroducing `?? 0`. |
+| P7-80 | P2 | fixed | `routeReachesModel` in check-provenance omitted the `app` path segment, so the model-reachability probe had returned false for every route since the rule was written; every AI claim passed via the dialog-embed shortcut alone. Strict-direction, so nothing bad slipped through — it failed the first good file to rely on it, the social-sentiment split. Fixed, negative-tested both ways. |
+| P7-81 | P2 | fixed | Social Sentiment's Tooltips toggle silenced nothing: `ConditionalTooltip` read a local always-true `useState` instead of the toggle — the defect market-sentiment's copy already had fixed in its own split. Shared fixed version promoted to `ui/conditional-tooltip.tsx`, all call sites wired. Dead 34-line `SentimentPill` (never rendered) deleted after `check-dead-components` flagged its extracted file. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-282 findings recorded · **245 fixed · 9 wontfix · 2 verified-ok · 26 open.**
+284 findings recorded · **247 fixed · 9 wontfix · 2 verified-ok · 26 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -5236,3 +5238,57 @@ a negative test that refused to fail.**
 - **No production build has run.** `pnpm build` fails locally on Node 24 and fails identically
   on the committed tree. Vercel's staging build is the first real compile for all 34 commits.
 - **No UI change was visually verified.** The Browser pane would not composite frames.
+
+## 2026-08-14 — the social-sentiment split, and a rule half that had never run
+
+`components/social-sentiment.tsx` was 757 lines and is now 168, across five modules in
+`components/social-sentiment/`: the payload types, the formatting helpers (each carrying
+its P6/P7 provenance comment unchanged), and the four cards — headline gauge, index
+heatmap, indicator rows, AI summary. Verified the standing way: every user-visible string
+literal and text node from the pre-split file compared as a multiset against the
+post-split set. The only absences are the strings of code deleted deliberately (below).
+
+### P7-80 — the model-reachability half of the AI-claim rule never worked
+
+The split moved `RunScenarioInAIDialog` out of the file that says "AI", and
+`check-provenance` rule 2 FAILED on the main component — correctly, loudly, the P7-64
+shape. Diagnosing the failure found something older: `routeReachesModel()` built its
+path as `ROOT/api/<route>/route.ts`, **without the `app` segment**. That file exists for
+no route, the read threw, and the function returned false — for every route, since the
+rule was written. The rule's comment even names `/api/earnings-calendar/insights` as
+"the reason the hop exists"; the hop had never once proven anything, and every AI claim
+in the codebase passed solely via the dialog-embed shortcut.
+
+The polarity is what kept it invisible: a probe that always says "not proven" makes the
+rule stricter, not blinder, so it could never let a bad file through — it could only
+fail a good one, and until this split no good file exercised it. Fixed with the `app`
+segment; negative-tested by breaking the path again (rule fails on the split component)
+and restoring (5 claims, all backed — `/api/social-sentiment` reaches
+`generateWithFallback` directly).
+
+### P7-81 — a Tooltips toggle that silenced nothing, and a gauge nobody rendered
+
+`market-sentiment.tsx` and `social-sentiment.tsx` both carried a `ConditionalTooltip`.
+When market-sentiment was split (P6-13), its copy was fixed to take `enabled` as a prop
+— the header comment documents exactly that change. Social-sentiment's copy kept the
+original defect: `enabled` came from a **local `useState(true)` whose setter no code
+ever called**, so the tab's Tooltips toggle wrote parent state that no tooltip read.
+Switching tooltips off on this tab silenced nothing — P7-63's shape, one tab over, found
+by the same route: a split making a file short enough to read.
+
+The duplicate is deleted, the fixed version is promoted to
+`components/ui/conditional-tooltip.tsx` (the basename-uniqueness check is what forced
+the promotion — two `conditional-tooltip.tsx` files are ambiguous to import matching),
+and all three call sites now pass the toggle's state.
+
+In the same file: `SentimentPill` and its private `getSentimentColor` — a complete
+34-line gauge component **that no JSX ever rendered**, invisible as module-local code.
+The moment the split gave it its own file, `check-dead-components` flagged it as
+unreachable. Deleted. A dead component inside a 757-line file and a dead component in
+its own file are the same dead code; only one of them is visible to the instruments,
+which is one more argument for the splits.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-80 | P2 | tooling | `routeReachesModel` in check-provenance built its route path without the `app` segment, so the model-reachability probe returned false for every route since the rule was written — every AI claim passed only via the dialog-embed shortcut. Strict-direction failure, so it never admitted a bad file; surfaced the first time a split separated the claim from the dialog. Fixed and negative-tested. |
+| P7-81 | P2 | ANALYZE → Social Sentiment | The tab's Tooltips toggle controlled nothing: its `ConditionalTooltip` read a local always-true state instead of the toggle, the defect market-sentiment's copy had already had fixed. One shared `ui/conditional-tooltip.tsx` now serves both tabs, wired to the toggle. The split also surfaced `SentimentPill`, a 34-line gauge no JSX rendered — deleted. |

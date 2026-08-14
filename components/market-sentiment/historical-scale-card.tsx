@@ -13,7 +13,7 @@ import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { Info } from "lucide-react"
 import { BarChartIcon, InfoIcon } from "./icons"
-import { ConditionalTooltip } from "./conditional-tooltip"
+import { ConditionalTooltip } from "@/components/ui/conditional-tooltip"
 import type { MarketData } from "./market-data"
 
 export function HistoricalScaleCard({
