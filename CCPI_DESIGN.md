@@ -607,6 +607,76 @@ eight years?*
 
 ---
 
+## 8b. P7-73 — the FRED Buffett basis, measured, and a band proposal (2026-08-14)
+
+**The question:** `lib/ccpi/buffett-indicator.ts` computes NCBEILQ027S/1000 ÷ GDP — free,
+keyless, 55 years deep — but its basis (nonfinancial corporate equities) is not the
+total-market-cap basis the CCPI's bands (>200/>180/>150/>120) were calibrated against.
+Measured the week of 2026-08-14: FRED basis **218.1**, GuruFocus **183.8**. A naive swap
+moves the indicator 13 → 16 points and reads as the market moving.
+
+**Method that was tried and REJECTED, stated so nobody re-tries it:** translating the old
+cutoffs through a total-market index. Yahoo's `^DWCF` (Dow Jones US Total Stock Market,
+full cap) has quarterly history to 1995 and regresses against the FRED basis at r²=0.98 —
+and fails its own sanity check: scaled to today's 183.8, it puts the March-2000 top at
+**114%**, when the indicator's own well-documented 2000 reading is ~140%. A full-cap
+*price* index misses net issuance (IPOs add cap without moving it; buybacks remove cap),
+so its scale drifts across decades. The r² was trend, not mapping. FRED's own Wilshire
+series (`WILL5000PRFC` et al.) would have settled it, but FRED removed them entirely —
+404, data and all — when the Wilshire licence ended in 2024.
+
+**What stands is the FRED series' own history** (225 quarterly observations, 1970-Q1 →
+2026-Q1, refetchable keyless via `scripts/analysis-buffett-bands.mjs`; the two
+`fredgraph.csv` downloads are the only inputs):
+
+| | value |
+|---|---|
+| entering dot-com top (2000-Q1) | 162.6 |
+| entering GFC (2007-Q3) | 120.6 |
+| entering covid (2020-Q1) | 128.8 |
+| entering 2022 bear (2021-Q4) | 218.7 |
+| all-time max (2025-Q4) | **228.7** |
+| latest (2026-Q1) | **218.1** |
+| percentiles since 1995 (n=125) | p50 = 120.8 · p75 = 150.8 · p90 = 198.0 · p95 = 210.7 |
+
+**Proposed ladder, percentile-matched to the modern era:** `>210 / >195 / >150 / >120`
+(p95 / ~p90 / ~p75 / ~p50). The lower two rungs land on the existing cutoffs by
+coincidence of the distribution, so **only the top two cutoffs move** (200→210, 180→195).
+
+**Lead-time record on this basis, run the E-6 way:** `>210` first fired **2021-Q2 (216),
+three quarters before the 2022 bear start** — a real lead on the one valuation-driven
+episode. It never fired ahead of 2000, 2008 or 2020: the GFC and covid were not
+valuation unwinds, and on THIS basis the dot-com top only reached 162.6 — nonfinancial
+corporate equities simply were not where that bubble's cap sat. Anyone reading the
+gauge should know the indicator is a one-crash-in-four leader on either basis.
+
+**The divergence that needs a decision, stated plainly:** today the two bases disagree
+about where the market sits relative to their own histories. The FRED basis reads 218.1
+against its p95 of 210.7 — inside the top band, at roughly the 97th percentile of the
+modern era, 10 points under its all-time high; five of the last six quarters sat above
+210. The scraped basis reads 183.8 — its second band, below its own 2021 extreme. So on
+the proposed ladder the FRED basis scores **16** where the scraped basis scores **13**
+today. That is not a calibration error to be smoothed away; the two series genuinely
+rank the present differently, and picking a basis is picking which story the pillar
+tells.
+
+**Decision for the owner — one of:**
+- **(a) Adopt the FRED basis with the proposed ladder** (>210/>195/>150/>120), retiring
+  the ScrapingBee/GuruFocus scrape for this input. Free, keyless, survives any provider,
+  and the band derivation is reproducible from public data. Valuation gains 3 points
+  today relative to the scrape — disclosed above, not hidden.
+- **(b) Keep the scraped basis as primary, FRED as fallback through its OWN ladder** —
+  never through the scraped ladder. Costs the ScrapingBee dependency P7-74/P7-75 mapped;
+  keeps continuity with the bands' original meaning.
+- **(c) Leave it unwired** (today's state): the series accumulates in `market_series`
+  and the CCPI keeps scoring the scraped figure when ScrapingBee has a key, nothing
+  otherwise.
+
+Until one is chosen, nothing changes in scoring — `computeBuffettIndicator` stays
+deliberately unwired, exactly as P7-73 left it.
+
+---
+
 ## 9. What this document deliberately does not do
 
 It does not re-weight anything, and it does not assert that any indicator works. Every lead
