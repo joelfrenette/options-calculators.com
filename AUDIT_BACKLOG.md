@@ -450,11 +450,13 @@ recomputes it.
 | P7-74 | P3 | fixed | `APIFY_API_TOKEN` is redundant. Its only scoring use is `spxPE`/`spxPS` in `/api/ccpi`, and `fetchFMPValuation("SPY")` already returns exactly those two from FMP `key-metrics`, wired as the fallback in the same expression; `/api/apify-proxy` exists as a route no component fetches. Recorded so the next spend question does not re-derive it: check `FMP_API_KEY` and whether `key-metrics` is on the plan (P7-41 established the SCREENER is paid-tier) before adding a second provider for the same two numbers. |
 | P7-75 | P2 | fixed | **`spxPE`/`spxPS` now come from a free source before a paid one, and the probe that proves it treats a 200 as no answer.** 30 of Valuation's 100 points (plus the 10 derived) had no live source on either host: Apify has no token and FMP's other endpoint is paid-tier. multpl.com publishes both free, keyless, in a `<meta description>`, and survives a plain server fetch — tested three times for a stable body, because one success proves nothing. **aaii.com does NOT**: it answers a plain fetch with HTTP 200 and a ~6 KB Imperva interstitial where 60 KB of survey belongs, and it was reported to the owner as a working free source for one turn on exactly that evidence. `looksBlocked` now judges every source on whether a VALUE came back. Free source FIRST, paid as fallback — P7-72's lesson, applied deliberately rather than discovered. `/api/admin/source-probe` answers the same question from the deployment, which is the only place that can answer it. 14 parser assertions, including that a block page containing the sentence still returns null. |
 | P7-76 | **P1** | fixed | **`*/*` in a MIME Accept header opened a phantom comment that blanked the rest of the file for every comment-stripping check in the suite.** `*/*` contains `/*`; the strippers' `\/\*[\s\S]*?\*\//` then ran to the next `*/` and deleted everything between. Measured, not theorised: **996 bytes of `app/api/yahoo-proxy/route.ts` were invisible** to all 16 scripts that strip comments — `check-provenance` rules 6/7/9/12/13, `check-route-timeouts`, `check-house-libs`, `check-write-only-state`, `check-dead-exports` and the rest. Found because a new route with `*/*` in its Accept header failed the timeout rule while visibly carrying `AbortSignal.timeout`. Fixed with a `(?<!\*)` lookbehind in all 14 scripts that carry the pattern. **This is the P6-75 shape at its worst: not a check that stopped covering one file, but a hole in the mechanism every check shares.** |
+| P7-77 | P2 | fixed | **The Risk Calculator's VIX cash bands now match the framework they cite, and five threshold ladders became one.** Owner decision 2026-08-14: adopt Ryan Hildreth's four published bands (25-50 / 15-25 / 5-10 / 0-5) in place of the site's six, which were more defensive at VIX 15-25 and cited nobody. The tab now names the framework where the numbers render. **Cutting the library to four bands was HALF A CHANGE**: three more ladders lived outside it — a hardcoded six-row range list in the allocation section, a nested-ternary boundary ladder computing which row is CURRENT, and a five-rung sentiment ternary in the calculator — so the tab would have rendered six rows, two of them duplicates, with the badge on the old boundaries. All now read `getVixLevel`. `invested` is derived as `100 − cash` because the source states 15-25% cash AND "deploying roughly 50% to 75%" for the same band, which do not sum to 100. The >30 guidance to add outside capital is deliberately NOT implemented and pinned as a negative assertion. 31 checks. |
+| P7-78 | **P1** | fixed | **A generator script wrote a literal BACKSPACE byte into a check's regex, and the rule passed on code that visibly violated it.** `` was written through a language that interpreted the escape, so the pattern asked for a control character appearing in no source file. The rule reported clean while the ladder it was written to catch sat three lines from the top of the scanned file. TWO rewrites of the scanning logic were spent chasing it — a whole-file regex strip, then a block-comment state machine — and a wrong diagnosis in between (node's TypeScript stripper mis-lexing `<`) before `cat -A` showed `^H` in the source. The pattern is now built with `String.raw` from a string. **The only thing that ever surfaced it was the negative test refusing to fail**, which is the project's standing rule arriving as its own demonstration: same session, the same escaping mistake also produced a literal newline inside a regex twice. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-279 findings recorded · **242 fixed · 9 wontfix · 2 verified-ok · 26 open.**
+281 findings recorded · **244 fixed · 9 wontfix · 2 verified-ok · 26 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -5091,3 +5093,66 @@ all 14 scripts carrying the pattern.
 |----|-----|------|---------|
 | P7-75 | P2 | ANALYZE → CCPI | S&P P/E and P/S now come free from multpl before FMP; aaii.com serves a bot wall at HTTP 200 and was briefly mistaken for a working free source. `looksBlocked` judges on the value, and `/api/admin/source-probe` answers the reachability question from the deployment. |
 | P7-76 | P1 | tooling | `*/*` in an Accept header opened a phantom comment that blanked the rest of the file for all 16 comment-stripping checks — 996 bytes of yahoo-proxy were invisible to the entire suite. Fixed with a lookbehind in 14 scripts. |
+
+## 2026-08-14 — the VIX bands get a source, and a check that could not fail
+
+### P7-77 — five ladders became one, and the numbers now match the citation
+
+Owner decision 2026-08-14: adopt Ryan Hildreth's four published VIX cash bands
+(**25-50 / 15-25 / 5-10 / 0-5**) in place of the site's six. Where the two disagreed the
+site was more defensive — 20-25% cash at VIX 15-20 against his 15-25%, and 10-15% at
+20-25 against his 5-10% — and it cited nobody. The tab now names the framework where the
+numbers render: a discretionary approach a named third party describes publicly, not a
+backtested rule and not the site's own model.
+
+**Cutting the library to four bands was half a change.** Three more classifications lived
+outside it:
+
+- a hardcoded six-row range list in the allocation section,
+- a nested-ternary boundary ladder beside it computing which row is CURRENT,
+- a five-rung sentiment ternary in the calculator itself.
+
+Left alone, the tab would have rendered **six rows, two of them duplicates, with the CURRENT
+badge on the old boundaries** — a visibly wrong money surface produced by a change that
+typechecked. All three now read `getVixLevel`, which is the only place a VIX number becomes
+a band.
+
+Two smaller things worth keeping. `invested` is derived as `100 − cash`, because the source
+states 15-25% cash AND "deploying roughly 50% to 75%" for the same band and those do not
+sum to 100 — deriving it means the pair cannot disagree. And the framework's >30 guidance to
+bring fresh external capital into the account is **not implemented**, pinned as a negative
+assertion: adding new money is a different act from rebalancing what is already invested.
+
+The file's own header also claimed "ONE classification per reading" while carrying two
+ladders. That comment was written during P6-13's split earlier the same day, copied from
+the panic module where the claim is true, without being checked against this file.
+
+### P7-78 — a backspace byte in a regex, and a rule that could not fail
+
+The new rule banning a second VIX ladder **passed on a file that visibly contained one**.
+
+The cause, after `cat -A`:
+
+```
+const BOUNDARY = /^Hvix\w*\s*(?:<=|>=|<|>)\s*(?:12|15|20|25|30)^H/i
+```
+
+`^H` is a literal **backspace byte (0x08)**. A generator script wrote `\b` through a
+language that interpreted the escape, so the pattern asked for a control character that
+appears in no source file.
+
+Two rewrites of the scanning logic were spent chasing this — a whole-file regex strip,
+then a block-comment state machine — plus a confident wrong diagnosis in between (node's
+TypeScript stripper mis-lexing the `<` inside the character alternation). None of it was
+the problem. The pattern is now built with `String.raw` from a string.
+
+**The only thing that ever surfaced it was the negative test refusing to fail.** That is
+this project's standing note — *a negative test that does not produce the negative
+condition proves nothing* — arriving as its own demonstration. The same escaping mistake
+produced a literal newline inside a regex twice more in the same session, each time caught
+only because the script then failed to parse. This one parsed fine and lied.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-77 | P2 | ANALYZE → VIX | The cash bands now match the framework the tab cites, and the five independent VIX threshold ladders became one. Invested derived from cash; the >30 external-capital guidance deliberately excluded and pinned as a negative. 31 checks. |
+| P7-78 | P1 | tooling | A literal backspace byte in a check's regex made the rule unfailable — it reported clean on code three lines from the top of the scanned file. Found only because the negative test would not fire. |

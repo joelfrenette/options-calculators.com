@@ -211,15 +211,12 @@ export function RiskCalculator() {
                         <div className="text-xs font-semibold">TODAY</div>
                         <div className="text-2xl font-bold">{vixValue.toFixed(2)}</div>
                         <div className="text-xs text-center">
-                          {vixValue <= 12
-                            ? "Extreme Greed"
-                            : vixValue <= 15
-                              ? "Greed"
-                              : vixValue <= 20
-                                ? "Normal"
-                                : vixValue <= 30
-                                  ? "Fear"
-                                  : "Extreme Fear"}
+                          {/* P7-77: the band names the sentiment. This was a
+                              fifth inline threshold ladder — five rungs against
+                              the library's four bands, so the marker could read
+                              "Greed" while the table below highlighted a
+                              different row. */}
+                          {getVixLevel(vixValue).sentiment}
                         </div>
                       </div>
                       <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-black mx-auto" />
@@ -322,13 +319,13 @@ export function RiskCalculator() {
               <DollarSign className="h-5 w-5 text-primary" />
               Portfolio Information
               {tooltipsEnabled && (
-                <ConditionalTooltip content="Enter your total portfolio value to get personalized cash allocation recommendations based on current VIX levels. Higher VIX = keep more cash ready for opportunities and margin requirements.">
+                <ConditionalTooltip content="Enter your portfolio value to see the cash target for the current VIX band. Higher VIX means a lower cash target — the buffer held at calm levels is what gets deployed when volatility rises.">
                   <Info className="h-4 w-4 text-muted-foreground cursor-help" />
                 </ConditionalTooltip>
               )}
             </CardTitle>
             <p className="text-sm text-gray-600 mt-2">
-              Please Enter Your Portfolio Size - So we can calculate the recommended Cash on Hand Level
+              Enter your portfolio size to see the cash target for the current VIX band
             </p>
           </CardHeader>
           <CardContent className="pt-4 pb-4">

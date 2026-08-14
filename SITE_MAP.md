@@ -14,7 +14,7 @@
 | `ccpi` ★ | Crash & Corrections Prediction Index | `CcpiDashboard` | `components/ccpi-dashboard.tsx` | 534 | `/api/ccpi/executive-summary`<br>`/api/ccpi`<br>`/api/ccpi/history` |
 | `earnings-calendar` | Earnings & Economic Calendar | `EarningsEconomicCalendar` | `components/earnings-economic-calendar.tsx` | 604 | `/api/earnings-calendar/insights`<br>`/api/earnings-calendar` |
 | `trend-analysis` | Index Trend Analysis | `TrendAnalysis` | `components/trend-analysis.tsx` | 146 | `/api/trend-analysis` |
-| `risk-management` | CBOE VIX Volatility Index | `RiskCalculator` | `components/risk-calculator.tsx` | 474 | `/api/vix`<br>`/api/vix-history` |
+| `risk-management` | CBOE VIX Volatility Index | `RiskCalculator` | `components/risk-calculator.tsx` | 471 | `/api/vix`<br>`/api/vix-history` |
 | `market-sentiment` | CNN's Fear & Greed | `MarketSentiment` | `components/market-sentiment.tsx` | 600 | `/api/market-sentiment` |
 | `panic-euphoria` | Citibank's Panic & Euphoria Index | `PanicEuphoria` | `components/panic-euphoria.tsx` | 189 | `/api/panic-euphoria` |
 | `social-sentiment` | Social Sentiment Index | `SocialSentiment` | `components/social-sentiment.tsx` | 758 | `/api/social-sentiment` |

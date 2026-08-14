@@ -25,49 +25,38 @@ export function AllocationByVixSection({ vixValue }: { vixValue: number | null }
                     Portfolio Allocation Guidance by VIX Level
                   </CardTitle>
                   <p className="text-sm text-gray-600 mt-2 text-left">
-                    Complete allocation strategies across all volatility regimes — cash vs. deployed shares, LEAPS, and options
+                    Cash vs. deployed shares, LEAPS and options across all volatility regimes
+                  </p>
+                  {/* P7-77. The cash bands are a named third party's published
+                      framework, not this site's model and not a backtested rule.
+                      Citing it without saying so is the label-is-a-claim defect
+                      this audit exists to remove, so the attribution sits with
+                      the numbers rather than in a footer. */}
+                  <p className="text-xs text-gray-500 mt-2 text-left">
+                    Cash levels follow the VIX allocation framework published by Ryan Hildreth
+                    (&ldquo;Options With Ryan&rdquo;) — a discretionary approach, not a backtested rule.
+                    Shown as a reference for anyone already following it.
                   </p>
                 </CardHeader>
               </AccordionTrigger>
               <AccordionContent>
                 <CardContent className="pt-4 pb-4">
                   <div className="space-y-3">
-                    {[
-                      { range: "≤ 12", vix: 10 },
-                      { range: "12-15", vix: 13.5 },
-                      { range: "15-20", vix: 17.5 },
-                      { range: "20-25", vix: 22.5 },
-                      { range: "25-30", vix: 27.5 },
-                      { range: "≥ 30", vix: 35 },
-                    ].map((item, index) => {
-                      const levelData = getVixPortfolioAllocation(item.vix)
-                      const levelInfo = getVixLevel(item.vix)
-                      const isCurrent =
-                        vixValue &&
-                        vixValue >=
-                          (index === 0
-                            ? 0
-                            : index === 1
-                              ? 12
-                              : index === 2
-                                ? 15
-                                : index === 3
-                                  ? 20
-                                  : index === 4
-                                    ? 25
-                                    : 30) &&
-                        vixValue <
-                          (index === 5
-                            ? 999
-                            : index === 4
-                              ? 30
-                              : index === 3
-                                ? 25
-                                : index === 2
-                                  ? 20
-                                  : index === 1
-                                    ? 15
-                                    : 12)
+                    {/* P7-77. Rows come from VIX_LEVELS, not from a list typed
+                        here. This block used to carry its own six ranges AND its
+                        own nested-ternary boundary ladder — a third and fourth
+                        classification of the same VIX reading, independent of
+                        `getVixLevel`. Cutting the library to four bands left
+                        this rendering six rows, two of them duplicates, with the
+                        CURRENT badge on the old boundaries. Half a change. */}
+                    {VIX_LEVELS.map((levelInfo, index) => {
+                      const levelData = getVixPortfolioAllocation(
+                        // A reading that unambiguously sits inside this band.
+                        levelInfo.range === "> 30" ? 35 : (levelInfo.cashMin + levelInfo.cashMax) / 2 + 10,
+                      )
+                      // Reference equality: `getVixLevel` returns the very object
+                      // being rendered, so the badge cannot disagree with the band.
+                      const isCurrent = vixValue !== null && getVixLevel(vixValue) === levelInfo
 
                       return (
                         <div
@@ -81,7 +70,7 @@ export function AllocationByVixSection({ vixValue }: { vixValue: number | null }
                           <div className="mb-3">
                             <div className="flex items-center justify-between mb-2">
                               <div>
-                                <span className="font-mono text-sm font-bold text-gray-900">VIX {item.range}</span>
+                                <span className="font-mono text-sm font-bold text-gray-900">VIX {levelInfo.range}</span>
                                 <span className={`ml-3 font-bold text-sm ${levelInfo.color}`}>
                                   {levelInfo.sentiment}
                                 </span>

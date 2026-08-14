@@ -1,13 +1,52 @@
 /**
- * The VIX bands, and the allocation each one implies.
+ * VIX bands and the allocation each one implies.
  *
- * Split out of `components/risk-calculator.tsx` (P6-13) unchanged.
+ * ── WHOSE FRAMEWORK THIS IS ──────────────────────────────────────────────────
+ * P7-77. The four cash bands below are Ryan Hildreth's ("Options With Ryan")
+ * published VIX cash-allocation levels, adopted by owner decision 2026-08-14.
+ * They are a DISCRETIONARY framework a named third party describes publicly —
+ * not a backtested rule, not this site's own model, and not advice. Anything
+ * rendering them must say so; the tab is a calculator for someone who has
+ * already chosen to follow it.
  *
- * ONE classification per reading: `getVixLevel` decides the band and
- * `getVixPortfolioAllocation` reads off it. Positions are shares/LEAPS/options/
- * cash and diversification runs through sectors and indexes — the house
- * allocation rule, which is why no separate asset class appears below.
+ * The site previously carried six bands of its own, and where they disagreed it
+ * was more defensive — 20–25% cash at VIX 15–20 against his 15–25%, and 10–15%
+ * at VIX 20–25 against his 5–10%. Those are gone rather than blended: a table
+ * that cites a framework and then quietly holds different numbers is the
+ * label-is-a-claim defect this audit exists to remove.
+ *
+ * ── INVESTED IS DERIVED, NOT STORED ──────────────────────────────────────────
+ * The source states "15% to 25% in cash, deploying roughly 50% to 75% of the
+ * portfolio" for the 15–20 band, and those two do not sum to 100. Rather than
+ * pick one and bury the conflict, invested is computed as `100 − cash`, so the
+ * pair cannot disagree. Storing one half of a complementary pair and deriving
+ * the other is this project's standing rule.
+ *
+ * ── ONE CLASSIFICATION, AND IT IS NOW TRUE ───────────────────────────────────
+ * The header this file carried until today claimed "ONE classification per
+ * reading: `getVixLevel` decides the band and `getVixPortfolioAllocation` reads
+ * off it." **That was false when written** — the second function carried its own
+ * independent six-rung threshold ladder, so two ladders had to be kept in step
+ * by hand. The comment was written during P6-13's split, copied from the panic
+ * module where the claim IS true, without checking it against this file. It is
+ * true here now: the allocation detail hangs off the band object, and
+ * `getVixLevel` is the only place a VIX number becomes a band.
+ *
+ * Positions are shares/LEAPS/options/cash and diversification runs through
+ * sectors and indexes — the house allocation rule, which is why no separate
+ * asset class appears below.
  */
+
+export interface VixAllocationDetail {
+  stocks: string
+  options: string
+  leaps: string
+  hedges: string
+  /** Derived from the band's cashMin/cashMax; never typed separately. */
+  cash: string
+  description: string
+  rationale: string[]
+}
 
 export interface VixLevel {
   range: string
@@ -21,208 +60,155 @@ export interface VixLevel {
   equityAction: string
   marginBufferPercent: number // Percentage of total cash for margin buffer
   opportunityPercent: number // Percentage of total cash for dip-buying
+  allocation: Omit<VixAllocationDetail, "cash">
 }
 
-export const VIX_LEVELS: VixLevel[] = [
+/**
+ * The four bands, cash percentages exactly as the cited framework states them.
+ *
+ * `investedMin`/`investedMax` are filled in by the derivation below, never typed
+ * here — see the header.
+ */
+const BANDS: Array<Omit<VixLevel, "investedMin" | "investedMax">> = [
   {
-    range: "≤ 12",
-    sentiment: "Extreme Greed",
-    cashMin: 40,
+    range: "< 15",
+    sentiment: "Greed / Low Fear",
+    cashMin: 25,
     cashMax: 50,
-    investedMin: 50,
-    investedMax: 60,
     color: "text-green-600",
-    optionsAction: "Sell limited-risk spreads only",
-    equityAction: "Avoid new buys; trim winners",
-    marginBufferPercent: 50, // 20-25% of portfolio
-    opportunityPercent: 50, // 20-25% of portfolio
-  },
-  {
-    range: "12-15",
-    sentiment: "Greed",
-    cashMin: 30,
-    cashMax: 40,
-    investedMin: 60,
-    investedMax: 70,
-    color: "text-green-500",
-    optionsAction: "Small size, short puts on quality stocks",
-    equityAction: "Wait for pullback",
-    marginBufferPercent: 55,
-    opportunityPercent: 45,
-  },
-  {
-    range: "15-20",
-    sentiment: "Slight Fear",
-    cashMin: 20,
-    cashMax: 25,
-    investedMin: 75,
-    investedMax: 80,
-    color: "text-yellow-600",
-    optionsAction: "Regular put selling",
-    equityAction: "Start small DCA",
-    marginBufferPercent: 60,
-    opportunityPercent: 40,
-  },
-  {
-    range: "20-25",
-    sentiment: "Fear",
-    cashMin: 10,
-    cashMax: 15,
-    investedMin: 85,
-    investedMax: 90,
-    color: "text-orange-600",
-    optionsAction: "Scale up short puts / strangles",
-    equityAction: "Deploy dip cash (10-15%)",
-    marginBufferPercent: 70,
-    opportunityPercent: 30,
-  },
-  {
-    range: "25-30",
-    sentiment: "Very Fearful",
-    cashMin: 5,
-    cashMax: 10,
-    investedMin: 90,
-    investedMax: 95,
-    color: "text-red-600",
-    optionsAction: "Go heavier into short puts (still hedged)",
-    equityAction: "Aggressive DCA, nibble growth names",
-    marginBufferPercent: 80,
-    opportunityPercent: 20,
-  },
-  {
-    range: "≥ 30",
-    sentiment: "Extreme Fear",
-    cashMin: 0,
-    cashMax: 5,
-    investedMin: 95,
-    investedMax: 100,
-    color: "text-red-700",
-    optionsAction: "Massive premiums — ladder entries carefully",
-    equityAction: "Deploy remaining cash in tranches",
-    marginBufferPercent: 100,
-    opportunityPercent: 0,
-  },
-]
-
-export function getVixLevel(vix: number): VixLevel {
-  if (vix <= 12) return VIX_LEVELS[0]
-  if (vix <= 15) return VIX_LEVELS[1]
-  if (vix <= 20) return VIX_LEVELS[2]
-  if (vix <= 25) return VIX_LEVELS[3]
-  if (vix <= 30) return VIX_LEVELS[4]
-  return VIX_LEVELS[5]
-}
-
-export function getVixPortfolioAllocation(vixLevel: number): {
-  stocks: string
-  options: string
-  leaps: string
-  hedges: string
-  cash: string
-  description: string
-  rationale: string[]
-} {
-  if (vixLevel <= 12) {
-    // Extreme Greed (VIX ≤ 12)
-    return {
-      stocks: "35-45%",
+    optionsAction: "Defined-risk spreads; small size on short puts",
+    equityAction: "Trim winners; wait for a pullback",
+    marginBufferPercent: 50,
+    opportunityPercent: 50,
+    allocation: {
+      stocks: "35-50%",
       options: "10-15%",
       leaps: "0-5%",
       hedges: "5-10%",
-      cash: "40-50%",
-      description: "Maximum caution - markets at peak complacency, crashes often follow extreme lows",
+      description:
+        "Complacent market. The framework holds the largest cash buffer here, and largest of all when the index is at an all-time high.",
       rationale: [
-        "Trim equity exposure aggressively; VIX this low historically precedes sharp corrections",
-        "Limit options to defined-risk spreads only; avoid naked short puts",
-        "Build large cash reserves for inevitable volatility spike buying opportunities",
-        "Tilt remaining equity toward defensive sectors (XLU/XLP) and carry index put hedges against sudden reversals",
-        "Keep LEAPS minimal; avoid adding leverage at market peaks",
+        "Cash is highest when fear is lowest — the buffer exists to be spent later, not now",
+        "Limit options to defined-risk structures; premiums are thin and do not pay for naked risk",
+        "Trim winners rather than add; this band is about having powder, not deploying it",
+        "Defensive sector tilt (XLU/XLP) with index put hedges against a sudden reversal",
+        "Keep LEAPS minimal — adding leverage at a complacent peak is the opposite of the band's purpose",
       ],
-    }
-  } else if (vixLevel <= 15) {
-    // Greed (VIX 12-15)
-    return {
-      stocks: "40-50%",
-      options: "10-15%",
-      leaps: "3-5%",
-      hedges: "5-10%",
-      cash: "30-40%",
-      description: "Still elevated greed - cautious deployment, wait for better risk/reward setups",
-      rationale: [
-        "Maintain elevated cash levels; market still pricing in low volatility",
-        "Selective short puts on highest-quality names only with small position sizing",
-        "Continue building cash reserves for better opportunities ahead",
-        "Defensive sector weight (XLU/XLP) as portfolio stabilizer; LEAPS only as small tactical positions",
-        "Focus on risk management over aggressive growth",
-      ],
-    }
-  } else if (vixLevel <= 20) {
-    // Slight Fear (VIX 15-20)
-    return {
+    },
+  },
+  {
+    range: "15 - 20",
+    sentiment: "Slight Fear / Normal",
+    cashMin: 15,
+    cashMax: 25,
+    color: "text-yellow-600",
+    optionsAction: "Regular put selling",
+    equityAction: "Start scaling in on pullbacks",
+    marginBufferPercent: 60,
+    opportunityPercent: 40,
+    allocation: {
       stocks: "50-60%",
       options: "15-20%",
       leaps: "5-10%",
       hedges: "3-5%",
-      cash: "20-25%",
-      description: "Normal volatility environment - balanced approach with regular options selling",
+      description: "Normal volatility. Regular put selling, with a working cash buffer still held back.",
       rationale: [
-        "Healthy volatility levels support regular put-selling strategies",
-        "Begin DCA into quality growth stocks on minor pullbacks",
-        "Options premiums still attractive for income generation",
-        "Maintain tactical cash buffer for opportunistic additions",
-        "Diversified exposure across sectors and indexes for risk balance",
+        "Healthy volatility supports routine put-selling without stretching size",
+        "Begin scaling into quality names on minor pullbacks rather than all at once",
+        "Premiums are adequate for income without requiring elevated risk",
+        "Keep a tactical buffer — this band is the middle of the range, not the bottom",
+        "Diversify across sectors and indexes rather than concentrating the deployment",
       ],
-    }
-  } else if (vixLevel <= 25) {
-    // Fear (VIX 20-25)
-    return {
-      stocks: "60-70%",
-      options: "15-20%",
+    },
+  },
+  {
+    range: "20 - 30",
+    sentiment: "Elevated Fear",
+    cashMin: 5,
+    cashMax: 10,
+    color: "text-orange-600",
+    optionsAction: "Scale up short puts; premiums are rich",
+    equityAction: "Deploy the dip-buying reserve",
+    marginBufferPercent: 80,
+    opportunityPercent: 20,
+    allocation: {
+      stocks: "60-75%",
+      options: "15-25%",
       leaps: "5-10%",
       hedges: "0-5%",
-      cash: "10-15%",
-      description: "Elevated fear creates opportunities - deploy dip-buying cash on pullbacks",
+      description:
+        "Mostly invested. The cash held back at lower VIX is spent here, and option premiums are the point of the band.",
       rationale: [
-        "Increase equity exposure as fear rises; best buying opportunities emerge",
-        "Scale up short put strategies as premiums expand significantly",
-        "Deploy 10-15% of cash reserves on high-quality dip purchases",
-        "Options strategies generate outsized income during volatility spikes",
-        "Maintain some cash for potential further downside but start getting aggressive",
+        "This is what the buffer was for — elevated fear is when the reserve gets deployed",
+        "Short-put premiums expand materially; size up within a plan rather than opportunistically",
+        "Buy quality on the way down in tranches, not in one decision",
+        "Remaining cash is mostly margin buffer, not opportunity money",
+        "Volatility is the income source in this band, not the risk to avoid",
       ],
-    }
-  } else if (vixLevel <= 30) {
-    // Very Fearful (VIX 25-30)
-    return {
-      stocks: "65-75%",
-      options: "20-25%",
-      leaps: "5-10%",
-      hedges: "0-5%",
-      cash: "5-10%",
-      description: "High fear environment - aggressive buying of quality assets at discount prices",
-      rationale: [
-        "Significant market fear creates exceptional entry points for long-term holdings",
-        "Heavy short put activity captures massive volatility premiums",
-        "Deploy cash reserves aggressively through systematic DCA approach",
-        "Focus on mega-cap tech and defensive blue chips at attractive valuations",
-        "Options strategies generate outsized income during volatility spikes",
-      ],
-    }
-  } else {
-    // Extreme Fear (VIX ≥ 30)
-    return {
+    },
+  },
+  {
+    range: "> 30",
+    sentiment: "Market Panic",
+    cashMin: 0,
+    cashMax: 5,
+    color: "text-red-600",
+    optionsAction: "Ladder entries — premiums are extreme, so is the risk",
+    equityAction: "Deploy what remains, in tranches",
+    marginBufferPercent: 100,
+    opportunityPercent: 0,
+    allocation: {
       stocks: "70-85%",
       options: "20-30%",
       leaps: "5-10%",
       hedges: "0%",
-      cash: "0-5%",
-      description: "Maximum opportunity - panic creates generational buying moments",
+      description: "Panic. Effectively fully invested, with cash kept only for margin.",
       rationale: [
-        "Deploy all remaining cash in measured tranches; these are lifetime opportunities",
-        "Massive options premiums available; ladder short put entries carefully to avoid catching falling knives",
-        "Buy growth stocks that sold off 40-60% from highs with strong balance sheets",
-        "Market panic rarely lasts; positioning for 6-12 month recovery timeframe",
-        "Keep minimal cash only for emergency margin requirements and essential liquidity",
+        "Deploy in measured tranches; a laddered entry survives being early, a single one may not",
+        "Premiums are at their richest and so is assignment risk — ladder rather than reach",
+        "The framework's own guidance to add outside capital here is deliberately NOT implemented: bringing new money in is a different decision from rebalancing what is already invested",
+        "What cash remains is for margin and liquidity, not for opportunity",
+        "Panic bands are short-lived historically, but 'short-lived' is not a timeframe anyone can size a position against",
       ],
-    }
-  }
+    },
+  },
+]
+
+/**
+ * The bands, with `invested` derived so it cannot drift from `cash`.
+ */
+export const VIX_LEVELS: VixLevel[] = BANDS.map((b) => ({
+  ...b,
+  investedMin: 100 - b.cashMax,
+  investedMax: 100 - b.cashMin,
+}))
+
+/**
+ * The only place a VIX reading becomes a band.
+ *
+ * BOUNDARIES ARE STATED, because the source's prose ("Below 15", "Between 15
+ * and 20", "Between 20 and 30", "Above 30") does not settle what happens at
+ * exactly 15, 20 or 30. The choice made here: a boundary reading belongs to the
+ * CALMER band — 20.0 is "15 - 20", 30.0 is "20 - 30". An undocumented boundary
+ * is a number nobody can reproduce.
+ */
+export function getVixLevel(vix: number): VixLevel {
+  if (vix < 15) return VIX_LEVELS[0]
+  if (vix <= 20) return VIX_LEVELS[1]
+  if (vix <= 30) return VIX_LEVELS[2]
+  return VIX_LEVELS[3]
+}
+
+/** The cash range as displayed, derived from the band so the two cannot disagree. */
+export function cashRangeLabel(level: VixLevel): string {
+  return `${level.cashMin}-${level.cashMax}%`
+}
+
+/**
+ * Allocation detail for a reading — a LOOKUP on `getVixLevel`, not a second
+ * threshold ladder. See the header for what this function used to be.
+ */
+export function getVixPortfolioAllocation(vixLevel: number): VixAllocationDetail {
+  const level = getVixLevel(vixLevel)
+  return { ...level.allocation, cash: cashRangeLabel(level) }
 }
