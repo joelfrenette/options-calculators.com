@@ -5201,3 +5201,38 @@ is to show it.
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-79 | P2 | ANALYZE → VIX | The tab computed a cash target and never a position. Two optional inputs now measure free cash — cash on hand less collateral pledged to open puts — against the band. Blank stays null, never 0; over-commitment reports negative rather than clamping. 14 assertions, negative-tested. |
+
+## 2026-08-14 — end-of-session state
+
+**Baselines:** typecheck 0 · formulas **1125** · contracts **60 routes / 60 contracts** ·
+remediation 31 · ledger **282 rows / 26 open / 245 fixed / 9 wontfix / 2 verified-ok**.
+Staging `audit-preview` = `29099e3`, **34 commits ahead of production `04399e9`**.
+
+**Twenty-one findings this session, P7-59 … P7-79.** Five P1s, and only one of them was
+caused by the day's own work:
+
+| ID | what it was |
+|----|-------------|
+| P7-70 | An unauthenticated route published 15 characters of an API key — harmless only because the key is unset, so **setting it, the action being recommended at the time, is what would have started the leak**. Still live on `main`. |
+| P7-72 | An LLM was asked for the put/call ratio BEFORE CBOE, so 29 scoring points were excluded by call order rather than by missing data. |
+| P7-76 | `*/*` in a MIME Accept header opened a phantom comment that blanked 996 measured bytes of a route from **all 16** comment-stripping checks. |
+| P7-78 | A literal backspace byte in a check's regex made the rule unfailable; it reported clean on a violation three lines from the top of the scanned range. |
+| P7-62 | A split deleted two whole render sections with typecheck green — a component nothing renders is not a type error. (P2, but the one the refactor caused.) |
+
+**The recurring shape, stated once:** a check pinned to a path, a name, a line or a
+punctuation mark is pinned to an accident. Four pinned-claim registry entries rotted in a
+single day; three checks lost their scope to a refactor; two new rules had to be corrected
+twice each. Every one was caught, and **every catch traces to either a `scope:` assertion or
+a negative test that refused to fail.**
+
+### Not done, and deliberately
+
+- **P7-73** (open): the CCPI's Buffett bands cannot take the FRED basis without
+  recalibration — 218.1% vs the scraped 183.8%, crossing a band boundary. The series are
+  stored and the ratio is computed and asserted; wiring it into scoring is a decision for
+  `CCPI_DESIGN.md`, not a refactor.
+- **P7-67** (wontfix): `lib/ccpi/scoring.ts` stays one 849-line file. Four check scripts load
+  it under plain node, which cannot resolve an extensionless relative TS import.
+- **No production build has run.** `pnpm build` fails locally on Node 24 and fails identically
+  on the committed tree. Vercel's staging build is the first real compile for all 34 commits.
+- **No UI change was visually verified.** The Browser pane would not composite frames.
