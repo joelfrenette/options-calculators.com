@@ -455,11 +455,12 @@ recomputes it.
 | P7-79 | P2 | fixed | **The Risk Calculator produced a target and never a measurement.** It took one input — portfolio value — multiplied it by the band percentage, and never asked what the user holds, so it could not say whether they were on it. The cited framework's own ratio is `Free Liquid Cash ÷ Account Value`, where free EXCLUDES collateral pledged against open cash-secured puts, and that exclusion is the whole point: $30k cash against $20k pledged is $10k free — the account reads 30% and the deployable figure is 10%, which against a 15-25% target is the difference between "comfortably on target" and "well under". Two optional inputs added; the tab now shows free cash against the band with the over/under. **A blank field stays NULL rather than becoming 0** — `\|\| 0` would render a confident "badly under" from no data, the audit's third failure shape — and each of the three fields is asserted separately, because one coercion would have made them look identical. Over-commitment reports a NEGATIVE percentage rather than clamping to a calm 0%. 14 assertions, negative-tested by reintroducing `?? 0`. |
 | P7-80 | P2 | fixed | `routeReachesModel` in check-provenance omitted the `app` path segment, so the model-reachability probe had returned false for every route since the rule was written; every AI claim passed via the dialog-embed shortcut alone. Strict-direction, so nothing bad slipped through — it failed the first good file to rely on it, the social-sentiment split. Fixed, negative-tested both ways. |
 | P7-81 | P2 | fixed | Social Sentiment's Tooltips toggle silenced nothing: `ConditionalTooltip` read a local always-true `useState` instead of the toggle — the defect market-sentiment's copy already had fixed in its own split. Shared fixed version promoted to `ui/conditional-tooltip.tsx`, all call sites wired. Dead 34-line `SentimentPill` (never rendered) deleted after `check-dead-components` flagged its extracted file. |
+| P7-82 | P3 | fixed | `lib/remediation.ts` 755 → 124 lines across four modules in `lib/remediation/`. The node-loadability constraint that made P7-67 a wontfix does not bind: relative imports here take explicit `.ts` extensions, which plain node resolves. Proven by running the check script through the split chain — 31/31. The module header's "no imports" purity claim narrowed to "none from outside lib/remediation/", and `routeFile`'s P7-9 "deliberately un-exported" comment rewritten rather than carried across false. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-284 findings recorded · **247 fixed · 9 wontfix · 2 verified-ok · 26 open.**
+285 findings recorded · **248 fixed · 9 wontfix · 2 verified-ok · 26 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -5292,3 +5293,39 @@ which is one more argument for the splits.
 |----|-----|------|---------|
 | P7-80 | P2 | tooling | `routeReachesModel` in check-provenance built its route path without the `app` segment, so the model-reachability probe returned false for every route since the rule was written — every AI claim passed only via the dialog-embed shortcut. Strict-direction failure, so it never admitted a bad file; surfaced the first time a split separated the claim from the dialog. Fixed and negative-tested. |
 | P7-81 | P2 | ANALYZE → Social Sentiment | The tab's Tooltips toggle controlled nothing: its `ConditionalTooltip` read a local always-true state instead of the toggle, the defect market-sentiment's copy had already had fixed. One shared `ui/conditional-tooltip.tsx` now serves both tabs, wired to the toggle. The split also surfaced `SentimentPill`, a 34-line gauge no JSX rendered — deleted. |
+
+## 2026-08-14 — lib/remediation splits, and the wontfix that does not generalise
+
+`lib/remediation.ts` was 755 lines and is now 124: the entry point, the
+`diagnose()` dispatch, and the module header that states the input contract. The four
+extracted modules are `remediation-types.ts` (64), `remediation-providers.ts` (the key
+alias table, provider dashboards, Vercel links and path hints), `remediation-helpers.ts`
+(the seven pure helpers) and `remediation-branches.ts` (453 — one function per classified
+failure mode).
+
+**The constraint that made `lib/ccpi/scoring.ts` wontfix does not apply here, and it was
+tested rather than assumed.** `scripts/check-remediation.ts` loads this module under plain
+`node`, and node cannot resolve an extensionless relative TypeScript import — which is why
+P7-67 left scoring.ts whole. The difference is that P7-67's finding named the fix and then
+declined it for a *different* module: `scoring.ts` is imported by app code through `@/`
+aliases, while remediation's internal imports are relative and can carry explicit `.ts`
+extensions. `allowImportingTsExtensions` makes that legal under `noEmit`, and the
+tsconfig.json note already records that the same pattern built clean on Vercel on
+2026-08-12 for three `lib/ccpi` imports. Verified the only way it can be: `node
+scripts/check-remediation.ts` runs the whole chain and reports **31/31**.
+
+The module's purity claim was tightened rather than restated. Its header said "no imports";
+that is now "no imports from outside `lib/remediation/`", because a claim that is false in
+letter teaches the reader to discount the claim that is true in spirit — it still reads no
+env, does no I/O, and imports nothing that does.
+
+One comment was rewritten rather than moved. `routeFile()` carried a P7-9 note explaining
+that it is deliberately **un-exported**; the split necessarily exports it. Carried across
+verbatim, that comment would have described the file as being in a state the file is not
+in — the P7-77 shape, a header claiming "ONE classification per reading" while two ladders
+sat below it. It now records what P7-9 fixed and why this export is a different case: a
+real importer, not a same-named stranger in another script.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-82 | P3 | tooling | `lib/remediation.ts` 755 → 124 across four modules under `lib/remediation/`. The check script loads it under plain node, which is what made `lib/ccpi/scoring.ts` wontfix (P7-67) — but relative imports here can carry explicit `.ts` extensions, which node resolves and `allowImportingTsExtensions` permits. Tested, not assumed: 31/31 remediation checks pass through the split chain. Purity claim narrowed to the truth, and `routeFile`'s "deliberately un-exported" comment rewritten rather than carried across false. |
