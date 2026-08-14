@@ -3,12 +3,12 @@
  *
  * Run: node scripts/check-buffett-indicator.ts
  *
- * WHY THIS FILE EXISTS (P7-73). `/api/ccpi` scores a Buffett Indicator scraped
- * from GuruFocus, and ScrapingBee is unset in both environments (P7-69), so the
- * scored value has been an LLM's recollection. FRED publishes both halves and
- * the site already reads FRED — but the two halves are in DIFFERENT UNITS
- * (millions vs billions) and the FRED numerator is a DIFFERENT MEASUREMENT
- * (nonfinancial corporate equities, not total market cap).
+ * WHY THIS FILE EXISTS (P7-73, then P7-73a). FRED publishes both halves of a
+ * Buffett Indicator and since the 2026-08-14 owner decision the CCPI scores
+ * this basis through its own recalibrated ladder — but the two halves are in
+ * DIFFERENT UNITS (millions vs billions) and the FRED numerator is a DIFFERENT
+ * MEASUREMENT (nonfinancial corporate equities, not the total market cap the
+ * retired scrape used).
  *
  * Either of those, unnoticed, produces a number that renders and scores. The
  * first is out by 1000×; the second is out by ~34 percentage points and crosses
@@ -17,6 +17,7 @@
  */
 
 import { computeBuffettIndicator, observationGapDays } from "../lib/ccpi/buffett-indicator.ts"
+import { BUFFETT_BANDS, BUFFETT_BASIS, BUFFETT_MAX, scoreBuffett, buffettCanarySeverity } from "../lib/ccpi/buffett-bands.ts"
 
 let failures = 0
 function check(name: string, passed: boolean, detail = ""): void {
@@ -84,23 +85,52 @@ for (const [label, args] of NULL_CASES) {
 
 check(
   "the reading names its basis, so it cannot be mistaken for the scraped figure",
-  real !== null && real.basis === "nonfinancial-corporate-equities",
+  real !== null && real.basis === BUFFETT_BASIS,
   real ? real.basis : "null",
 )
 
 /**
- * The reason this is not wired into scoring, pinned so a future session cannot
- * quietly wire it. The CCPI bands are >200 / >180 / >150 / >120 and were
- * calibrated for the total-market-cap basis; the GuruFocus figure observed on
- * staging the same week read 183.8 and scored 13 of 16. This series reads 218.1
- * and would score 16 — a three-point move that is entirely a change of source.
+ * P7-73a: the FRED basis IS wired into scoring now, through a ladder
+ * recalibrated for this series' own history (>210/>195/>150/>120 — see
+ * lib/ccpi/buffett-bands.ts and CCPI_DESIGN §8b). What stays pinned is the
+ * DIVERGENCE: the two bases still measure different things, and the old
+ * total-market-cap ladder must never be fed this series. The GuruFocus figure
+ * observed on staging the week of the decision read 183.8 — under this ladder
+ * that would be 9 points, under its own retired ladder 13, and this series
+ * reads 218.1 → 16. Any future "simplification" that reunifies the ladders
+ * has to get past these assertions.
  */
 const GURUFOCUS_OBSERVED = 183.8
-const band = (v: number) => (v > 200 ? 16 : v > 180 ? 13 : v > 150 ? 9 : v > 120 ? 5 : 0)
+const OLD_TOTAL_MARKET_BAND = (v: number) => (v > 200 ? 16 : v > 180 ? 13 : v > 150 ? 9 : v > 120 ? 5 : 0)
 check(
-  "the two bases do NOT agree, which is why this one does not score",
-  real !== null && band(real.percent) !== band(GURUFOCUS_OBSERVED),
-  real ? `FRED ${real.percent}% → ${band(real.percent)} pts vs GuruFocus ${GURUFOCUS_OBSERVED}% → ${band(GURUFOCUS_OBSERVED)} pts` : "null",
+  "the recalibrated ladder puts today's FRED reading in the top band",
+  real !== null && scoreBuffett(real.percent) === BUFFETT_MAX,
+  real ? `${real.percent}% → ${scoreBuffett(real.percent)} of ${BUFFETT_MAX}` : "null",
+)
+check(
+  "the two bases still disagree — the scraped figure lands two rungs lower on this ladder",
+  scoreBuffett(GURUFOCUS_OBSERVED) === 9 && OLD_TOTAL_MARKET_BAND(GURUFOCUS_OBSERVED) === 13,
+  `183.8 → ${scoreBuffett(GURUFOCUS_OBSERVED)} pts on the FRED ladder vs ${OLD_TOTAL_MARKET_BAND(GURUFOCUS_OBSERVED)} on the retired one`,
+)
+check(
+  "210 exactly is NOT in the top band — the cutoffs are exclusive",
+  scoreBuffett(210) === 13,
+  `210 → ${scoreBuffett(210)}`,
+)
+check("no reading scores null, never zero", scoreBuffett(null) === null)
+check(
+  "the ladder's cutoffs strictly descend and its top points equal BUFFETT_MAX",
+  BUFFETT_BANDS.every((b, i) => i === 0 || b.above < BUFFETT_BANDS[i - 1].above) &&
+    BUFFETT_BANDS[0].points === BUFFETT_MAX,
+  BUFFETT_BANDS.map((b) => `>${b.above}=${b.points}`).join(" "),
+)
+check(
+  "canary severity agrees with the scoring ladder at both rungs it uses",
+  buffettCanarySeverity(BUFFETT_BANDS[0].above + 1) === "high" &&
+    buffettCanarySeverity(BUFFETT_BANDS[2].above + 1) === "medium" &&
+    buffettCanarySeverity(BUFFETT_BANDS[3].above + 1) === null &&
+    buffettCanarySeverity(null) === null,
+  "high above the top cutoff, medium above the third, nothing below, null in null out",
 )
 
 // ---------------------------------------------------------------- staleness

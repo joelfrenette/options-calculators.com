@@ -33,6 +33,8 @@
  * the weights as an argument keeps PILLAR_WEIGHTS as the single source of
  * truth without duplicating it here.
  */
+import { buffettCanarySeverity } from "./buffett-bands.ts"
+
 export interface PillarPercentages {
   momentum: number
   riskAppetite: number
@@ -329,11 +331,16 @@ export function generateCanarySignals(inputs: CanaryInputs, PILLAR_PCT: PillarPe
     }
   })
 
+  // P7-73a: severity comes from the same ladder that scores the indicator
+  // (lib/ccpi/buffett-bands.ts). Before this, the canary said "significantly
+  // overvalued" above 200 while scoring awarded full marks above 200 and the
+  // middle rungs disagreed (150 vs 180) — two ladders for one number.
   when("Buffett Indicator", [inputs.buffettIndicator], () => {
     const v = inputs.buffettIndicator as number
-    if (v > 200) {
+    const severity = buffettCanarySeverity(v)
+    if (severity === "high") {
       push(`Buffett Indicator at ${v.toFixed(0)}% - Significantly overvalued`, VALUATION, "high", 16, PILLAR_PCT.valuation)
-    } else if (v > 150) {
+    } else if (severity === "medium") {
       push(`Buffett Indicator at ${v.toFixed(0)}% - Above fair value`, VALUATION, "medium", 16, PILLAR_PCT.valuation)
     }
   })

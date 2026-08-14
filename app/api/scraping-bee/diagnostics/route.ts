@@ -35,7 +35,8 @@ export async function GET() {
     environment: process.env.NODE_ENV || 'development',
     apiKeyConfigured: !!apiKey,
     requiredFor: [
-      'Buffett Indicator (Market Cap / GDP)',
+      // Buffett Indicator removed 2026-08-14 (P7-73a): it now comes from FRED
+      // and never touches ScrapingBee.
       'Put/Call Ratio (CBOE)',
       'AAII Sentiment (Bullish/Bearish %)',
       'Short Interest Ratio (SPY)'

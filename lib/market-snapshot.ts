@@ -94,21 +94,13 @@ export const FRED_SERIES: { id: string; cadence: "daily" | "weekly" | "monthly" 
     // computed from FRED — which the site already reads — instead of scraped
     // from GuruFocus through ScrapingBee.
     //
-    // NOT SCORED, and not wired into /api/ccpi. Both IDs were fetched and their
-    // real values read before being added here, and the reason they are not
-    // wired is what that showed: at 2026-01, NCBEILQ027S/1000 ÷ GDP = 218.1%
-    // while the GuruFocus figure the CCPI actually scores read 183.8%. They are
-    // different measurements — NCBEILQ027S is NONFINANCIAL corporate equities,
-    // GuruFocus uses total market cap — and the CCPI's bands (>200 / >180 /
-    // >150 / >120) are calibrated for the second. Feeding the first into them
-    // would move the indicator from 13 points to 16 and look like the market
-    // moving. Scoring it needs the bands recalibrated against THIS series'
-    // history, which is the same "does this indicator earn its weight" question
-    // CCPI_DESIGN.md already has open.
-    //
-    // Stored now regardless, for the reason the Trigger candidates above were:
-    // a quarterly series has to accumulate before any backtest can measure it,
-    // and that lead time starts when the cron does.
+    // SCORED since 2026-08-14 (P7-73a): /api/ccpi reads these two through
+    // lib/ccpi/route/fred-buffett.ts (store first, live FRED second) and scores
+    // the ratio through the basis-correct ladder in lib/ccpi/buffett-bands.ts
+    // (>210 / >195 / >150 / >120, derived from this series' own history —
+    // CCPI_DESIGN §8b). The GuruFocus/ScrapingBee scrape is retired for this
+    // input. The two bases remain different measurements; the check script
+    // pins that the old total-market ladder is never fed this series.
     { id: "NCBEILQ027S", cadence: "quarterly", dailyLimit: 2 }, // nonfinancial corp equities, millions USD
     { id: "GDP", cadence: "quarterly", dailyLimit: 2 }, // nominal GDP, BILLIONS USD — note the unit gap
   ]

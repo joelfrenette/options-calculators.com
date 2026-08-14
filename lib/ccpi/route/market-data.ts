@@ -21,7 +21,8 @@ import {
   getSOXIndex,
   getVIX,
 } from "@/lib/unified-ai-fallback"
-import { scrapeAAIISentiment, scrapeBuffettIndicator, scrapePutCallRatio } from "@/lib/scraping-bee"
+import { scrapeAAIISentiment, scrapePutCallRatio } from "@/lib/scraping-bee"
+import { fetchFredBuffett } from "./fred-buffett"
 import { fetchSpxValuation } from "@/lib/spx-valuation"
 import type { Tier } from "@/lib/ccpi/scoring"
 import { type APIStatusTracker, type TierMaps, aiTier, weakerTier } from "./provenance"
@@ -100,7 +101,10 @@ export async function fetchMarketData() {
     fetchAlphaVantageIndicators(),
     fetchApifyYahooFinanceUtil("SPY"),
     fetchEquityFearGreed(),
-    scrapeBuffettIndicator(),
+    // P7-73a: the Buffett Indicator comes from FRED (store, then live API),
+    // scored through the recalibrated basis-correct ladder in buffett-bands.ts.
+    // The GuruFocus/ScrapingBee scrape is retired for this input.
+    fetchFredBuffett(),
     scrapePutCallRatio(),
     scrapeAAIISentiment(),
     fetchSpxValuation(), // P7-75: free multpl first, FMP only for whatever it misses
@@ -112,10 +116,7 @@ export async function fetchMarketData() {
   const alphaVantageData = results[3].status === "fulfilled" ? results[3].value : null
   const apifyRaw = results[4].status === "fulfilled" ? results[4].value : null
   const fearGreedData = results[5].status === "fulfilled" ? results[5].value : { fearGreed: null, dataSource: "failed" }
-  const buffettData =
-    results[6].status === "fulfilled"
-      ? results[6].value
-      : { ratio: buffettResult.value, status: "baseline" as const }
+  const fredBuffett = results[6].status === "fulfilled" ? results[6].value : null
   const putCallData =
     results[7].status === "fulfilled"
       ? results[7].value
@@ -158,8 +159,10 @@ export async function fetchMarketData() {
     lastUpdated: now(),
   }
   apiStatus.buffett = {
-    live: buffettData.status === "live",
-    source: buffettData.status === "live" ? "ScrapingBee" : buffettResult.source,
+    live: fredBuffett !== null,
+    // The basis is part of the source claim: this is NOT the total-market-cap
+    // figure the site used to scrape, and the label must not let the two blur.
+    source: fredBuffett ? `${fredBuffett.source} (${fredBuffett.reading.basis})` : buffettResult.source,
     lastUpdated: now(),
   }
   apiStatus.putCall = {
@@ -239,7 +242,9 @@ export async function fetchMarketData() {
     valuation: {
       spxPE: spxPETier,
       spxPS: spxPSTier,
-      buffettIndicator: buffettData.status === "live" ? "live" : aiTier(buffettResult.source),
+      // P7-73a: a FRED reading is a measurement — "live". Without one the LLM
+      // recollection still fills the DISPLAY (ai-estimate never scores, P6-34).
+      buffettIndicator: fredBuffett ? "live" : aiTier(buffettResult.source),
       qqqPE: aiTier(qqqPEResult.source),
       mag7Concentration: aiTier(mag7Result.source),
       shillerCAPE: aiTier(shillerCAPEResult.source),
@@ -313,7 +318,7 @@ export async function fetchMarketData() {
     // gpuPricingPremium/aiJobPostingsGrowth were hardcoded constants shipped in
     // the payload with zero consumers — dead fields carrying invented numbers.
 
-    buffettIndicator: buffettData.status === "live" ? buffettData.ratio : buffettResult.value,
+    buffettIndicator: fredBuffett ? fredBuffett.reading.percent : buffettResult.value,
     aaiiBullish: aaiData.status === "live" ? aaiData.bullish : aaiiBullishResult.value,
     // Bearish/spread have NO AI-fallback path — only the (kill-switched)
     // ScrapingBee scrape carries them. When not live they are undefined, and

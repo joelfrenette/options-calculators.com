@@ -13,6 +13,7 @@ import { Info, DollarSign } from "lucide-react"
 import { AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 
 import type { CCPIPillarProvenance } from "@/lib/ccpi/types"
+import { buffettMarkerPercent } from "@/lib/ccpi/buffett-bands"
 import { PillarProvenanceLine, PillarScore } from "@/components/ccpi/pillar-bits"
 
 export function PillarValuation({
@@ -169,7 +170,7 @@ export function PillarValuation({
               {/* Added tooltip to Buffett Indicator */}
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium flex items-center gap-1">
-                  Buffett Indicator (Market Cap / GDP)
+                  Buffett Indicator (Corporate Equities / GDP)
                   {tooltipsEnabled && (
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -177,24 +178,29 @@ export function PillarValuation({
                       </TooltipTrigger>
                       <TooltipContent className="max-w-xs bg-red-50 border-red-200">
                         <p className="font-semibold mb-1">Buffett Indicator</p>
-                        <p className="text-sm">Compares total stock market capitalization to GDP.</p>
+                        <p className="text-sm">
+                          Nonfinancial corporate equities (FRED NCBEILQ027S) relative to GDP. This basis reads higher
+                          than the classic total-market-cap version — the bands below are calibrated to this series'
+                          own 55-year history, not to the classic one.
+                        </p>
                         <ul className="text-sm mt-1 space-y-1">
                           <li>
-                            <strong>{"<"} 120%:</strong> Undervalued, low crash risk
+                            <strong>{"<"} 120%:</strong> Below its historical midpoint, low crash risk
                           </li>
                           <li>
-                            <strong>120-150%:</strong> Fair value, moderate risk
+                            <strong>120-150%:</strong> Around the modern-era median
                           </li>
                           <li>
-                            <strong>150-180%:</strong> Elevated risk
+                            <strong>150-195%:</strong> Elevated — upper quartile of readings since 1995
                           </li>
                           <li>
-                            <strong>{">"} 200%:</strong> Historically signifies market bubbles, extreme crash risk
+                            <strong>{">"} 210%:</strong> Top 5% of all readings since 1995 — extreme
                           </li>
                         </ul>
                         <p className="text-xs mt-2">
-                          <strong>Impact:</strong> A high Buffett Indicator suggests the market is significantly
-                          overvalued relative to the economy's productive capacity
+                          <strong>Record:</strong> above 210% it warned three quarters before the 2022 bear — and gave
+                          no warning before 2000, 2008 or 2020. One episode in four; treat it as a valuation gauge,
+                          not a crash timer.
                         </p>
                       </TooltipContent>
                     </Tooltip>
@@ -207,15 +213,15 @@ export function PillarValuation({
                 <div
                   className="absolute inset-0 bg-gray-200"
                   style={{
-                    marginLeft: `${Math.min(100, Math.max(0, (indicators.buffettIndicator - 80) / 1.6))}%`,
+                    marginLeft: `${buffettMarkerPercent(indicators.buffettIndicator)}%`,
                   }}
                 />
               </div>
               <div className="flex justify-between text-xs text-gray-600">
-                <span>Undervalued: {"<"}120%</span>
-                <span>Fair: 120-150%</span>
-                <span>Warning: 150-180%</span>
-                <span className="text-red-600">Danger: {">"}200%</span>
+                <span>Low: {"<"}120%</span>
+                <span>Median: 120-150%</span>
+                <span>Elevated: 150-195%</span>
+                <span className="text-red-600">Extreme: {">"}210%</span>
               </div>
             </div>
           )}

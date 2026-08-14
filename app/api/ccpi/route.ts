@@ -3,7 +3,6 @@ import { resolveApiKey } from "@/lib/api-keys"
 import { fredLatestFromStore } from "@/lib/fred-store"
 import { fetchVIXTermStructure } from "@/lib/vix-term-structure"
 import { fetchQQQTechnicals as fetchQQQTechnicalsData } from "@/lib/qqq-technicals"
-import { scrapeBuffettIndicator, scrapePutCallRatio, scrapeAAIISentiment } from "@/lib/scraping-bee"
 import { fetchApifyYahooFinance as fetchApifyYahooFinanceUtil } from "@/lib/apify-yahoo-finance"
 import { fetchFMPValuation } from "@/lib/fmp-valuation"
 

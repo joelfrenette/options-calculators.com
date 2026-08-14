@@ -94,7 +94,7 @@ const calmRisk: RiskAppetiteInputs = { putCallRatio: 0.95, fearGreedIndex: 50, a
 const maxRiskValuation: ValuationInputs = {
   spxPE: 35,
   spxPS: 4,
-  buffettIndicator: 210,
+  buffettIndicator: 230, // above the recalibrated top band (>210, P7-73a); 210 itself is NOT in it
   qqqPE: 45,
   mag7Concentration: 70,
   shillerCAPE: 40,

@@ -13,6 +13,14 @@
 // than MIN_SCORED_MAX of a pillar's weight is live, the pillar reports null
 // rather than a number built mostly on air.
 //
+// ONE import, with an explicit `.ts` extension on purpose. This module is
+// loaded by check scripts under plain node, which cannot resolve an
+// EXTENSIONLESS relative TS import (P7-67) but resolves an explicit one fine
+// (P7-82 proved the chain; the tsconfig note records the same pattern building
+// clean on Vercel). The Buffett ladder lives in buffett-bands.ts because four
+// surfaces read it and they must move together (P7-73a).
+import { scoreBuffett } from "./buffett-bands.ts"
+//
 // P6-34 (owner decision, 2026-08-10): ai-estimate stopped scoring. The eleven
 // indicators on the LLM fallback chain are all PUBLISHED figures — the VIX, a
 // share price, the CBOE put/call ratio, ISM PMI. An LLM asked for one of those
@@ -461,14 +469,11 @@ export function computeValuationPillar(d: ValuationInputs, tiers: ValuationTiers
       if (d.spxPS > 2.0) return 4
       return 0
     })(),
-    buffettIndicator: (() => {
-      if (d.buffettIndicator === null) return null // P6-34: no reading, no points
-      if (d.buffettIndicator > 200) return 16 // Danger: >200%
-      if (d.buffettIndicator > 180) return 13
-      if (d.buffettIndicator > 150) return 9
-      if (d.buffettIndicator > 120) return 5
-      return 0
-    })(),
+    // The ladder lives in ./buffett-bands.ts and nowhere else (P7-73a). It was
+    // recalibrated for the FRED nonfinancial-corporate-equities basis, and the
+    // canary severities, the check script and the UI axis read the same file —
+    // a threshold change is half a change until every ladder moves with it.
+    buffettIndicator: scoreBuffett(d.buffettIndicator),
     qqqPE: (() => {
       if (d.qqqPE === null) return null // P6-34: no reading, no points
       if (d.qqqPE > 40) return 16 // Bubble territory
