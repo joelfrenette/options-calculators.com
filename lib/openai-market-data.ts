@@ -66,37 +66,6 @@ Value:`,
   }
 }
 
-export async function fetchShillerCAPEWithOpenAI(): Promise<number | null> {
-  console.log(`[v0] OpenAI: Fetching Shiller CAPE ratio (cyclically adjusted price-to-earnings ratio for S&P 500)...`)
-  return fetchMarketDataWithOpenAI(
-    "Shiller CAPE ratio (cyclically adjusted price-to-earnings ratio for S&P 500)",
-    "Current CAPE ratio value",
-  )
-}
-
-export async function fetchShortInterestWithOpenAI(): Promise<number | null> {
-  console.log(`[v0] OpenAI: Fetching SPY ETF short interest ratio as percentage of float...`)
-  return fetchMarketDataWithOpenAI(
-    "SPY ETF short interest ratio as percentage of float",
-    "Current short interest percentage",
-  )
-}
-
-export async function fetchMag7ConcentrationWithOpenAI(): Promise<number | null> {
-  console.log(
-    `[v0] OpenAI: Fetching Magnificent 7 stocks (AAPL, MSFT, GOOGL, AMZN, NVDA, TSLA, META) market cap as percentage of QQQ ETF...`,
-  )
-  return fetchMarketDataWithOpenAI(
-    "Magnificent 7 stocks (AAPL, MSFT, GOOGL, AMZN, NVDA, TSLA, META) market cap as percentage of QQQ ETF",
-    "Current percentage concentration",
-  )
-}
-
-export async function fetchQQQPEWithOpenAI(): Promise<number | null> {
-  console.log(`[v0] OpenAI: Fetching QQQ ETF forward price-to-earnings ratio...`)
-  return fetchMarketDataWithOpenAI("QQQ ETF forward price-to-earnings ratio", "Current forward P/E ratio")
-}
-
 export async function fetchBuffettIndicatorWithOpenAI(): Promise<number | null> {
   console.log(`[v0] OpenAI: Fetching Buffett Indicator (Market Cap to GDP ratio)...`)
   return fetchMarketDataWithOpenAI("Buffett Indicator (Market Cap to GDP ratio)", "Current percentage")
@@ -125,11 +94,6 @@ export async function fetchNVIDIAPriceWithOpenAI(): Promise<number | null> {
 export async function fetchSOXIndexWithOpenAI(): Promise<number | null> {
   console.log(`[v0] OpenAI: Fetching PHLX Semiconductor Index (SOX)...`)
   return fetchMarketDataWithOpenAI("PHLX Semiconductor Index (SOX)", "Current SOX index level")
-}
-
-export async function fetchISMPMIWithOpenAI(): Promise<number | null> {
-  console.log(`[v0] OpenAI: Fetching ISM Manufacturing PMI...`)
-  return fetchMarketDataWithOpenAI("ISM Manufacturing PMI", "Current ISM PMI value")
 }
 
 // Removed 2026-08-10 (P6-34): the S&P P/E, Fear & Greed and yield-curve

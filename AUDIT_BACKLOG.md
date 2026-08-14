@@ -463,7 +463,7 @@ recomputes it.
 | P7-73a | P2 | fixed | The FRED-basis decision wired: four independent Buffett ladders (scoring >200/180/150/120, canaries >200/150 — already disagreeing at the middle rung, the check script's local copy, and the UI's hardcoded 80-240 axis) became lib/ccpi/buffett-bands.ts, read by all of them with explicit .ts imports the plain-node checks resolve. Data: store-first, live-FRED-fallback, null-excluded; scrape retired for this input; diagnostics and UI copy updated to the real basis. Six assertions pin the ladder and the cross-basis divergence. |
 | P7-87 | P2 | fixed | The TED spread input was a corpse scored as live: FRED discontinued TEDRATE 2022-01-21, the desc/limit-1 fetch returned the terminal observation forever, and it tiered "live" at 13/100 of Macro daily — missing-data guards ask if a value exists, never when it is from, and the store staleness gate had been set to Infinity to accommodate exactly this. Retired: null on both paths, macro renormalises (ceiling 87), stored tail kept. Whether the weight moves to a SOFR-era successor is the owner's call. |
 | P7-88 | P2 | fixed | The CCPI subtitle claimed "AI-led market correction early warning oracle" — false twice: AI cannot move the score (P6-34), and the walk-forward confirmed zero early-warning candidates (§6b). Subtitle corrected; honesty line added under the gauge and PINNED to the §6b verdict heading it quotes (negative-tested both directions); oracle phrase retired. CSP verbs live on the allocation bands (cspAction), one ladder not two. |
-| P7-89 | P1 | fixed | Real data only, executed: the six LLM-only inputs (89/400 pts) and the dead TED spread dropped; per-pillar weights rescaled to exactly 100 (RA 37/30/33 · Val 32/21/29/18 · Macro 21/19/17/15/14/14); SOX measured via Yahoo; buffett ladder points 29 with cutoffs unchanged and table-equality asserted; canaries, payload, provenance, admin audit panels, UI counts, tooltips and five checks moved together. Ceilings 100/79/70 recomputed and pinned; five LLM calls per load removed. Provider-level fetcher corpses remain behind import lines — named follow-up. |
+| P7-89 | P1 | fixed | Real data only, executed: the six LLM-only inputs (89/400 pts) and the dead TED spread dropped; per-pillar weights rescaled to exactly 100 (RA 37/30/33 · Val 32/21/29/18 · Macro 21/19/17/15/14/14); SOX measured via Yahoo; buffett ladder points 29 with cutoffs unchanged and table-equality asserted; canaries, payload, provenance, admin audit panels, UI counts, tooltips and five checks moved together. Ceilings 100/79/70 recomputed and pinned; five LLM calls per load removed. Provider-level fetcher corpses removed the same day: 15 functions (5 each across the OpenAI, Anthropic and Groq provider files) plus their 15 import lines; the shared prompt helpers keep their six surviving callers. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
@@ -5631,8 +5631,9 @@ everything-up **100** (was 81 — the gap WAS the six dead inputs), ScrapingBee-
 retired — against the rescaled tables it can no longer express the defect it documented;
 its record stays in P6-35/P6-76. Five LLM calls per uncached CCPI load are gone with the
 getters (`getShillerCAPE`, `getShortInterest`, `getMag7Concentration`, `getQQQPE`,
-`getISMPMI`); their per-provider fetcher functions survive unreferenced behind import
-lines in `lib/unified-ai-fallback.ts` and are named here as mechanical follow-up.
+`getISMPMI`); their per-provider fetcher functions — 15 across the
+OpenAI, Anthropic and Groq provider files — were removed with their import lines in the
+follow-up commit the same day.
 
 Formulas 1137 → **1128**: the canary and scoring suites lost the assertions that tested
 dropped inputs and gained the rescale's (net −9), and both scope pins moved deliberately

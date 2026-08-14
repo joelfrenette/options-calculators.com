@@ -1,43 +1,28 @@
 import {
-  fetchShillerCAPEWithOpenAI,
-  fetchShortInterestWithOpenAI,
-  fetchMag7ConcentrationWithOpenAI,
-  fetchQQQPEWithOpenAI,
   fetchBuffettIndicatorWithOpenAI,
   fetchPutCallRatioWithOpenAI,
   fetchAAIIBullishWithOpenAI,
   fetchVIXWithOpenAI,
   fetchNVIDIAPriceWithOpenAI,
   fetchSOXIndexWithOpenAI,
-  fetchISMPMIWithOpenAI,
 } from "./openai-market-data"
 
 import {
-  fetchShillerCAPEWithAnthropic,
-  fetchShortInterestWithAnthropic,
-  fetchMag7ConcentrationWithAnthropic,
-  fetchQQQPEWithAnthropic,
   fetchBuffettIndicatorWithAnthropic,
   fetchPutCallRatioWithAnthropic,
   fetchAAIIBullishWithAnthropic,
   fetchVIXWithAnthropic,
   fetchNVIDIAPriceWithAnthropic,
   fetchSOXIndexWithAnthropic,
-  fetchISMPMIWithAnthropic,
 } from "./anthropic-market-data"
 
 import {
-  fetchShillerCAPEWithGroqLLM,
-  fetchShortInterestWithGroqLLM,
-  fetchMag7ConcentrationWithGroqLLM,
-  fetchQQQPEWithGroqLLM,
   fetchBuffettIndicatorWithGroqLLM,
   fetchPutCallRatioWithGroqLLM,
   fetchAAIIBullishWithGroqLLM,
   fetchVIXWithGroqLLM,
   fetchNVIDIAPriceWithGroqLLM,
   fetchSOXIndexWithGroqLLM,
-  fetchISMPMIWithGroqLLM,
 } from "./groq-llm-market-data"
 
 import { fetchMarketDataWithGrok } from "./grok-market-data"

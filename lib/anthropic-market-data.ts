@@ -74,35 +74,6 @@ Value:`,
   }
 }
 
-export async function fetchShillerCAPEWithAnthropic(): Promise<number | null> {
-  console.log(`[v0] Anthropic: Fetching Shiller CAPE ratio...`)
-  return fetchMarketDataWithAnthropic(
-    "Shiller CAPE ratio (cyclically adjusted price-to-earnings ratio for S&P 500)",
-    "Current CAPE ratio value",
-  )
-}
-
-export async function fetchShortInterestWithAnthropic(): Promise<number | null> {
-  console.log(`[v0] Anthropic: Fetching SPY short interest...`)
-  return fetchMarketDataWithAnthropic(
-    "SPY ETF short interest ratio as percentage of float",
-    "Current short interest percentage",
-  )
-}
-
-export async function fetchMag7ConcentrationWithAnthropic(): Promise<number | null> {
-  console.log(`[v0] Anthropic: Fetching Mag7 concentration...`)
-  return fetchMarketDataWithAnthropic(
-    "Magnificent 7 stocks (AAPL, MSFT, GOOGL, AMZN, NVDA, TSLA, META) market cap as percentage of QQQ ETF",
-    "Current percentage concentration",
-  )
-}
-
-export async function fetchQQQPEWithAnthropic(): Promise<number | null> {
-  console.log(`[v0] Anthropic: Fetching QQQ P/E...`)
-  return fetchMarketDataWithAnthropic("QQQ ETF forward price-to-earnings ratio", "Current forward P/E ratio")
-}
-
 export async function fetchBuffettIndicatorWithAnthropic(): Promise<number | null> {
   console.log(`[v0] Anthropic: Fetching Buffett Indicator...`)
   return fetchMarketDataWithAnthropic("Buffett Indicator (Market Cap to GDP ratio)", "Current percentage")
@@ -131,11 +102,6 @@ export async function fetchNVIDIAPriceWithAnthropic(): Promise<number | null> {
 export async function fetchSOXIndexWithAnthropic(): Promise<number | null> {
   console.log(`[v0] Anthropic: Fetching SOX Index...`)
   return fetchMarketDataWithAnthropic("PHLX Semiconductor Index (SOX)", "Current SOX index level")
-}
-
-export async function fetchISMPMIWithAnthropic(): Promise<number | null> {
-  console.log(`[v0] Anthropic: Fetching ISM PMI...`)
-  return fetchMarketDataWithAnthropic("ISM Manufacturing PMI", "Current ISM PMI value")
 }
 
 // Removed 2026-08-10 (P6-34): the S&P P/E, Fear & Greed and yield-curve

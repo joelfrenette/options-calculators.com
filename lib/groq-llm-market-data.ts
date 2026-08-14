@@ -78,35 +78,6 @@ Value:`,
   }
 }
 
-export async function fetchShillerCAPEWithGroqLLM(): Promise<number | null> {
-  console.log(`[v0] Groq LLM: Fetching Shiller CAPE ratio...`)
-  return fetchMarketDataWithGroqLLM(
-    "Shiller CAPE ratio (cyclically adjusted price-to-earnings ratio for S&P 500)",
-    "Current CAPE ratio value",
-  )
-}
-
-export async function fetchShortInterestWithGroqLLM(): Promise<number | null> {
-  console.log(`[v0] Groq LLM: Fetching SPY short interest...`)
-  return fetchMarketDataWithGroqLLM(
-    "SPY ETF short interest ratio as percentage of float",
-    "Current short interest percentage",
-  )
-}
-
-export async function fetchMag7ConcentrationWithGroqLLM(): Promise<number | null> {
-  console.log(`[v0] Groq LLM: Fetching Mag7 concentration...`)
-  return fetchMarketDataWithGroqLLM(
-    "Magnificent 7 stocks (AAPL, MSFT, GOOGL, AMZN, NVDA, TSLA, META) market cap as percentage of QQQ ETF",
-    "Current percentage concentration",
-  )
-}
-
-export async function fetchQQQPEWithGroqLLM(): Promise<number | null> {
-  console.log(`[v0] Groq LLM: Fetching QQQ P/E...`)
-  return fetchMarketDataWithGroqLLM("QQQ ETF forward price-to-earnings ratio", "Current forward P/E ratio")
-}
-
 export async function fetchBuffettIndicatorWithGroqLLM(): Promise<number | null> {
   console.log(`[v0] Groq LLM: Fetching Buffett Indicator...`)
   return fetchMarketDataWithGroqLLM("Buffett Indicator (Market Cap to GDP ratio)", "Current percentage")
@@ -135,11 +106,6 @@ export async function fetchNVIDIAPriceWithGroqLLM(): Promise<number | null> {
 export async function fetchSOXIndexWithGroqLLM(): Promise<number | null> {
   console.log(`[v0] Groq LLM: Fetching SOX Index...`)
   return fetchMarketDataWithGroqLLM("PHLX Semiconductor Index (SOX)", "Current SOX index level")
-}
-
-export async function fetchISMPMIWithGroqLLM(): Promise<number | null> {
-  console.log(`[v0] Groq LLM: Fetching ISM PMI...`)
-  return fetchMarketDataWithGroqLLM("ISM Manufacturing PMI", "Current ISM PMI value")
 }
 
 // Removed 2026-08-10 (P6-34): the S&P P/E, Fear & Greed and yield-curve
