@@ -456,11 +456,13 @@ recomputes it.
 | P7-80 | P2 | fixed | `routeReachesModel` in check-provenance omitted the `app` path segment, so the model-reachability probe had returned false for every route since the rule was written; every AI claim passed via the dialog-embed shortcut alone. Strict-direction, so nothing bad slipped through — it failed the first good file to rely on it, the social-sentiment split. Fixed, negative-tested both ways. |
 | P7-81 | P2 | fixed | Social Sentiment's Tooltips toggle silenced nothing: `ConditionalTooltip` read a local always-true `useState` instead of the toggle — the defect market-sentiment's copy already had fixed in its own split. Shared fixed version promoted to `ui/conditional-tooltip.tsx`, all call sites wired. Dead 34-line `SentimentPill` (never rendered) deleted after `check-dead-components` flagged its extracted file. |
 | P7-82 | P3 | fixed | `lib/remediation.ts` 755 → 124 lines across four modules in `lib/remediation/`. The node-loadability constraint that made P7-67 a wontfix does not bind: relative imports here take explicit `.ts` extensions, which plain node resolves. Proven by running the check script through the split chain — 31/31. The module header's "no imports" purity claim narrowed to "none from outside lib/remediation/", and `routeFile`'s P7-9 "deliberately un-exported" comment rewritten rather than carried across false. |
+| P7-83 | P2 | fixed | The Jobs Report tab said AI in six places — header, summary card, chart title, two series names, hover chip, implications card — over a forecast that is a trend read on FRED series and trading bullets that are hardcoded arrays picked by an if/else. P6-48 retired the header string FROM THIS FILE and the other five, differently worded, passed the same phrase-pinned list. All six corrected to what the code does; two substring pins added to RETIRED and negative-tested in both directions. |
+| P7-84 | P3 | open | check-provenance rule 2 passes any component embedding RunScenarioInAIDialog. That is correct for what it tests and structurally cannot tell "there is an AI dialog here" from "this number is AI-generated" — P7-83 sat green under it. Recorded rather than fixed; attributing a claim to the element it labels is a different rule. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-285 findings recorded · **248 fixed · 9 wontfix · 2 verified-ok · 26 open.**
+287 findings recorded · **249 fixed · 9 wontfix · 2 verified-ok · 27 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -5329,3 +5331,60 @@ real importer, not a same-named stranger in another script.
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-82 | P3 | tooling | `lib/remediation.ts` 755 → 124 across four modules under `lib/remediation/`. The check script loads it under plain node, which is what made `lib/ccpi/scoring.ts` wontfix (P7-67) — but relative imports here can carry explicit `.ts` extensions, which node resolves and `allowImportingTsExtensions` permits. Tested, not assumed: 31/31 remediation checks pass through the split chain. Purity claim narrowed to the truth, and `routeFile`'s "deliberately un-exported" comment rewritten rather than carried across false. |
+
+## 2026-08-14 — the jobs tab said AI six times, and one retirement had caught one of them
+
+`components/jobs-report-dashboard.tsx` was 750 lines and is now 169, across six modules in
+`components/jobs-report/`: the payload type and two formatters, the two tooltip wrappers,
+the forecast summary card, the projection chart, the four indicator cards, the trading
+implications card, and the historical table with its attribution. Verified by the standing
+multiset comparison; the only strings absent from the post-split set are the six corrected
+below.
+
+### P7-83 — a phrase-pinned retirement catches the phrase, not the claim
+
+`/api/jobs-report` imports `NextResponse`, `getApiKey` and `fred-store`. There is no model
+on that path, and `keyFactors` / `tradingImplications` are **hardcoded string arrays chosen
+by an if/else on the trend direction**. The tab nevertheless said AI six times:
+
+| where | string |
+|---|---|
+| tab header | "AI-Powered Employment Forecasts & Analysis" |
+| summary card title | "AI Forecast Summary" |
+| chart title | "UNRATE & U-6 Trend with AI Forecasts" |
+| two chart series | "UNRATE (AI Forecast)", "U-6 (AI Forecast)" |
+| chart hover chip | "AI Forecast" |
+| implications card | "AI Trading Implications" |
+
+**P6-48 retired the first one, from this same file, and the other five went on rendering.**
+They are in `check-provenance`'s RETIRED list, pinned by exact string — and five different
+strings making the same false claim all passed it, in the file the pin was written for. The
+comment P6-48 left behind is still there and still accurate about the route; it simply
+described one line while five more sat below it. That is P7-77's half-a-change shape and
+P6-75's scope shape at once: *a rule scoped to a phrase is scoped to an accident of
+wording.*
+
+Corrected to what the code does — "Trend Forecast Summary", "Projected", "Trend
+projection" — and both the AI-context strings sent to the dialog were changed too, since
+"AI Forecast: UNRATE 4.3%" told the model its own output was the input.
+
+Two entries added to RETIRED, negative-tested by reintroducing each title (both FAIL naming
+the file, both PASS restored). `"AI Forecast"` is deliberately the *substring* shared by
+five of the six, rather than five exact pins: a rule that has to enumerate every wording is
+the rule that just failed.
+
+### P7-84 — why the AI-claim rule could never have caught this
+
+Rule 2 passes any component embedding `RunScenarioInAIDialog`, because the dialog genuinely
+reaches a model. That shortcut is correct for what it tests and cannot distinguish **"there
+is an AI dialog on this tab"** from **"this number was produced by AI"** — and this tab is
+the demonstration: a real dialog beside six false labels, rule green throughout. Recorded
+rather than fixed, because the alternative (attributing each claim to the element it
+labels) is a different rule than the one rule 2 is, and the RETIRED list is where a
+specific false label belongs. Stated here so the next reader does not mistake rule 2's
+PASS for evidence that a tab's numbers are AI-generated.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-83 | P2 | LEARN → Jobs Report | The tab claimed AI six times over a forecast that is deterministic arithmetic on FRED series with hardcoded trading bullets. P6-48 had retired one of the six strings from this very file; the other five used different wordings and passed the same list. All corrected, two substring pins added and negative-tested. |
+| P7-84 | P3 | tooling | check-provenance rule 2 accepts any component embedding the AI dialog, which is right for what it tests and cannot tell an AI dialog from an AI-generated number. Recorded, not fixed: P7-83's six false labels sat beside a genuine dialog with the rule green. |

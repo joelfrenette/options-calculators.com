@@ -286,6 +286,14 @@ const RETIRED: ReadonlyArray<[string, string]> = [
   ["AI Trade Ideas & Adjustments This Week", "P6-46 — static object literal on nine tabs"],
   ["AI Insights: Insider Activity", "P6-42 — the section under it was fabricated"],
   ["AI-Powered Employment Forecasts", "P6-48 — /api/jobs-report imports no model"],
+  // P7-83. P6-48 retired the line above from the SAME TAB and the tab went on
+  // saying AI five more times, in five different strings, every one of them
+  // passing this list. A phrase-pinned rule catches the phrase, not the claim.
+  // "AI Forecast" is the substring shared by the summary card's title, the
+  // chart's title ("...with AI Forecasts"), both dashed series names
+  // ("UNRATE (AI Forecast)") and the hover chip.
+  ["AI Forecast", "P7-83 — the projection is a trend read on FRED series; no model is on that path"],
+  ["AI Trading Implications", "P7-83 — the bullets are hardcoded arrays chosen by an if/else on the trend"],
   ["AI-powered predictions using Fed Funds futures", "P6-45 — no model and no futures"],
   ["Sell cash-secured puts on quality stocks", "P6-47 — the CCPI reads nothing about any ticker"],
 ]
