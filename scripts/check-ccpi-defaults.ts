@@ -54,7 +54,7 @@ const routeSrc = readFileSync(join(ROOT, "app", "api", "ccpi", "route.ts"), "utf
 const weightKeys = [...scoringSrc.matchAll(/\{\s*key:\s*"([A-Za-z0-9]+)"/g)].map((m) => m[1])
 const uniqueKeys = [...new Set(weightKeys)]
 
-const EXPECTED_KEYS = 29
+const EXPECTED_KEYS = 23 // was 29 until P7-89 dropped the six never-live inputs (and P7-87 the dead TED)
 check(
   `scope: ${uniqueKeys.length} scored indicator(s) derived from the WEIGHTS tables`,
   uniqueKeys.length === EXPECTED_KEYS,

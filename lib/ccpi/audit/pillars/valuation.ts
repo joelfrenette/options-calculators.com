@@ -20,9 +20,9 @@ export const buildValuationPillar = (ccpi: any, prov: any): PillarAudit => {
     excluded: Array.isArray(p.excluded) ? p.excluded : [],
     formula: "Valuation = (Raw Points / Scored Weight) × 100, renormalized over live/AI-backed indicators",
     calculation:
-      "7 indicators with maxima summing to 100: S&P P/E (18), S&P P/S (12), Buffett Indicator (16), QQQ P/E (16), Mag7 Concentration (15), Shiller CAPE (13), Equity Risk Premium (10).",
+      "4 indicators with maxima summing to 100: S&P P/E (32), S&P P/S (21), Buffett Indicator (29), Equity Risk Premium (18). QQQ P/E, Mag7 Concentration and Shiller CAPE were dropped by P7-89 — LLM-only inputs that could never score.",
     executiveSummary:
-      "Valuation pillar identifies bubble conditions and structural fragility. High P/E ratios, extreme concentration in Mag7, and negative equity risk premiums signal overvalued markets vulnerable to sharp corrections.",
+      "Valuation pillar identifies bubble conditions and structural fragility. High earnings and sales multiples, an extreme Buffett reading and a thin equity risk premium signal overvalued markets vulnerable to sharp corrections.",
     validation: band(ccpi.pillars?.valuation, "🔴 BUBBLE TERRITORY", "🟡 OVERVALUED", "🟢 REASONABLE"),
     indicators: [
       {
@@ -60,92 +60,22 @@ export const buildValuationPillar = (ccpi: any, prov: any): PillarAudit => {
         },
       },
       {
-        name: "Buffett Indicator (Market Cap / GDP)",
-        formula: "Total Market Valuation = Wilshire 5000 Market Cap / US GDP × 100",
+        name: "Buffett Indicator (Corporate Equities / GDP)",
+        formula: "NCBEILQ027S (nonfinancial corporate equities, FRED) / GDP × 100 — see lib/ccpi/buffett-indicator.ts",
         executiveSummary:
-          "Warren Buffett's favorite metric. Above 120% is fairly valued; above 150% is overvalued; above 200% is bubble territory.",
+          "The FRED basis adopted by P7-73a. Bands are percentile-matched to this series' own 55-year history (lib/ccpi/buffett-bands.ts), not to the retired total-market-cap scrape — the two bases are not interchangeable at a fixed threshold.",
         currentValue: fx(i.buffettIndicator, 0, { suffix: "%" }),
         ranges: {
-          safe: "Below 100% (undervalued)",
-          warning: "100-150% (fairly valued)",
-          danger: "Above 150% (overvalued), >180% (bubble)",
+          safe: "Below 120% (under the modern-era median)",
+          warning: "120-195% (median to ~p90)",
+          danger: "Above 195% (~p90), >210% (top 5% of readings since 1995)",
         },
-        dataSources: src(prov, "valuation", "buffettIndicator", "ScrapingBee scrape", [
-          "AI fallback chain (lib/unified-ai-fallback.ts)",
+        dataSources: src(prov, "valuation", "buffettIndicator", "FRED (store-first, live fallback)", [
+          "AI fallback chain (display only — ai-estimate never scores)",
         ]),
         canaryThresholds: {
           medium: ">150%",
-          high: ">180% (significantly overvalued)",
-        },
-      },
-      {
-        name: "QQQ Forward P/E (AI-Specific Valuation)",
-        formula: "Tech Valuation = QQQ Price / Weighted Average Forward Earnings",
-        executiveSummary:
-          "QQQ P/E above 30 indicates AI/tech bubble; above 40 signals extreme speculation. More sensitive than S&P 500.",
-        currentValue: fx(i.qqqPE, 1),
-        ranges: {
-          safe: "Below 25",
-          warning: "25-35",
-          danger: "Above 35 (bubble if >40)",
-        },
-        dataSources: src(
-          prov,
-          "valuation",
-          "qqqPE",
-          "AI fallback chain (lib/unified-ai-fallback.ts) — no live provider is wired for QQQ P/E",
-          [],
-        ),
-        canaryThresholds: {
-          medium: ">30",
-          high: ">40 (AI bubble territory)",
-        },
-      },
-      {
-        name: "Magnificent 7 Concentration (Crash Contagion Risk)",
-        formula:
-          "Top-Heavy Risk = (AAPL + MSFT + GOOGL + AMZN + NVDA + META + TSLA Market Cap) / Total QQQ Market Cap × 100",
-        executiveSummary:
-          "Extreme concentration amplifies crash risk. If Mag7 falls, entire index collapses. Above 60% is dangerous top-heaviness.",
-        currentValue: fx(i.mag7Concentration, 1, { suffix: "%" }),
-        ranges: {
-          safe: "Below 45% (diversified)",
-          warning: "45-55%",
-          danger: "Above 55% (concentrated), >60% (extreme)",
-        },
-        dataSources: src(
-          prov,
-          "valuation",
-          "mag7Concentration",
-          "AI fallback chain (lib/unified-ai-fallback.ts) — no live provider is wired for Mag7 weight",
-          [],
-        ),
-        canaryThresholds: {
-          medium: ">50%",
-          high: ">60% (severe concentration risk)",
-        },
-      },
-      {
-        name: "Shiller CAPE Ratio (10-Year Cyclical Valuation)",
-        formula: "Cyclically-Adjusted P/E = Price / 10-Year Average Inflation-Adjusted Earnings",
-        executiveSummary:
-          "CAPE above 30 has historically preceded major market declines. Smooths earnings volatility for long-term valuation view.",
-        currentValue: fx(i.shillerCAPE, 1),
-        ranges: {
-          safe: "Below 20 (historical average ~16)",
-          warning: "20-30",
-          danger: "Above 30 (overvalued), >35 (extreme)",
-        },
-        dataSources: src(
-          prov,
-          "valuation",
-          "shillerCAPE",
-          "AI fallback chain (lib/unified-ai-fallback.ts) — no live provider is wired for CAPE",
-          [],
-        ),
-        canaryThresholds: {
-          medium: ">28",
-          high: ">35 (historic overvaluation)",
+          high: ">210% (top band of the recalibrated ladder)",
         },
       },
       {

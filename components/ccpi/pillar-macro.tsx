@@ -33,7 +33,7 @@ export function PillarMacro({
           <div className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-purple-600" />
             <span className="text-lg font-semibold">Pillar 4 - Macro</span>
-            <span className="text-sm text-gray-600">Weight: 20% | 8 indicators</span>
+            <span className="text-sm text-gray-600">Weight: 20% | 6 indicators</span>
           </div>
           <PillarScore score={score} />
         </div>
@@ -48,61 +48,6 @@ export function PillarMacro({
             </p>
           )}
           {/* TED Spread */}
-          {indicators.tedSpread != null && (
-            <div className="space-y-2">
-              {/* Added tooltip to TED Spread indicator */}
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium flex items-center gap-1">
-                  TED Spread (Banking System Stress)
-                  {tooltipsEnabled && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs bg-orange-50 border-orange-200">
-                        <p className="font-semibold mb-1">TED Spread</p>
-                        <p className="text-sm">
-                          Difference between US Dollar LIBOR and US Treasury yields, indicating credit market
-                          stress.
-                        </p>
-                        <ul className="text-sm mt-1 space-y-1">
-                          <li>
-                            <strong>{"<"} 0.35%:</strong> Low stress, stable banking
-                          </li>
-                          <li>
-                            <strong>0.5-0.75%:</strong> Rising stress, caution needed
-                          </li>
-                          <li>
-                            <strong>{">"} 1.0%:</strong> High stress, impending crisis
-                          </li>
-                        </ul>
-                        <p className="text-xs mt-2">
-                          <strong>Impact:</strong> Widening TED spread signals increasing fear of bank defaults
-                          and credit crunch
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  )}
-                </span>
-                <span className="font-bold">{indicators.tedSpread.toFixed(2)}%</span>
-              </div>
-              <div className="relative w-full h-3 rounded-full overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                <div
-                  className="absolute inset-0 bg-gray-200"
-                  style={{
-                    marginLeft: `${Math.min(100, (indicators.tedSpread / 1.5) * 100)}%`,
-                  }}
-                />
-              </div>
-              <div className="flex justify-between text-xs text-gray-600">
-                <span>Normal: {"<"}0.35%</span>
-                <span>Warning: 0.5-0.75%</span>
-                <span>Crisis: {">"}1.0%</span>
-              </div>
-            </div>
-          )}
-
           {/* US Dollar Index (DXY) */}
           {indicators.dxyIndex != null && (
             <div className="space-y-2">
@@ -157,58 +102,6 @@ export function PillarMacro({
           )}
 
           {/* ISM Manufacturing PMI */}
-          {indicators.ismPMI != null && (
-            <div className="space-y-2">
-              {/* Added tooltip to ISM Manufacturing PMI */}
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium flex items-center gap-1">
-                  ISM Manufacturing PMI (Economic Leading)
-                  {tooltipsEnabled && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs bg-gray-50 border-gray-200">
-                        <p className="font-semibold mb-1">ISM Manufacturing PMI</p>
-                        <p className="text-sm">Purchasing Managers' Index for the manufacturing sector.</p>
-                        <ul className="text-sm mt-1 space-y-1">
-                          <li>
-                            <strong>{">"} 52:</strong> Expansion, positive economic signal
-                          </li>
-                          <li>
-                            <strong>50-52:</strong> Slowing growth
-                          </li>
-                          <li>
-                            <strong>{"<"} 50:</strong> Contraction, recessionary signal
-                          </li>
-                        </ul>
-                        <p className="text-xs mt-2">
-                          <strong>Impact:</strong> A PMI below 50 often indicates weakening demand and potential
-                          economic slowdown
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  )}
-                </span>
-                <span className="font-bold">{indicators.ismPMI.toFixed(1)}</span>
-              </div>
-              <div className="relative w-full h-3 rounded-full overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
-                <div
-                  className="absolute inset-0 bg-gray-200"
-                  style={{
-                    marginLeft: `${Math.min(100, Math.max(0, 100 - ((indicators.ismPMI - 40) / 20) * 100))}%`,
-                  }}
-                />
-              </div>
-              <div className="flex justify-between text-xs text-gray-600">
-                <span>Expansion: {">"}52</span>
-                <span>Neutral: 50</span>
-                <span>Contraction: {"<"}50</span>
-              </div>
-            </div>
-          )}
-
           {/* Fed Funds Rate */}
           {indicators.fedFundsRate != null && (
             <div className="space-y-2">

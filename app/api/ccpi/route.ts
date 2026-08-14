@@ -28,19 +28,6 @@ import {
   type Regime,
 } from "@/lib/ccpi/scoring"
 
-import {
-  getShillerCAPE,
-  getShortInterest,
-  getMag7Concentration,
-  getQQQPE,
-  getBuffettIndicator,
-  getPutCallRatio,
-  getAAIIBullish,
-  getVIX,
-  getNVIDIAPrice,
-  getSOXIndex,
-  getISMPMI,
-} from "@/lib/unified-ai-fallback"
 
 
 // P6-13. This route was 990 lines. Its body is now `lib/ccpi/route/`:
@@ -165,23 +152,17 @@ export async function GET() {
       // Already nullable at source (P6-18) — no tier gate needed.
       fearGreedIndex: data.fearGreedIndex,
       aaiiBullish: measured(data.aaiiBullish, rt.aaiiBullish),
-      shortInterest: measured(data.shortInterest, rt.shortInterest),
       // Informational, outside the tier system; undefined means not fetched.
       etfFlows: data.etfFlows ?? null,
       spxPE: measured(data.spxPE, vt.spxPE),
       spxPS: measured(data.spxPS, vt.spxPS),
       buffettIndicator: measured(data.buffettIndicator, vt.buffettIndicator),
-      qqqPE: measured(data.qqqPE, vt.qqqPE),
-      mag7Concentration: measured(data.mag7Concentration, vt.mag7Concentration),
-      shillerCAPE: measured(data.shillerCAPE, vt.shillerCAPE),
       equityRiskPremium: measured(data.equityRiskPremium, vt.equityRiskPremium),
       fedFundsRate: measured(data.fedFundsRate, kt.fedFundsRate),
       junkSpread: measured(data.junkSpread, kt.junkSpread),
       debtToGDP: measured(data.debtToGDP, kt.debtToGDP),
       yieldCurve: measured(data.yieldCurve, kt.yieldCurve),
-      tedSpread: measured(data.tedSpread, kt.tedSpread),
       dxyIndex: measured(data.dxyIndex, kt.dxyIndex),
-      ismPMI: measured(data.ismPMI, kt.ismPMI),
       fedReverseRepo: measured(data.fedReverseRepo, kt.fedReverseRepo),
     }, PILLAR_PCT)
     console.log(
@@ -263,7 +244,6 @@ export async function GET() {
         putCallRatio: data.putCallRatio,
         fearGreedIndex: data.fearGreedIndex,
         etfFlows: data.etfFlows,
-        shortInterest: data.shortInterest,
         aaiiBullish: data.aaiiBullish,
         aaiiBearish: data.aaiiBearish,
         aaiiSpread: data.aaiiSpread,
@@ -272,15 +252,10 @@ export async function GET() {
         nvidiaPrice: data.nvidiaPrice,
         nvidiaMomentum: data.nvidiaMomentum,
         soxIndex: data.soxIndex,
-        tedSpread: data.tedSpread,
         dxyIndex: data.dxyIndex,
-        ismPMI: data.ismPMI,
         fedReverseRepo: data.fedReverseRepo,
 
         // Phase 2 indicators
-        qqqPE: data.qqqPE,
-        mag7Concentration: data.mag7Concentration,
-        shillerCAPE: data.shillerCAPE,
         equityRiskPremium: data.equityRiskPremium,
       },
       canaries,

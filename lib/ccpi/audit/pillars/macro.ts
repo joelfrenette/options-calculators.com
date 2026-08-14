@@ -20,28 +20,11 @@ export const buildMacroPillar = (ccpi: any, prov: any): PillarAudit => {
     excluded: Array.isArray(p.excluded) ? p.excluded : [],
     formula: "Macro = (Raw Points / Scored Weight) × 100, renormalized over live/AI-backed indicators",
     calculation:
-      "8 indicators with maxima summing to 100: TED Spread (13), DXY Dollar Index (12), ISM PMI (15), Fed Funds Rate (15), Fed Reverse Repo (11), Junk Bond Spread (10), US Debt-to-GDP (10), Yield Curve (14). The 10Y-2Y yield curve is scored once, here — its former duplicates in Pillars 1 and 2 and the crash-amplifier bonus were removed.",
+      "6 indicators with maxima summing to 100: DXY Dollar Index (17), Fed Funds Rate (21), Fed Reverse Repo (15), Junk Bond Spread (14), US Debt-to-GDP (14), Yield Curve (19). TED Spread (13) was retired by P7-87 — FRED discontinued the series in 2022 — and ISM PMI (15) was dropped by P7-89 as LLM-only. The 10Y-2Y yield curve is scored once, here — its former duplicates in Pillars 1 and 2 and the crash-amplifier bonus were removed.",
     executiveSummary:
-      "Macro pillar captures systemic economic and financial conditions. Banking stress (TED spread), policy tightness (Fed funds), and credit stress (junk spreads) signal macro headwinds that can trigger crashes.",
+      "Macro pillar captures systemic economic and financial conditions. Policy tightness (Fed funds), credit stress (junk spreads) and curve inversion signal macro headwinds that can trigger crashes.",
     validation: band(ccpi.pillars?.macro, "🔴 MACRO CRISIS", "🟡 RESTRICTIVE", "🟢 STABLE"),
     indicators: [
-      {
-        name: "TED Spread (Banking System Stress)",
-        formula: "Credit Risk = 3-Month LIBOR - 3-Month Treasury Yield",
-        executiveSummary:
-          "TED spread above 0.5% signals banking sector stress; above 1.0% indicates credit crisis. 2008 crisis saw TED > 4%.",
-        currentValue: fx(i.tedSpread, 2, { suffix: "%" }),
-        ranges: {
-          safe: "Below 0.35% (healthy credit markets)",
-          warning: "0.35-0.75%",
-          danger: "Above 0.75% (stress), >1.0% (crisis)",
-        },
-        dataSources: src(prov, "macro", "tedSpread", FRED, []),
-        canaryThresholds: {
-          medium: ">0.50%",
-          high: ">1.0% (banking crisis signal)",
-        },
-      },
       {
         name: "US Dollar Index (DXY) - Tech Headwind",
         formula: "Dollar Strength = Weighted basket vs EUR, JPY, GBP, CAD, SEK, CHF",
@@ -57,29 +40,6 @@ export const buildMacroPillar = (ccpi: any, prov: any): PillarAudit => {
         canaryThresholds: {
           medium: ">105",
           high: ">110 (extreme dollar strength)",
-        },
-      },
-      {
-        name: "ISM Manufacturing PMI (Economic Leading)",
-        formula: "Factory Health = Survey of purchasing managers (>50 = expansion, <50 = contraction)",
-        executiveSummary:
-          "PMI below 50 indicates manufacturing contraction; below 45 signals recession risk. Leading indicator for GDP.",
-        currentValue: fx(i.ismPMI, 1),
-        ranges: {
-          safe: "Above 52 (expansion)",
-          warning: "50-52 (neutral)",
-          danger: "Below 50 (contraction), <45 (recession)",
-        },
-        dataSources: src(
-          prov,
-          "macro",
-          "ismPMI",
-          "AI fallback chain (lib/unified-ai-fallback.ts) — no live provider is wired for ISM",
-          [],
-        ),
-        canaryThresholds: {
-          medium: "<50 (contraction)",
-          high: "<46 (deep contraction)",
         },
       },
       {

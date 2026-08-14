@@ -19,7 +19,7 @@
 // (P7-82 proved the chain; the tsconfig note records the same pattern building
 // clean on Vercel). The Buffett ladder lives in buffett-bands.ts because four
 // surfaces read it and they must move together (P7-73a).
-import { scoreBuffett } from "./buffett-bands.ts"
+import { scoreBuffett, BUFFETT_MAX } from "./buffett-bands.ts"
 //
 // P6-34 (owner decision, 2026-08-10): ai-estimate stopped scoring. The eleven
 // indicators on the LLM fallback chain are all PUBLISHED figures — the VIX, a
@@ -124,59 +124,56 @@ export const MOMENTUM_WEIGHTS: ReadonlyArray<WeightEntry<MomentumKey>> = [
   { key: "vixTermStructure", max: 9 },
 ]
 
-export type RiskAppetiteKey = "putCallRatio" | "fearGreedIndex" | "aaiiBullish" | "shortInterest"
+export type RiskAppetiteKey = "putCallRatio" | "fearGreedIndex" | "aaiiBullish"
 
 // Was: 18,15,16,13,(atr 5),(ltv 5),(bullishPercent 5),(yieldCurve 8) — summed to 85.
 // Removed the four unsourced/duplicate entries; remaining 62 rescaled ×100/62.
+// P7-89 executed the P6-35 decision: shortInterest (21) dropped — its only
+// source was an LLM, so it could never score; carrying the weight just lowered
+// the certainty ceiling. Survivors rescaled x100/79.
 export const RISK_APPETITE_WEIGHTS: ReadonlyArray<WeightEntry<RiskAppetiteKey>> = [
-  { key: "putCallRatio", max: 29 },
-  { key: "fearGreedIndex", max: 24 },
-  { key: "aaiiBullish", max: 26 },
-  { key: "shortInterest", max: 21 },
+  { key: "putCallRatio", max: 37 },
+  { key: "fearGreedIndex", max: 30 },
+  { key: "aaiiBullish", max: 33 },
 ]
 
 export type ValuationKey =
   | "spxPE"
   | "spxPS"
   | "buffettIndicator"
-  | "qqqPE"
-  | "mag7Concentration"
-  | "shillerCAPE"
   | "equityRiskPremium"
 
-// Unchanged — already summed to 100.
+// P7-89 executed the P6-35 decision: qqqPE (16), mag7Concentration (15) and
+// shillerCAPE (13) dropped — LLM-only, never scored. Survivors rescaled
+// x100/56. Mag-7 concentration returns as a measured DISPLAY series when its
+// own bands can be derived from history (see the CCPI audit report §5); it
+// does not re-enter the weights by intuition.
 export const VALUATION_WEIGHTS: ReadonlyArray<WeightEntry<ValuationKey>> = [
-  { key: "spxPE", max: 18 },
-  { key: "spxPS", max: 12 },
-  { key: "buffettIndicator", max: 16 },
-  { key: "qqqPE", max: 16 },
-  { key: "mag7Concentration", max: 15 },
-  { key: "shillerCAPE", max: 13 },
-  { key: "equityRiskPremium", max: 10 },
+  { key: "spxPE", max: 32 },
+  { key: "spxPS", max: 21 },
+  { key: "buffettIndicator", max: BUFFETT_MAX },
+  { key: "equityRiskPremium", max: 18 },
 ]
 
 export type MacroKey =
-  | "tedSpread"
   | "dxyIndex"
-  | "ismPMI"
   | "fedFundsRate"
   | "fedReverseRepo"
   | "junkSpread"
   | "debtToGDP"
   | "yieldCurve"
 
-// Yield curve joins its natural home at max 14 (P3-13); the previous seven
-// (15,14,18,17,13,12,11 = 100) rescaled ×86/100 with debtToGDP taking the
-// rounding remainder so the pillar still sums to exactly 100.
+// P7-89 executed the P6-35 decision plus P7-87's retirement: ismPMI (15) was
+// LLM-only and never scored; tedSpread (13) is a series FRED discontinued in
+// 2022 whose terminal value had been scoring as live. Survivors rescaled
+// x100/72.
 export const MACRO_WEIGHTS: ReadonlyArray<WeightEntry<MacroKey>> = [
-  { key: "tedSpread", max: 13 },
-  { key: "dxyIndex", max: 12 },
-  { key: "ismPMI", max: 15 },
-  { key: "fedFundsRate", max: 15 },
-  { key: "fedReverseRepo", max: 11 },
-  { key: "junkSpread", max: 10 },
-  { key: "debtToGDP", max: 10 },
-  { key: "yieldCurve", max: 14 },
+  { key: "dxyIndex", max: 17 },
+  { key: "fedFundsRate", max: 21 },
+  { key: "fedReverseRepo", max: 15 },
+  { key: "junkSpread", max: 14 },
+  { key: "debtToGDP", max: 14 },
+  { key: "yieldCurve", max: 19 },
 ]
 
 function assertSumsTo100(name: string, weights: ReadonlyArray<WeightEntry>): void {
@@ -383,7 +380,6 @@ export interface RiskAppetiteInputs {
   /** CNN equity Fear & Greed 0-100; null when the source is unavailable */
   fearGreedIndex: number | null
   aaiiBullish: number | null // null when no source produced a reading (P6-34)
-  shortInterest: number | null // null when no source produced a reading (P6-34)
 }
 
 export type RiskAppetiteTiers = Record<RiskAppetiteKey, Tier>
@@ -392,11 +388,11 @@ export function computeRiskAppetitePillar(d: RiskAppetiteInputs, tiers: RiskAppe
   const points: Record<RiskAppetiteKey, number | null> = {
     putCallRatio: (() => {
       if (d.putCallRatio === null) return null // P6-34: no reading, no points
-      if (d.putCallRatio < 0.6) return 29 // Extreme complacency
-      if (d.putCallRatio < 0.7) return 22
-      if (d.putCallRatio < 0.9) return 16
-      if (d.putCallRatio > 1.3) return 13 // Extreme fear (contrarian)
-      if (d.putCallRatio > 1.1) return 6
+      if (d.putCallRatio < 0.6) return 37 // Extreme complacency
+      if (d.putCallRatio < 0.7) return 28
+      if (d.putCallRatio < 0.9) return 20
+      if (d.putCallRatio > 1.3) return 17 // Extreme fear (contrarian)
+      if (d.putCallRatio > 1.1) return 8
       return 0
     })(),
     // null ⇒ excluded AND renormalized (the old code excluded without
@@ -406,29 +402,20 @@ export function computeRiskAppetitePillar(d: RiskAppetiteInputs, tiers: RiskAppe
         ? null
         : (() => {
             const fg = d.fearGreedIndex
-            if (fg > 80) return 24 // Extreme greed
-            if (fg > 70) return 19
-            if (fg > 60) return 13
-            if (fg < 20) return 13 // Extreme fear (contrarian)
-            if (fg < 30) return 6
+            if (fg > 80) return 30 // Extreme greed
+            if (fg > 70) return 24
+            if (fg > 60) return 16
+            if (fg < 20) return 16 // Extreme fear (contrarian)
+            if (fg < 30) return 8
             return 0
           })(),
     aaiiBullish: (() => {
       if (d.aaiiBullish === null) return null // P6-34: no reading, no points
-      if (d.aaiiBullish > 55) return 26 // Retail euphoria
-      if (d.aaiiBullish > 50) return 19
-      if (d.aaiiBullish > 45) return 13
-      if (d.aaiiBullish < 25) return 10 // Extreme pessimism (contrarian)
-      if (d.aaiiBullish < 30) return 5
-      return 0
-    })(),
-    shortInterest: (() => {
-      if (d.shortInterest === null) return null // P6-34: no reading, no points
-      if (d.shortInterest < 1.5) return 21 // Extreme complacency
-      if (d.shortInterest < 2.0) return 16
-      if (d.shortInterest < 3.0) return 10
-      if (d.shortInterest > 8.0) return 13 // Crowded shorts (contrarian)
-      if (d.shortInterest > 6.0) return 6
+      if (d.aaiiBullish > 55) return 33 // Retail euphoria
+      if (d.aaiiBullish > 50) return 24
+      if (d.aaiiBullish > 45) return 16
+      if (d.aaiiBullish < 25) return 13 // Extreme pessimism (contrarian)
+      if (d.aaiiBullish < 30) return 6
       return 0
     })(),
   }
@@ -443,9 +430,6 @@ export interface ValuationInputs {
   spxPE: number | null // null when no source produced a reading (P7-17)
   spxPS: number | null // null when no source produced a reading (P7-17)
   buffettIndicator: number | null // null when no source produced a reading (P6-34)
-  qqqPE: number | null // null when no source produced a reading (P6-34)
-  mag7Concentration: number | null // null when no source produced a reading (P6-34)
-  shillerCAPE: number | null // null when no source produced a reading (P6-34)
   equityRiskPremium: number | null // null when no source produced a reading (P7-17)
 }
 
@@ -455,18 +439,18 @@ export function computeValuationPillar(d: ValuationInputs, tiers: ValuationTiers
   const points: Record<ValuationKey, number | null> = {
     spxPE: (() => {
       if (d.spxPE === null) return null // P7-17: no reading, no points
-      if (d.spxPE > 30) return 18 // Extreme overvaluation
-      if (d.spxPE > 25) return 14
-      if (d.spxPE > 22) return 10
-      if (d.spxPE > 18) return 6
-      return 2
+      if (d.spxPE > 30) return 32 // Extreme overvaluation
+      if (d.spxPE > 25) return 25
+      if (d.spxPE > 22) return 18
+      if (d.spxPE > 18) return 11
+      return 4
     })(),
     spxPS: (() => {
       if (d.spxPS === null) return null // P7-17: no reading, no points
-      if (d.spxPS > 3.5) return 12
-      if (d.spxPS > 3.0) return 10
-      if (d.spxPS > 2.5) return 7
-      if (d.spxPS > 2.0) return 4
+      if (d.spxPS > 3.5) return 21
+      if (d.spxPS > 3.0) return 17
+      if (d.spxPS > 2.5) return 12
+      if (d.spxPS > 2.0) return 7
       return 0
     })(),
     // The ladder lives in ./buffett-bands.ts and nowhere else (P7-73a). It was
@@ -474,37 +458,12 @@ export function computeValuationPillar(d: ValuationInputs, tiers: ValuationTiers
     // canary severities, the check script and the UI axis read the same file —
     // a threshold change is half a change until every ladder moves with it.
     buffettIndicator: scoreBuffett(d.buffettIndicator),
-    qqqPE: (() => {
-      if (d.qqqPE === null) return null // P6-34: no reading, no points
-      if (d.qqqPE > 40) return 16 // Bubble territory
-      if (d.qqqPE > 35) return 13
-      if (d.qqqPE > 30) return 10
-      if (d.qqqPE > 25) return 6
-      return 2
-    })(),
-    mag7Concentration: (() => {
-      if (d.mag7Concentration === null) return null // P6-34: no reading, no points
-      if (d.mag7Concentration > 65) return 15 // Extreme concentration
-      if (d.mag7Concentration > 60) return 12
-      if (d.mag7Concentration > 55) return 9
-      if (d.mag7Concentration > 50) return 6
-      if (d.mag7Concentration > 45) return 3
-      return 0
-    })(),
-    shillerCAPE: (() => {
-      if (d.shillerCAPE === null) return null // P6-34: no reading, no points
-      if (d.shillerCAPE > 35) return 13 // Historic overvaluation
-      if (d.shillerCAPE > 30) return 10
-      if (d.shillerCAPE > 25) return 7
-      if (d.shillerCAPE > 20) return 4
-      return 0
-    })(),
     equityRiskPremium: (() => {
       if (d.equityRiskPremium === null) return null // P7-17: no reading, no points
-      if (d.equityRiskPremium < 1.5) return 10 // Severely overpriced vs bonds
-      if (d.equityRiskPremium < 2.0) return 8
-      if (d.equityRiskPremium < 3.0) return 5
-      if (d.equityRiskPremium < 4.0) return 2
+      if (d.equityRiskPremium < 1.5) return 18 // Severely overpriced vs bonds
+      if (d.equityRiskPremium < 2.0) return 14
+      if (d.equityRiskPremium < 3.0) return 9
+      if (d.equityRiskPremium < 4.0) return 4
       return 0
     })(),
   }
@@ -516,9 +475,7 @@ export function computeValuationPillar(d: ValuationInputs, tiers: ValuationTiers
 // ---------------------------------------------------------------------------
 
 export interface MacroInputs {
-  tedSpread: number | null // null when no source produced a reading (P7-17)
   dxyIndex: number | null // null when no source produced a reading (P7-17)
-  ismPMI: number | null // null when no source produced a reading (P6-34)
   fedFundsRate: number | null // null when no source produced a reading (P7-17)
   fedReverseRepo: number | null // null when no source produced a reading (P7-17)
   junkSpread: number | null // null when no source produced a reading (P7-17)
@@ -531,71 +488,55 @@ export type MacroTiers = Record<MacroKey, Tier>
 
 export function computeMacroPillar(d: MacroInputs, tiers: MacroTiers): PillarResult {
   const points: Record<MacroKey, number | null> = {
-    tedSpread: (() => {
-      if (d.tedSpread === null) return null // P7-17: no reading, no points
-      if (d.tedSpread > 1.0) return 13 // Extreme banking stress
-      if (d.tedSpread > 0.75) return 10
-      if (d.tedSpread > 0.5) return 8
-      if (d.tedSpread > 0.35) return 4
-      return 0
-    })(),
     dxyIndex: (() => {
       if (d.dxyIndex === null) return null // P7-17: no reading, no points
-      if (d.dxyIndex > 115) return 12 // Very strong dollar hurts tech
-      if (d.dxyIndex > 110) return 9
-      if (d.dxyIndex > 105) return 6
-      if (d.dxyIndex > 100) return 3
-      return 0
-    })(),
-    ismPMI: (() => {
-      if (d.ismPMI === null) return null // P6-34: no reading, no points
-      if (d.ismPMI < 42) return 15 // Deep contraction
-      if (d.ismPMI < 46) return 12
-      if (d.ismPMI < 50) return 8
-      if (d.ismPMI < 52) return 3
+      if (d.dxyIndex > 115) return 17 // Very strong dollar hurts tech
+      if (d.dxyIndex > 110) return 13
+      if (d.dxyIndex > 105) return 9
+      if (d.dxyIndex > 100) return 4
       return 0
     })(),
     fedFundsRate: (() => {
       if (d.fedFundsRate === null) return null // P7-17: no reading, no points
-      if (d.fedFundsRate > 6.0) return 15 // Extremely restrictive
-      if (d.fedFundsRate > 5.5) return 12
-      if (d.fedFundsRate > 5.0) return 9
-      if (d.fedFundsRate > 4.5) return 6
-      if (d.fedFundsRate > 4.0) return 3
+      if (d.fedFundsRate > 6.0) return 21 // Extremely restrictive
+      if (d.fedFundsRate > 5.5) return 17
+      if (d.fedFundsRate > 5.0) return 13
+      if (d.fedFundsRate > 4.5) return 8
+      if (d.fedFundsRate > 4.0) return 4
       return 0
     })(),
     fedReverseRepo: (() => {
       if (d.fedReverseRepo === null) return null // P7-17: no reading, no points
-      if (d.fedReverseRepo > 2000) return 11 // Extreme liquidity drain
-      if (d.fedReverseRepo > 1500) return 8
-      if (d.fedReverseRepo > 1000) return 6
-      if (d.fedReverseRepo > 500) return 3
+      if (d.fedReverseRepo > 2000) return 15 // Extreme liquidity drain
+      if (d.fedReverseRepo > 1500) return 11
+      if (d.fedReverseRepo > 1000) return 8
+      if (d.fedReverseRepo > 500) return 4
       return 0
     })(),
     junkSpread: (() => {
       if (d.junkSpread === null) return null // P7-17: no reading, no points
-      if (d.junkSpread > 10) return 10 // Severe credit stress
-      if (d.junkSpread > 8) return 8
-      if (d.junkSpread > 6) return 6
-      if (d.junkSpread > 5) return 3
-      if (d.junkSpread > 3.5) return 2
+      if (d.junkSpread > 10) return 14 // Severe credit stress
+      if (d.junkSpread > 8) return 11
+      if (d.junkSpread > 6) return 8
+      if (d.junkSpread > 5) return 4
+      if (d.junkSpread > 3.5) return 3
       return 0
     })(),
     debtToGDP: (() => {
       if (d.debtToGDP === null) return null // P7-17: no reading, no points
-      if (d.debtToGDP > 130) return 10 // Fiscal crisis risk
-      if (d.debtToGDP > 120) return 8
-      if (d.debtToGDP > 110) return 5
-      if (d.debtToGDP > 100) return 3
+      if (d.debtToGDP > 130) return 14 // Fiscal crisis risk
+      if (d.debtToGDP > 120) return 11
+      if (d.debtToGDP > 110) return 7
+      if (d.debtToGDP > 100) return 4
       return 0
     })(),
     // Scored ONCE, here (P3-13).
     yieldCurve: (() => {
       if (d.yieldCurve === null) return null // P7-17: no reading, no points
-      if (d.yieldCurve < -1.0) return 14 // Deep inversion
-      if (d.yieldCurve < -0.5) return 11
-      if (d.yieldCurve < -0.2) return 6
-      if (d.yieldCurve < 0) return 3
+      if (d.yieldCurve < -1.0) return 19 // Deep inversion
+      if (d.yieldCurve < -0.5) return 15
+      if (d.yieldCurve < -0.2) return 8
+      if (d.yieldCurve < 0) return 4
       return 0
     })(),
   }

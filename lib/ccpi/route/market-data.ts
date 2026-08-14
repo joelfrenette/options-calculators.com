@@ -11,18 +11,14 @@ import { fetchApifyYahooFinance as fetchApifyYahooFinanceUtil } from "@/lib/apif
 import {
   getAAIIBullish,
   getBuffettIndicator,
-  getISMPMI,
-  getMag7Concentration,
   getNVIDIAPrice,
   getPutCallRatio,
-  getQQQPE,
-  getShillerCAPE,
-  getShortInterest,
   getSOXIndex,
   getVIX,
 } from "@/lib/unified-ai-fallback"
 import { scrapeAAIISentiment, scrapePutCallRatio } from "@/lib/scraping-bee"
 import { fetchFredBuffett } from "./fred-buffett"
+import { fetchSoxIndex } from "./sox-index"
 import { fetchSpxValuation } from "@/lib/spx-valuation"
 import type { Tier } from "@/lib/ccpi/scoring"
 import { type APIStatusTracker, type TierMaps, aiTier, weakerTier } from "./provenance"
@@ -40,34 +36,21 @@ export async function fetchMarketData() {
     buffett: { live: false, source: "baseline", lastUpdated: now() },
     putCall: { live: false, source: "baseline", lastUpdated: now() },
     aaii: { live: false, source: "baseline", lastUpdated: now() },
-    shortInterest: { live: false, source: "baseline", lastUpdated: now() },
   }
 
-  const [
-    shillerCAPEResult,
-    shortInterestResult,
-    mag7Result,
-    qqqPEResult,
-    buffettResult,
-    putCallResult,
-    aaiiBullishResult,
-    vixAiResult,
-    nvidiaPriceResult,
-    soxIndexResult,
-    ismPMIResult,
-  ] = await Promise.all([
-    getShillerCAPE(),
-    getShortInterest(),
-    getMag7Concentration(),
-    getQQQPE(),
-    getBuffettIndicator(),
-    getPutCallRatio(),
-    getAAIIBullish(),
-    getVIX(),
-    getNVIDIAPrice(),
-    getSOXIndex(),
-    getISMPMI(),
-  ])
+  // P7-89: five getters left this batch with the inputs they served —
+  // shillerCAPE, shortInterest, mag7Concentration, qqqPE and ismPMI were
+  // dropped from the weights (LLM-only, never scored), so recalling them
+  // burned five model calls per uncached load for numbers nothing consumed.
+  const [buffettResult, putCallResult, aaiiBullishResult, vixAiResult, nvidiaPriceResult, soxIndexResult] =
+    await Promise.all([
+      getBuffettIndicator(),
+      getPutCallRatio(),
+      getAAIIBullish(),
+      getVIX(),
+      getNVIDIAPrice(),
+      getSOXIndex(),
+    ])
 
   // Spot VIX is a PUBLISHED NUMBER, and the site already stores it: the
   // market-snapshot cron writes FRED VIXCLS daily. Asking an LLM to recall
@@ -82,17 +65,12 @@ export async function fetchMarketData() {
   }
 
   console.log("[v0] AI Fallback Summary:")
-  console.log(`  Shiller CAPE: ${shillerCAPEResult.value} (${shillerCAPEResult.source})`)
-  console.log(`  Short Interest: ${shortInterestResult.value} (${shortInterestResult.source})`)
-  console.log(`  Mag7 Concentration: ${mag7Result.value} (${mag7Result.source})`)
-  console.log(`  QQQ P/E: ${qqqPEResult.value} (${qqqPEResult.source})`)
   console.log(`  Buffett Indicator: ${buffettResult.value} (${buffettResult.source})`)
   console.log(`  Put/Call Ratio: ${putCallResult.value} (${putCallResult.source})`)
   console.log(`  AAII Bullish: ${aaiiBullishResult.value} (${aaiiBullishResult.source})`)
   console.log(`  VIX: ${vixResult.value} (${vixResult.source})`)
   console.log(`  NVIDIA Price: ${nvidiaPriceResult.value} (${nvidiaPriceResult.source})`)
   console.log(`  SOX Index: ${soxIndexResult.value} (${soxIndexResult.source})`)
-  console.log(`  ISM PMI: ${ismPMIResult.value} (${ismPMIResult.source})`)
 
   const results = await Promise.allSettled([
     fetchQQQTechnicalsData(),
@@ -105,6 +83,9 @@ export async function fetchMarketData() {
     // scored through the recalibrated basis-correct ladder in buffett-bands.ts.
     // The GuruFocus/ScrapingBee scrape is retired for this input.
     fetchFredBuffett(),
+    // P7-89: measured ^SOX from Yahoo's keyless chart API — the input's only
+    // source was an LLM, so its 9 Momentum points could never score.
+    fetchSoxIndex(),
     scrapePutCallRatio(),
     scrapeAAIISentiment(),
     fetchSpxValuation(), // P7-75: free multpl first, FMP only for whatever it misses
@@ -117,17 +98,18 @@ export async function fetchMarketData() {
   const apifyRaw = results[4].status === "fulfilled" ? results[4].value : null
   const fearGreedData = results[5].status === "fulfilled" ? results[5].value : { fearGreed: null, dataSource: "failed" }
   const fredBuffett = results[6].status === "fulfilled" ? results[6].value : null
+  const soxMeasured = results[7].status === "fulfilled" ? results[7].value : null
   const putCallData =
-    results[7].status === "fulfilled"
-      ? results[7].value
-      : { ratio: putCallResult.value, status: "baseline" as const }
-  const aaiData =
     results[8].status === "fulfilled"
       ? results[8].value
-      : { bullish: aaiiBullishResult.value, bearish: 30, neutral: 35, spread: 5, status: "baseline" as const }
-  const spxVal =
+      : { ratio: putCallResult.value, status: "baseline" as const }
+  const aaiData =
     results[9].status === "fulfilled"
       ? results[9].value
+      : { bullish: aaiiBullishResult.value, bearish: 30, neutral: 35, spread: 5, status: "baseline" as const }
+  const spxVal =
+    results[10].status === "fulfilled"
+      ? results[10].value
       : { spxPE: null, spxPS: null, peSource: null, psSource: null }
 
   const qqqLive = qqqData?.source === "live"
@@ -140,7 +122,7 @@ export async function fetchMarketData() {
 
   apiStatus.technical = { live: qqqLive, source: qqqData?.source || "baseline", lastUpdated: now() }
   apiStatus.vixTerm = { live: vixTermLive, source: vixTermData?.source || vixResult.source, lastUpdated: now() }
-  apiStatus.fred = { live: fredLive, source: fredLive ? "FRED API" : ismPMIResult.source, lastUpdated: now() }
+  apiStatus.fred = { live: fredLive, source: fredLive ? "FRED API" : "unavailable", lastUpdated: now() }
   apiStatus.alphaVantage = {
     live: alphaVantageLive,
     source: alphaVantageLive ? "Alpha Vantage API" : `${nvidiaPriceResult.source} / ${soxIndexResult.source}`,
@@ -177,7 +159,6 @@ export async function fetchMarketData() {
   }
   // Short interest has no scraped source wired in — it always comes from the
   // AI fallback chain (the old `status === "live"` comparison could never be true).
-  apiStatus.shortInterest = { live: false, source: shortInterestResult.source, lastUpdated: now() }
 
   // P7-75. Order: Apify (if a token exists at all), then the free/paid resolver
   // in `lib/spx-valuation.ts`, which tries multpl before FMP. Apify stays first
@@ -204,7 +185,9 @@ export async function fetchMarketData() {
   const tiers: TierMaps = {
     momentum: {
       nvidiaMomentum: alphaVantageLive ? "live" : "baseline",
-      soxIndex: aiTier(soxIndexResult.source),
+      // P7-89: a Yahoo close is a measurement; the LLM recollection remains
+      // display-only.
+      soxIndex: soxMeasured ? "live" : aiTier(soxIndexResult.source),
       qqqDailyReturn: qqqLive ? "live" : "baseline",
       qqqConsecDown: qqqLive ? "live" : "baseline",
       qqqSMA20: qqqLive ? "live" : "baseline",
@@ -237,7 +220,6 @@ export async function fetchMarketData() {
           : aaiData.status === "ai-estimate"
             ? "ai-estimate"
             : aiTier(aaiiBullishResult.source),
-      shortInterest: aiTier(shortInterestResult.source),
     },
     valuation: {
       spxPE: spxPETier,
@@ -245,9 +227,6 @@ export async function fetchMarketData() {
       // P7-73a: a FRED reading is a measurement — "live". Without one the LLM
       // recollection still fills the DISPLAY (ai-estimate never scores, P6-34).
       buffettIndicator: fredBuffett ? "live" : aiTier(buffettResult.source),
-      qqqPE: aiTier(qqqPEResult.source),
-      mag7Concentration: aiTier(mag7Result.source),
-      shillerCAPE: aiTier(shillerCAPEResult.source),
       // Derived from S&P earnings yield and the FRED 10Y — as weak as its
       // weakest component.
       equityRiskPremium: weakerTier(spxPETier, fredTier),
@@ -257,9 +236,7 @@ export async function fetchMarketData() {
       // blanket fredTier stamped every macro input live if the batch call as a
       // whole succeeded, so one dead series scored its baseline constant as
       // real data.
-      tedSpread: fredData?.tedSpread != null ? "live" : "baseline",
       dxyIndex: fredData?.dxyIndex != null ? "live" : "baseline",
-      ismPMI: aiTier(ismPMIResult.source),
       fedFundsRate: fredData?.fedFundsRate != null ? "live" : "baseline",
       fedReverseRepo: fredData?.fedReverseRepo != null ? "live" : "baseline",
       junkSpread: fredData?.junkSpread != null ? "live" : "baseline",
@@ -297,9 +274,6 @@ export async function fetchMarketData() {
     // Valuation
     spxPE,
     spxPS,
-    qqqPE: qqqPEResult.value,
-    mag7Concentration: mag7Result.value,
-    shillerCAPE: shillerCAPEResult.value,
     equityRiskPremium: calculateEquityRiskPremium(spxPE, yieldCurve10Y),
 
     // Macro
@@ -312,7 +286,6 @@ export async function fetchMarketData() {
     putCallRatio: putCallData.ratio,
     fearGreedIndex: fearGreedData.fearGreed,
     etfFlows: apifyRaw?.data?.netInflows as number | undefined,
-    shortInterest: shortInterestResult.value,
 
     // AI Structural block deleted (P6-5): aiCapexGrowth/aiRevenueGrowth/
     // gpuPricingPremium/aiJobPostingsGrowth were hardcoded constants shipped in
@@ -345,10 +318,9 @@ export async function fetchMarketData() {
     // were measured. P6-4 fixed exactly this idiom for AAII eight lines above
     // and left this one.
     nvidiaMomentum: alphaVantageData?.nvidiaMomentum ?? null,
-    soxIndex: soxIndexResult.value,
+    soxIndex: soxMeasured ? soxMeasured.level : soxIndexResult.value,
     tedSpread: fredData?.tedSpread ?? null,
     dxyIndex: fredData?.dxyIndex ?? null,
-    ismPMI: ismPMIResult.value,
     fedReverseRepo: fredData?.fedReverseRepo ?? null,
 
     apiStatus,

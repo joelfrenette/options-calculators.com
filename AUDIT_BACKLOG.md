@@ -463,11 +463,12 @@ recomputes it.
 | P7-73a | P2 | fixed | The FRED-basis decision wired: four independent Buffett ladders (scoring >200/180/150/120, canaries >200/150 — already disagreeing at the middle rung, the check script's local copy, and the UI's hardcoded 80-240 axis) became lib/ccpi/buffett-bands.ts, read by all of them with explicit .ts imports the plain-node checks resolve. Data: store-first, live-FRED-fallback, null-excluded; scrape retired for this input; diagnostics and UI copy updated to the real basis. Six assertions pin the ladder and the cross-basis divergence. |
 | P7-87 | P2 | fixed | The TED spread input was a corpse scored as live: FRED discontinued TEDRATE 2022-01-21, the desc/limit-1 fetch returned the terminal observation forever, and it tiered "live" at 13/100 of Macro daily — missing-data guards ask if a value exists, never when it is from, and the store staleness gate had been set to Infinity to accommodate exactly this. Retired: null on both paths, macro renormalises (ceiling 87), stored tail kept. Whether the weight moves to a SOFR-era successor is the owner's call. |
 | P7-88 | P2 | fixed | The CCPI subtitle claimed "AI-led market correction early warning oracle" — false twice: AI cannot move the score (P6-34), and the walk-forward confirmed zero early-warning candidates (§6b). Subtitle corrected; honesty line added under the gauge and PINNED to the §6b verdict heading it quotes (negative-tested both directions); oracle phrase retired. CSP verbs live on the allocation bands (cspAction), one ladder not two. |
+| P7-89 | P1 | fixed | Real data only, executed: the six LLM-only inputs (89/400 pts) and the dead TED spread dropped; per-pillar weights rescaled to exactly 100 (RA 37/30/33 · Val 32/21/29/18 · Macro 21/19/17/15/14/14); SOX measured via Yahoo; buffett ladder points 29 with cutoffs unchanged and table-equality asserted; canaries, payload, provenance, admin audit panels, UI counts, tooltips and five checks moved together. Ceilings 100/79/70 recomputed and pinned; five LLM calls per load removed. Provider-level fetcher corpses remain behind import lines — named follow-up. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-292 findings recorded · **255 fixed · 9 wontfix · 2 verified-ok · 26 open.**
+293 findings recorded · **256 fixed · 9 wontfix · 2 verified-ok · 26 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -5597,3 +5598,46 @@ write regexes here; the fix was made with a direct edit.
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-88 | P2 | ANALYZE → CCPI | The index subtitled itself "AI-led market correction early warning oracle" — AI cannot move the score (P6-34) and the site's own walk-forward confirmed zero early-warning signals (§6b). Replaced with what the code does, plus an honesty line under the gauge pinned to the §6b verdict heading it quotes: a confirmed signal fails the check until the sentence moves. CSP per-regime verbs added on the allocation bands themselves, not as a second prose ladder. |
+
+## 2026-08-14 — P7-89: the decided drop, executed — every scored input is now a measurement
+
+The owner's instruction, verbatim intent: real data only, no LLM guesses, every pillar
+scored and weighted sensibly. That is the P6-35 decision of 2026-08-10, which the design
+supersession had parked. It is now executed, together with P7-87's retirement.
+
+**Dropped from the weights** (none could ever reach tier `live`): `shortInterest` (21,
+Risk Appetite), `qqqPE` (16), `mag7Concentration` (15), `shillerCAPE` (13) (Valuation),
+`ismPMI` (15, Macro) — plus `tedSpread` (13, Macro), whose series is dead. Survivors
+rescaled per pillar to sum to exactly 100 (the load-time assertion never moved):
+
+- **Risk Appetite**: Put/Call 37 · Fear&Greed 30 · AAII 33
+- **Valuation**: S&P P/E 32 · P/S 21 · Buffett 29 · ERP 18
+- **Macro**: FFR 21 · Curve 19 · DXY 17 · RRP 15 · Junk 14 · Debt/GDP 14
+- **Momentum**: unchanged — and `soxIndex` (9) gained a MEASURED source
+  (`lib/ccpi/route/sox-index.ts`, Yahoo ^SOX keyless), so its nine points stop being a
+  permanent hole. The LLM recollection remains display-only.
+
+**Every consumer moved in the same commit**, which is the P7-77 rule at scale: the
+Buffett ladder's points rescaled inside `buffett-bands.ts` (cutoffs unchanged, 16→29 at
+the top, asserted equal to the weight table at module load); canary weights and gates;
+the route payload (dropped keys no longer sent); the provenance tracker; the four admin
+audit-panel pillar files (which described "7 indicators", a Wilshire formula, and a
+ScrapingBee source for Buffett — all now the truth); the UI pillar sections and their
+"N indicators" labels; tooltip copy; and five check scripts.
+
+**The certainty ceilings are the point.** `ccpi-certainty-ceiling.ts` recomputed:
+everything-up **100** (was 81 — the gap WAS the six dead inputs), ScrapingBee-off **79**
+(was 62), ScrapingBee+CNN-off **70** (was 55). The historical lying-scrapes scenario was
+retired — against the rescaled tables it can no longer express the defect it documented;
+its record stays in P6-35/P6-76. Five LLM calls per uncached CCPI load are gone with the
+getters (`getShillerCAPE`, `getShortInterest`, `getMag7Concentration`, `getQQQPE`,
+`getISMPMI`); their per-provider fetcher functions survive unreferenced behind import
+lines in `lib/unified-ai-fallback.ts` and are named here as mechanical follow-up.
+
+Formulas 1137 → **1128**: the canary and scoring suites lost the assertions that tested
+dropped inputs and gained the rescale's (net −9), and both scope pins moved deliberately
+(29 → 23 scored indicators; 30 → 24 canary gates).
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-89 | P1 | ANALYZE → CCPI | The P6-35 decision executed with P7-87's retirement: six never-live inputs (89 weight points) and the dead TED spread left the tables; survivors rescaled to 100 per pillar; SOX gained a measured Yahoo source; every ladder, canary, payload key, admin-audit claim, UI label and check moved in one commit. Ceilings recomputed and pinned: 100 / 79 / 70. Every scored input now has a live path — the composite can no longer be accused of scoring a guess. |

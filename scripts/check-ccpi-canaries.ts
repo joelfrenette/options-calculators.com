@@ -55,26 +55,23 @@ const ALL_NULL: CanaryInputs = {
   putCallRatio: null,
   fearGreedIndex: null,
   aaiiBullish: null,
-  shortInterest: null,
   etfFlows: null,
   spxPE: null,
   spxPS: null,
   buffettIndicator: null,
-  qqqPE: null,
-  mag7Concentration: null,
-  shillerCAPE: null,
   equityRiskPremium: null,
   fedFundsRate: null,
   junkSpread: null,
   debtToGDP: null,
   yieldCurve: null,
-  tedSpread: null,
   dxyIndex: null,
-  ismPMI: null,
   fedReverseRepo: null,
 }
 
-const INDICATOR_COUNT = 30 // 34 fields; the four breach/proximity pairs share one gate each
+const INDICATOR_COUNT = 24 // 28 fields; the four breach/proximity pairs share one gate each.
+// Was 30 until P7-89 dropped the six gates whose inputs could never be measured
+// (shortInterest, qqqPE, mag7Concentration, shillerCAPE, ismPMI) or whose series
+// no longer exists (tedSpread).
 
 // ---------------------------------------------------------------------------
 // 1. THE REGRESSION: no data must produce no warnings.
@@ -101,15 +98,9 @@ check(
 )
 check("Buffett is named in suppressed when null", empty.suppressed.includes("Buffett Indicator"))
 
-// The two other P6-31 constants, pinned at the values they used to default to.
-check(
-  "short interest 2.5 (the old fallback) sits exactly on its own boundary",
-  generateCanarySignals({ ...ALL_NULL, shortInterest: 2.5 }, PILLAR_PCT).canaries.length === 0,
-)
-check(
-  "short interest 2.4 does fire",
-  generateCanarySignals({ ...ALL_NULL, shortInterest: 2.4 }, PILLAR_PCT).canaries.length === 1,
-)
+// The P6-31 constant that survives P7-89, pinned at the value it used to
+// default to. (The short-interest pair this section also carried tested a gate
+// whose input was LLM-only and is dropped.)
 check(
   "AAII 35 (the old fallback) is below its threshold and stays quiet",
   generateCanarySignals({ ...ALL_NULL, aaiiBullish: 35 }, PILLAR_PCT).canaries.length === 0,
@@ -171,7 +162,7 @@ check(
   Math.abs(mixed.canaries.find((c) => c.signal.includes("VIX"))!.impactScore - 13 * (35 / 100)) < 1e-9,
 )
 check(
-  "three of 30 measured leaves 27 suppressed",
+  "three of 24 measured leaves 21 suppressed",
   mixed.suppressed.length === INDICATOR_COUNT - 3,
   `${mixed.suppressed.length}`,
 )

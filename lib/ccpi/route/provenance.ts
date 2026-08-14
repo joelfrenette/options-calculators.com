@@ -103,5 +103,4 @@ export interface APIStatusTracker {
   buffett: DataSourceStatus
   putCall: DataSourceStatus
   aaii: DataSourceStatus
-  shortInterest: DataSourceStatus
 }

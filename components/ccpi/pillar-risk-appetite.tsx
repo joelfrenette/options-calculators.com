@@ -33,7 +33,7 @@ export function PillarRiskAppetite({
           <div className="flex items-center gap-2">
             <TrendingDown className="h-5 w-5 text-orange-600" />
             <span className="text-lg font-semibold">Pillar 2 - Risk Appetite & Volatility</span>
-            <span className="text-sm text-gray-600">Weight: 30% | 4 indicators</span>
+            <span className="text-sm text-gray-600">Weight: 30% | 3 indicators</span>
           </div>
           <PillarScore score={score} />
         </div>

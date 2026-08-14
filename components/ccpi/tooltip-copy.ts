@@ -44,11 +44,6 @@ export function getSignalTooltip(signal: string): string {
     return "AAII tracks how individual investors feel about the market. When bullish sentiment exceeds 45-50%, it often signals excessive optimism. Historically, the market tends to underperform after periods of extreme retail bullishness because there are fewer new buyers left."
   }
 
-  // ISM PMI
-  if (signalLower.includes("ism") || signalLower.includes("pmi") || signalLower.includes("manufacturing")) {
-    return "The ISM Manufacturing Index measures factory activity. Readings below 50 indicate contraction. Weak manufacturing often leads to job losses and reduced consumer spending, which eventually hurts corporate profits and stock prices."
-  }
-
   // P/E Ratio
   if (signalLower.includes("p/e") || signalLower.includes("pe ratio")) {
     return "The Price-to-Earnings ratio shows how much investors pay for each dollar of company earnings. The S&P 500 historical average is around 16. When it's above 22, stocks are considered expensive. High P/E markets are more vulnerable to sharp corrections."
@@ -64,11 +59,6 @@ export function getSignalTooltip(signal: string): string {
     return "This measures government debt relative to the economy's size. High debt levels (above 100% of GDP) can lead to higher interest rates, inflation concerns, and reduced government spending flexibility. This creates headwinds for economic growth and stock returns."
   }
 
-  // Shiller CAPE
-  if (signalLower.includes("shiller") || signalLower.includes("cape")) {
-    return "The Shiller CAPE looks at stock prices versus 10 years of averaged earnings (adjusting for inflation). It smooths out short-term profit swings. Above 30 is historically expensive - periods of high CAPE have often preceded below-average returns over the next decade."
-  }
-
   // P/S Ratio
   if (signalLower.includes("p/s") || signalLower.includes("price-to-sales") || signalLower.includes("price to sales")) {
     return "Price-to-Sales ratio compares stock prices to company revenues. Unlike earnings, sales are harder to manipulate. When P/S is elevated (above 2.5 for S&P 500), it suggests investors are paying a premium for revenue, which may not be sustainable."
@@ -82,11 +72,6 @@ export function getSignalTooltip(signal: string): string {
   // Yield Curve
   if (signalLower.includes("yield curve") || signalLower.includes("inversion")) {
     return "The yield curve compares short-term and long-term interest rates. When short-term rates exceed long-term rates (inversion), it signals that investors expect economic weakness ahead. Inversions have preceded every US recession in the past 50 years."
-  }
-
-  // Mag7 Concentration
-  if (signalLower.includes("mag7") || signalLower.includes("concentration") || signalLower.includes("magnificent")) {
-    return "The Magnificent 7 (Apple, Microsoft, Google, Amazon, NVIDIA, Meta, Tesla) now dominate the S&P 500. High concentration means the index depends heavily on just a few stocks. If these leaders stumble, the entire market can fall sharply."
   }
 
   // Default

@@ -63,7 +63,7 @@ export const buildMomentumPillar = (ccpi: any, prov: any): PillarAudit => {
           prov,
           "momentum",
           "soxIndex",
-          "AI fallback chain (lib/unified-ai-fallback.ts) — no live provider is wired for SOX",
+          "Yahoo Finance chart API (^SOX, measured — P7-89); AI fallback chain is display-only",
           [],
         ),
         canaryThresholds: {

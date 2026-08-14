@@ -89,30 +89,22 @@ const calmMomentum: MomentumInputs = {
   vix: 13,
   vixTermStructure: 1.08, // normal contango
 }
-const maxRiskRisk: RiskAppetiteInputs = { putCallRatio: 0.5, fearGreedIndex: 85, aaiiBullish: 60, shortInterest: 1.0 }
-const calmRisk: RiskAppetiteInputs = { putCallRatio: 0.95, fearGreedIndex: 50, aaiiBullish: 35, shortInterest: 3.5 }
+const maxRiskRisk: RiskAppetiteInputs = { putCallRatio: 0.5, fearGreedIndex: 85, aaiiBullish: 60 }
+const calmRisk: RiskAppetiteInputs = { putCallRatio: 0.95, fearGreedIndex: 50, aaiiBullish: 35 }
 const maxRiskValuation: ValuationInputs = {
   spxPE: 35,
   spxPS: 4,
   buffettIndicator: 230, // above the recalibrated top band (>210, P7-73a); 210 itself is NOT in it
-  qqqPE: 45,
-  mag7Concentration: 70,
-  shillerCAPE: 40,
   equityRiskPremium: 1.0,
 }
 const calmValuation: ValuationInputs = {
   spxPE: 15,
   spxPS: 1.8,
   buffettIndicator: 100,
-  qqqPE: 20,
-  mag7Concentration: 40,
-  shillerCAPE: 18,
   equityRiskPremium: 5,
 }
 const maxRiskMacro: MacroInputs = {
-  tedSpread: 1.5,
   dxyIndex: 120,
-  ismPMI: 40,
   fedFundsRate: 6.5,
   fedReverseRepo: 2500,
   junkSpread: 12,
@@ -120,9 +112,7 @@ const maxRiskMacro: MacroInputs = {
   yieldCurve: -1.5,
 }
 const calmMacro: MacroInputs = {
-  tedSpread: 0.2,
   dxyIndex: 95,
-  ismPMI: 55,
   fedFundsRate: 3.0,
   fedReverseRepo: 300,
   junkSpread: 3.0,
@@ -197,7 +187,7 @@ check(`scoredMax < ${MIN_SCORED_MAX} ⇒ pillar reports null`, starved.score ===
 // Null input value (Fear & Greed unavailable) is excluded AND renormalized
 const fgNull = computeRiskAppetitePillar({ ...maxRiskRisk, fearGreedIndex: null }, liveRisk)
 check("null F&G excluded and renormalized (still 100 at max risk)", fgNull.score === 100, `got ${fgNull.score}`)
-check("null F&G reduces scoredMax to 76", fgNull.scoredMax === 76, `got ${fgNull.scoredMax}`)
+check("null F&G reduces scoredMax to 70", fgNull.scoredMax === 70, `got ${fgNull.scoredMax}`)
 
 // P7-10: the same contract for nvidiaMomentum, which was `number` until Alpha
 // Vantage's failure path was found to be handing over a defaulted 50.
@@ -319,8 +309,9 @@ const skipped = [
   ...MACRO_WEIGHTS.filter((w) => !inFixture(maxRiskMacro, w.key)),
 ]
 
-// 6 momentum + 4 risk-appetite + 7 valuation + 8 macro.
-const EXPECTED_NULLABLE = 25
+// 6 momentum + 3 risk-appetite + 4 valuation + 6 macro (P7-89 dropped the
+// six LLM-only inputs and the discontinued TED spread).
+const EXPECTED_NULLABLE = 19
 check(
   `scope: ${nullableCases.length} scored inputs are covered by the null sweep`,
   nullableCases.length === EXPECTED_NULLABLE,
@@ -520,21 +511,20 @@ const nullRisk: RiskAppetiteInputs = {
   putCallRatio: null,
   fearGreedIndex: null,
   aaiiBullish: null,
-  shortInterest: null,
 }
 const nullRiskLive = computeRiskAppetitePillar(nullRisk, allTiers(RISK_APPETITE_WEIGHTS, "live") as RiskAppetiteTiers)
 check("all-null inputs score nothing even when tiered live", nullRiskLive.rawPoints === 0, `${nullRiskLive.rawPoints}`)
 check("all-null inputs earn no scored weight", nullRiskLive.scoredMax === 0, `${nullRiskLive.scoredMax}`)
 check("all-null inputs report null score, not 0/100", nullRiskLive.score === null, String(nullRiskLive.score))
-check("all four indicators are listed as excluded", nullRiskLive.excluded.length === 4, `${nullRiskLive.excluded.length}`)
+check("all three indicators are listed as excluded", nullRiskLive.excluded.length === 3, `${nullRiskLive.excluded.length}`)
 
 const oneRealRisk = computeRiskAppetitePillar(
-  { putCallRatio: 0.5, fearGreedIndex: null, aaiiBullish: null, shortInterest: null },
+  { putCallRatio: 0.5, fearGreedIndex: null, aaiiBullish: null },
   allTiers(RISK_APPETITE_WEIGHTS, "live") as RiskAppetiteTiers,
 )
-check("a single live input scores its own weight", oneRealRisk.scoredMax === 29, `${oneRealRisk.scoredMax}`)
+check("a single live input scores its own weight", oneRealRisk.scoredMax === 37, `${oneRealRisk.scoredMax}`)
 check(
-  "...but 29 is below MIN_SCORED_MAX, so the pillar still refuses a number",
+  "...but 37 is below MIN_SCORED_MAX, so the pillar still refuses a number",
   oneRealRisk.score === null,
   String(oneRealRisk.score),
 )

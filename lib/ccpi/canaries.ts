@@ -87,24 +87,18 @@ export interface CanaryInputs {
   putCallRatio: number | null
   fearGreedIndex: number | null
   aaiiBullish: number | null
-  shortInterest: number | null
   etfFlows: number | null
   // Valuation
   spxPE: number | null
   spxPS: number | null
   buffettIndicator: number | null
-  qqqPE: number | null
-  mag7Concentration: number | null
-  shillerCAPE: number | null
   equityRiskPremium: number | null
   // Macro
   fedFundsRate: number | null
   junkSpread: number | null
   debtToGDP: number | null
   yieldCurve: number | null
-  tedSpread: number | null
   dxyIndex: number | null
-  ismPMI: number | null
   fedReverseRepo: number | null
 }
 
@@ -268,36 +262,27 @@ export function generateCanarySignals(inputs: CanaryInputs, PILLAR_PCT: PillarPe
   when("Put/Call Ratio", [inputs.putCallRatio], () => {
     const v = inputs.putCallRatio as number
     if (v < 0.6) {
-      push(`Put/Call at ${v.toFixed(2)} - Extreme complacency`, RISK, "high", 29, PILLAR_PCT.riskAppetite)
+      push(`Put/Call at ${v.toFixed(2)} - Extreme complacency`, RISK, "high", 37, PILLAR_PCT.riskAppetite)
     } else if (v < 0.85) {
-      push(`Put/Call at ${v.toFixed(2)} - Low hedging activity`, RISK, "medium", 29, PILLAR_PCT.riskAppetite)
+      push(`Put/Call at ${v.toFixed(2)} - Low hedging activity`, RISK, "medium", 37, PILLAR_PCT.riskAppetite)
     }
   })
 
   when("Fear & Greed", [inputs.fearGreedIndex], () => {
     const v = inputs.fearGreedIndex as number
     if (v > 80) {
-      push(`Fear & Greed at ${v} - Extreme greed`, RISK, "high", 24, PILLAR_PCT.riskAppetite)
+      push(`Fear & Greed at ${v} - Extreme greed`, RISK, "high", 30, PILLAR_PCT.riskAppetite)
     } else if (v > 70) {
-      push(`Fear & Greed at ${v} - Elevated greed`, RISK, "medium", 24, PILLAR_PCT.riskAppetite)
+      push(`Fear & Greed at ${v} - Elevated greed`, RISK, "medium", 30, PILLAR_PCT.riskAppetite)
     }
   })
 
   when("AAII Bullish", [inputs.aaiiBullish], () => {
     const v = inputs.aaiiBullish as number
     if (v > 55) {
-      push(`AAII Bullish at ${v}% - Retail euphoria`, RISK, "high", 26, PILLAR_PCT.riskAppetite)
+      push(`AAII Bullish at ${v}% - Retail euphoria`, RISK, "high", 33, PILLAR_PCT.riskAppetite)
     } else if (v > 45) {
-      push(`AAII Bullish at ${v}% - Elevated retail optimism`, RISK, "medium", 26, PILLAR_PCT.riskAppetite)
-    }
-  })
-
-  when("Short Interest", [inputs.shortInterest], () => {
-    const v = inputs.shortInterest as number
-    if (v < 1.5) {
-      push(`Short Interest at ${v.toFixed(1)}% - Extreme complacency`, RISK, "high", 21, PILLAR_PCT.riskAppetite)
-    } else if (v < 2.5) {
-      push(`Short Interest at ${v.toFixed(1)}% - Low positioning`, RISK, "medium", 21, PILLAR_PCT.riskAppetite)
+      push(`AAII Bullish at ${v}% - Elevated retail optimism`, RISK, "medium", 33, PILLAR_PCT.riskAppetite)
     }
   })
 
@@ -316,18 +301,18 @@ export function generateCanarySignals(inputs: CanaryInputs, PILLAR_PCT: PillarPe
   when("S&P 500 P/E", [inputs.spxPE], () => {
     const v = inputs.spxPE as number
     if (v > 30) {
-      push(`S&P 500 P/E at ${v.toFixed(1)} - Extreme overvaluation`, VALUATION, "high", 18, PILLAR_PCT.valuation)
+      push(`S&P 500 P/E at ${v.toFixed(1)} - Extreme overvaluation`, VALUATION, "high", 32, PILLAR_PCT.valuation)
     } else if (v > 22) {
-      push(`S&P 500 P/E at ${v.toFixed(1)} - Above historical average`, VALUATION, "medium", 18, PILLAR_PCT.valuation)
+      push(`S&P 500 P/E at ${v.toFixed(1)} - Above historical average`, VALUATION, "medium", 32, PILLAR_PCT.valuation)
     }
   })
 
   when("S&P 500 P/S", [inputs.spxPS], () => {
     const v = inputs.spxPS as number
     if (v > 3.5) {
-      push(`S&P 500 P/S at ${v.toFixed(1)} - Extremely expensive`, VALUATION, "high", 12, PILLAR_PCT.valuation)
+      push(`S&P 500 P/S at ${v.toFixed(1)} - Extremely expensive`, VALUATION, "high", 21, PILLAR_PCT.valuation)
     } else if (v > 2.5) {
-      push(`S&P 500 P/S at ${v.toFixed(1)} - Elevated valuation`, VALUATION, "medium", 12, PILLAR_PCT.valuation)
+      push(`S&P 500 P/S at ${v.toFixed(1)} - Elevated valuation`, VALUATION, "medium", 21, PILLAR_PCT.valuation)
     }
   })
 
@@ -339,45 +324,18 @@ export function generateCanarySignals(inputs: CanaryInputs, PILLAR_PCT: PillarPe
     const v = inputs.buffettIndicator as number
     const severity = buffettCanarySeverity(v)
     if (severity === "high") {
-      push(`Buffett Indicator at ${v.toFixed(0)}% - Significantly overvalued`, VALUATION, "high", 16, PILLAR_PCT.valuation)
+      push(`Buffett Indicator at ${v.toFixed(0)}% - Significantly overvalued`, VALUATION, "high", 29, PILLAR_PCT.valuation)
     } else if (severity === "medium") {
-      push(`Buffett Indicator at ${v.toFixed(0)}% - Above fair value`, VALUATION, "medium", 16, PILLAR_PCT.valuation)
-    }
-  })
-
-  when("QQQ P/E", [inputs.qqqPE], () => {
-    const v = inputs.qqqPE as number
-    if (v > 40) {
-      push(`QQQ P/E at ${v.toFixed(1)} - AI bubble territory`, VALUATION, "high", 16, PILLAR_PCT.valuation)
-    } else if (v > 30) {
-      push(`QQQ P/E at ${v.toFixed(1)} - Tech overvaluation`, VALUATION, "medium", 16, PILLAR_PCT.valuation)
-    }
-  })
-
-  when("Mag7 Concentration", [inputs.mag7Concentration], () => {
-    const v = inputs.mag7Concentration as number
-    if (v > 65) {
-      push(`Mag7 at ${v.toFixed(1)}% of QQQ - Extreme concentration risk`, VALUATION, "high", 15, PILLAR_PCT.valuation)
-    } else if (v > 55) {
-      push(`Mag7 at ${v.toFixed(1)}% of QQQ - High concentration`, VALUATION, "medium", 15, PILLAR_PCT.valuation)
-    }
-  })
-
-  when("Shiller CAPE", [inputs.shillerCAPE], () => {
-    const v = inputs.shillerCAPE as number
-    if (v > 35) {
-      push(`Shiller CAPE at ${v.toFixed(1)} - Historic overvaluation`, VALUATION, "high", 13, PILLAR_PCT.valuation)
-    } else if (v > 28) {
-      push(`Shiller CAPE at ${v.toFixed(1)} - Elevated cyclical valuation`, VALUATION, "medium", 13, PILLAR_PCT.valuation)
+      push(`Buffett Indicator at ${v.toFixed(0)}% - Above fair value`, VALUATION, "medium", 29, PILLAR_PCT.valuation)
     }
   })
 
   when("Equity Risk Premium", [inputs.equityRiskPremium], () => {
     const v = inputs.equityRiskPremium as number
     if (v < 1.5) {
-      push(`Equity Risk Premium at ${v.toFixed(2)}% - Stocks vs bonds severely overpriced`, VALUATION, "high", 10, PILLAR_PCT.valuation)
+      push(`Equity Risk Premium at ${v.toFixed(2)}% - Stocks vs bonds severely overpriced`, VALUATION, "high", 18, PILLAR_PCT.valuation)
     } else if (v < 3.0) {
-      push(`Equity Risk Premium at ${v.toFixed(2)}% - Low compensation for equity risk`, VALUATION, "medium", 10, PILLAR_PCT.valuation)
+      push(`Equity Risk Premium at ${v.toFixed(2)}% - Low compensation for equity risk`, VALUATION, "medium", 18, PILLAR_PCT.valuation)
     }
   })
 
@@ -386,27 +344,27 @@ export function generateCanarySignals(inputs: CanaryInputs, PILLAR_PCT: PillarPe
   when("Fed Funds Rate", [inputs.fedFundsRate], () => {
     const v = inputs.fedFundsRate as number
     if (v > 6.0) {
-      push(`Fed Funds at ${v.toFixed(2)}% - Extremely restrictive`, MACRO, "high", 15, PILLAR_PCT.macro)
+      push(`Fed Funds at ${v.toFixed(2)}% - Extremely restrictive`, MACRO, "high", 21, PILLAR_PCT.macro)
     } else if (v > 5.0) {
-      push(`Fed Funds at ${v.toFixed(2)}% - Restrictive policy`, MACRO, "medium", 15, PILLAR_PCT.macro)
+      push(`Fed Funds at ${v.toFixed(2)}% - Restrictive policy`, MACRO, "medium", 21, PILLAR_PCT.macro)
     }
   })
 
   when("Junk Spread", [inputs.junkSpread], () => {
     const v = inputs.junkSpread as number
     if (v > 8) {
-      push(`Junk Bond Spread at ${v.toFixed(2)}% - Severe credit stress`, MACRO, "high", 10, PILLAR_PCT.macro)
+      push(`Junk Bond Spread at ${v.toFixed(2)}% - Severe credit stress`, MACRO, "high", 14, PILLAR_PCT.macro)
     } else if (v > 5) {
-      push(`Junk Bond Spread at ${v.toFixed(2)}% - Credit tightening`, MACRO, "medium", 10, PILLAR_PCT.macro)
+      push(`Junk Bond Spread at ${v.toFixed(2)}% - Credit tightening`, MACRO, "medium", 14, PILLAR_PCT.macro)
     }
   })
 
   when("Debt-to-GDP", [inputs.debtToGDP], () => {
     const v = inputs.debtToGDP as number
     if (v > 130) {
-      push(`US Debt-to-GDP at ${v.toFixed(0)}% - Fiscal crisis risk`, MACRO, "high", 10, PILLAR_PCT.macro)
+      push(`US Debt-to-GDP at ${v.toFixed(0)}% - Fiscal crisis risk`, MACRO, "high", 14, PILLAR_PCT.macro)
     } else if (v > 110) {
-      push(`US Debt-to-GDP at ${v.toFixed(0)}% - Elevated fiscal burden`, MACRO, "medium", 10, PILLAR_PCT.macro)
+      push(`US Debt-to-GDP at ${v.toFixed(0)}% - Elevated fiscal burden`, MACRO, "medium", 14, PILLAR_PCT.macro)
     }
   })
 
@@ -415,45 +373,27 @@ export function generateCanarySignals(inputs: CanaryInputs, PILLAR_PCT: PillarPe
   when("Yield Curve", [inputs.yieldCurve], () => {
     const v = inputs.yieldCurve as number
     if (v < -1.0) {
-      push(`Yield curve inverted ${Math.abs(v).toFixed(2)}% - Deep inversion`, MACRO, "high", 14, PILLAR_PCT.macro)
+      push(`Yield curve inverted ${Math.abs(v).toFixed(2)}% - Deep inversion`, MACRO, "high", 19, PILLAR_PCT.macro)
     } else if (v < -0.2) {
-      push(`Yield curve inverted ${Math.abs(v).toFixed(2)}%`, MACRO, "medium", 14, PILLAR_PCT.macro)
-    }
-  })
-
-  when("TED Spread", [inputs.tedSpread], () => {
-    const v = inputs.tedSpread as number
-    if (v > 1.0) {
-      push(`TED Spread at ${v.toFixed(2)}% - Banking system stress`, MACRO, "high", 13, PILLAR_PCT.macro)
-    } else if (v > 0.5) {
-      push(`TED Spread at ${v.toFixed(2)}% - Credit market tension`, MACRO, "medium", 13, PILLAR_PCT.macro)
+      push(`Yield curve inverted ${Math.abs(v).toFixed(2)}%`, MACRO, "medium", 19, PILLAR_PCT.macro)
     }
   })
 
   when("Dollar Index", [inputs.dxyIndex], () => {
     const v = inputs.dxyIndex as number
     if (v > 115) {
-      push(`Dollar Index at ${v.toFixed(1)} - Extreme dollar strength hurts tech`, MACRO, "high", 12, PILLAR_PCT.macro)
+      push(`Dollar Index at ${v.toFixed(1)} - Extreme dollar strength hurts tech`, MACRO, "high", 17, PILLAR_PCT.macro)
     } else if (v > 105) {
-      push(`Dollar Index at ${v.toFixed(1)} - Strong dollar headwind`, MACRO, "medium", 12, PILLAR_PCT.macro)
-    }
-  })
-
-  when("ISM PMI", [inputs.ismPMI], () => {
-    const v = inputs.ismPMI as number
-    if (v < 46) {
-      push(`ISM PMI at ${v.toFixed(1)} - Manufacturing contraction`, MACRO, "high", 15, PILLAR_PCT.macro)
-    } else if (v < 50) {
-      push(`ISM PMI at ${v.toFixed(1)} - Weak manufacturing`, MACRO, "medium", 15, PILLAR_PCT.macro)
+      push(`Dollar Index at ${v.toFixed(1)} - Strong dollar headwind`, MACRO, "medium", 17, PILLAR_PCT.macro)
     }
   })
 
   when("Fed Reverse Repo", [inputs.fedReverseRepo], () => {
     const v = inputs.fedReverseRepo as number
     if (v > 2000) {
-      push(`Fed RRP at $${v.toFixed(0)}B - Severe liquidity drain`, MACRO, "high", 11, PILLAR_PCT.macro)
+      push(`Fed RRP at $${v.toFixed(0)}B - Severe liquidity drain`, MACRO, "high", 15, PILLAR_PCT.macro)
     } else if (v > 1000) {
-      push(`Fed RRP at $${v.toFixed(0)}B - Tight liquidity conditions`, MACRO, "medium", 11, PILLAR_PCT.macro)
+      push(`Fed RRP at $${v.toFixed(0)}B - Tight liquidity conditions`, MACRO, "medium", 15, PILLAR_PCT.macro)
     }
   })
 

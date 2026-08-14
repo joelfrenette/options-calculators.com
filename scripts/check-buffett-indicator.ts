@@ -109,12 +109,13 @@ check(
 )
 check(
   "the two bases still disagree — the scraped figure lands two rungs lower on this ladder",
-  scoreBuffett(GURUFOCUS_OBSERVED) === 9 && OLD_TOTAL_MARKET_BAND(GURUFOCUS_OBSERVED) === 13,
-  `183.8 → ${scoreBuffett(GURUFOCUS_OBSERVED)} pts on the FRED ladder vs ${OLD_TOTAL_MARKET_BAND(GURUFOCUS_OBSERVED)} on the retired one`,
+  scoreBuffett(GURUFOCUS_OBSERVED) === BUFFETT_BANDS[2].points &&
+    OLD_TOTAL_MARKET_BAND(GURUFOCUS_OBSERVED) === 13,
+  `183.8 → ${scoreBuffett(GURUFOCUS_OBSERVED)} pts (third rung) on the FRED ladder vs 13/16 (second rung) on the retired one`,
 )
 check(
   "210 exactly is NOT in the top band — the cutoffs are exclusive",
-  scoreBuffett(210) === 13,
+  scoreBuffett(210) === BUFFETT_BANDS[1].points,
   `210 → ${scoreBuffett(210)}`,
 )
 check("no reading scores null, never zero", scoreBuffett(null) === null)

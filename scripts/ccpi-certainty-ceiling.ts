@@ -51,17 +51,16 @@ import {
  * is their only source (P6-35, unchanged by this session). Listing them here
  * rather than inferring keeps the assumption visible.
  */
-const NEVER_LIVE = new Set([
-  "shortInterest",
-  "qqqPE",
-  "mag7Concentration",
-  "ismPMI",
-  "shillerCAPE",
-  "soxIndex",
-])
+// P7-89 emptied this set: the five LLM-only inputs were dropped from the
+// weights outright, and soxIndex gained a measured source (Yahoo ^SOX). Kept
+// as a set rather than deleted so the next never-live input has somewhere to
+// be declared — an empty set here is a claim the suite verifies, not a shrug.
+const NEVER_LIVE = new Set<string>([])
 
 /** Indicators whose only live source is ScrapingBee. */
-const SCRAPINGBEE_ONLY = new Set(["putCallRatio", "aaiiBullish", "buffettIndicator"])
+// buffettIndicator left this set in P7-73a: it comes from FRED now and does
+// not touch ScrapingBee at all.
+const SCRAPINGBEE_ONLY = new Set(["putCallRatio", "aaiiBullish"])
 
 /** Indicators whose only live source is CNN. */
 const CNN_ONLY = new Set(["fearGreedIndex"])
@@ -78,34 +77,29 @@ interface Scenario {
 const SCENARIOS: Scenario[] = [
   {
     name: "Everything reachable",
-    note: "ScrapingBee and CNN both up. The theoretical ceiling — still not 100, because six indicators have no live path at all.",
+    note: "ScrapingBee and CNN both up. 100 since P7-89: every input in the weight tables now has a live path — the ceiling below 100 WAS the six LLM-only inputs, and they are gone.",
     scrapingBee: true,
     cnn: true,
   },
   {
     name: "ScrapingBee off",
-    note: "putCallRatio, aaiiBullish and buffettIndicator fall to ai-estimate. Since P6-72/P6-74 that is what actually happens; before those fixes the first two self-reported live.",
+    note: "putCallRatio and aaiiBullish fall to ai-estimate (buffettIndicator left this list in P7-73a — it is FRED now). Risk Appetite keeps only Fear & Greed's 30 points, under MIN_SCORED_MAX, so the pillar drops out.",
     scrapingBee: false,
     cnn: true,
   },
   {
     name: "ScrapingBee and CNN off",
-    note: "Risk Appetite loses every one of its four inputs.",
+    note: "Risk Appetite loses every one of its three inputs.",
     scrapingBee: false,
     cnn: false,
   },
-  {
-    name: "ScrapingBee off, BEFORE P6-72/P6-74 (historical — do not restore)",
-    note:
-      "What production actually reported until 2026-08-11. scrapePutCallRatio and " +
-      "scrapeAAIISentiment self-reported status:'live' for Grok answers, so 55 points of " +
-      "Risk Appetite counted as measured. Kept as a scenario because the gap between this " +
-      "row and the one above IS the defect: the index looked far more measured than it was, " +
-      "and its largest pillar stayed alive on two LLM guesses instead of dropping out.",
-    scrapingBee: false,
-    cnn: true,
-    countAiAsLive: ["putCallRatio", "aaiiBullish"],
-  },
+  // The fourth, HISTORICAL scenario — "ScrapingBee off, BEFORE P6-72/P6-74",
+  // published 79 — was retired by P7-89. It modelled two scrapes self-reporting
+  // "live" against the OLD weight tables; against the rescaled tables the same
+  // lie computes the same 100 as everything-up, so the scenario can no longer
+  // express the defect it existed to document. The record stays in the P6-35 /
+  // P6-76 rows: production reported 79% measured when 62% was the honest
+  // maximum, and the gap was two LLM guesses counted as measurements.
 ]
 
 /** liveMax for one pillar under a scenario: the weight that can reach `live`. */
@@ -147,10 +141,12 @@ const PILLARS: Array<[string, ReadonlyArray<WeightEntry>, number]> = [
  * other side derived rather than restated.**
  */
 const PUBLISHED: Record<string, number> = {
-  "Everything reachable": 81,
-  "ScrapingBee off": 62,
-  "ScrapingBee and CNN off": 55,
-  "ScrapingBee off, BEFORE P6-72/P6-74 (historical — do not restore)": 79,
+  // Post-P7-89 figures. The pre-rescale ceilings — 81 / 62 / 55, and the
+  // historical 79 — are preserved in the P6-35/P6-76 backlog rows as the
+  // record of the old weight tables.
+  "Everything reachable": 100,
+  "ScrapingBee off": 79,
+  "ScrapingBee and CNN off": 70,
 }
 
 let failures = 0

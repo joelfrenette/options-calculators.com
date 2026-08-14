@@ -22,10 +22,16 @@
  * Derived from the FRED series' own 225-quarter history (1970-Q1 → 2026-Q1),
  * percentile-matched to the modern era (1995+, n=125):
  *
- *   >210  p95   (210.7)     16 pts
- *   >195  ~p90  (198.0)     13
- *   >150  ~p75  (150.8)      9
- *   >120  ~p50  (120.8)      5
+ *   >210  p95   (210.7)     29 pts
+ *   >195  ~p90  (198.0)     23
+ *   >150  ~p75  (150.8)     16
+ *   >120  ~p50  (120.8)      8
+ *
+ * Points were 16/13/9/5 until the P7-89 rescale executed the owner's decided
+ * drop of the never-scoring inputs; Valuation's surviving weights rescaled
+ * x100/56 and this indicator's max moved 16 -> 29. The CUTOFFS did not move —
+ * only what a band is worth. scoring.ts asserts at module load that
+ * BUFFETT_MAX equals the weight table's entry, so the two cannot drift.
  *
  * The lower two rungs coincide with the retired total-market-cap ladder; only
  * the top two moved (200→210, 180→195). `scripts/analysis-buffett-bands.mjs`
@@ -51,14 +57,14 @@ export const BUFFETT_BASIS = "nonfinancial-corporate-equities" as const
 
 /** Cutoff (exclusive) → points, highest first. The single source of the ladder. */
 export const BUFFETT_BANDS: ReadonlyArray<{ above: number; points: number }> = [
-  { above: 210, points: 16 },
-  { above: 195, points: 13 },
-  { above: 150, points: 9 },
-  { above: 120, points: 5 },
+  { above: 210, points: 29 },
+  { above: 195, points: 23 },
+  { above: 150, points: 16 },
+  { above: 120, points: 8 },
 ]
 
 /** Full marks for this indicator — the top band's points. */
-export const BUFFETT_MAX = 16
+export const BUFFETT_MAX = 29
 
 /**
  * Points for a reading, or NULL when there is no reading.

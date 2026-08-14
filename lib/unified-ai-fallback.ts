@@ -216,50 +216,6 @@ async function fetchWithAIFallback(
   return { value: null, source: "unavailable" }
 }
 
-export async function getShillerCAPE(): Promise<AIFallbackResult> {
-  return fetchWithAIFallback(
-    "Shiller CAPE",
-    async () => await fetchMarketDataWithGrok("Shiller CAPE", "Current CAPE ratio"),
-    fetchShillerCAPEWithGroqLLM,
-    fetchShillerCAPEWithAnthropic,
-    fetchShillerCAPEWithOpenAI,
-    { min: 5, max: 60 },
-  )
-}
-
-export async function getShortInterest(): Promise<AIFallbackResult> {
-  return fetchWithAIFallback(
-    "Short Interest",
-    async () => await fetchMarketDataWithGrok("Short Interest", "Current short interest level"),
-    fetchShortInterestWithGroqLLM,
-    fetchShortInterestWithAnthropic,
-    fetchShortInterestWithOpenAI,
-    { min: 0.2, max: 20 },
-  )
-}
-
-export async function getMag7Concentration(): Promise<AIFallbackResult> {
-  return fetchWithAIFallback(
-    "Mag7 Concentration",
-    async () => await fetchMarketDataWithGrok("Mag7 Concentration", "Current concentration level"),
-    fetchMag7ConcentrationWithGroqLLM,
-    fetchMag7ConcentrationWithAnthropic,
-    fetchMag7ConcentrationWithOpenAI,
-    { min: 20, max: 80 },
-  )
-}
-
-export async function getQQQPE(): Promise<AIFallbackResult> {
-  return fetchWithAIFallback(
-    "QQQ P/E",
-    async () => await fetchMarketDataWithGrok("QQQ P/E", "Current QQQ P/E ratio"),
-    fetchQQQPEWithGroqLLM,
-    fetchQQQPEWithAnthropic,
-    fetchQQQPEWithOpenAI,
-    { min: 10, max: 60 },
-  )
-}
-
 export async function getBuffettIndicator(): Promise<AIFallbackResult> {
   return fetchWithAIFallback(
     "Buffett Indicator",
@@ -327,18 +283,13 @@ export async function getSOXIndex(): Promise<AIFallbackResult> {
   )
 }
 
-export async function getISMPMI(): Promise<AIFallbackResult> {
-  return fetchWithAIFallback(
-    "ISM PMI",
-    async () => await fetchMarketDataWithGrok("ISM Manufacturing PMI", "Current ISM PMI value"),
-    fetchISMPMIWithGroqLLM,
-    fetchISMPMIWithAnthropic,
-    fetchISMPMIWithOpenAI,
-    { min: 30, max: 70 },
-  )
-}
-
 /**
+ * REMOVED 2026-08-14 (P7-89): getShillerCAPE, getShortInterest,
+ * getMag7Concentration, getQQQPE and getISMPMI — their indicators were dropped
+ * from the weights (LLM-only, never scored), so recalling them burned five
+ * model calls per uncached load for numbers nothing consumed. Their
+ * per-provider fetchers go with them.
+ *
  * REMOVED 2026-08-10 (P6-34): getSPXPE, getFearGreed and getYieldCurve.
  *
  * All three were exported and never called, and all three asked an LLM for a

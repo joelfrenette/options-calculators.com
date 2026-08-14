@@ -19,7 +19,7 @@ export const buildRiskAppetitePillar = (ccpi: any, prov: any): PillarAudit => {
     excluded: Array.isArray(p.excluded) ? p.excluded : [],
     formula: "Risk Appetite = (Raw Points / Scored Weight) × 100, renormalized over live/AI-backed indicators",
     calculation:
-      "4 indicators with maxima summing to 100: Put/Call (29), Fear & Greed (24), AAII Bullish (26), Short Interest (21). A null Fear & Greed is excluded AND renormalized rather than silently deflating the pillar.",
+      "3 indicators with maxima summing to 100: Put/Call (37), Fear & Greed (30), AAII Bullish (33). Short Interest (21) was dropped by P7-89 â€” its only source was an LLM, so it could never score. A null Fear & Greed is excluded AND renormalized rather than silently deflating the pillar.",
     executiveSummary:
       "Risk appetite pillar detects euphoria (complacency) and panic (capitulation) through sentiment and positioning indicators. Low put/call ratios and high bullish sentiment signal dangerous complacency, while extreme fear can be contrarian opportunity.",
     validation: band(ccpi.pillars?.riskAppetite, "🔴 EXTREME COMPLACENCY", "🟡 ELEVATED RISK", "🟢 HEALTHY"),
@@ -89,29 +89,6 @@ export const buildRiskAppetitePillar = (ccpi: any, prov: any): PillarAudit => {
         canaryThresholds: {
           medium: ">45% or <30%",
           high: ">55% (euphoria warning)",
-        },
-      },
-      {
-        name: "SPY Short Interest Ratio",
-        formula: "Bearish Positioning = SPY ETF short interest as % of float",
-        executiveSummary:
-          "Measures bearish bets on the S&P 500. Lower short interest (2-3%) signals bullish confidence; high short interest (>6%) signals bearish positioning and elevated stress.",
-        currentValue: fx(i.shortInterest, 1, { suffix: "%" }),
-        ranges: {
-          safe: "2-3% (bullish confidence, low bearish stress)",
-          warning: "3-5% (normal range)",
-          danger: "Above 6% (elevated bearish stress), >8% (extreme bearish sentiment)",
-        },
-        dataSources: src(
-          prov,
-          "riskAppetite",
-          "shortInterest",
-          "AI fallback chain (lib/unified-ai-fallback.ts) — no live provider is wired for short interest",
-          [],
-        ),
-        canaryThresholds: {
-          medium: ">5% (increased bearish positioning)",
-          high: ">8% (extreme bearish stress)",
         },
       },
     ],
