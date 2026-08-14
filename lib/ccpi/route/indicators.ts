@@ -34,23 +34,29 @@ export async function fetchFREDIndicators() {
   // through to the live path unchanged, so the store is never a new failure
   // mode (and works even when FRED itself is down or the key is absent).
   try {
-    const [sDff, sJunk, sCurve, sDebt, sTed, sDxy, sRrp, s10y] = await Promise.all([
+    // TEDRATE is deliberately NOT read (P7-87): FRED discontinued it on
+    // 2022-01-21 when LIBOR ended, so its "latest" observation is that day's
+    // 0.09 forever. Reading it here meant a four-year-old number tiered "live"
+    // and scored as today's interbank stress — present-but-terminal passed
+    // every missing-data guard the P6-6 fix added. tedSpread is null below,
+    // which the tier map turns into "baseline" and scoring excludes; whether
+    // the weight moves to a SOFR-era successor is an owner decision.
+    const [sDff, sJunk, sCurve, sDebt, sDxy, sRrp, s10y] = await Promise.all([
       fredLatestFromStore("DFF"),
       fredLatestFromStore("BAMLH0A0HYM2"),
       fredLatestFromStore("T10Y2Y"),
       fredLatestFromStore("GFDEGDQ188S"),
-      fredLatestFromStore("TEDRATE"),
       fredLatestFromStore("DTWEXBGS"),
       fredLatestFromStore("RRPONTSYD"),
       fredLatestFromStore("DGS10"),
     ])
-    if (sDff && sJunk && sCurve && sDebt && sTed && sDxy && sRrp && s10y) {
+    if (sDff && sJunk && sCurve && sDebt && sDxy && sRrp && s10y) {
       return {
         fedFundsRate: sDff.value,
         junkSpread: sJunk.value,
         yieldCurve: sCurve.value,
         debtToGDP: sDebt.value,
-        tedSpread: sTed.value,
+        tedSpread: null, // discontinued series — see P7-87 note above
         dxyIndex: sDxy.value,
         ismPMI: null, // never carried by FRED; comes from the AI fallback
         fedReverseRepo: sRrp.value,
@@ -72,7 +78,7 @@ export async function fetchFREDIndicators() {
   try {
     const baseUrl = "https://api.stlouisfed.org/fred/series/observations"
 
-    const [fedFundsRes, junkSpreadRes, yieldCurveRes, debtToGDPRes, tedSpreadRes, dxyRes, rrpRes, treasury10YRes] =
+    const [fedFundsRes, junkSpreadRes, yieldCurveRes, debtToGDPRes, dxyRes, rrpRes, treasury10YRes] =
       await Promise.all([
         fetch(`${baseUrl}?series_id=DFF&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
           signal: AbortSignal.timeout(10000),
@@ -86,9 +92,6 @@ export async function fetchFREDIndicators() {
         fetch(`${baseUrl}?series_id=GFDEGDQ188S&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
           signal: AbortSignal.timeout(10000),
         }),
-        fetch(`${baseUrl}?series_id=TEDRATE&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
-          signal: AbortSignal.timeout(10000),
-        }),
         fetch(`${baseUrl}?series_id=DTWEXBGS&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
           signal: AbortSignal.timeout(10000),
         }),
@@ -100,12 +103,11 @@ export async function fetchFREDIndicators() {
         }),
       ])
 
-    const [fedFunds, junkSpread, yieldCurve, debtToGDP, tedSpread, dxy, rrp, treasury10Y] = await Promise.all([
+    const [fedFunds, junkSpread, yieldCurve, debtToGDP, dxy, rrp, treasury10Y] = await Promise.all([
       fedFundsRes.json(),
       junkSpreadRes.json(),
       yieldCurveRes.json(),
       debtToGDPRes.json(),
-      tedSpreadRes.json(),
       dxyRes.json(),
       rrpRes.json(),
       treasury10YRes.json(),
@@ -127,7 +129,7 @@ export async function fetchFREDIndicators() {
       junkSpread: obs(junkSpread),
       yieldCurve: obs(yieldCurve),
       debtToGDP: obs(debtToGDP),
-      tedSpread: obs(tedSpread),
+      tedSpread: null, // discontinued series — see P7-87 note above
       dxyIndex: obs(dxy),
       ismPMI: null, // never carried by FRED; comes from the AI fallback
       fedReverseRepo: obs(rrp),

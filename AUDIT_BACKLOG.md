@@ -461,11 +461,12 @@ recomputes it.
 | P7-85 | P2 | fixed | The CPI tab's "Show Calculations" panel — the transparency feature — described a consensus forecast (Fed SEP, Blue Chip, SPF, weighted formula, smoothing constants, confidence bands) that exists nowhere: the route reads one FRED series and runs `next = clamp(current + 0.15·(target−current) + 0.70·slope, 1.5, 5.0)`. Chart series renamed from "Consensus Inflation Model"; panel rewritten to the real recurrence with the clamp disclosed, since the Y axis is drawn to the clamp bounds. Two retired phrases + a pinned claim on the three constants, negative-tested. Split 669 → 157 in the same commit; a dead unreachable error card deleted. |
 | P7-86 | P3 | fixed | A high r² is not evidence of substitutability: the ^DWCF-to-FRED Buffett regression fits at 0.98 and misplaces the March-2000 top by ~26 points, because a full-cap price index misses net issuance. Rejected on the record in CCPI_DESIGN §8b, together with the fact that FRED withdrew its Wilshire series outright in 2024. |
 | P7-73a | P2 | fixed | The FRED-basis decision wired: four independent Buffett ladders (scoring >200/180/150/120, canaries >200/150 — already disagreeing at the middle rung, the check script's local copy, and the UI's hardcoded 80-240 axis) became lib/ccpi/buffett-bands.ts, read by all of them with explicit .ts imports the plain-node checks resolve. Data: store-first, live-FRED-fallback, null-excluded; scrape retired for this input; diagnostics and UI copy updated to the real basis. Six assertions pin the ladder and the cross-basis divergence. |
+| P7-87 | P2 | fixed | The TED spread input was a corpse scored as live: FRED discontinued TEDRATE 2022-01-21, the desc/limit-1 fetch returned the terminal observation forever, and it tiered "live" at 13/100 of Macro daily — missing-data guards ask if a value exists, never when it is from, and the store staleness gate had been set to Infinity to accommodate exactly this. Retired: null on both paths, macro renormalises (ceiling 87), stored tail kept. Whether the weight moves to a SOFR-era successor is the owner's call. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-290 findings recorded · **253 fixed · 9 wontfix · 2 verified-ok · 26 open.**
+291 findings recorded · **254 fixed · 9 wontfix · 2 verified-ok · 26 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -5521,3 +5522,38 @@ scored indicator should carry its own record where the user reads it.
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-73a | P2 | ANALYZE → CCPI | Owner decision executed: FRED basis scored through the §8b ladder. Four independent Buffett ladders (scoring, canary severities, check script, UI axis — the canary pair already disagreed with scoring at the middle rung) became one import-free module, loaded with explicit `.ts` imports by everything including the plain-node checks. Data path is store-first/live-FRED-second/null-never-scrape; diagnostics and the UI stopped claiming the retired basis. |
+
+## 2026-08-14 — P7-87: a series that died in 2022 was scored as live every day since
+
+Preparing the CCPI audit the owner requested meant re-reading the macro pillar's data
+path, and one input failed a question none of the guards ask: **not "is the value
+missing", but "when is this value FROM".**
+
+FRED discontinued `TEDRATE` on **2022-01-21** — the TED spread's reference rate, LIBOR,
+ceased to exist. `sort_order=desc&limit=1` therefore returns that terminal observation,
+forever. It parses finite, so `obs()` returns it; the tier map sees a non-null value and
+stamps it **`live`**; and the macro pillar has scored a four-and-a-half-year-old reading —
+the same 13/100 of pillar weight, the same number, every single day — as today's
+interbank stress. A frozen ~0.1% TED reads as "no stress", permanently, inside a crash
+index.
+
+**The gap is precise: P6-6 made MISSING honest, and nothing ever made STALE honest.**
+Every guard on this path — the per-series null parse, `check-ccpi-defaults`, the tier
+exclusion — asks whether a number exists, not whether it is current. Worse, the staleness
+that WOULD have caught it was deliberately disabled: `lib/fred-store.ts` carries
+`TEDRATE: Number.POSITIVE_INFINITY` with a comment saying the gate had to go "else the
+store could never win" — the plumbing was tuned so the store could serve the dead value as
+efficiently as the live path did. An accommodation of the discontinuation, made where the
+freshness rule lives, without anyone weighing what was being accommodated.
+
+Fixed by retiring the input, not by faking a successor: both fetch paths skip `TEDRATE`,
+`tedSpread` is null with the reason stated inline, the tier map turns that into
+`baseline`, and scoring excludes it — Macro's live ceiling drops 100 → 87 and renormalises,
+which is the honest state. The snapshot cron keeps storing the historical tail (it is
+real history and the backtest may want it). **Whether the 13 points move to a SOFR-era
+successor or redistribute is an owner decision**, queued with the CCPI audit's questions —
+the P6-35-superseded rule stands: no weight rescale outside a deliberate decision.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-87 | P2 | ANALYZE → CCPI | `TEDRATE` was discontinued by FRED in January 2022; `limit=1&sort_order=desc` kept returning the terminal observation, which parsed finite, tiered "live", and scored 13/100 of Macro daily for 4.5 years — present-but-terminal passes every missing-data guard, and the store's staleness gate had been set to Infinity specifically so the dead value could keep flowing. Input retired: null on both paths, excluded from scoring, tail still stored. Successor/reweight is an owner decision. |
