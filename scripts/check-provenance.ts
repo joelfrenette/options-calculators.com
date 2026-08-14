@@ -303,6 +303,11 @@ const RETIRED: ReadonlyArray<[string, string]> = [
   // name.
   ["Consensus forecast combining Fed projections", "P7-85 — the route fetches no Fed projection and no survey"],
   ["Consensus Inflation Model", "P7-85 — the dashed line is the site's own recurrence, nobody's consensus"],
+  // P7-88. The CCPI's own subtitle. "AI-led" contradicts P6-34 (nothing an AI
+  // returns can move the number), and "early warning oracle" contradicts the
+  // site's own walk-forward verdict (§6b: zero confirmed leading signals).
+  // The rule-2 dialog shortcut kept it green for the P7-84 reason.
+  ["AI-led market correction early warning", "P7-88 — AI cannot move the score, and the backtest refused every early-warning candidate"],
   ["AI-powered predictions using Fed Funds futures", "P6-45 — no model and no futures"],
   ["Sell cash-secured puts on quality stocks", "P6-47 — the CCPI reads nothing about any ticker"],
 ]
@@ -651,6 +656,18 @@ const PINNED: PinnedClaim[] = [
     why: "the row says it is unscored; putting it back into componentScores would make that false",
   },
   {
+    finding: "P7-88",
+    // The honesty line under the gauge states the walk-forward's conclusion.
+    // It stays true only while CCPI_DESIGN §6b's verdict stands — if a signal
+    // is ever confirmed, the heading below changes and this pin fails until
+    // the sentence is rewritten with it.
+    claimFile: "components/ccpi/dashboard-score-card.tsx",
+    claim: "reliably led drawdowns",
+    dependsOnFile: "CCPI_DESIGN.md",
+    dependsOn: /## 6b\. WALK-FORWARD VERDICT[\s\S]{0,60}Nothing is confirmed/,
+    why: "the sentence quotes the backtest's verdict; a confirmed signal would make it false and must take the sentence with it",
+  },
+  {
     finding: "P7-85",
     // The corrected methodology panel discloses the projection's exact
     // arithmetic — 15% pull to target, 70% of the recent slope, clamped to
@@ -685,7 +702,7 @@ const PINNED: PinnedClaim[] = [
  * would be satisfied by swapping one finding for another. Removing a pin now
  * means deleting its entry AND its ID here, in the same commit, on purpose.
  */
-const PINNED_FINDINGS = ["P6-34", "P6-43", "P6-45", "P6-58", "P6-47", "P6-53", "P6-66", "P6-61", "P7-85"] as const
+const PINNED_FINDINGS = ["P6-34", "P6-43", "P6-45", "P6-58", "P6-47", "P6-53", "P6-66", "P6-61", "P7-85", "P7-88"] as const
 const pinnedIds = PINNED.map((p) => p.finding)
 check(
   `scope: ${PINNED.length} pinned claim(s), covering ${PINNED_FINDINGS.length} finding(s)`,

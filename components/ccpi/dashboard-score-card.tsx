@@ -41,7 +41,13 @@ export function ScoreCard({
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-2xl">Crash &amp; Corrections Prediction Index (CCPI)</CardTitle>
-                <CardDescription>AI-led market correction early warning oracle for options traders</CardDescription>
+                <CardDescription>
+                  {/* Was "AI-led market correction early warning oracle" — false on
+                      both nouns (P7-88): AI cannot move the number since P6-34, and
+                      the site's own walk-forward (CCPI_DESIGN §6b) refused every
+                      early-warning candidate. */}
+                  Present-conditions crash-risk index for options sellers — measured inputs only
+                </CardDescription>
               </div>
               <Badge variant={zone.color === "red" ? "destructive" : "secondary"} className="text-lg px-4 py-2">
                 {zone.label}
@@ -103,6 +109,11 @@ export function ScoreCard({
                   {data.ccpi}
                 </p>
                 <p className="text-xs text-gray-500">0 = No risk, 100 = Imminent crash</p>
+                <p className="text-xs text-gray-500 mt-1 max-w-xs mx-auto">
+                  Summarises present conditions from measured inputs. In this site&apos;s own backtesting, no freely
+                  available input reliably led drawdowns — read elevated regimes as a reason to hold more cash, not as
+                  timing.
+                </p>
               </div>
 
               <div className="text-center p-6 bg-gray-50 rounded-lg">

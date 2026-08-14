@@ -462,11 +462,12 @@ recomputes it.
 | P7-86 | P3 | fixed | A high r² is not evidence of substitutability: the ^DWCF-to-FRED Buffett regression fits at 0.98 and misplaces the March-2000 top by ~26 points, because a full-cap price index misses net issuance. Rejected on the record in CCPI_DESIGN §8b, together with the fact that FRED withdrew its Wilshire series outright in 2024. |
 | P7-73a | P2 | fixed | The FRED-basis decision wired: four independent Buffett ladders (scoring >200/180/150/120, canaries >200/150 — already disagreeing at the middle rung, the check script's local copy, and the UI's hardcoded 80-240 axis) became lib/ccpi/buffett-bands.ts, read by all of them with explicit .ts imports the plain-node checks resolve. Data: store-first, live-FRED-fallback, null-excluded; scrape retired for this input; diagnostics and UI copy updated to the real basis. Six assertions pin the ladder and the cross-basis divergence. |
 | P7-87 | P2 | fixed | The TED spread input was a corpse scored as live: FRED discontinued TEDRATE 2022-01-21, the desc/limit-1 fetch returned the terminal observation forever, and it tiered "live" at 13/100 of Macro daily — missing-data guards ask if a value exists, never when it is from, and the store staleness gate had been set to Infinity to accommodate exactly this. Retired: null on both paths, macro renormalises (ceiling 87), stored tail kept. Whether the weight moves to a SOFR-era successor is the owner's call. |
+| P7-88 | P2 | fixed | The CCPI subtitle claimed "AI-led market correction early warning oracle" — false twice: AI cannot move the score (P6-34), and the walk-forward confirmed zero early-warning candidates (§6b). Subtitle corrected; honesty line added under the gauge and PINNED to the §6b verdict heading it quotes (negative-tested both directions); oracle phrase retired. CSP verbs live on the allocation bands (cspAction), one ladder not two. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-291 findings recorded · **254 fixed · 9 wontfix · 2 verified-ok · 26 open.**
+292 findings recorded · **255 fixed · 9 wontfix · 2 verified-ok · 26 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -5557,3 +5558,42 @@ the P6-35-superseded rule stands: no weight rescale outside a deliberate decisio
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-87 | P2 | ANALYZE → CCPI | `TEDRATE` was discontinued by FRED in January 2022; `limit=1&sort_order=desc` kept returning the terminal observation, which parsed finite, tiered "live", and scored 13/100 of Macro daily for 4.5 years — present-but-terminal passes every missing-data guard, and the store's staleness gate had been set to Infinity specifically so the dead value could keep flowing. Input retired: null on both paths, excluded from scoring, tail still stored. Successor/reweight is an owner decision. |
+
+## 2026-08-14 — P7-88: the index called itself an oracle, and the regimes get put-seller verbs
+
+The CCPI audit's §6 recommendations, built. And building them found the subtitle.
+
+### P7-88 — "AI-led market correction early warning oracle"
+
+That was the sentence under the index's own title, and it is false twice in eight words.
+"AI-led": since P6-34, nothing an AI returns can move the score — that is the page's
+proudest property. "Early warning oracle": the site's own walk-forward (CCPI_DESIGN §6b)
+tested every free candidate at every horizon from 30 to 540 days and confirmed zero.
+The rule-2 dialog shortcut kept it green for exactly the P7-84 reason.
+
+The subtitle now says what the code does ("Present-conditions crash-risk index for
+options sellers — measured inputs only"), and a new line under the gauge states the
+backtest's conclusion where the number renders. **The honesty line is pinned to the
+verdict it quotes**: the pinned-claim entry ties it to §6b's "Nothing is confirmed"
+heading, so if a signal is ever confirmed, the check fails until the sentence changes
+with it. Negative-tested in both directions — flipping the design-doc heading fails the
+pin; reintroducing the oracle line fails the retired-phrase check.
+
+### The CSP verbs, one ladder, not two
+
+Each CCPI allocation band gains a `cspAction` — close / stop-opening / roll / sideline
+verbs for a cash-secured-put seller, educational wording — **in `lib/allocation.ts`,
+beside the cash figure and stance the band already carries.** Putting them in the band
+table rather than in component prose is deliberate: the score card already carries one
+prose ladder branching on the same thresholds, and a third copy in a new component is
+how P7-77's five VIX ladders happened. The allocation card renders them under each band.
+
+And an escaping note for the record, because it is this project's recurring bug shape:
+the first version of the P7-88 pin was written through a Python heredoc, and a
+single-backslash `\n` became a REAL newline inside the regex — a syntax error this time
+(loud), where P7-78's backspace byte parsed fine and lied. Generators do not get to
+write regexes here; the fix was made with a direct edit.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-88 | P2 | ANALYZE → CCPI | The index subtitled itself "AI-led market correction early warning oracle" — AI cannot move the score (P6-34) and the site's own walk-forward confirmed zero early-warning signals (§6b). Replaced with what the code does, plus an honesty line under the gauge pinned to the §6b verdict heading it quotes: a confirmed signal fails the check until the sentence moves. CSP per-regime verbs added on the allocation bands themselves, not as a second prose ladder. |

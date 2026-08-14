@@ -61,6 +61,12 @@ export interface AllocationBand {
   cash: number
   /** One line on what the split is for at this level. */
   stance: string
+  /**
+   * The put-seller verbs for this band (CCPI scale only). Lives here so the
+   * regime ladder and its actions are one table — a second prose ladder in a
+   * component is how the P7-77 duplicates happened. Educational wording only.
+   */
+  cspAction?: string
 }
 
 export interface AllocationScale {
@@ -80,6 +86,7 @@ const CCPI_ALLOCATION_BANDS: readonly AllocationBand[] = [
     level: "Low Risk",
     cash: 10,
     stance: "Fully deployed. Hold only the cash you need to act on a pullback.",
+    cspAction: "Normal CSP program: standard sizing and deltas; take assignment only where you want the shares.",
   },
   {
     range: "20-39",
@@ -88,6 +95,7 @@ const CCPI_ALLOCATION_BANDS: readonly AllocationBand[] = [
     level: "Normal",
     cash: 20,
     stance: "Standard positioning with a working cash reserve.",
+    cspAction: "Standard program on quality underlyings; keep the working cash reserve intact.",
   },
   {
     range: "40-59",
@@ -96,6 +104,7 @@ const CCPI_ALLOCATION_BANDS: readonly AllocationBand[] = [
     level: "Caution",
     cash: 35,
     stance: "Trim into strength and let cash build.",
+    cspAction: "Stop opening new CSPs on extended names; roll threatened puts down and out on strength; let expiring winners expire and let cash build toward the band.",
   },
   {
     range: "60-79",
@@ -104,6 +113,7 @@ const CCPI_ALLOCATION_BANDS: readonly AllocationBand[] = [
     level: "High Alert",
     cash: 55,
     stance: "Cash is the larger half. Keep only high-conviction and defensive names.",
+    cspAction: "Close short puts into strength rather than squeezing the last premium; open no new short puts; bring cash to the top of the band.",
   },
   {
     range: "80-100",
@@ -112,6 +122,7 @@ const CCPI_ALLOCATION_BANDS: readonly AllocationBand[] = [
     level: "Crash Watch",
     cash: 75,
     stance: "Capital preservation. Deploy again only after the regime downgrades.",
+    cspAction: "No new short puts. Hold cash and keep the re-entry list ready — LEAPS and CSP strikes at prior support — for the regime downgrade.",
   },
 ]
 

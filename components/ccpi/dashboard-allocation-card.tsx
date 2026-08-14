@@ -69,6 +69,11 @@ export function AllocationCard({
                           <AllocationBar band={band} />
 
                           <p className="text-sm text-gray-600 italic mt-3">{band.stance}</p>
+                          {band.cspAction && (
+                            <p className="text-sm text-gray-700 mt-2">
+                              <span className="font-semibold">For CSP sellers:</span> {band.cspAction}
+                            </p>
+                          )}
                         </div>
                       )
                     })}
