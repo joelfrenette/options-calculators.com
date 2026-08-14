@@ -22,6 +22,7 @@
 import { readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { computeFreeCashPosition, describeStanding } from "../components/risk/free-cash.ts"
 import {
   VIX_LEVELS,
   cashRangeLabel,
@@ -152,6 +153,102 @@ for (const b of VIX_LEVELS) {
     cashRangeLabel(b),
   )
 }
+
+// ------------------------------------------------- free cash vs the target
+
+/**
+ * P7-79. The tab used to compute a TARGET and never a measurement. These pin the
+ * measurement, and the first two are the ones that matter: a blank field must
+ * not become 0, and collateral must not be silently ignored.
+ */
+
+/** The worked example from the header: $30k cash, $20k pledged, $100k account. */
+const WORKED = computeFreeCashPosition(
+  { accountValue: 100_000, cashOnHand: 30_000, committedCollateral: 20_000 },
+  15,
+  25,
+)
+check(
+  "collateral is subtracted — $30k cash less $20k pledged reads 10%, not 30%",
+  WORKED !== null && WORKED.freeCashPercent === 10,
+  WORKED ? `${WORKED.freeCashPercent}%` : "null",
+)
+check(
+  "and 10% against a 15-25% target reads UNDER, not on target",
+  WORKED !== null && WORKED.standing === "under" && WORKED.distanceFromTarget === 5,
+  WORKED ? `${WORKED.standing}, ${WORKED.distanceFromTarget} pts` : "null",
+)
+
+/**
+ * The defect this shape invites: a blank input coerced to 0 renders a confident
+ * "badly under" from no data at all. Each field is checked separately because
+ * `|| 0` would have made all three look identical.
+ */
+const BLANKS: Array<[string, Parameters<typeof computeFreeCashPosition>[0]]> = [
+  ["no account value", { accountValue: null, cashOnHand: 30_000, committedCollateral: 20_000 }],
+  ["no cash figure", { accountValue: 100_000, cashOnHand: null, committedCollateral: 20_000 }],
+  ["no collateral figure", { accountValue: 100_000, cashOnHand: 30_000, committedCollateral: null }],
+]
+for (const [label, inputs] of BLANKS) {
+  check(
+    `${label} returns null rather than a 0% position`,
+    computeFreeCashPosition(inputs, 15, 25) === null,
+  )
+}
+
+check(
+  "a zero account value returns null — an account worth nothing has no allocation",
+  computeFreeCashPosition({ accountValue: 0, cashOnHand: 10_000, committedCollateral: 0 }, 15, 25) === null,
+)
+check(
+  "a negative input is treated as a typo, not a position",
+  computeFreeCashPosition({ accountValue: 100_000, cashOnHand: -1, committedCollateral: 0 }, 15, 25) === null,
+)
+
+/** Over-commitment is reported, not clamped to a calm 0%. */
+const OVER = computeFreeCashPosition(
+  { accountValue: 100_000, cashOnHand: 10_000, committedCollateral: 25_000 },
+  15,
+  25,
+)
+check(
+  "collateral exceeding cash yields a NEGATIVE free-cash figure, not 0",
+  OVER !== null && OVER.freeCashPercent === -15 && OVER.overCommitted,
+  OVER ? `${OVER.freeCashPercent}%, overCommitted=${OVER.overCommitted}` : "null",
+)
+check(
+  "and the sentence says so plainly instead of reporting a standing",
+  OVER !== null && describeStanding(OVER, 15, 25).includes("exceeds cash on hand"),
+  OVER ? describeStanding(OVER, 15, 25) : "null",
+)
+
+/** Band edges are inside the target, not outside it. */
+for (const [pct, cash, expected] of [
+  [15, 15_000, "within"],
+  [25, 25_000, "within"],
+  [26, 26_000, "over"],
+  [14, 14_000, "under"],
+] as Array<[number, number, string]>) {
+  const pos = computeFreeCashPosition(
+    { accountValue: 100_000, cashOnHand: cash, committedCollateral: 0 },
+    15,
+    25,
+  )
+  check(`${pct}% against a 15-25% target reads "${expected}"`, pos !== null && pos.standing === expected, pos?.standing)
+}
+
+/** Every sentence names the target it was measured against. */
+const within = computeFreeCashPosition(
+  { accountValue: 100_000, cashOnHand: 20_000, committedCollateral: 0 },
+  15,
+  25,
+)
+check(
+  "the reading names the band target rather than standing alone",
+  within !== null && describeStanding(within, 15, 25).includes("15-25%"),
+  within ? describeStanding(within, 15, 25) : "null",
+)
+
 
 // ------------------------------------------------- no sixth ladder
 

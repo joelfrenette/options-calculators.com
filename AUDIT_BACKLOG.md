@@ -452,11 +452,12 @@ recomputes it.
 | P7-76 | **P1** | fixed | **`*/*` in a MIME Accept header opened a phantom comment that blanked the rest of the file for every comment-stripping check in the suite.** `*/*` contains `/*`; the strippers' `\/\*[\s\S]*?\*\//` then ran to the next `*/` and deleted everything between. Measured, not theorised: **996 bytes of `app/api/yahoo-proxy/route.ts` were invisible** to all 16 scripts that strip comments — `check-provenance` rules 6/7/9/12/13, `check-route-timeouts`, `check-house-libs`, `check-write-only-state`, `check-dead-exports` and the rest. Found because a new route with `*/*` in its Accept header failed the timeout rule while visibly carrying `AbortSignal.timeout`. Fixed with a `(?<!\*)` lookbehind in all 14 scripts that carry the pattern. **This is the P6-75 shape at its worst: not a check that stopped covering one file, but a hole in the mechanism every check shares.** |
 | P7-77 | P2 | fixed | **The Risk Calculator's VIX cash bands now match the framework they cite, and five threshold ladders became one.** Owner decision 2026-08-14: adopt Ryan Hildreth's four published bands (25-50 / 15-25 / 5-10 / 0-5) in place of the site's six, which were more defensive at VIX 15-25 and cited nobody. The tab now names the framework where the numbers render. **Cutting the library to four bands was HALF A CHANGE**: three more ladders lived outside it — a hardcoded six-row range list in the allocation section, a nested-ternary boundary ladder computing which row is CURRENT, and a five-rung sentiment ternary in the calculator — so the tab would have rendered six rows, two of them duplicates, with the badge on the old boundaries. All now read `getVixLevel`. `invested` is derived as `100 − cash` because the source states 15-25% cash AND "deploying roughly 50% to 75%" for the same band, which do not sum to 100. The >30 guidance to add outside capital is deliberately NOT implemented and pinned as a negative assertion. 31 checks. |
 | P7-78 | **P1** | fixed | **A generator script wrote a literal BACKSPACE byte into a check's regex, and the rule passed on code that visibly violated it.** `` was written through a language that interpreted the escape, so the pattern asked for a control character appearing in no source file. The rule reported clean while the ladder it was written to catch sat three lines from the top of the scanned file. TWO rewrites of the scanning logic were spent chasing it — a whole-file regex strip, then a block-comment state machine — and a wrong diagnosis in between (node's TypeScript stripper mis-lexing `<`) before `cat -A` showed `^H` in the source. The pattern is now built with `String.raw` from a string. **The only thing that ever surfaced it was the negative test refusing to fail**, which is the project's standing rule arriving as its own demonstration: same session, the same escaping mistake also produced a literal newline inside a regex twice. |
+| P7-79 | P2 | fixed | **The Risk Calculator produced a target and never a measurement.** It took one input — portfolio value — multiplied it by the band percentage, and never asked what the user holds, so it could not say whether they were on it. The cited framework's own ratio is `Free Liquid Cash ÷ Account Value`, where free EXCLUDES collateral pledged against open cash-secured puts, and that exclusion is the whole point: $30k cash against $20k pledged is $10k free — the account reads 30% and the deployable figure is 10%, which against a 15-25% target is the difference between "comfortably on target" and "well under". Two optional inputs added; the tab now shows free cash against the band with the over/under. **A blank field stays NULL rather than becoming 0** — `\|\| 0` would render a confident "badly under" from no data, the audit's third failure shape — and each of the three fields is asserted separately, because one coercion would have made them look identical. Over-commitment reports a NEGATIVE percentage rather than clamping to a calm 0%. 14 assertions, negative-tested by reintroducing `?? 0`. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-281 findings recorded · **244 fixed · 9 wontfix · 2 verified-ok · 26 open.**
+282 findings recorded · **245 fixed · 9 wontfix · 2 verified-ok · 26 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -5156,3 +5157,47 @@ only because the script then failed to parse. This one parsed fine and lied.
 |----|-----|------|---------|
 | P7-77 | P2 | ANALYZE → VIX | The cash bands now match the framework the tab cites, and the five independent VIX threshold ladders became one. Invested derived from cash; the >30 external-capital guidance deliberately excluded and pinned as a negative. 31 checks. |
 | P7-78 | P1 | tooling | A literal backspace byte in a check's regex made the rule unfailable — it reported clean on code three lines from the top of the scanned file. Found only because the negative test would not fire. |
+
+## 2026-08-14 — P7-79: a target is not a measurement
+
+The Risk Calculator took **one** input, portfolio value, multiplied it by the band
+percentage, and rendered the result. That is a target. It never asked what the user holds,
+so it could never say whether they were on it — and the tab's own tooltip called the output
+"personalized cash allocation recommendations".
+
+The cited framework's ratio is:
+
+```
+Cash Allocation % = Free Liquid Cash ÷ Current Account Value × 100
+```
+
+where **Free Liquid Cash excludes collateral pledged against open cash-secured puts**. That
+exclusion is the entire point of the metric:
+
+```
+Cash showing in the account          $30,000   30% — reads like a healthy buffer
+Collateral locked against open puts  $20,000
+Free Liquid Cash                     $10,000   10% — what can actually be deployed
+```
+
+Against a 15-25% target the first number reads comfortably on target and the second reads
+well under. Only the second is true.
+
+Two optional inputs now sit under the portfolio field, and when both are present the tab
+shows free cash against the band with the distance from it. When either is blank nothing
+renders — the tab is a target-only calculator again, exactly as before.
+
+**The defect this shape invites is a blank field coerced to zero.** `|| 0` on an unentered
+figure produces a confident "badly under" from no data at all — the audit's third failure
+shape, a missing value rendering as a reading. Each of the three fields is asserted
+separately, because a single coercion would have made all three behave identically and one
+test would have passed anyway. Negative-tested by reintroducing `?? 0`: two assertions fail.
+
+Over-commitment — collateral exceeding cash on hand — reports a **negative** free-cash
+percentage rather than clamping to a calm 0%. It should be impossible in a real account, so
+if it appears it is a typo or something genuinely wrong, and either way the honest response
+is to show it.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-79 | P2 | ANALYZE → VIX | The tab computed a cash target and never a position. Two optional inputs now measure free cash — cash on hand less collateral pledged to open puts — against the band. Blank stays null, never 0; over-commitment reports negative rather than clamping. 14 assertions, negative-tested. |

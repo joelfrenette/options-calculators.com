@@ -43,11 +43,15 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 // P6-13. This file was 858 lines. The VIX bands and the allocation each implies
 // are now in `components/risk/vix-allocation.ts`, unchanged.
 import { VIX_LEVELS, type VixLevel, getVixLevel, getVixPortfolioAllocation } from "@/components/risk/vix-allocation"
+import { computeFreeCashPosition, describeStanding } from "@/components/risk/free-cash"
 import { AllocationByVixSection } from "@/components/risk/allocation-by-vix-section"
 import { OptionsHedgingSection } from "@/components/risk/options-hedging-section"
 
 export function RiskCalculator() {
   const [portfolioSize, setPortfolioSize] = useState<string>("")
+  // P7-79. Optional: entering both turns the target into a position.
+  const [cashOnHand, setCashOnHand] = useState<string>("")
+  const [committedCollateral, setCommittedCollateral] = useState<string>("")
   const [vixValue, setVixValue] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -103,6 +107,28 @@ export function RiskCalculator() {
   const cashMax = currentLevel ? (portfolioValue * currentLevel.cashMax) / 100 : 0
   const investedMin = currentLevel ? (portfolioValue * currentLevel.investedMin) / 100 : 0
   const investedMax = currentLevel ? (portfolioValue * currentLevel.investedMax) / 100 : 0
+
+  /**
+   * The measured side. Blank fields stay NULL rather than becoming 0 — an
+   * unentered figure is not a position of zero cash, and 0% against a
+   * 25-50% target would render as a loud, false 'badly under'.
+   */
+  const numOrNull = (v: string): number | null => {
+    if (v.trim() === "") return null
+    const n = Number.parseFloat(v)
+    return Number.isFinite(n) ? n : null
+  }
+  const freeCashPosition = currentLevel
+    ? computeFreeCashPosition(
+        {
+          accountValue: numOrNull(portfolioSize),
+          cashOnHand: numOrNull(cashOnHand),
+          committedCollateral: numOrNull(committedCollateral),
+        },
+        currentLevel.cashMin,
+        currentLevel.cashMax,
+      )
+    : null
 
   const marginBufferMin = currentLevel ? (cashMin * currentLevel.marginBufferPercent) / 100 : 0
   const marginBufferMax = currentLevel ? (cashMax * currentLevel.marginBufferPercent) / 100 : 0
@@ -347,6 +373,86 @@ export function RiskCalculator() {
                 />
               </div>
             </div>
+
+            {/* P7-79. Both optional. The tab worked as a target-only calculator
+                before these existed and still does when they are blank — which
+                is why nothing below renders until a position can actually be
+                computed. */}
+            <div className="grid gap-4 sm:grid-cols-2 mt-4">
+              <div className="space-y-2">
+                <Label htmlFor="cash-on-hand" className="text-sm font-semibold text-gray-700">
+                  Cash in account <span className="font-normal text-gray-500">(optional)</span>
+                </Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">$</span>
+                  <Input
+                    id="cash-on-hand"
+                    type="number"
+                    placeholder="30000"
+                    value={cashOnHand}
+                    onChange={(e) => setCashOnHand(e.target.value)}
+                    className="pl-7 h-11 border-gray-300 focus:border-primary focus:ring-primary"
+                    min="0"
+                    step="1000"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="committed-collateral" className="text-sm font-semibold text-gray-700">
+                  Committed to open puts <span className="font-normal text-gray-500">(optional)</span>
+                </Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">$</span>
+                  <Input
+                    id="committed-collateral"
+                    type="number"
+                    placeholder="20000"
+                    value={committedCollateral}
+                    onChange={(e) => setCommittedCollateral(e.target.value)}
+                    className="pl-7 h-11 border-gray-300 focus:border-primary focus:ring-primary"
+                    min="0"
+                    step="1000"
+                  />
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Cash pledged as collateral against open cash-secured puts is not deployable. Entering both
+              shows free cash — the figure this framework's ratio is built on — against the band target.
+            </p>
+
+            {freeCashPosition && currentLevel && (
+              <div
+                className={`mt-4 p-4 rounded-lg border-2 ${
+                  freeCashPosition.overCommitted
+                    ? "border-red-300 bg-red-50"
+                    : freeCashPosition.standing === "within"
+                      ? "border-green-300 bg-green-50"
+                      : "border-yellow-300 bg-yellow-50"
+                }`}
+              >
+                <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                  <div>
+                    <div className="text-xs font-semibold uppercase text-gray-600">Free liquid cash</div>
+                    <div className="text-2xl font-bold text-gray-900">
+                      {freeCashPosition.freeCashPercent}%
+                      <span className="ml-2 text-base font-normal text-gray-600">
+                        (${freeCashPosition.freeCash.toLocaleString()})
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs font-semibold uppercase text-gray-600">Band target</div>
+                    <div className="text-lg font-bold text-gray-900">
+                      {currentLevel.cashMin}-{currentLevel.cashMax}%
+                    </div>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-700 mt-2">
+                  {describeStanding(freeCashPosition, currentLevel.cashMin, currentLevel.cashMax)}
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
