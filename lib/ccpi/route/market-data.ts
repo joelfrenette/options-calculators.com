@@ -22,7 +22,7 @@ import {
   getVIX,
 } from "@/lib/unified-ai-fallback"
 import { scrapeAAIISentiment, scrapeBuffettIndicator, scrapePutCallRatio } from "@/lib/scraping-bee"
-import { fetchFMPValuation } from "@/lib/fmp-valuation"
+import { fetchSpxValuation } from "@/lib/spx-valuation"
 import type { Tier } from "@/lib/ccpi/scoring"
 import { type APIStatusTracker, type TierMaps, aiTier, weakerTier } from "./provenance"
 import { fetchAlphaVantageIndicators, fetchEquityFearGreed, fetchFREDIndicators } from "./indicators"
@@ -103,7 +103,7 @@ export async function fetchMarketData() {
     scrapeBuffettIndicator(),
     scrapePutCallRatio(),
     scrapeAAIISentiment(),
-    fetchFMPValuation("SPY"), // live valuation fallback when Apify is disabled
+    fetchSpxValuation(), // P7-75: free multpl first, FMP only for whatever it misses
   ])
 
   const qqqData = results[0].status === "fulfilled" ? results[0].value : null
@@ -124,7 +124,10 @@ export async function fetchMarketData() {
     results[8].status === "fulfilled"
       ? results[8].value
       : { bullish: aaiiBullishResult.value, bearish: 30, neutral: 35, spread: 5, status: "baseline" as const }
-  const fmpVal = results[9].status === "fulfilled" ? results[9].value : null
+  const spxVal =
+    results[9].status === "fulfilled"
+      ? results[9].value
+      : { spxPE: null, spxPS: null, peSource: null, psSource: null }
 
   const qqqLive = qqqData?.source === "live"
   const vixTermLive = vixTermData?.source === "live"
@@ -132,7 +135,7 @@ export async function fetchMarketData() {
   const alphaVantageLive = alphaVantageData?.source === "live"
   const apifyLive = Boolean(apifyRaw?.data && apifyRaw.dataSource && !apifyRaw.dataSource.includes("baseline"))
   const fearGreedLive = fearGreedData.fearGreed !== null
-  const fmpLive = Boolean(fmpVal && (fmpVal.spxPE !== undefined || fmpVal.spxPS !== undefined))
+  const fmpLive = Boolean(spxVal.peSource || spxVal.psSource)
 
   apiStatus.technical = { live: qqqLive, source: qqqData?.source || "baseline", lastUpdated: now() }
   apiStatus.vixTerm = { live: vixTermLive, source: vixTermData?.source || vixResult.source, lastUpdated: now() }
@@ -144,7 +147,9 @@ export async function fetchMarketData() {
   }
   apiStatus.apify = {
     live: apifyLive,
-    source: apifyRaw?.dataSource || (fmpLive ? "FMP key-metrics" : "baseline"),
+    // Names the source that actually answered — "multpl" and "FMP key-metrics"
+    // are different claims and the payload should not blur them (P7-75).
+    source: apifyRaw?.dataSource || (fmpLive ? `spx:${spxVal.peSource ?? spxVal.psSource}` : "baseline"),
     lastUpdated: now(),
   }
   apiStatus.fearGreed = {
@@ -171,10 +176,19 @@ export async function fetchMarketData() {
   // AI fallback chain (the old `status === "live"` comparison could never be true).
   apiStatus.shortInterest = { live: false, source: shortInterestResult.source, lastUpdated: now() }
 
-  const spxPE = (apifyLive ? apifyRaw?.data?.forwardPE || apifyRaw?.data?.trailingPE : undefined) || fmpVal?.spxPE || null
-  const spxPS = (apifyLive ? apifyRaw?.data?.priceToSales : undefined) || fmpVal?.spxPS || null
-  const spxPETier: Tier = apifyLive || fmpVal?.spxPE !== undefined ? "live" : "baseline"
-  const spxPSTier: Tier = (apifyLive && apifyRaw?.data?.priceToSales) || fmpVal?.spxPS !== undefined ? "live" : "baseline"
+  // P7-75. Order: Apify (if a token exists at all), then the free/paid resolver
+  // in `lib/spx-valuation.ts`, which tries multpl before FMP. Apify stays first
+  // only because a deployment that HAS paid for it should use what it bought;
+  // with no token `apifyLive` is false and this falls straight through.
+  const spxPE = (apifyLive ? apifyRaw?.data?.forwardPE || apifyRaw?.data?.trailingPE : undefined) ?? spxVal.spxPE
+  const spxPS = (apifyLive ? apifyRaw?.data?.priceToSales : undefined) ?? spxVal.spxPS
+  // TIERED ON THE VALUE, not on "did a provider respond". The old expression
+  // read `apifyLive || fmpVal?.spxPE !== undefined`, so an Apify response that
+  // carried no P/E still claimed `live` — harmless only because `scorePillar`
+  // independently refuses a null (P6-34's belt-and-braces). Stating it on the
+  // value removes the need to rely on that.
+  const spxPETier: Tier = spxPE !== null && spxPE !== undefined ? "live" : "baseline"
+  const spxPSTier: Tier = spxPS !== null && spxPS !== undefined ? "live" : "baseline"
   const yieldCurve10Y = fredData?.yieldCurve10Y ?? null
   // Per-series, not blanket (P6-6): the 10Y is the only series ERP depends on.
   const fredTier: Tier = fredData?.yieldCurve10Y != null ? "live" : "baseline"

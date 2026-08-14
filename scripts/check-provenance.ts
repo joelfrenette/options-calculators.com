@@ -96,7 +96,7 @@ function walk(dir: string, match: (p: string) => boolean): string[] {
  */
 function stripComments(src: string): string {
   return src
-    .replace(/\/\*[\s\S]*?\*\//g, (m) => " " + "\n".repeat((m.match(/\n/g) || []).length))
+    .replace(/(?<!\*)\/\*[\s\S]*?\*\//g, (m) => " " + "\n".repeat((m.match(/\n/g) || []).length))
     .replace(/(^|[^:])\/\/[^\n]*/g, "$1")
 }
 

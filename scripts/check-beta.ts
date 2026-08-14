@@ -259,7 +259,7 @@ const SCANNER_FILES = [
   ...walk(join(ROOT, "lib/strategy-scanner"), (p) => p.endsWith(".ts")),
 ]
 const routeRaw = SCANNER_FILES.map((f) => readFileSync(f, "utf8")).join("\n")
-const routeSrc = routeRaw.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/[^\n]*/g, (m, pre) =>
+const routeSrc = routeRaw.replace(/(?<!\*)\/\*[\s\S]*?\*\/|(^|[^:])\/\/[^\n]*/g, (m, pre) =>
   m.startsWith("/*") ? " " + "\n".repeat((m.match(/\n/g) || []).length) : (pre ?? ""),
 )
 

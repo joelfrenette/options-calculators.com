@@ -66,7 +66,7 @@ const stripComments = (src: string): string =>
   // otherwise reads as a block opener and eats the rest of the file. The
   // `[^:]` guard keeps `https://` from reading as a comment, which matters
   // more here than anywhere: this check is entirely about URLs.
-  src.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/[^\n]*/g, (m, pre) =>
+  src.replace(/(?<!\*)\/\*[\s\S]*?\*\/|(^|[^:])\/\/[^\n]*/g, (m, pre) =>
     m.startsWith("/*") ? " " + "\n".repeat((m.match(/\n/g) || []).length) : (pre ?? ""),
   )
 

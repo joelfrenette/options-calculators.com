@@ -85,7 +85,7 @@ const stripComments = (src: string): string =>
   // and eats everything to the next `*/`; that hid ~70 lines of
   // wheel-scanner.tsx from four checks. The `[^:]` guard keeps `https://` from
   // reading as a comment.
-  src.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/[^\n]*/g, (m, pre) =>
+  src.replace(/(?<!\*)\/\*[\s\S]*?\*\/|(^|[^:])\/\/[^\n]*/g, (m, pre) =>
     m.startsWith("/*") ? " " + "\n".repeat((m.match(/\n/g) || []).length) : (pre ?? ""),
   )
 

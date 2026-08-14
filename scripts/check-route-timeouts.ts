@@ -44,7 +44,7 @@ const rel = (p: string) => relative(ROOT, p).split(sep).join("/")
  * `/api/sentiment-heatmap`: its measured half already existed in the
  * social-sentiment tab, and its other half asked a model for an impression.
  */
-const EXPECTED_ROUTES = 59
+const EXPECTED_ROUTES = 60
 const MIN_OUTBOUND_ROUTES = 30
 
 let failures = 0
@@ -64,7 +64,7 @@ function walk(dir: string, out: string[] = []): string[] {
 
 const stripComments = (src: string): string =>
   src
-    .replace(/\/\*[\s\S]*?\*\//g, (m) => " " + "\n".repeat((m.match(/\n/g) || []).length))
+    .replace(/(?<!\*)\/\*[\s\S]*?\*\//g, (m) => " " + "\n".repeat((m.match(/\n/g) || []).length))
     .replace(/(^|[^:])\/\/[^\n]*/g, "$1")
 
 const ROUTES = walk(join(ROOT, "app", "api"))

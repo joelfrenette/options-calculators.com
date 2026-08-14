@@ -241,7 +241,7 @@ check(
  * and "this tab must not contain the words options flow" is a sentence anyone
  * can check by eye.
  */
-const viewNoComments = viewSrc.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/[^\n]*/g, (m, pre) =>
+const viewNoComments = viewSrc.replace(/(?<!\*)\/\*[\s\S]*?\*\/|(^|[^:])\/\/[^\n]*/g, (m, pre) =>
   m.startsWith("/*") ? " " : (pre ?? ""),
 )
 check(

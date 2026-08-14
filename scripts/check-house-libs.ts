@@ -87,7 +87,7 @@ const stripComments = (src: string): string =>
   // Alternation scans left to right, so at a `//` the line form matches first
   // and at a `/*` the block form does. The `[^:]` guard keeps `https://` from
   // reading as a comment.
-  src.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/[^\n]*/g, (m, pre) =>
+  src.replace(/(?<!\*)\/\*[\s\S]*?\*\/|(^|[^:])\/\/[^\n]*/g, (m, pre) =>
     m.startsWith("/*") ? " " + "\n".repeat((m.match(/\n/g) || []).length) : (pre ?? ""),
   )
 

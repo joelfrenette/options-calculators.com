@@ -448,11 +448,13 @@ recomputes it.
 | P7-72 | **P1** | fixed | **An LLM was asked for the put/call ratio BEFORE the real source, so the real source was only ever reached when the guess failed.** `scrapePutCallRatio` called Grok first and returned any answer between 0.3 and 3 immediately as `ai-estimate`; the CBOE scrape ran only on failure. P6-72 had correctly stopped that guess from SCORING, which is exactly what made the ordering look harmless — and it was not: since `ai-estimate` does not score, a model answering first meant `putCallRatio` contributed **nothing on almost every request**, and the 29 points it is worth were excluded by a CALL ORDER rather than by any absence of data. Reversed: a measurement is tried before a recollection of one. Same function's baseline return was `ratio: 0.95` — a plausible reading handed to the payload as `putCallRatio` — now `null`, per P6-34: the tier says how good a number is, it cannot say there is no number. |
 | P7-73 | P2 | open | **The Buffett Indicator can come from FRED, but not for free, and the reason is a threshold.** `/api/ccpi` scrapes it from GuruFocus via ScrapingBee, which is unset in both environments (P7-69). FRED publishes both halves and the site already reads FRED — so this looked like a straight substitution, and it is not. Measured, not recalled: `NCBEILQ027S`/1000 ÷ `GDP` at 2026-01 is **218.1%**; the GuruFocus figure on staging the same week read **183.8%**. `NCBEILQ027S` is NONFINANCIAL corporate equities, GuruFocus uses TOTAL market cap. The CCPI's bands (>200/>180/>150/>120) are calibrated for the second, so swapping sources moves the indicator 13 → 16 points and reads as the market moving. Both series are now STORED (a quarterly series must accumulate before any backtest can measure it) and the ratio is computed in an import-free module with 15 assertions, including the 1000× unit trap — but it is deliberately NOT wired into scoring. Recalibrating the bands against this series' own history is the open half, and it is the same question CCPI_DESIGN.md already has open. |
 | P7-74 | P3 | fixed | `APIFY_API_TOKEN` is redundant. Its only scoring use is `spxPE`/`spxPS` in `/api/ccpi`, and `fetchFMPValuation("SPY")` already returns exactly those two from FMP `key-metrics`, wired as the fallback in the same expression; `/api/apify-proxy` exists as a route no component fetches. Recorded so the next spend question does not re-derive it: check `FMP_API_KEY` and whether `key-metrics` is on the plan (P7-41 established the SCREENER is paid-tier) before adding a second provider for the same two numbers. |
+| P7-75 | P2 | fixed | **`spxPE`/`spxPS` now come from a free source before a paid one, and the probe that proves it treats a 200 as no answer.** 30 of Valuation's 100 points (plus the 10 derived) had no live source on either host: Apify has no token and FMP's other endpoint is paid-tier. multpl.com publishes both free, keyless, in a `<meta description>`, and survives a plain server fetch — tested three times for a stable body, because one success proves nothing. **aaii.com does NOT**: it answers a plain fetch with HTTP 200 and a ~6 KB Imperva interstitial where 60 KB of survey belongs, and it was reported to the owner as a working free source for one turn on exactly that evidence. `looksBlocked` now judges every source on whether a VALUE came back. Free source FIRST, paid as fallback — P7-72's lesson, applied deliberately rather than discovered. `/api/admin/source-probe` answers the same question from the deployment, which is the only place that can answer it. 14 parser assertions, including that a block page containing the sentence still returns null. |
+| P7-76 | **P1** | fixed | **`*/*` in a MIME Accept header opened a phantom comment that blanked the rest of the file for every comment-stripping check in the suite.** `*/*` contains `/*`; the strippers' `\/\*[\s\S]*?\*\//` then ran to the next `*/` and deleted everything between. Measured, not theorised: **996 bytes of `app/api/yahoo-proxy/route.ts` were invisible** to all 16 scripts that strip comments — `check-provenance` rules 6/7/9/12/13, `check-route-timeouts`, `check-house-libs`, `check-write-only-state`, `check-dead-exports` and the rest. Found because a new route with `*/*` in its Accept header failed the timeout rule while visibly carrying `AbortSignal.timeout`. Fixed with a `(?<!\*)` lookbehind in all 14 scripts that carry the pattern. **This is the P6-75 shape at its worst: not a check that stopped covering one file, but a hole in the mechanism every check shares.** |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-277 findings recorded · **240 fixed · 9 wontfix · 2 verified-ok · 26 open.**
+279 findings recorded · **242 fixed · 9 wontfix · 2 verified-ok · 26 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -5032,3 +5034,60 @@ question `CCPI_DESIGN.md` already has open.
 | P7-72 | P1 | ANALYZE → CCPI | Grok was asked for the put/call ratio before CBOE, so the real source was reached only when the guess failed — and since `ai-estimate` does not score, 29 points were excluded by call order rather than by missing data. Reversed; the `0.95` baseline constant is now null. |
 | P7-73 | P2 | ANALYZE → CCPI | The FRED Buffett Indicator is a different measurement from the scraped one — 218.1% vs 183.8%, crossing a band boundary. Series stored and the ratio computed with 15 assertions including the 1000× unit trap, but not wired into scoring until the bands are recalibrated. |
 | P7-74 | P3 | tooling | `APIFY_API_TOKEN` is redundant: FMP `key-metrics` already supplies the same `spxPE`/`spxPS`, and `/api/apify-proxy` has no consumer. Check FMP before adding a provider. |
+
+## 2026-08-14 — the cost question, and a hole under the whole suite
+
+The owner asked whether `SCRAPINGBEE_API_KEY` and `APIFY_API_TOKEN` could be dropped.
+Answering it produced a free data source, a corrected recommendation, and a P1 in the
+audit's own tooling.
+
+### P7-75 — free first, and a 200 is not an answer
+
+`spxPE` and `spxPS` are 30 of Valuation's 100 points and `equityRiskPremium` (10 more) is
+derived from the P/E. Neither had a live source on either host: Apify has no token, and
+FMP's only other endpoint is the paid-tier screener that already latched off (P7-41).
+
+**multpl.com publishes both, free and keyless**, in a `<meta name="description">` — no JS,
+trivially parseable. Tested three times in a row for a stable body and an extractable
+value, because one success proves nothing.
+
+**aaii.com does not.** It answers a plain server fetch with **HTTP 200 and a ~6 KB Imperva
+interstitial** where 60 KB of survey table belongs. The first request of a session returns
+real data; the next returns the wall. It was reported to the owner as a working free source
+for one turn, on exactly that evidence — the project's own rule (*never 200 with an error
+body*) arriving from the other side, and being fallen for.
+
+So `looksBlocked` judges every source on whether a VALUE came back, never on the status.
+`lib/spx-valuation.ts` tries multpl **before** FMP — P7-72's lesson applied deliberately
+this time rather than discovered — and resolves the two fields independently, so a page
+that serves one and fails the other still contributes.
+
+`/api/admin/source-probe` asks the same question **from the deployment**, which is the only
+place that can answer it: datacentre IPs get blocked where a laptop is not, and that is most
+of what a scraping proxy is for. It is admin-only, and an orphan by design — a tab
+rendering it would spend outbound requests on every page load to answer a question asked
+twice a year.
+
+### P7-76 — a phantom comment under every check in the suite
+
+The new probe route failed `check-route-timeouts` while visibly carrying
+`AbortSignal.timeout`. The cause is worth stating precisely:
+
+**`*/*` contains `/*`.** In a MIME Accept header — `Accept: "text/html,...,*/*"` — the
+strippers' `/\/\*[\s\S]*?\*\//` sees a comment opening and runs to the next `*/`, deleting
+every line between.
+
+Measured rather than theorised: **996 bytes of `app/api/yahoo-proxy/route.ts` were invisible
+to all 16 scripts that strip comments** — `check-provenance` rules 6/7/9/12/13,
+`check-route-timeouts`, `check-house-libs`, `check-write-only-state`, `check-dead-exports`,
+and the rest. Six occurrences across five files, every one an Accept header.
+
+This is P6-75's shape at its worst. Not a check that stopped covering one file, but **a hole
+in the mechanism every check shares** — and it has been there the whole time, silently, in a
+suite whose stated purpose is catching exactly this. Fixed with a `(?<!\*)` lookbehind in
+all 14 scripts carrying the pattern.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P7-75 | P2 | ANALYZE → CCPI | S&P P/E and P/S now come free from multpl before FMP; aaii.com serves a bot wall at HTTP 200 and was briefly mistaken for a working free source. `looksBlocked` judges on the value, and `/api/admin/source-probe` answers the reachability question from the deployment. |
+| P7-76 | P1 | tooling | `*/*` in an Accept header opened a phantom comment that blanked the rest of the file for all 16 comment-stripping checks — 996 bytes of yahoo-proxy were invisible to the entire suite. Fixed with a lookbehind in 14 scripts. |

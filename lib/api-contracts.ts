@@ -588,6 +588,16 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     tabs: [],
   },
   {
+    // P7-75. Admin-only: it makes the server fetch fixed third-party URLs to
+    // answer whether this deployment can reach them without a scraping proxy.
+    path: "/api/admin/source-probe",
+    method: "GET",
+    schema: anyObject,
+    budgetMs: 45000,
+    needsAuth: true,
+    tabs: [],
+  },
+  {
     path: "/api/scraping-bee/diagnostics",
     method: "GET",
     schema: anyObject,

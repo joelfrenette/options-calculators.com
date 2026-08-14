@@ -50,7 +50,7 @@ const noticeRaw = readFileSync(join(ROOT, NOTICE), "utf8")
  * a line comment containing a glob path and everything after it.
  */
 const stripComments = (src: string): string =>
-  src.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/[^\n]*/g, (m, pre) =>
+  src.replace(/(?<!\*)\/\*[\s\S]*?\*\/|(^|[^:])\/\/[^\n]*/g, (m, pre) =>
     m.startsWith("/*") ? " " + "\n".repeat((m.match(/\n/g) || []).length) : (pre ?? ""),
   )
 

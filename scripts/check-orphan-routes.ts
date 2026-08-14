@@ -66,7 +66,7 @@ const stripComments = (src: string): string =>
   // ONE pass, alternation ordered by position. The `[^:]` guard matters here
   // more than usual: every string this file cares about starts `/api/`, and a
   // naive line-comment pattern would treat `https://` as a comment opener.
-  src.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/[^\n]*/g, (m, pre) =>
+  src.replace(/(?<!\*)\/\*[\s\S]*?\*\/|(^|[^:])\/\/[^\n]*/g, (m, pre) =>
     m.startsWith("/*") ? " " + "\n".repeat((m.match(/\n/g) || []).length) : (pre ?? ""),
   )
 
@@ -206,9 +206,15 @@ const KNOWN_ORPHANS: ReadonlySet<string> = new Set([
   "/api/breadth", // E-7e; invoked by hand with ?backfill=
   "/api/breadth-backtest", // E-7e; same
   "/api/cron/quiver-probe", // run by hand; `lib/quiver.ts` cites its results in a comment
+  // P7-75. Operator tool, invoked by typing the URL: it answers whether THIS
+  // deployment can reach the free data sources directly, which decides whether
+  // SCRAPINGBEE_API_KEY and FMP_API_KEY are worth paying for. Deliberately has
+  // no feature caller — a tab rendering it would spend outbound requests on
+  // every page load to answer a question asked twice a year.
+  "/api/admin/source-probe",
 ])
 
-const KNOWN_ORPHAN_BASELINE = 12
+const KNOWN_ORPHAN_BASELINE = 13
 
 check(
   `the known-orphan list still holds ${KNOWN_ORPHAN_BASELINE} entries`,

@@ -558,6 +558,7 @@ function contractCoverage() {
     "/api/admin/ads", "/api/admin/api-keys", "/api/admin/api-status",
     "/api/admin/backup", "/api/admin/budget-guard", "/api/admin/ccpi-backtest",
     "/api/admin/run-health-checks",
+    "/api/admin/source-probe",
     "/api/admin/usage",
     "/api/ai-status", "/api/apify-proxy", "/api/ccpi-signals",
     "/api/auth/login", "/api/auth/logout", "/api/auth/reset-password",
