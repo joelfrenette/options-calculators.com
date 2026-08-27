@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { RunScenarioInAIDialog } from "@/components/run-scenario-ai-dialog"
 import { RefreshButton } from "@/components/ui/refresh-button"
+import { EmailReportButton } from "@/components/email-report-button"
+import { buildCalendarReport } from "@/lib/reports/from-analyze-pages"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DataLoadGate } from "@/components/data-load-gate"
@@ -354,6 +356,7 @@ export function EarningsEconomicCalendar() {
           </div>
           <div className="flex items-center gap-3">
             <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
+            <EmailReportButton payload={() => buildCalendarReport(data?.earnings ?? [], data?.economic ?? [], data?.dateRange)} label="Email calendar" />
             <RefreshButton onClick={handleRefresh} isLoading={refreshing} />
           </div>
         </div>
