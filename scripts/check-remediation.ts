@@ -115,7 +115,7 @@ const CASES: Case[] = [
   // --------------------------------------------------------------- HTTP modes
   {
     label: "HTTP 401 / admin session expired",
-    input: result({ path: "/api/admin/ads", status: "fail", httpStatus: 401, detail: "HTTP 401: Unauthorized", tabs: [] }),
+    input: result({ path: "/api/admin/api-keys", status: "fail", httpStatus: 401, detail: "HTTP 401: Unauthorized", tabs: [] }),
     owner: "owner",
     mentions: "/login",
   },

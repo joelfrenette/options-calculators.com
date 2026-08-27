@@ -427,7 +427,6 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
   // scores signals against the reference drawdowns and writes nothing. Slow
   // because it pulls every stored series it needs.
   { path: "/api/admin/ccpi-backtest", method: "GET", schema: anyObject, budgetMs: 120000, tabs: [], needsAuth: true },
-  { path: "/api/admin/ads", method: "GET", schema: anyObject, budgetMs: 5000, tabs: [], needsAuth: true },
   { path: "/api/admin/backup", method: "GET", schema: anyObject, budgetMs: 15000, tabs: [], needsAuth: true },
   // Budget guard (E-5). GET is read-only — spend vs hard stops plus the kill-flag
   // state — so it is safe to probe. The POST side (clear / trip) is not probed:

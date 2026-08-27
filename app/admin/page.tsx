@@ -17,10 +17,6 @@ import {
   BarChart3,
   Github,
   ExternalLink,
-  Trash2,
-  Plus,
-  Save,
-  ImageIcon,
   Zap,
   Key,
   DollarSign,
@@ -123,9 +119,6 @@ export default function AdminDashboard() {
   const [apiStatuses, setApiStatuses] = useState<ApiStatus[]>([])
   const [apiStatusError, setApiStatusError] = useState<string | null>(null)
   const [apiStatusLoaded, setApiStatusLoaded] = useState(false)
-  const [adImages, setAdImages] = useState<string[]>([])
-  const [adUrl, setAdUrl] = useState("")
-  const [newAdImage, setNewAdImage] = useState("")
   const [activeTab, setActiveTab] = useState("health")
 
   useEffect(() => {
@@ -164,43 +157,7 @@ export default function AdminDashboard() {
     }
   }
 
-  const fetchAdData = async () => {
-    try {
-      const response = await fetch("/api/admin/ads")
-      const data = await response.json()
-      setAdImages(data.images)
-      setAdUrl(data.targetUrl)
-    } catch (error) {
-      console.error("Failed to fetch ad data:", error)
-    }
-  }
 
-  const saveAdData = async () => {
-    setLoading(true)
-    try {
-      await fetch("/api/admin/ads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: adImages, targetUrl: adUrl }),
-      })
-      alert("Ad settings saved successfully!")
-    } catch (error) {
-      alert("Failed to save ad settings")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const addAdImage = () => {
-    if (newAdImage.trim()) {
-      setAdImages([...adImages, newAdImage.trim()])
-      setNewAdImage("")
-    }
-  }
-
-  const deleteAdImage = (index: number) => {
-    setAdImages(adImages.filter((_, i) => i !== index))
-  }
 
   const handleBackup = async () => {
     setLoading(true)
@@ -266,7 +223,7 @@ export default function AdminDashboard() {
 
         {/* Main Tabs */}
         <Tabs defaultValue="health" className="w-full" onValueChange={setActiveTab}>
-          <TabsList className="w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-9 gap-1 bg-gray-100 border border-gray-200 p-1 h-auto mb-6">
+          <TabsList className="w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-1 bg-gray-100 border border-gray-200 p-1 h-auto mb-6">
             <TabsTrigger
               value="health"
               className="text-gray-600 data-[state=active]:bg-emerald-700 data-[state=active]:text-white text-xs md:text-sm"
@@ -322,13 +279,6 @@ export default function AdminDashboard() {
             >
               <Github className="h-4 w-4 mr-1 md:mr-2" />
               Backup
-            </TabsTrigger>
-            <TabsTrigger
-              value="ads"
-              className="text-gray-600 data-[state=active]:bg-emerald-700 data-[state=active]:text-white text-xs md:text-sm"
-            >
-              <ImageIcon className="h-4 w-4 mr-1 md:mr-2" />
-              Ads
             </TabsTrigger>
           </TabsList>
 
@@ -522,60 +472,6 @@ export default function AdminDashboard() {
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
-
-          <TabsContent value="ads">
-            <Card className="bg-white">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ImageIcon className="h-5 w-5 text-orange-600" />
-                  Rotating Ad Banner Management
-                </CardTitle>
-                <CardDescription>Manage the rotating banner ads shown on the site</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div>
-                    <Label>Target URL (where ads link to)</Label>
-                    <Input
-                      value={adUrl}
-                      onChange={(e) => setAdUrl(e.target.value)}
-                      placeholder="https://example.com/promo"
-                      className="mt-1"
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Ad Images</Label>
-                    <div className="space-y-2 mt-2">
-                      {adImages.map((img, index) => (
-                        <div key={index} className="flex items-center gap-2 p-2 border rounded">
-                          <span className="flex-1 text-sm truncate">{img}</span>
-                          <Button variant="ghost" size="sm" onClick={() => deleteAdImage(index)}>
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex gap-2 mt-2">
-                      <Input
-                        value={newAdImage}
-                        onChange={(e) => setNewAdImage(e.target.value)}
-                        placeholder="Image URL"
-                      />
-                      <Button onClick={addAdImage}>
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                <Button onClick={saveAdData} disabled={loading} className="w-full">
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Ad Settings
-                </Button>
-              </CardContent>
-            </Card>
           </TabsContent>
         </Tabs>
         </div>
