@@ -9,7 +9,6 @@ import { GreeksCalculator } from "@/components/greeks-calculator"
 import { EarningsVolatilityCalculator } from "@/components/earnings-volatility-calculator"
 import { FomcPredictions } from "@/components/fomc-predictions"
 import { TrendAnalysis } from "@/components/trend-analysis"
-import { RotatingAdBanner } from "@/components/rotating-ad-banner"
 import { WheelScanner } from "@/components/wheel-scanner"
 import { CpiInflationAnalysis } from "@/components/cpi-inflation-analysis"
 import { CcpiDashboard } from "@/components/ccpi-dashboard"
@@ -384,8 +383,8 @@ export default function Home() {
       <div className="pt-0">
         <header className="border-b border-gray-200 bg-white shadow-sm">
           <div className="container mx-auto px-4">
-            <div className="max-w-[1400px] mx-auto">
-              <div className="flex items-center justify-between py-3 gap-4">
+            <div className="max-w-5xl mx-auto">
+              <div className="flex items-center justify-between py-2 gap-4">
                 <div className="flex items-center gap-2">
                   <Image
                     src="/logo.png"
@@ -402,7 +401,6 @@ export default function Home() {
                   </a>
                 </div>
 
-                <RotatingAdBanner />
 
                 <div className="hidden md:block">
                   <SessionControls />
