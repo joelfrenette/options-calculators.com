@@ -342,7 +342,7 @@ export function WheelScanner() {
           disabled={isEnrichingRelaxed}
         >
           <Filter className="mr-2 h-5 w-5" />
-          {stepTitled("technical", "View Relaxed Criteria Results")}
+          {stepTitled("relaxed")}
         </Button>
       )}
 
@@ -362,7 +362,7 @@ export function WheelScanner() {
           disabled={isEnrichingRelaxed}
         >
           <Filter className="mr-2 h-5 w-5" />
-          {stepTitled("technical", "View Relaxed Criteria Results")}
+          {stepTitled("relaxed")}
         </Button>
       )}
 
@@ -381,7 +381,10 @@ export function WheelScanner() {
         </div>
       )}
 
-      {/* CHANGE: Only render Step 4 table when we have enriched relaxed results (not during loading or when empty) */}
+      {/* Step 5 (relaxed) table. Since the relaxed pass now prices the
+          entry-excluded candidates too (owner 2026-08-27), those rows are
+          flagged HERE with their exclusion reason folded into the Landmine
+          column — a relaxed exclusion must never be a silent one. */}
       {showRelaxedResults && !isEnrichingRelaxed && relaxedResults.length > 0 && (
         <RelaxedResultsTable
           relaxedResults={relaxedResults}
@@ -393,7 +396,15 @@ export function WheelScanner() {
           handleRelaxedSort={handleRelaxedSort}
           showRelaxedResults={showRelaxedResults}
           technicalFilterSettings={technicalFilterSettings}
-          getLandminesForRow={getLandminesForRow}
+          getLandminesForRow={(stock) => {
+            const mines = getLandminesForRow(stock) ?? []
+            const reasons = entryExclusionSummary.find((e) => e.ticker === stock.ticker)?.reasons ?? []
+            const excl = reasons.map((r) => `Entry-excluded: ${r}`)
+            const merged = [...excl, ...mines]
+            // Preserve the "still loading" null only when there is nothing else
+            // to say — a known exclusion reason is worth showing immediately.
+            return merged.length ? merged : getLandminesForRow(stock)
+          }}
         />
       )}
 

@@ -468,14 +468,23 @@ export function useWheelScanner() {
       setStep4CurrentTicker("")
       setRelaxedResults([]) // Clear previous relaxed results
 
-      // The SAME exclusion pass as the strict path above. This is the copy that
-      // actually protects the owner's rule: the relaxed table is the one that
-      // shows near misses, so an exclusion applied only to the strict path
-      // would hide a gapped-up stock from the table nobody was worried about
-      // and leave it in the table they were.
-      const { kept: eligibleForRelaxed } = partitionByEntryExclusions(fundamentalResults, technicalFilterSettings)
+      // OWNER DECISION 2026-08-27: the relaxed pass now relaxes the ENTRY
+      // EXCLUSIONS too, not only the sliders. Previously this ran the same
+      // exclusion pass as the strict path, so a gapped-up / down-year /
+      // laggard / Stage-4 stock never reached the relaxed table either. The
+      // owner wants "relaxed" to mean "loosen everything in Step 4", so every
+      // fundamental candidate is priced here. The exclusions are NOT discarded
+      // — they are computed for flagging, and each formerly-excluded row shows
+      // in the relaxed table with its reason in the Landmine column, never
+      // silently. (This reverses the earlier "protects the rule" note; showing
+      // a flagged stock in an explicitly-exploratory table is the honest half.)
+      const { excluded: relaxedEntryExcluded } = partitionByEntryExclusions(
+        fundamentalResults,
+        technicalFilterSettings,
+      )
+      const entryExcludedTickers = new Set(relaxedEntryExcluded.map((e) => e.ticker))
 
-      enrichWithOptionsData(eligibleForRelaxed, (current, total, ticker) => {
+      enrichWithOptionsData(fundamentalResults, (current, total, ticker) => {
         setStep4Progress(Math.round((current / total) * 100))
         setStep4CurrentTicker(ticker)
       })
@@ -490,9 +499,12 @@ export function useWheelScanner() {
 
             // Relaxed = passes at least some criteria but NOT all (would have been in Step 3 otherwise)
             // Also include options that pass none but have valid data (exploratory)
-            if (passesAll) {
+            // A strict-passing stock is already in the Step 4 table — UNLESS
+            // it was entry-excluded, in which case Step 4 never showed it and
+            // the relaxed table is the only place it can appear.
+            if (passesAll && !entryExcludedTickers.has(stock.ticker)) {
               console.log(
-                `[v0] ${stock.ticker} $${stock.putStrike} - Passes ALL criteria (already in ${stepLabel("fundamentals")}, excluding from ${stepLabel("technical")})`,
+                `[v0] ${stock.ticker} $${stock.putStrike} - Passes ALL criteria (already in ${stepLabel("technical")}, excluding from ${stepLabel("relaxed")})`,
               )
               return false
             }

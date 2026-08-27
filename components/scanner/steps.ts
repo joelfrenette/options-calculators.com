@@ -28,17 +28,25 @@
  * Calls". Those files are deliberately out of scope here and in the check.
  */
 
-export type ScannerStepKey = "dollarFilter" | "preFilter" | "fundamentals" | "technical"
+export type ScannerStepKey = "dollarFilter" | "preFilter" | "fundamentals" | "technical" | "relaxed"
 
-export const SCANNER_STEPS: Record<ScannerStepKey, { n: 1 | 2 | 3 | 4; title: string; action: string }> = {
+export const SCANNER_STEPS: Record<ScannerStepKey, { n: 1 | 2 | 3 | 4 | 5; title: string; action: string }> = {
   /** The price ceiling slider. A filter, not an action — nothing to click. */
   dollarFilter: { n: 1, title: "Dollar Amount Filtering", action: "Set the price ceiling" },
   /** Loads the ticker universe from /api/polygon-tickers. */
   preFilter: { n: 2, title: "Smart Pre-Filtering", action: "Scan for Potential Stocks" },
   /** Fundamental criteria over the loaded universe. */
   fundamentals: { n: 3, title: "Fundamental Criteria", action: "Scan Fundamentals" },
-  /** Technical criteria plus options enrichment, including the relaxed flow. */
+  /** Technical criteria plus options enrichment (the STRICT pass). */
   technical: { n: 4, title: "Technical Criteria", action: "Run Technical Analysis" },
+  /**
+   * The relaxed/exploratory pass, its own step (owner 2026-08-27). It re-prices
+   * every fundamental candidate with the Step 4 filters LOOSENED — both the
+   * sliders (near-misses shown) and the entry exclusions (formerly hidden
+   * candidates now shown, flagged with their exclusion reason). Distinct from
+   * Step 4 so the button and the empty-state card read "Step 5", not "Step 4".
+   */
+  relaxed: { n: 5, title: "Relaxed Criteria", action: "View Relaxed Criteria Results" },
 }
 
 /** "Step 2" — for interpolation into a heading, button or error. */

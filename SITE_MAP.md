@@ -26,7 +26,7 @@
 
 | Tab id | Label | Component | File | Lines | Internal APIs |
 |---|---|---|---|---|---|
-| `wheel-scanner` | Sell Put Scanner | `WheelScanner` | `components/wheel-scanner.tsx` | 422 | none (static) |
+| `wheel-scanner` | Sell Put Scanner | `WheelScanner` | `components/wheel-scanner.tsx` | 433 | none (static) |
 | `calendar-spread-scanner` | Calendar Spreads | `CalendarSpreadScanner` | `components/calendar-spread-scanner.tsx` | 590 | `/api/strategy-scanner` |
 | `credit-spread-scanner` | Credit Spreads | `CreditSpreadScanner` | `components/credit-spread-scanner.tsx` | 428 | `/api/strategy-scanner` |
 | `iron-condor-scanner` | Iron Condors | `IronCondorScanner` | `components/iron-condor-scanner.tsx` | 429 | `/api/strategy-scanner` |

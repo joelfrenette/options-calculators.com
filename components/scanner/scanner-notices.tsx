@@ -135,7 +135,7 @@ export function NoRelaxedResultsCard({ fundamentalCount }: NoRelaxedResultsCardP
           <CardHeader className="bg-gradient-to-r from-yellow-50 to-amber-50">
             <div className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-yellow-600" />
-              <CardTitle className="text-yellow-900">{stepLabel("technical")}: No Relaxed Options Found</CardTitle>
+              <CardTitle className="text-yellow-900">{stepLabel("relaxed")}: No Relaxed Options Found</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="p-6">
@@ -180,8 +180,9 @@ export function EntryExclusionCard({ excluded }: EntryExclusionCardProps) {
           {excluded.length} candidate{excluded.length === 1 ? "" : "s"} excluded before pricing
         </CardTitle>
         <CardDescription className="text-amber-800">
-          Removed by the entry exclusions in {stepLabel("technical")}, not by the sliders. They are not in the strict
-          or the relaxed table. A stock whose history is too short to measure is excluded by the filter that needs it.
+          Removed from the STRICT {stepLabel("technical")} table by the entry exclusions, not by the sliders. Run
+          {" "}{stepLabel("relaxed")} to price them anyway — they appear there flagged with the reason below. A stock
+          whose history is too short to measure is excluded by the filter that needs it.
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-4">
