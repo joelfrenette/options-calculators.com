@@ -21,37 +21,52 @@ function sign(value: string) {
   return crypto.createHmac("sha256", getSessionSecret()).update(value).digest("hex")
 }
 
-// Token format: "<base64url(payload)>.<hmac>" where payload = { exp: <ms> }.
-function createToken() {
-  const payload = Buffer.from(JSON.stringify({ exp: Date.now() + SESSION_MAX_AGE * 1000 })).toString("base64url")
+// Token format: "<base64url(payload)>.<hmac>" where payload =
+// { exp: <ms>, role?: "admin" | "member", email?: string }. Tokens minted
+// before the members feature carry only { exp }; they are treated as admin so
+// a deploy never signs the owner out (the only holder of a legacy token).
+export type SessionRole = "admin" | "member"
+
+function createToken(role: SessionRole, email: string) {
+  const payload = Buffer.from(
+    JSON.stringify({ exp: Date.now() + SESSION_MAX_AGE * 1000, role, email }),
+  ).toString("base64url")
   return `${payload}.${sign(payload)}`
 }
 
-function verifyToken(token: string | undefined): boolean {
-  if (!token) return false
+interface SessionPayload {
+  exp: number
+  role: SessionRole
+  email: string | null
+}
+
+function verifyToken(token: string | undefined): SessionPayload | null {
+  if (!token) return null
 
   const [payload, signature] = token.split(".")
-  if (!payload || !signature) return false
+  if (!payload || !signature) return null
 
   // Constant-time signature comparison.
   let expected: string
   try {
     expected = sign(payload)
   } catch {
-    return false
+    return null
   }
   const sigBuf = Buffer.from(signature)
   const expBuf = Buffer.from(expected)
   if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
-    return false
+    return null
   }
 
-  // Signature is valid — now check expiry.
+  // Signature is valid — now check expiry and read the role.
   try {
-    const { exp } = JSON.parse(Buffer.from(payload, "base64url").toString())
-    return typeof exp === "number" && Date.now() < exp
+    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString())
+    if (typeof parsed.exp !== "number" || Date.now() >= parsed.exp) return null
+    const role: SessionRole = parsed.role === "member" ? "member" : "admin"
+    return { exp: parsed.exp, role, email: typeof parsed.email === "string" ? parsed.email : null }
   } catch {
-    return false
+    return null
   }
 }
 
@@ -146,8 +161,8 @@ export function isPasswordHashed(): boolean {
   return !!ADMIN_PASSWORD_HASH
 }
 
-export async function createSession() {
-  const token = createToken()
+export async function createSession(role: SessionRole = "admin", email = "") {
+  const token = createToken(role, email)
   ;(await cookies()).set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -165,14 +180,22 @@ export async function deleteSession() {
   ;(await cookies()).delete(COOKIE_NAME)
 }
 
+/** Any valid session — member or admin. The middleware's question. */
 export async function isAuthenticated() {
-  return verifyToken(await getSession())
+  return verifyToken(await getSession()) !== null
 }
 
+/**
+ * ADMIN-ONLY gate. Every existing /api/admin route calls this, so the safe
+ * default when members arrived was to keep its meaning: a member session is
+ * NOT authenticated here. Anything both roles may use checks isAuthenticated
+ * (or is covered by the middleware gate) instead.
+ */
 export async function verifyAuth(_request?: Request) {
   const session = await getSession()
+  const parsed = verifyToken(session)
 
-  if (!verifyToken(session)) {
+  if (!parsed || parsed.role !== "admin") {
     return {
       authenticated: false as const,
       error: "Invalid or missing session",

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { verifyCredentials, createSession } from "@/lib/auth"
+import { verifyMemberCredentials, recordMemberLogin } from "@/lib/members"
 import {
   checkLoginRateLimit,
   clearLoginFailures,
@@ -50,16 +51,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
     }
 
-    const isValid = await verifyCredentials(email, password)
+    // Admin first (env credentials), then the invited-members table. Both
+    // verifiers run their comparison in constant time; the member check also
+    // does the same scrypt work for an unknown email as for a real one, so
+    // the two paths do not disagree about how long "wrong" takes.
+    const isAdmin = await verifyCredentials(email, password)
+    const isMember = isAdmin ? false : await verifyMemberCredentials(email, password)
 
-    if (!isValid) {
+    if (!isAdmin && !isMember) {
       recordLoginAttempt(ip, false)
       // Same message and status for a wrong email as for a wrong password —
-      // the endpoint must not confirm which admin address is valid.
+      // the endpoint must not confirm which address is valid.
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
     }
 
-    await createSession()
+    await createSession(isAdmin ? "admin" : "member", email.trim().toLowerCase())
+    if (isMember) recordMemberLogin(email)
     recordLoginAttempt(ip, true)
     clearLoginFailures(ip)
     pruneLoginAttempts()

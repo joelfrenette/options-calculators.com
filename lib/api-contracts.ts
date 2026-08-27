@@ -403,6 +403,7 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
   // Admin routes are session-gated; the probe forwards the caller's cookie, so
   // without needsAuth they would all report a 401 as a route failure.
   { path: "/api/admin/api-keys", method: "GET", schema: anyObject, budgetMs: 5000, tabs: [], needsAuth: true },
+  { path: "/api/admin/members", method: "GET", schema: anyObject, budgetMs: 8000, tabs: [], needsAuth: true },
   { path: "/api/admin/usage", method: "GET", schema: anyObject, budgetMs: 5000, tabs: [], needsAuth: true },
   {
     path: "/api/admin/api-status",

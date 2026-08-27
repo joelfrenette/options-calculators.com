@@ -1,0 +1,119 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace; }
+    a { color: #7CE8A4; } a:hover { color: #A5F3C4; }
+  </style>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+</helmet>
+<div style="width: 1280px; height: 800px; background: #0A0F0C; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
+
+  <sc-if value="{{ locked }}" hint-placeholder-val="{{ true }}">
+    <div style="width: 340px; background: #0E1511; border: 1px solid #1D2A22; border-radius: 8px; padding: 20px; box-shadow: 0 0 48px rgba(124,232,164,0.06);">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 0 4px 12px 4px;">
+        <span style="font-size: 11px; letter-spacing: 0.2em; color: #3E5548;">CALC-80</span>
+        <span style="width: 8px; height: 8px; border-radius: 999px; background: #7CE8A4; box-shadow: 0 0 8px rgba(124,232,164,0.8);"></span>
+      </div>
+      <div style="height: 68px; background: #060A08; border: 1px solid #16211B; border-radius: 6px; display: flex; align-items: center; justify-content: flex-end; padding: 0 14px; font-size: 34px; font-weight: 500; color: #7CE8A4; letter-spacing: 0.06em; overflow: hidden; white-space: nowrap; text-shadow: 0 0 12px rgba(124,232,164,0.45);">{{ disp }}</div>
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 14px;">
+        <sc-for list="{{ keys }}" as="k" hint-placeholder-count="20">
+          <button onClick="{{ k.press }}" style="height: 52px; border: 1px solid #1D2A22; border-radius: 6px; background: {{ k.bg }}; color: {{ k.fg }}; font-size: 17px; font-weight: 500; font-family: inherit; cursor: pointer;">{{ k.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ unlocked }}" hint-placeholder-val="{{ false }}">
+    <div style="width: 340px; background: #0E1511; border: 1px solid #1D2A22; border-radius: 8px; padding: 24px; display: flex; flex-direction: column; gap: 12px;">
+      <div style="font-size: 12px; letter-spacing: 0.14em; color: #7CE8A4;">&gt; ACCESS CODE ACCEPTED</div>
+      <div style="font-size: 11px; color: #3E5548; padding-bottom: 4px;">identify yourself_</div>
+      <input placeholder="email" style="height: 44px; border: 1px solid #1D2A22; border-radius: 6px; padding: 0 12px; font-size: 13px; font-family: inherit; color: #C9F5DB; background: #060A08; outline: none;">
+      <input placeholder="password" type="password" style="height: 44px; border: 1px solid #1D2A22; border-radius: 6px; padding: 0 12px; font-size: 13px; font-family: inherit; color: #C9F5DB; background: #060A08; outline: none;">
+      <button style="height: 44px; border: 1px solid #2A5C41; border-radius: 6px; background: #123322; color: #7CE8A4; font-size: 13px; font-weight: 600; font-family: inherit; letter-spacing: 0.1em; cursor: pointer;">ENTER</button>
+      <button onClick="{{ relock }}" style="border: none; background: none; font-size: 11px; color: #3E5548; cursor: pointer; font-family: inherit; padding: 4px 0 0 0; text-align: left;">&lt; back to calculator</button>
+    </div>
+  </sc-if>
+
+  <div style="position: absolute; bottom: 24px; font-size: 11px; color: #1D2A22; letter-spacing: 0.1em;">EST. 2026</div>
+  <div style="position: absolute; top: 24px; left: 24px; font-size: 11px; color: #3E5548; background: #0E1511; border: 1px solid #1D2A22; border-radius: 999px; padding: 6px 12px;">Sample unlock: type 2468 then =</div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  state = { disp: '0', acc: null, op: null, fresh: true, typed: '', unlocked: false }
+
+  digit(d) {
+    const s = this.state
+    const disp = s.fresh ? String(d) : (s.disp.length < 10 ? s.disp + d : s.disp)
+    this.setState({ disp: disp.replace(/^0(?=\d)/, ''), fresh: false, typed: s.typed + d })
+  }
+  dot() {
+    const s = this.state
+    if (s.fresh) { this.setState({ disp: '0.', fresh: false, typed: '' }); return }
+    if (!s.disp.includes('.')) this.setState({ disp: s.disp + '.', typed: '' })
+  }
+  setOp(op) {
+    const s = this.state
+    const cur = parseFloat(s.disp)
+    const acc = s.op && !s.fresh ? this.apply(s.acc, cur, s.op) : (s.acc === null || !s.fresh ? cur : s.acc)
+    this.setState({ acc: acc, op: op, fresh: true, disp: this.fmt(acc), typed: '' })
+  }
+  apply(a, b, op) {
+    if (op === '+') return a + b
+    if (op === '−') return a - b
+    if (op === '×') return a * b
+    if (op === '÷') return b === 0 ? NaN : a / b
+    return b
+  }
+  fmt(n) {
+    if (!isFinite(n)) return 'Error'
+    const r = Math.round(n * 1e9) / 1e9
+    let out = String(r)
+    if (out.length > 10) { const p = r.toPrecision(7); out = p.includes('e') ? p : p.replace(/\.?0+$/, '') }
+    return out
+  }
+  eq() {
+    const s = this.state
+    if (s.typed === '2468' && s.op === null) { this.setState({ unlocked: true }); return }
+    if (s.op === null) { this.setState({ fresh: true, typed: '' }); return }
+    const res = this.apply(s.acc, parseFloat(s.disp), s.op)
+    this.setState({ disp: this.fmt(res), acc: null, op: null, fresh: true, typed: '' })
+  }
+  clr() { this.setState({ disp: '0', acc: null, op: null, fresh: true, typed: '' }) }
+  back() {
+    const s = this.state
+    if (s.fresh) return
+    const d = s.disp.length > 1 ? s.disp.slice(0, -1) : '0'
+    this.setState({ disp: d, fresh: d === '0', typed: s.typed.slice(0, -1) })
+  }
+  neg() { const s = this.state; this.setState({ disp: this.fmt(-parseFloat(s.disp)), typed: '' }) }
+
+  renderVals() {
+    const keyBg = '#101A14', opBg = '#0C1710', num = '#C9F5DB', opFg = '#7CE8A4'
+    const mk = (label, press, bg, fg) => ({ label: label, press: press, bg: bg || keyBg, fg: fg || num })
+    const keys = [
+      mk('C', () => this.clr(), opBg, opFg), mk('⌫', () => this.back(), opBg, opFg), mk('±', () => this.neg(), opBg, opFg), mk('÷', () => this.setOp('÷'), opBg, opFg),
+      mk('7', () => this.digit('7')), mk('8', () => this.digit('8')), mk('9', () => this.digit('9')), mk('×', () => this.setOp('×'), opBg, opFg),
+      mk('4', () => this.digit('4')), mk('5', () => this.digit('5')), mk('6', () => this.digit('6')), mk('−', () => this.setOp('−'), opBg, opFg),
+      mk('1', () => this.digit('1')), mk('2', () => this.digit('2')), mk('3', () => this.digit('3')), mk('+', () => this.setOp('+'), opBg, opFg),
+      mk('%', () => this.setState({ disp: this.fmt(parseFloat(this.state.disp) / 100), typed: '' }), opBg, opFg), mk('0', () => this.digit('0')), mk('.', () => this.dot()), mk('=', () => this.eq(), '#123322', opFg),
+    ]
+    return {
+      disp: this.state.disp,
+      keys: keys,
+      locked: !this.state.unlocked,
+      unlocked: this.state.unlocked,
+      relock: () => this.setState({ unlocked: false, disp: '0', acc: null, op: null, fresh: true, typed: '' }),
+    }
+  }
+}
+</script>
+</body>
+</html>

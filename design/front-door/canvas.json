@@ -1,0 +1,13 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "title": "A — Just a Calculator", "x": 0, "y": 0, "w": 1280, "h": 800, "is_interactive": true },
+    { "file": "Terminal.dc.html", "title": "B — The Terminal", "x": 1400, "y": 0, "w": 1280, "h": 800, "is_interactive": true },
+    { "file": "StudioCard.dc.html", "title": "C — The Studio Card", "x": 0, "y": 1010, "w": 1280, "h": 800, "is_interactive": true },
+    { "file": "BreakEven.dc.html", "title": "D — Break-Even Utility", "x": 1400, "y": 1010, "w": 1280, "h": 800, "is_interactive": true }
+  ],
+  "annotations": [
+    { "id": "how-the-door-works", "x": 0, "y": -280, "w": 620, "text": "How the door really works (all four versions):\nThe calculator code only REVEALS the sign-in — it is a door knocker, not a password. Real security = your existing session login extended with a small members table (you + Johnny), plus middleware that gates every app page AND every /api/* route. The API gate is what actually stops strangers burning credits. The site also gets noindex so search engines forget it.\n\nEvery calculator here works — try the math, then try the unlock." },
+    { "id": "pick-two-things", "x": 700, "y": -280, "w": 500, "text": "Two picks needed:\n1) A direction (A, B, C or D)\n2) The unlock gesture — typed code + '=' (A/B/C), tap-the-logo 5× (D), or both. '2468' is a SAMPLE code; the real one is set at build time and can be changed whenever.\n\nNote: /login stays reachable by direct URL either way, so you and Johnny can bookmark it and skip the theater." }
+  ],
+  "launch": { "view": "canvas" }
+}

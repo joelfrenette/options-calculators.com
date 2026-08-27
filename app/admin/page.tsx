@@ -29,6 +29,7 @@ import {
   PowerOff,
 } from "lucide-react"
 import { ApiKeysManager } from "@/components/api-keys-manager"
+import { MembersManager } from "@/components/members-manager"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CcpiAuditAdmin } from "@/components/ccpi-audit-admin"
 import { ApiDataSourceStatus } from "@/components/api-data-source-status"
@@ -432,7 +433,8 @@ export default function AdminDashboard() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="keys">
+          <TabsContent value="keys" className="space-y-6">
+            <MembersManager />
             <ApiKeysManager />
           </TabsContent>
 

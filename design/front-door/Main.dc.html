@@ -1,0 +1,121 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: "Instrument Sans", system-ui, -apple-system, sans-serif; }
+    a { color: #57534E; } a:hover { color: #1C1917; }
+    link-fonts { display: none; }
+  </style>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap">
+</helmet>
+<div style="width: 1280px; height: 800px; background: #FAFAF9; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
+
+  <sc-if value="{{ locked }}" hint-placeholder-val="{{ true }}">
+    <div style="width: 320px; display: flex; flex-direction: column; gap: 16px;">
+      <div style="background: #FFFFFF; border: 1px solid #E7E5E4; border-radius: 14px; padding: 20px; box-shadow: 0 1px 2px rgba(28,25,23,0.04);">
+        <div style="height: 72px; display: flex; align-items: flex-end; justify-content: flex-end; padding: 0 8px 8px 8px; font-size: 44px; font-weight: 500; color: #1C1917; letter-spacing: -0.01em; overflow: hidden; white-space: nowrap;">{{ disp }}</div>
+        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;">
+          <sc-for list="{{ keys }}" as="k" hint-placeholder-count="20">
+            <button onClick="{{ k.press }}" style="height: 56px; border: none; border-radius: 10px; background: {{ k.bg }}; color: {{ k.fg }}; font-size: 20px; font-weight: 500; font-family: inherit; cursor: pointer;">{{ k.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ unlocked }}" hint-placeholder-val="{{ false }}">
+    <div style="width: 320px; background: #FFFFFF; border: 1px solid #E7E5E4; border-radius: 14px; padding: 28px; box-shadow: 0 1px 2px rgba(28,25,23,0.04); display: flex; flex-direction: column; gap: 14px;">
+      <div style="font-size: 15px; font-weight: 600; color: #1C1917;">Sign in</div>
+      <input placeholder="Email" style="height: 44px; border: 1px solid #E7E5E4; border-radius: 10px; padding: 0 12px; font-size: 14px; font-family: inherit; color: #1C1917; background: #FAFAF9; outline: none;">
+      <input placeholder="Password" type="password" style="height: 44px; border: 1px solid #E7E5E4; border-radius: 10px; padding: 0 12px; font-size: 14px; font-family: inherit; color: #1C1917; background: #FAFAF9; outline: none;">
+      <button style="height: 44px; border: none; border-radius: 10px; background: #1C1917; color: #FAFAF9; font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer;">Continue</button>
+      <div style="display: flex; justify-content: space-between; align-items: baseline;">
+        <span style="font-size: 12px; color: #A8A29E;">Invite only.</span>
+        <button onClick="{{ relock }}" style="border: none; background: none; font-size: 12px; color: #57534E; cursor: pointer; font-family: inherit; padding: 0;">Back</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <div style="position: absolute; bottom: 24px; font-size: 12px; color: #D6D3D1;">© 2026</div>
+
+  <div style="position: absolute; top: 24px; left: 24px; font-size: 12px; color: #A8A29E; background: #F5F5F4; border-radius: 999px; padding: 6px 12px;">Sample unlock: type 2468 then =</div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  state = { disp: '0', acc: null, op: null, fresh: true, typed: '', unlocked: false }
+
+  digit(d) {
+    const s = this.state
+    const disp = s.fresh ? String(d) : (s.disp.length < 12 ? s.disp + d : s.disp)
+    this.setState({ disp: d === '.' && s.fresh ? '0.' : disp.replace(/^0(?=\d)/, ''), fresh: false, typed: s.typed + d })
+  }
+  dot() {
+    const s = this.state
+    if (s.fresh) { this.setState({ disp: '0.', fresh: false, typed: '' }); return }
+    if (!s.disp.includes('.')) this.setState({ disp: s.disp + '.', typed: '' })
+  }
+  setOp(op) {
+    const s = this.state
+    const cur = parseFloat(s.disp)
+    const acc = s.op && !s.fresh ? this.apply(s.acc, cur, s.op) : (s.acc === null || !s.fresh ? cur : s.acc)
+    this.setState({ acc: acc, op: op, fresh: true, disp: this.fmt(acc), typed: '' })
+  }
+  apply(a, b, op) {
+    if (op === '+') return a + b
+    if (op === '−') return a - b
+    if (op === '×') return a * b
+    if (op === '÷') return b === 0 ? NaN : a / b
+    return b
+  }
+  fmt(n) {
+    if (!isFinite(n)) return 'Error'
+    const r = Math.round(n * 1e9) / 1e9
+    let out = String(r)
+    if (out.length > 12) { const p = r.toPrecision(8); out = p.includes('e') ? p : p.replace(/\.?0+$/, '') }
+    return out
+  }
+  eq() {
+    const s = this.state
+    if (s.typed === '2468' && s.op === null) { this.setState({ unlocked: true }); return }
+    if (s.op === null) { this.setState({ fresh: true, typed: '' }); return }
+    const res = this.apply(s.acc, parseFloat(s.disp), s.op)
+    this.setState({ disp: this.fmt(res), acc: null, op: null, fresh: true, typed: '' })
+  }
+  clr() { this.setState({ disp: '0', acc: null, op: null, fresh: true, typed: '' }) }
+  back() {
+    const s = this.state
+    if (s.fresh) return
+    const d = s.disp.length > 1 ? s.disp.slice(0, -1) : '0'
+    this.setState({ disp: d, fresh: d === '0', typed: s.typed.slice(0, -1) })
+  }
+  neg() { const s = this.state; this.setState({ disp: this.fmt(-parseFloat(s.disp)), typed: '' }) }
+
+  renderVals() {
+    const ink = '#1C1917', soft = '#F5F5F4', opBg = '#E7E5E4'
+    const mk = (label, press, bg, fg) => ({ label: label, press: press, bg: bg || soft, fg: fg || ink })
+    const keys = [
+      mk('C', () => this.clr(), opBg), mk('⌫', () => this.back(), opBg), mk('±', () => this.neg(), opBg), mk('÷', () => this.setOp('÷'), opBg),
+      mk('7', () => this.digit('7')), mk('8', () => this.digit('8')), mk('9', () => this.digit('9')), mk('×', () => this.setOp('×'), opBg),
+      mk('4', () => this.digit('4')), mk('5', () => this.digit('5')), mk('6', () => this.digit('6')), mk('−', () => this.setOp('−'), opBg),
+      mk('1', () => this.digit('1')), mk('2', () => this.digit('2')), mk('3', () => this.digit('3')), mk('+', () => this.setOp('+'), opBg),
+      mk('%', () => this.setState({ disp: this.fmt(parseFloat(this.state.disp) / 100), typed: '' }), opBg), mk('0', () => this.digit('0')), mk('.', () => this.dot()), mk('=', () => this.eq(), ink, '#FAFAF9'),
+    ]
+    return {
+      disp: this.state.disp,
+      keys: keys,
+      locked: !this.state.unlocked,
+      unlocked: this.state.unlocked,
+      relock: () => this.setState({ unlocked: false, disp: '0', acc: null, op: null, fresh: true, typed: '' }),
+    }
+  }
+}
+</script>
+</body>
+</html>

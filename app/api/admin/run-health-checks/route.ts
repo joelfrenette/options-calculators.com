@@ -98,7 +98,10 @@ async function probe(c: RouteContract, origin: string, sessionCookie: string | n
     }
   }
 
-  if (c.needsAuth && !sessionCookie) {
+  // Since the private-club gate (2026-08-14), EVERY route needs a session —
+  // the middleware answers 401 to anonymous /api/* across the board, so a
+  // probe without the caller's cookie can exercise nothing.
+  if (!sessionCookie) {
     return { ...base, status: "blocked", detail: "Auth-gated route and no session cookie was forwarded." }
   }
 
@@ -110,9 +113,11 @@ async function probe(c: RouteContract, origin: string, sessionCookie: string | n
   // injects this secret as an env var and honors it as a bypass header.
   const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
   if (bypass) headers["x-vercel-protection-bypass"] = bypass
-  // Forward the caller's own admin session so auth-gated routes are exercised
-  // rather than reporting their 401 as a route failure.
-  if (c.needsAuth && sessionCookie) headers.cookie = `admin-session=${sessionCookie}`
+  // Forward the caller's own admin session to every probe. Before the
+  // private-club gate this was needsAuth-only; now the middleware gates every
+  // route, so a cookie-less probe would report the gate (401), not the route.
+  // Same-host only, as ever — buildUrl targets the report's own origin.
+  headers.cookie = `admin-session=${sessionCookie}`
 
   const started = Date.now()
   try {
@@ -284,13 +289,14 @@ async function seriesCoverageReport() {
  * reader to ignore this block. `fail` is reserved for the case that cannot be
  * intentional — no pillar scoring at all, which is the 503 state.
  */
-async function ccpiPillarCoverage(origin: string) {
+async function ccpiPillarCoverage(origin: string, coverageCookie: string | null) {
   const PILLARS = ["momentum", "riskAppetite", "valuation", "macro"] as const
   try {
-    // No cookie: /api/ccpi is public. Forwarding the admin session here would
-    // be a credential sent where it is not needed, and the probe above already
-    // showed how easily that goes cross-host (see `originFrom`).
+    // The session cookie rides along since the private-club gate — /api/ccpi
+    // stopped being public with everything else, and a cookie-less probe would
+    // measure the middleware's 401, not the pillars. Same-host only.
     const res = await fetch(`${origin}/api/ccpi`, {
+      headers: coverageCookie ? { cookie: `admin-session=${coverageCookie}` } : undefined,
       signal: AbortSignal.timeout(60_000),
       cache: "no-store",
     })
@@ -501,7 +507,7 @@ export async function GET(request: NextRequest) {
     seriesCoverage: await seriesCoverageReport(),
     universeFreshness: await universeFreshnessReport(),
     budgetEnv: budgetEnvReport(),
-    ccpiPillarCoverage: await ccpiPillarCoverage(origin),
+    ccpiPillarCoverage: await ccpiPillarCoverage(origin, sessionCookie),
   })
 }
 
@@ -555,7 +561,7 @@ function securityPosture() {
  */
 function contractCoverage() {
   const KNOWN_ROUTES = [
-    "/api/admin/ads", "/api/admin/api-keys", "/api/admin/api-status",
+    "/api/admin/ads", "/api/admin/api-keys", "/api/admin/api-status", "/api/admin/members",
     "/api/admin/backup", "/api/admin/budget-guard", "/api/admin/ccpi-backtest",
     "/api/admin/run-health-checks",
     "/api/admin/source-probe",
