@@ -18,25 +18,37 @@ export async function sendReportEmail(
   const key = resolveApiKey("RESEND_API_KEY")
   if (!key) return { ok: false, error: "Email is not configured (RESEND_API_KEY)" }
 
-  let excel: Buffer, pdf: Buffer
-  try {
-    ;[excel, pdf] = await Promise.all([buildReportExcel(payload), buildReportPdf(payload)])
-  } catch (e) {
-    return { ok: false, error: `Could not build the report files: ${e instanceof Error ? e.message : String(e)}` }
+  // Build both independently. The Excel path is robust; the PDF path depends on
+  // pdfkit's fonts being traced into the serverless bundle (next.config.mjs).
+  // If the PDF ever fails to build, the email still goes with the Excel and the
+  // body — a report with one attachment beats no report at all — and the body
+  // says the PDF could not be generated rather than pretending it is attached.
+  const [excelR, pdfR] = await Promise.allSettled([buildReportExcel(payload), buildReportPdf(payload)])
+  if (excelR.status !== "fulfilled") {
+    return { ok: false, error: `Could not build the report: ${excelR.reason instanceof Error ? excelR.reason.message : String(excelR.reason)}` }
   }
+  const excel = excelR.value
+  const pdf = pdfR.status === "fulfilled" ? pdfR.value : null
 
   const slug = reportSlug(payload)
+  const attachments = [{ filename: `${slug}.xlsx`, content: excel }]
+  if (pdf) attachments.push({ filename: `${slug}.pdf`, content: pdf })
+
+  const html = pdf
+    ? buildReportEmailHtml(payload)
+    : buildReportEmailHtml(payload).replace(
+        "print-ready.",
+        "print-ready. (The PDF could not be generated this time; the Excel above has the full table.)",
+      )
+
   try {
     const { error } = await new Resend(key).emails.send({
       from: "Options Calculator <noreply@options-calculators.com>",
       to,
       subject: `${payload.title} — ${new Date(payload.generatedAt).toUTCString().replace("GMT", "UTC")}`,
-      html: buildReportEmailHtml(payload),
+      html,
       text: buildReportEmailText(payload),
-      attachments: [
-        { filename: `${slug}.xlsx`, content: excel },
-        { filename: `${slug}.pdf`, content: pdf },
-      ],
+      attachments,
     })
     if (error) return { ok: false, error: typeof error === "string" ? error : (error.message ?? "Send failed") }
     return { ok: true }
