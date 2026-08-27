@@ -73,6 +73,14 @@ export async function buildReportExcel(payload: ReportPayload): Promise<Buffer> 
     ws.getColumn(i + 1).width = Math.min(Math.max(widest + 2, 10), 44)
   })
 
+  // AutoFilter across the header row so every column gets a filter dropdown
+  // (owner ask 2026-08-27). Range spans the header and all data rows.
+  const lastRow = 6 + payload.rows.length
+  ws.autoFilter = {
+    from: { row: 6, column: 1 },
+    to: { row: Math.max(6, lastRow), column: payload.columns.length },
+  }
+
   const out = await wb.xlsx.writeBuffer()
   return Buffer.from(out)
 }
