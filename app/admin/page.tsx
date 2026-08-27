@@ -31,6 +31,7 @@ import {
 import { ApiKeysManager } from "@/components/api-keys-manager"
 import { MembersManager } from "@/components/members-manager"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import Image from "next/image"
 import { CcpiAuditAdmin } from "@/components/ccpi-audit-admin"
 import { ApiDataSourceStatus } from "@/components/api-data-source-status"
 import { AIStatusAdmin } from "@/components/ai-status-admin"
@@ -216,93 +217,115 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-white">Admin Dashboard</h1>
-            <p className="text-slate-400 mt-1">Complete System Monitoring & Audit</p>
+    <div className="min-h-screen bg-gray-50">
+      {/* Same header strip as the main site: white, compact, max-w-5xl. */}
+      <header className="border-b border-gray-200 bg-white shadow-sm">
+        <div className="container mx-auto px-4">
+          <div className="max-w-5xl mx-auto">
+            <div className="flex items-center justify-between py-2 gap-4">
+              <div className="flex items-center gap-2">
+                <Image src="/logo.png" alt="Options Calculators Logo" width={32} height={32} className="h-8 w-8 rounded-md" />
+                <a href="/" className="text-xl md:text-2xl font-bold text-gray-900 hover:text-primary transition-colors">
+                  OPTIONS-CALCULATORS.COM
+                </a>
+                <span className="hidden sm:inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+                  Admin
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => router.push("/")}
+                  variant="outline"
+                  className="border-gray-200 text-gray-700 hover:bg-gray-100 bg-transparent"
+                  size="sm"
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  View Site
+                </Button>
+                <Button
+                  onClick={handleLogout}
+                  variant="outline"
+                  className="border-gray-200 text-gray-700 hover:bg-gray-100 bg-transparent"
+                  size="sm"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sign out
+                </Button>
+              </div>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <Button
-              onClick={() => router.push("/")}
-              variant="outline"
-              className="bg-transparent border-slate-600 text-slate-300 hover:bg-slate-800"
-              size="sm"
-            >
-              <ExternalLink className="mr-2 h-4 w-4" />
-              View Site
-            </Button>
-            <Button onClick={handleLogout} className="bg-white text-slate-900 hover:bg-slate-100" size="sm">
-              <LogOut className="mr-2 h-4 w-4" />
-              Logout
-            </Button>
-          </div>
+        </div>
+      </header>
+
+      <div className="container mx-auto px-4 py-6">
+        <div className="max-w-5xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+          <p className="text-gray-500 mt-1">Complete System Monitoring & Audit</p>
         </div>
 
         {/* Main Tabs */}
         <Tabs defaultValue="health" className="w-full" onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-9 gap-1 bg-slate-800 p-1 h-auto mb-6">
+          <TabsList className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-9 gap-1 bg-gray-100 border border-gray-200 p-1 h-auto mb-6">
             <TabsTrigger
               value="health"
-              className="text-slate-200 data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-xs md:text-sm"
+              className="text-gray-600 data-[state=active]:bg-emerald-700 data-[state=active]:text-white text-xs md:text-sm"
             >
               <HeartPulse className="h-4 w-4 mr-1 md:mr-2" />
               Health
             </TabsTrigger>
             <TabsTrigger
               value="costs"
-              className="text-slate-200 data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-xs md:text-sm"
+              className="text-gray-600 data-[state=active]:bg-emerald-700 data-[state=active]:text-white text-xs md:text-sm"
             >
               <DollarSign className="h-4 w-4 mr-1 md:mr-2" />
               Costs
             </TabsTrigger>
             <TabsTrigger
               value="status"
-              className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900 text-xs md:text-sm"
+              className="text-gray-600 data-[state=active]:bg-emerald-700 data-[state=active]:text-white text-xs md:text-sm"
             >
               <Activity className="h-4 w-4 mr-1 md:mr-2" />
               APIs
             </TabsTrigger>
             <TabsTrigger
               value="ai-status"
-              className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900 text-xs md:text-sm"
+              className="text-gray-600 data-[state=active]:bg-emerald-700 data-[state=active]:text-white text-xs md:text-sm"
             >
               <Zap className="h-4 w-4 mr-1 md:mr-2" />
               AI
             </TabsTrigger>
             <TabsTrigger
               value="sources"
-              className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900 text-xs md:text-sm"
+              className="text-gray-600 data-[state=active]:bg-emerald-700 data-[state=active]:text-white text-xs md:text-sm"
             >
               <Database className="h-4 w-4 mr-1 md:mr-2" />
               Data
             </TabsTrigger>
             <TabsTrigger
               value="keys"
-              className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900 text-xs md:text-sm"
+              className="text-gray-600 data-[state=active]:bg-emerald-700 data-[state=active]:text-white text-xs md:text-sm"
             >
               <Key className="h-4 w-4 mr-1 md:mr-2" />
               Keys
             </TabsTrigger>
             <TabsTrigger
               value="ccpi-audit"
-              className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900 text-xs md:text-sm"
+              className="text-gray-600 data-[state=active]:bg-emerald-700 data-[state=active]:text-white text-xs md:text-sm"
             >
               <BarChart3 className="h-4 w-4 mr-1 md:mr-2" />
               CCPI
             </TabsTrigger>
             <TabsTrigger
               value="backup"
-              className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900 text-xs md:text-sm"
+              className="text-gray-600 data-[state=active]:bg-emerald-700 data-[state=active]:text-white text-xs md:text-sm"
             >
               <Github className="h-4 w-4 mr-1 md:mr-2" />
               Backup
             </TabsTrigger>
             <TabsTrigger
               value="ads"
-              className="text-slate-200 data-[state=active]:bg-white data-[state=active]:text-slate-900 text-xs md:text-sm"
+              className="text-gray-600 data-[state=active]:bg-emerald-700 data-[state=active]:text-white text-xs md:text-sm"
             >
               <ImageIcon className="h-4 w-4 mr-1 md:mr-2" />
               Ads
@@ -400,7 +423,7 @@ export default function AdminDashboard() {
                         >
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-2 mb-1">
-                              <p className="font-bold text-slate-900">{api.name}</p>
+                              <p className="font-bold text-gray-900">{api.name}</p>
                               <span
                                 className={`text-xs px-2 py-1 rounded font-semibold border inline-flex items-center gap-1 ${chip.className}`}
                               >
@@ -408,7 +431,7 @@ export default function AdminDashboard() {
                                 {chip.label}
                               </span>
                               {!api.probed && !api.disabled && (
-                                <span className="text-xs text-slate-500">no network request was made</span>
+                                <span className="text-xs text-gray-500">no network request was made</span>
                               )}
                             </div>
                             <p className="text-sm text-slate-800">{api.message || "No diagnosis reported."}</p>
@@ -555,6 +578,7 @@ export default function AdminDashboard() {
             </Card>
           </TabsContent>
         </Tabs>
+        </div>
       </div>
     </div>
   )

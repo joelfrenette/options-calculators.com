@@ -84,7 +84,7 @@ const STATUS_META: Record<ProbeStatus, { label: string; chip: string; row: strin
   degraded: { label: "degraded", chip: "bg-amber-100 text-amber-800", row: "text-amber-700" },
   fail: { label: "fail", chip: "bg-red-100 text-red-800", row: "text-red-700" },
   blocked: { label: "blocked", chip: "bg-orange-100 text-orange-800", row: "text-orange-700" },
-  skipped: { label: "skipped", chip: "bg-slate-100 text-slate-500", row: "text-slate-500" },
+  skipped: { label: "skipped", chip: "bg-slate-100 text-gray-500", row: "text-gray-500" },
 }
 
 /** Sort weight: worst news first when sorting by status. */
@@ -230,7 +230,7 @@ export function HealthCheckPanel() {
             </Button>
           </div>
           {loading && (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-gray-500">
               Running live probes against {tabFilter.trim() || pathFilter.trim() ? "the filtered routes" : "all contracted routes"} — leave
               this tab open. Auth-gated routes reuse your current admin session.
             </p>
@@ -258,7 +258,7 @@ export function HealthCheckPanel() {
                     <XCircle className="h-4 w-4" /> FAILURES DETECTED
                   </span>
                 )}
-                <span className="inline-flex items-center gap-1 text-xs font-normal text-slate-500">
+                <span className="inline-flex items-center gap-1 text-xs font-normal text-gray-500">
                   <Clock className="h-3 w-3" /> {(report.durationMs / 1000).toFixed(1)}s ·{" "}
                   {new Date(report.timestamp).toLocaleString()} · {report.origin}
                 </span>
@@ -281,7 +281,7 @@ export function HealthCheckPanel() {
                 <span className="text-xs font-semibold px-2 py-1 rounded bg-orange-100 text-orange-800">
                   {report.summary.blocked} blocked
                 </span>
-                <span className="text-xs font-semibold px-2 py-1 rounded bg-slate-100 text-slate-500">
+                <span className="text-xs font-semibold px-2 py-1 rounded bg-slate-100 text-gray-500">
                   {report.summary.skipped} skipped
                 </span>
               </div>
@@ -310,7 +310,7 @@ export function HealthCheckPanel() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b text-left text-xs text-slate-500">
+                    <tr className="border-b text-left text-xs text-gray-500">
                       <th className="py-2 pr-2 w-6" />
                       <th className="py-2 pr-4 cursor-pointer select-none" onClick={() => toggleSort("path")}>
                         Route{sortArrow("path")}
@@ -393,7 +393,7 @@ export function HealthCheckPanel() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b text-left text-xs text-slate-500">
+                    <tr className="border-b text-left text-xs text-gray-500">
                       <th className="py-2 pr-4">Key</th>
                       <th className="py-2 pr-4">Configured</th>
                       <th className="py-2 pr-4">Kill switch</th>
@@ -406,14 +406,14 @@ export function HealthCheckPanel() {
                       const aliasMismatch = k.resolvedVia !== null && k.resolvedVia !== k.name
                       return (
                         <tr key={k.name} className="border-b last:border-0 align-top">
-                          <td className="py-2 pr-4 font-mono text-xs text-slate-900">{k.name}</td>
+                          <td className="py-2 pr-4 font-mono text-xs text-gray-900">{k.name}</td>
                           <td className="py-2 pr-4">
                             {k.configured ? (
                               <span className="inline-flex items-center gap-1 text-xs text-green-700">
                                 <CheckCircle2 className="h-3.5 w-3.5" /> yes
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-xs text-slate-400">
+                              <span className="inline-flex items-center gap-1 text-xs text-gray-500">
                                 <XCircle className="h-3.5 w-3.5" /> no
                               </span>
                             )}
@@ -424,7 +424,7 @@ export function HealthCheckPanel() {
                                 DISABLED_APIS
                               </span>
                             ) : (
-                              <span className="text-xs text-slate-400">—</span>
+                              <span className="text-xs text-gray-500">—</span>
                             )}
                           </td>
                           <td className="py-2 pr-4">
@@ -440,7 +440,7 @@ export function HealthCheckPanel() {
                                 <span className="font-mono text-xs text-slate-600">{k.resolvedVia}</span>
                               )
                             ) : (
-                              <span className="text-xs text-slate-400">—</span>
+                              <span className="text-xs text-gray-500">—</span>
                             )}
                           </td>
                           <td className="py-2 pr-4">
@@ -453,7 +453,7 @@ export function HealthCheckPanel() {
                                 ))}
                               </div>
                             ) : (
-                              <span className="text-xs text-slate-400">—</span>
+                              <span className="text-xs text-gray-500">—</span>
                             )}
                           </td>
                         </tr>
@@ -514,8 +514,8 @@ export function HealthCheckPanel() {
       )}
 
       {!report && !loading && !error && (
-        <p className="text-slate-400 text-sm">
-          No results yet — click <span className="font-semibold text-slate-300">Run All Checks</span> to probe the
+        <p className="text-gray-500 text-sm">
+          No results yet — click <span className="font-semibold text-gray-600">Run All Checks</span> to probe the
           live deployment. Nothing on this panel is cached or estimated; every number comes from a real request.
         </p>
       )}
@@ -543,7 +543,7 @@ function FragmentRow({
         className={`border-b last:border-0 ${hasDetail ? "cursor-pointer hover:bg-slate-50" : ""}`}
         onClick={onToggle}
       >
-        <td className="py-2 pr-2 text-slate-400">
+        <td className="py-2 pr-2 text-gray-500">
           {hasDetail ? (
             isOpen ? (
               <ChevronDown className="h-4 w-4" />
@@ -553,8 +553,8 @@ function FragmentRow({
           ) : null}
         </td>
         <td className="py-2 pr-4">
-          <span className="font-mono text-xs text-slate-900">{r.path}</span>
-          <span className="ml-2 text-[10px] text-slate-400">{r.method}</span>
+          <span className="font-mono text-xs text-gray-900">{r.path}</span>
+          <span className="ml-2 text-[10px] text-gray-500">{r.method}</span>
         </td>
         <td className="py-2 pr-4">
           <span className={`text-xs font-semibold px-2 py-0.5 rounded ${meta.chip}`}>{meta.label}</span>
@@ -563,18 +563,18 @@ function FragmentRow({
           {r.httpStatus !== null ? (
             <span className={r.httpStatus >= 400 ? "text-red-700" : "text-slate-700"}>{r.httpStatus}</span>
           ) : (
-            <span className="text-slate-400">—</span>
+            <span className="text-gray-500">—</span>
           )}
         </td>
         <td className="py-2 pr-4 font-mono text-xs">
           {r.latencyMs !== null ? (
             <span className={r.overBudget ? "text-amber-700 font-semibold" : "text-slate-700"}>
               {r.latencyMs}ms
-              <span className="text-slate-400 font-normal"> / {r.budgetMs}ms</span>
+              <span className="text-gray-500 font-normal"> / {r.budgetMs}ms</span>
               {r.overBudget && <span className="ml-1 text-[10px] uppercase text-amber-700">over budget</span>}
             </span>
           ) : (
-            <span className="text-slate-400">— / {r.budgetMs}ms</span>
+            <span className="text-gray-500">— / {r.budgetMs}ms</span>
           )}
         </td>
         <td className="py-2 pr-4">
@@ -587,7 +587,7 @@ function FragmentRow({
               ))}
             </div>
           ) : (
-            <span className="text-xs text-slate-400">—</span>
+            <span className="text-xs text-gray-500">—</span>
           )}
         </td>
       </tr>

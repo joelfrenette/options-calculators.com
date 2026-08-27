@@ -78,7 +78,7 @@ export function CcpiAuditAdmin() {
       case "baseline":
         return <Badge className="bg-orange-500 text-white">🟠 Baseline (not scored)</Badge>
       default:
-        return <Badge className="bg-slate-400 text-white">❓ Unknown</Badge>
+        return <Badge className="bg-slate-400 text-gray-900">❓ Unknown</Badge>
     }
   }
 
@@ -209,7 +209,7 @@ export function CcpiAuditAdmin() {
             {auditData.dataQuality.pillars.map((p: any) => (
               <div key={p.key} className="p-4 border rounded-lg">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-semibold text-slate-900">{p.name}</span>
+                  <span className="font-semibold text-gray-900">{p.name}</span>
                   <span className="text-lg font-bold text-slate-700">{p.score === null ? EM_DASH : `${p.score}/100`}</span>
                 </div>
                 <p className="text-xs text-slate-600">
@@ -223,7 +223,7 @@ export function CcpiAuditAdmin() {
                   </p>
                 )}
                 {p.excluded.length > 0 && (
-                  <p className="text-xs text-slate-500 mt-1">Excluded from scoring: {p.excluded.join(", ")}</p>
+                  <p className="text-xs text-gray-500 mt-1">Excluded from scoring: {p.excluded.join(", ")}</p>
                 )}
               </div>
             ))}
@@ -287,7 +287,7 @@ export function CcpiAuditAdmin() {
                   ) : auditData.ccpi.validation.ok === false ? (
                     <AlertTriangle className="h-5 w-5 text-red-600" />
                   ) : (
-                    <AlertTriangle className="h-5 w-5 text-slate-500" />
+                    <AlertTriangle className="h-5 w-5 text-gray-500" />
                   )}
                   Validation
                 </h4>

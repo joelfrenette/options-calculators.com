@@ -96,23 +96,23 @@ export function MembersManager() {
   }
 
   return (
-    <Card className="bg-slate-800 border-slate-700">
+    <Card className="bg-white border-gray-200">
       <CardHeader>
-        <CardTitle className="text-white flex items-center gap-2">
-          <Users className="h-5 w-5 text-emerald-400" />
+        <CardTitle className="text-gray-900 flex items-center gap-2">
+          <Users className="h-5 w-5 text-emerald-600" />
           Members
         </CardTitle>
-        <CardDescription className="text-slate-400">
+        <CardDescription className="text-gray-500">
           Who can sign in besides you. Share the temporary password out of band; the site stores only its hash.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && <p className="text-sm text-red-600">{error}</p>}
 
-        {members === null && !error && <p className="text-sm text-slate-400">Loading…</p>}
+        {members === null && !error && <p className="text-sm text-gray-500">Loading…</p>}
 
         {members !== null && members.length === 0 && (
-          <p className="text-sm text-slate-400">No members yet — it is just you.</p>
+          <p className="text-sm text-gray-500">No members yet — it is just you.</p>
         )}
 
         {members !== null && members.length > 0 && (
@@ -120,11 +120,11 @@ export function MembersManager() {
             {members.map((m) => (
               <div
                 key={m.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-700 bg-slate-900 px-3 py-2"
+                className="flex flex-wrap items-center justify-between gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2"
               >
                 <div className="flex flex-col">
-                  <span className={`text-sm ${m.active ? "text-white" : "text-slate-500 line-through"}`}>{m.email}</span>
-                  <span className="text-xs text-slate-500">
+                  <span className={`text-sm ${m.active ? "text-gray-900" : "text-gray-500 line-through"}`}>{m.email}</span>
+                  <span className="text-xs text-gray-500">
                     {m.last_login_at ? `Last sign-in ${new Date(m.last_login_at).toLocaleString()}` : "Never signed in"}
                   </span>
                 </div>
@@ -132,7 +132,7 @@ export function MembersManager() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="border-slate-600 text-slate-200 hover:bg-slate-700 bg-transparent"
+                    className="border-gray-300 text-gray-700 hover:bg-gray-100 bg-transparent"
                     onClick={() => patch(m.id, !m.active)}
                   >
                     {m.active ? "Disable" : "Enable"}
@@ -140,7 +140,7 @@ export function MembersManager() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="border-red-800 text-red-400 hover:bg-red-950 bg-transparent"
+                    className="border-red-200 text-red-600 hover:bg-red-50 bg-transparent"
                     onClick={() => remove(m.id, m.email)}
                   >
                     Remove
@@ -151,9 +151,9 @@ export function MembersManager() {
           </div>
         )}
 
-        <form onSubmit={add} className="flex flex-wrap items-end gap-2 border-t border-slate-700 pt-4">
+        <form onSubmit={add} className="flex flex-wrap items-end gap-2 border-t border-gray-200 pt-4">
           <div className="flex flex-col gap-1">
-            <label htmlFor="member-email" className="text-xs text-slate-400">
+            <label htmlFor="member-email" className="text-xs text-gray-500">
               Email
             </label>
             <input
@@ -162,11 +162,11 @@ export function MembersManager() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="h-9 w-56 rounded border border-slate-600 bg-slate-900 px-2 text-sm text-white outline-none focus:border-emerald-500"
+              className="h-9 w-56 rounded border border-gray-300 bg-gray-50 px-2 text-sm text-gray-900 outline-none focus:border-emerald-500"
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="member-password" className="text-xs text-slate-400">
+            <label htmlFor="member-password" className="text-xs text-gray-500">
               Temp password (min 10 chars)
             </label>
             <input
@@ -176,7 +176,7 @@ export function MembersManager() {
               minLength={10}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="h-9 w-56 rounded border border-slate-600 bg-slate-900 px-2 text-sm text-white outline-none focus:border-emerald-500"
+              className="h-9 w-56 rounded border border-gray-300 bg-gray-50 px-2 text-sm text-gray-900 outline-none focus:border-emerald-500"
             />
           </div>
           <Button type="submit" disabled={busy} className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white">

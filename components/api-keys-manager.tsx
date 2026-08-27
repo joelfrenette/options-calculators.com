@@ -418,7 +418,7 @@ export function ApiKeysManager() {
                         ) : state === "disabled" ? (
                           <PowerOff className="h-4 w-4 text-amber-600" />
                         ) : (
-                          <XCircle className="h-4 w-4 text-slate-400" />
+                          <XCircle className="h-4 w-4 text-gray-500" />
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">{apiKey.description}</p>
@@ -437,7 +437,7 @@ export function ApiKeysManager() {
                       ) : state === "disabled" ? (
                         <span className="text-amber-700">Disabled (kill switch)</span>
                       ) : (
-                        <span className="text-slate-400">Not Set</span>
+                        <span className="text-gray-500">Not Set</span>
                       )}
                       {d?.source === "admin" && (
                         <p className="text-[11px] font-normal text-blue-700">
@@ -445,7 +445,7 @@ export function ApiKeysManager() {
                         </p>
                       )}
                       {d?.source === "env" && (
-                        <p className="text-[11px] font-normal text-slate-500">From Vercel env</p>
+                        <p className="text-[11px] font-normal text-gray-500">From Vercel env</p>
                       )}
                     </div>
                   </div>
@@ -477,7 +477,7 @@ export function ApiKeysManager() {
                             size="sm"
                             onClick={() => submitKey(apiKey.name, "set")}
                             disabled={saving === apiKey.name || !(drafts[apiKey.name] ?? "").trim()}
-                            className="bg-slate-900 hover:bg-slate-800 text-white"
+                            className="bg-gray-50 hover:bg-gray-100 text-gray-900"
                           >
                             <Save className="h-3 w-3 mr-1" />
                             Save
@@ -500,7 +500,7 @@ export function ApiKeysManager() {
                         <p className="text-xs text-red-600">{rowError[apiKey.name]}</p>
                       )}
                       {d?.source === "admin" && d.updatedAt && (
-                        <p className="text-[11px] text-slate-500">
+                        <p className="text-[11px] text-gray-500">
                           Overriding <code>{apiKey.envVarName}</code> · set {new Date(d.updatedAt).toLocaleString()}
                           {d.updatedBy ? ` by ${d.updatedBy}` : ""}. Remove it to fall back to the environment variable.
                         </p>

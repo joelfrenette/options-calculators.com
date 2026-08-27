@@ -107,12 +107,12 @@ export function RemediationCard({
             <Icon className="h-3.5 w-3.5" />
             {meta.label}
           </span>
-          <span className="font-mono text-xs text-slate-500">{result.path}</span>
+          <span className="font-mono text-xs text-gray-500">{result.path}</span>
           {result.httpStatus !== null && result.httpStatus !== undefined && (
-            <span className="font-mono text-xs text-slate-400">HTTP {result.httpStatus}</span>
+            <span className="font-mono text-xs text-gray-500">HTTP {result.httpStatus}</span>
           )}
           {remediation.confidence === "likely" && (
-            <span className="text-[10px] uppercase tracking-wide text-slate-400" title="Best explanation for this symptom, not a certainty">
+            <span className="text-[10px] uppercase tracking-wide text-gray-500" title="Best explanation for this symptom, not a certainty">
               likely cause
             </span>
           )}
@@ -128,11 +128,11 @@ export function RemediationCard({
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <p className="text-sm font-semibold text-slate-900">{remediation.headline}</p>
+        <p className="text-sm font-semibold text-gray-900">{remediation.headline}</p>
         <p className="text-sm text-slate-600">{remediation.why}</p>
 
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Next steps</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Next steps</p>
           <ol className="list-decimal ml-5 space-y-1 text-sm text-slate-700">
             {remediation.steps.map((step, i) => (
               <li key={`${i}-${step.slice(0, 24)}`}>{step}</li>
@@ -143,7 +143,7 @@ export function RemediationCard({
         {remediation.claudePrompt && (
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Prompt for Claude Code</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Prompt for Claude Code</p>
               <Button
                 type="button"
                 onClick={copyPrompt}
@@ -168,7 +168,7 @@ export function RemediationCard({
 
         {remediation.links && remediation.links.length > 0 && (
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Where to go</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Where to go</p>
             <ul className="space-y-1">
               {remediation.links.map((link) => (
                 <li key={link.url}>
@@ -188,7 +188,7 @@ export function RemediationCard({
         )}
 
         {result.detail && (
-          <p className="text-[11px] font-mono text-slate-400 break-words">
+          <p className="text-[11px] font-mono text-gray-500 break-words">
             Reported: {result.detail}
           </p>
         )}
