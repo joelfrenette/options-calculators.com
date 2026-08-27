@@ -10,6 +10,8 @@ import type { QualifyingStock } from "./types"
 import { evaluateCriteria, type TechnicalFilterSettings } from "./technical-criteria"
 import { stepLabel } from "./steps"
 import { yahooChartUrl } from "@/lib/ticker-links"
+import { ExportMenu } from "@/components/export-menu"
+import { buildWheelReport } from "@/lib/reports/from-wheel-scanner"
 
 interface StrictResultsTableProps {
   technicalResults: QualifyingStock[]
@@ -74,10 +76,13 @@ export function StrictResultsTable({
                   {stepLabel("technical")}: Technical Analysis Results (Premium Entries) ✨
                 </CardTitle>
               </div>
-              <span className="text-sm font-semibold text-green-700 bg-green-100 px-3 py-1 rounded-full">
-                {technicalResults.length} {technicalResults.length === 1 ? "option meets" : "options meet"} all the
-                selection criteria
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-semibold text-green-700 bg-green-100 px-3 py-1 rounded-full">
+                  {technicalResults.length} {technicalResults.length === 1 ? "option meets" : "options meet"} all the
+                  selection criteria
+                </span>
+                <ExportMenu payload={() => buildWheelReport(technicalResults)} />
+              </div>
             </div>
             <p className="text-sm text-green-700 mt-2">
               🎉 Congratulations! These stocks passed ALL technical criteria - premium put-selling opportunities!

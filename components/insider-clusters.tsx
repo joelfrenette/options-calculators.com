@@ -7,7 +7,7 @@ import { ExternalLink, Users, TrendingUp, AlertCircle, Info } from "lucide-react
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DataLoadGate } from "@/components/data-load-gate"
 import { RefreshButton } from "@/components/ui/refresh-button"
-import { EmailReportButton } from "@/components/email-report-button"
+import { ExportMenu } from "@/components/export-menu"
 import { buildInsiderClustersReport } from "@/lib/reports/from-copy-pages"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { yahooChartUrl } from "@/lib/ticker-links"
@@ -128,7 +128,7 @@ export function InsiderClusters() {
             </select>
           </label>
           <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
-          <EmailReportButton payload={() => buildInsiderClustersReport(data?.clusters ?? [], data?.windowDays)} label="Email report" />
+          <ExportMenu payload={() => buildInsiderClustersReport(data?.clusters ?? [], data?.windowDays)} />
           <RefreshButton onClick={fetchData} isLoading={loading} loadingText="Refreshing..." />
         </div>
       </div>

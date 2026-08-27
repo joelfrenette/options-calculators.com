@@ -13,6 +13,8 @@ import { Filter } from "lucide-react"
 import type { QualifyingStock, RelaxedFilters } from "./types"
 import { evaluateCriteria, type TechnicalFilterSettings } from "./technical-criteria"
 import { stepLabel } from "./steps"
+import { ExportMenu } from "@/components/export-menu"
+import { buildWheelReport } from "@/lib/reports/from-wheel-scanner"
 import { yahooChartUrl } from "@/lib/ticker-links"
 
 interface RelaxedResultsTableProps {
@@ -110,12 +112,15 @@ export function RelaxedResultsTable({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Filter className="h-5 w-5 text-purple-600" />
-                <CardTitle className="text-purple-900">{stepLabel("technical")}: Relaxed Criteria Results</CardTitle>
+                <CardTitle className="text-purple-900">{stepLabel("relaxed")}: Relaxed Criteria Results</CardTitle>
               </div>
-              <span className="text-sm font-semibold text-purple-700 bg-purple-100 px-3 py-1 rounded-full">
-                {relaxedResults.length} {relaxedResults.length === 1 ? "option meets" : "options meet"} the relaxed
-                criteria
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-semibold text-purple-700 bg-purple-100 px-3 py-1 rounded-full">
+                  {relaxedResults.length} {relaxedResults.length === 1 ? "option meets" : "options meet"} the relaxed
+                  criteria
+                </span>
+                <ExportMenu payload={() => buildWheelReport(relaxedResults)} />
+              </div>
             </div>
             <p className="text-sm text-purple-700 mt-2">
               These stocks passed a slightly relaxed set of technical filters. Review for additional put-selling

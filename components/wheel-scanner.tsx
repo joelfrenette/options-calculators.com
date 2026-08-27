@@ -20,8 +20,6 @@ import { Step4TechnicalCard } from "@/components/scanner/step4-technical-card"
 import { FundamentalResultsTable } from "@/components/scanner/fundamental-results-table"
 import { StrictResultsTable } from "@/components/scanner/strict-results-table"
 import { RelaxedResultsTable } from "@/components/scanner/relaxed-results-table"
-import { EmailReportButton } from "@/components/email-report-button"
-import { buildWheelReport } from "@/lib/reports/from-wheel-scanner"
 import {
   RejectionSummaryCard,
   NoTechnicalPassCard,
@@ -328,11 +326,6 @@ export function WheelScanner() {
         />
       )}
 
-      {step >= 3 && !isScanningTechnicals && technicalResults.length > 0 && (
-        <div className="w-full max-w-7xl mx-auto mt-3 flex justify-end">
-          <EmailReportButton payload={() => buildWheelReport(technicalResults)} label="Email these results" />
-        </div>
-      )}
 
       {/* CHANGE: Added Step 4 button when Step 3 has results (previously only showed when no results) */}
       {step >= 3 && !isScanningTechnicals && technicalResults.length > 0 && !showRelaxedResults && (

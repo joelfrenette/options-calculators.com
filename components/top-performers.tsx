@@ -8,7 +8,7 @@ import { Trophy, TrendingUp, TrendingDown, Users, Info } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DataLoadGate } from "@/components/data-load-gate"
 import { RefreshButton } from "@/components/ui/refresh-button"
-import { EmailReportButton } from "@/components/email-report-button"
+import { ExportMenu } from "@/components/export-menu"
 import { buildTopPerformersReport } from "@/lib/reports/from-copy-pages"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 
@@ -128,7 +128,7 @@ export function TopPerformers() {
             </select>
           </label>
           <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
-          <EmailReportButton payload={() => buildTopPerformersReport(data?.top ?? [], data?.windowDays)} label="Email report" />
+          <ExportMenu payload={() => buildTopPerformersReport(data?.top ?? [], data?.windowDays)} />
           <RefreshButton onClick={fetchData} isLoading={loading} loadingText="Refreshing..." />
         </div>
       </div>

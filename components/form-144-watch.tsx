@@ -7,7 +7,7 @@ import { ExternalLink, AlertTriangle, FileText, Info } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DataLoadGate } from "@/components/data-load-gate"
 import { RefreshButton } from "@/components/ui/refresh-button"
-import { EmailReportButton } from "@/components/email-report-button"
+import { ExportMenu } from "@/components/export-menu"
 import { buildForm144Report } from "@/lib/reports/from-copy-pages"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 
@@ -95,7 +95,7 @@ export function Form144Watch() {
         </div>
         <div className="flex items-center gap-3">
           <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
-          <EmailReportButton payload={() => buildForm144Report(visible)} label="Email report" />
+          <ExportMenu payload={() => buildForm144Report(visible)} />
           <RefreshButton onClick={fetchData} isLoading={loading} loadingText="Refreshing..." />
         </div>
       </div>

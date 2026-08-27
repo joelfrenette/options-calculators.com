@@ -22,7 +22,7 @@ import {
 } from "lucide-react"
 import { DataLoadGate } from "@/components/data-load-gate"
 import { RefreshButton } from "@/components/ui/refresh-button"
-import { EmailReportButton } from "@/components/email-report-button"
+import { ExportMenu } from "@/components/export-menu"
 import { buildCongressReport } from "@/lib/reports/from-copy-pages"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { yahooChartUrl } from "@/lib/ticker-links"
@@ -169,7 +169,7 @@ export function CongressTradeFeed() {
           </div>
           <div className="flex items-center gap-3">
             <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
-            <EmailReportButton payload={() => buildCongressReport(visibleTrades)} label="Email report" />
+            <ExportMenu payload={() => buildCongressReport(visibleTrades)} />
             <RefreshButton onClick={fetchTrades} isLoading={loading} loadingText="Refreshing..." />
           </div>
         </div>
