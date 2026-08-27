@@ -222,7 +222,7 @@ _None._
 | File | Lines | Over by |
 |---|---|---|
 | `lib/ccpi/scoring.ts` | 796 | 196 |
-| `app/page.tsx` | 702 | 102 |
+| `app/page.tsx` | 705 | 105 |
 | `lib/api-contracts.ts` | 626 | 26 |
 | `components/admin/health-check-panel.tsx` | 622 | 22 |
 | `components/earnings-economic-calendar.tsx` | 604 | 4 |

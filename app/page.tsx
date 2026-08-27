@@ -537,6 +537,9 @@ export default function Home() {
               {mobileMenuOpen && (
                 <div className="md:hidden absolute left-0 right-0 top-[72px] bg-white border-b border-gray-200 shadow-lg z-50 max-h-[80vh] overflow-y-auto">
                   <nav className="py-2">
+                    <div className="px-4 py-2 border-b border-gray-100 mb-2 flex justify-end">
+                      <SessionControls />
+                    </div>
                     <div className="px-4 py-2 flex gap-2 border-b border-gray-100 mb-2">
                       <button
                         onClick={() => setActiveCategory("analyze")}
