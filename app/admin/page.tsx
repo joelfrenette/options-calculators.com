@@ -23,6 +23,7 @@ import {
   HeartPulse,
   MinusCircle,
   PowerOff,
+  Users,
 } from "lucide-react"
 import { ApiKeysManager } from "@/components/api-keys-manager"
 import { MembersManager } from "@/components/members-manager"
@@ -223,7 +224,7 @@ export default function AdminDashboard() {
 
         {/* Main Tabs */}
         <Tabs defaultValue="health" className="w-full" onValueChange={setActiveTab}>
-          <TabsList className="w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-1 bg-gray-100 border border-gray-200 p-1 h-auto mb-6">
+          <TabsList className="w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-9 gap-1 bg-gray-100 border border-gray-200 p-1 h-auto mb-6">
             <TabsTrigger
               value="health"
               className="text-gray-600 data-[state=active]:bg-emerald-700 data-[state=active]:text-white text-xs md:text-sm"
@@ -265,6 +266,13 @@ export default function AdminDashboard() {
             >
               <Key className="h-4 w-4 mr-1 md:mr-2" />
               Keys
+            </TabsTrigger>
+            <TabsTrigger
+              value="users"
+              className="text-gray-600 data-[state=active]:bg-emerald-700 data-[state=active]:text-white text-xs md:text-sm"
+            >
+              <Users className="h-4 w-4 mr-1 md:mr-2" />
+              Users
             </TabsTrigger>
             <TabsTrigger
               value="ccpi-audit"
@@ -406,9 +414,12 @@ export default function AdminDashboard() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="keys" className="space-y-6">
-            <MembersManager />
+          <TabsContent value="keys">
             <ApiKeysManager />
+          </TabsContent>
+
+          <TabsContent value="users">
+            <MembersManager />
           </TabsContent>
 
           <TabsContent value="ccpi-audit">
