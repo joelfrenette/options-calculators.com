@@ -14,6 +14,20 @@ const iso = () => new Date().toISOString()
 const num = (v: unknown): CellValue => (typeof v === "number" && Number.isFinite(v) ? v : null)
 const str = (v: unknown): CellValue => (typeof v === "string" && v ? v : null)
 
+/** Copy of an array sorted by a numeric key, DESC, with null/undefined last. */
+function byDesc<T>(arr: T[], key: (t: T) => number | null | undefined): T[] {
+  return [...arr].sort((a, b) => {
+    const av = key(a),
+      bv = key(b)
+    const an = typeof av === "number" && Number.isFinite(av)
+    const bn = typeof bv === "number" && Number.isFinite(bv)
+    if (an && bn) return (bv as number) - (av as number)
+    if (an) return -1
+    if (bn) return 1
+    return 0
+  })
+}
+
 // ---- Congress trades ----------------------------------------------------
 
 interface CongressTrade {
@@ -29,7 +43,7 @@ interface CongressTrade {
 
 export function buildCongressReport(trades: CongressTrade[]): ReportPayload | null {
   if (!trades || trades.length === 0) return null
-  const rows = trades.map((t) => ({
+  const rows = byDesc(trades, (t) => t.excessReturnPct).map((t) => ({
     ticker: str(t.ticker),
     member: str(t.member),
     party: str(t.party),
@@ -46,7 +60,7 @@ export function buildCongressReport(trades: CongressTrade[]): ReportPayload | nu
     executiveSummary:
       `${trades.length} disclosed ${trades.length === 1 ? "trade" : "trades"} in this view. ` +
       `${withXr} carry a measured excess return versus SPY over the holding window; the rest are too recent to score. ` +
-      `Rows are in the order the page shows them — disclosure is lagged by law, so a trade date is when it happened, not when it was known.`,
+      `Rows lead with the largest measured excess return versus SPY; trades too recent to score follow. Disclosure is lagged by law, so a trade date is when it happened, not when it was known.`,
     subtitle: `${trades.length} trades · ${withXr} with a measured excess return`,
     generatedAt: iso(),
     topN: 3,
@@ -77,7 +91,7 @@ interface SmartEtf {
 
 export function buildSmartMoneyReport(etfs: SmartEtf[]): ReportPayload | null {
   if (!etfs || etfs.length === 0) return null
-  const rows = etfs.map((e) => ({
+  const rows = byDesc(etfs, (e) => e.changePct).map((e) => ({
     ticker: str(e.ticker),
     name: str(e.name),
     category: str(e.category),
@@ -171,7 +185,7 @@ interface InsiderCluster {
 
 export function buildInsiderClustersReport(clusters: InsiderCluster[], windowDays?: number): ReportPayload | null {
   if (!clusters || clusters.length === 0) return null
-  const rows = clusters.map((c) => ({
+  const rows = byDesc(clusters, (c) => c.totalDollarValue).map((c) => ({
     ticker: str(c.ticker),
     buyers: num(c.buyerCount),
     totalBuys: num(c.totalBuys),
@@ -263,7 +277,7 @@ interface SpotlightMember {
 
 export function buildPoliticianReport(members: SpotlightMember[], windowDays?: number): ReportPayload | null {
   if (!members || members.length === 0) return null
-  const rows = members.map((m) => ({
+  const rows = byDesc(members, (m) => m.estimatedActivityUsd).map((m) => ({
     member: str(m.displayName),
     party: str(m.party),
     chamber: str(m.chamber),
