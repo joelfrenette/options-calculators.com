@@ -8,6 +8,8 @@ import { TrendingUp, TrendingDown, ExternalLink, Wallet, Building2, Users, Info 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DataLoadGate } from "@/components/data-load-gate"
 import { RefreshButton } from "@/components/ui/refresh-button"
+import { EmailReportButton } from "@/components/email-report-button"
+import { buildSmartMoneyReport } from "@/lib/reports/from-copy-pages"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { yahooChartUrl } from "@/lib/ticker-links"
 
@@ -102,6 +104,7 @@ export function SmartMoneyEtfs() {
         </div>
         <div className="flex items-center gap-3">
           <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
+          <EmailReportButton payload={() => buildSmartMoneyReport(data?.etfs ?? [])} label="Email report" />
           <RefreshButton onClick={fetchData} isLoading={loading} loadingText="Refreshing..." />
         </div>
       </div>
