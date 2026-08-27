@@ -107,6 +107,40 @@ export async function recordMemberLogin(email: string): Promise<void> {
   }
 }
 
+/** The member row for an email (admin's address never matches — it is no row). */
+export async function findMemberByEmail(email: string): Promise<{ id: number; email: string; active: boolean } | null> {
+  const cfg = config()
+  if (!cfg) return null
+  try {
+    const res = await fetch(
+      `${cfg.url}/rest/v1/members?select=id,email,active&email=eq.${encodeURIComponent(email.trim().toLowerCase())}&limit=1`,
+      { headers: headers(cfg.key), signal: AbortSignal.timeout(5000), cache: "no-store" },
+    )
+    if (!res.ok) return null
+    const rows = await res.json()
+    return Array.isArray(rows) && rows.length ? rows[0] : null
+  } catch {
+    return null
+  }
+}
+
+/** Replace a member's password hash (the reset flow's write). */
+export async function setMemberPassword(id: number, password: string): Promise<boolean> {
+  const cfg = config()
+  if (!cfg) return false
+  try {
+    const res = await fetch(`${cfg.url}/rest/v1/members?id=eq.${id}`, {
+      method: "PATCH",
+      headers: headers(cfg.key),
+      body: JSON.stringify({ password_hash: hashPassword(password) }),
+      signal: AbortSignal.timeout(8000),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
 export async function listMembers(): Promise<Member[] | null> {
   const cfg = config()
   if (!cfg) return null

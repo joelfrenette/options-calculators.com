@@ -99,6 +99,11 @@ export async function middleware(request: NextRequest) {
     return authed ? NextResponse.redirect(new URL("/", request.url)) : NextResponse.next()
   }
 
+  // Password reset must work signed out; a signed-in visitor has no use for it.
+  if (pathname === "/reset") {
+    return authed ? NextResponse.redirect(new URL("/", request.url)) : NextResponse.next()
+  }
+
   // The door has one public URL: "/". A direct hit on /door goes there too.
   if (pathname === "/door") {
     return NextResponse.redirect(new URL("/", request.url))

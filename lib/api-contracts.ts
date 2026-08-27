@@ -405,6 +405,20 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
   { path: "/api/admin/api-keys", method: "GET", schema: anyObject, budgetMs: 5000, tabs: [], needsAuth: true },
   { path: "/api/admin/members", method: "GET", schema: anyObject, budgetMs: 8000, tabs: [], needsAuth: true },
   { path: "/api/auth/session", method: "GET", schema: anyObject, budgetMs: 3000, tabs: [], needsAuth: true },
+  {
+    path: "/api/auth/reset/request",
+    method: "POST",
+    skip: "Sends a real reset email and mints a token; a probe would spam the member and churn the table.",
+    budgetMs: 8000,
+    tabs: [],
+  },
+  {
+    path: "/api/auth/reset/confirm",
+    method: "POST",
+    skip: "Consumes one-time tokens; a probe can only burn a real reset or record a failed attempt.",
+    budgetMs: 8000,
+    tabs: [],
+  },
   { path: "/api/admin/usage", method: "GET", schema: anyObject, budgetMs: 5000, tabs: [], needsAuth: true },
   {
     path: "/api/admin/api-status",

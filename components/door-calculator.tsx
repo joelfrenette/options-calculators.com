@@ -258,7 +258,9 @@ export function DoorCalculator() {
             {busy ? "Signing in…" : "Continue"}
           </button>
           <div className="flex justify-between items-baseline">
-            <span className="text-xs text-stone-400">Invite only.</span>
+            <a href="/reset" className="text-xs text-stone-500 underline underline-offset-2">
+              Forgot password?
+            </a>
             <button type="button" onClick={relock} className="text-xs text-stone-500 bg-transparent border-0 cursor-pointer p-0">
               Back
             </button>
