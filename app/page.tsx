@@ -39,6 +39,7 @@ import { LEAPSScanner } from "@/components/leaps-scanner"
 import { ZEBRAScanner } from "@/components/zebra-scanner"
 import { Menu, X, TrendingUp, Zap, Search, Users } from "lucide-react"
 import Image from "next/image"
+import { SessionControls } from "@/components/session-controls"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 const TAB_TOOLTIPS: Record<string, string> = {
@@ -402,6 +403,10 @@ export default function Home() {
                 </div>
 
                 <RotatingAdBanner />
+
+                <div className="hidden md:block">
+                  <SessionControls />
+                </div>
 
                 <button
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}

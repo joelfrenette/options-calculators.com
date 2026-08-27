@@ -185,6 +185,14 @@ export async function isAuthenticated() {
   return verifyToken(await getSession()) !== null
 }
 
+/** The session's role and email for the UI (e.g. showing the Admin button
+ * only to the owner), or null when there is no valid session. Display data
+ * only — every admin surface stays gated server-side by verifyAuth. */
+export async function getSessionInfo(): Promise<{ role: SessionRole; email: string | null } | null> {
+  const parsed = verifyToken(await getSession())
+  return parsed ? { role: parsed.role, email: parsed.email } : null
+}
+
 /**
  * ADMIN-ONLY gate. Every existing /api/admin route calls this, so the safe
  * default when members arrived was to keep its meaning: a member session is

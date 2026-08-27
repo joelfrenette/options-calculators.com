@@ -102,7 +102,7 @@ down from 12 to 11.
 **Count the PASS lines — do not trust the exit code alone.** The suites chain with
 `&&`, so a script that stops *running* is indistinguishable from one that passes, and
 this has cost the project a commit twice. Current baselines: **formulas 1128**,
-contracts 61 routes / 61 contracts, remediation 31.
+contracts 62 routes / 62 contracts, remediation 31.
 
 These four numbers are enforced by `scripts/check-doc-figures.ts` (Phase 7.5), because
 this sentence itself drifted: it read "formulas 514" while the suite had grown past it,
