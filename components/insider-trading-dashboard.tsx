@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button"
 import { InputGroup, InputGroupInput, InputGroupAddon } from "@/components/ui/input-group"
 import { RunScenarioInAIDialog } from "@/components/run-scenario-ai-dialog"
 import { RefreshButton } from "@/components/ui/refresh-button"
+import { EmailReportButton } from "@/components/email-report-button"
+import { buildInsiderTradesReport } from "@/lib/reports/from-copy-pages"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
@@ -333,6 +335,7 @@ const InsiderTradingDashboard = () => {
           </div>
           <div className="flex items-center gap-3">
             <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
+            <EmailReportButton payload={() => buildInsiderTradesReport(filteredTrades)} label="Email report" />
             <RefreshButton onClick={handleRefresh} isLoading={isRefreshing} loadingText="Refreshing..." />
           </div>
         </div>

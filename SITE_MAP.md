@@ -38,11 +38,11 @@
 
 | Tab id | Label | Component | File | Lines | Internal APIs |
 |---|---|---|---|---|---|
-| `insiders` | Insider Activity | `InsiderTradingDashboard` | `components/insider-trading-dashboard.tsx` | 400 | `/api/insider-trading`<br>`/api/insider-trading/ai-insights` |
-| `insider-clusters` | Cluster Buys | `InsiderClusters` | `components/insider-clusters.tsx` | 250 | `/api/insider-clusters` |
-| `form-144` | Form 144 Watch | `Form144Watch` | `components/form-144-watch.tsx` | 187 | `/api/form-144` |
+| `insiders` | Insider Activity | `InsiderTradingDashboard` | `components/insider-trading-dashboard.tsx` | 403 | `/api/insider-trading`<br>`/api/insider-trading/ai-insights` |
+| `insider-clusters` | Cluster Buys | `InsiderClusters` | `components/insider-clusters.tsx` | 253 | `/api/insider-clusters` |
+| `form-144` | Form 144 Watch | `Form144Watch` | `components/form-144-watch.tsx` | 190 | `/api/form-144` |
 | `congress-feed` | Congress Trade Feed | `CongressTradeFeed` | `components/congress-trade-feed.tsx` | 460 | `/api/congress-trades` |
-| `politician-spotlight` | Politician Spotlight | `PoliticianSpotlight` | `components/politician-spotlight.tsx` | 277 | `/api/politician-spotlight` |
+| `politician-spotlight` | Politician Spotlight | `PoliticianSpotlight` | `components/politician-spotlight.tsx` | 280 | `/api/politician-spotlight` |
 | `top-performers` | Top Performers | `TopPerformers` | `components/top-performers.tsx` | 288 | `/api/top-performers` |
 | `hedge-fund-13f` | Hedge Fund 13F | `HedgeFund13F` | `components/hedge-fund-13f.tsx` | 188 | `/api/hedge-fund-13f` |
 | `smart-money-etfs` | Smart-Money ETFs | `SmartMoneyEtfs` | `components/smart-money-etfs.tsx` | 199 | `/api/smart-money-etfs` |

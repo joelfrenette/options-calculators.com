@@ -8,6 +8,8 @@ import { TrendingUp, TrendingDown, AlertTriangle, ExternalLink, Building2, Star,
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DataLoadGate } from "@/components/data-load-gate"
 import { RefreshButton } from "@/components/ui/refresh-button"
+import { EmailReportButton } from "@/components/email-report-button"
+import { buildPoliticianReport } from "@/lib/reports/from-copy-pages"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { yahooChartUrl } from "@/lib/ticker-links"
 
@@ -133,6 +135,7 @@ export function PoliticianSpotlight() {
         </div>
         <div className="flex items-center gap-3">
           <TooltipsToggle enabled={tooltipsEnabled} onToggle={setTooltipsEnabled} />
+          <EmailReportButton payload={() => buildPoliticianReport(data?.members ?? [], data?.windowDays)} label="Email report" />
           <RefreshButton onClick={fetchData} isLoading={loading} loadingText="Refreshing..." />
         </div>
       </div>

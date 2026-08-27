@@ -159,3 +159,175 @@ export function buildTopPerformersReport(members: PerformerRow[], windowDays?: n
     rows,
   }
 }
+
+// ---- Insider clusters (multiple insiders buying the same name) ----------
+
+interface InsiderCluster {
+  ticker: string
+  buyerCount: number
+  totalBuys: number
+  totalDollarValue: number
+}
+
+export function buildInsiderClustersReport(clusters: InsiderCluster[], windowDays?: number): ReportPayload | null {
+  if (!clusters || clusters.length === 0) return null
+  const rows = clusters.map((c) => ({
+    ticker: str(c.ticker),
+    buyers: num(c.buyerCount),
+    totalBuys: num(c.totalBuys),
+    dollarValue: num(c.totalDollarValue),
+  }))
+  const total = clusters.reduce((s, c) => s + (c.totalDollarValue || 0), 0)
+  return {
+    title: "Insider Buying Clusters",
+    description: "Companies where multiple insiders bought within the same window.",
+    executiveSummary:
+      `${clusters.length} ${clusters.length === 1 ? "company" : "companies"} saw clustered insider buying` +
+      `${windowDays ? ` over the last ${windowDays} days` : ""}, totalling ` +
+      `$${(total / 1_000_000).toFixed(1)}M. A cluster — several insiders buying the same name at once — is a ` +
+      `stronger signal than a lone purchase, though insiders buy for many reasons and are sometimes early.`,
+    subtitle: windowDays ? `Window: ${windowDays} days` : undefined,
+    generatedAt: iso(),
+    topN: 3,
+    columns: [
+      { key: "ticker", label: "Ticker", format: "text" },
+      { key: "buyers", label: "Insiders Buying", format: "number" },
+      { key: "totalBuys", label: "Total Buys", format: "number" },
+      { key: "dollarValue", label: "Total $ Value", format: "currency" },
+    ],
+    rows,
+  }
+}
+
+// ---- Insider transactions (individual Form 4 rows; string-formatted) -----
+
+interface InsiderTrade {
+  ticker: string
+  owner: string
+  role: string
+  type: string
+  shares: string
+  price: string
+  value: string
+  date: string
+}
+
+export function buildInsiderTradesReport(trades: InsiderTrade[]): ReportPayload | null {
+  if (!trades || trades.length === 0) return null
+  const rows = trades.map((t) => ({
+    ticker: str(t.ticker),
+    owner: str(t.owner),
+    role: str(t.role),
+    type: str(t.type),
+    shares: str(t.shares),
+    price: str(t.price),
+    value: str(t.value),
+    date: str(t.date),
+  }))
+  return {
+    title: "Insider Transactions",
+    description: "Recent insider buys and sells (Form 4 filings).",
+    executiveSummary:
+      `${trades.length} recent insider ${trades.length === 1 ? "transaction" : "transactions"} in this view, ` +
+      `each an officer, director or large holder filing a Form 4. Values are as reported. A sale can be routine ` +
+      `(scheduled, tax) while a purchase is discretionary — read the role and type together, not the dollar value alone.`,
+    subtitle: `${trades.length} transactions`,
+    generatedAt: iso(),
+    topN: 3,
+    columns: [
+      { key: "ticker", label: "Ticker", format: "text" },
+      { key: "owner", label: "Insider", format: "text" },
+      { key: "role", label: "Role", format: "text" },
+      { key: "type", label: "Type", format: "text" },
+      { key: "shares", label: "Shares", format: "text" },
+      { key: "price", label: "Price", format: "text" },
+      { key: "value", label: "Value", format: "text" },
+      { key: "date", label: "Date", format: "text" },
+    ],
+    rows,
+  }
+}
+
+// ---- Politician spotlight (members with activity + excess return) --------
+
+interface SpotlightMember {
+  displayName: string
+  party: string
+  chamber: string
+  totalTrades: number
+  buys: number
+  sells: number
+  estimatedActivityUsd: number
+  avgExcessReturnPct: number | null
+}
+
+export function buildPoliticianReport(members: SpotlightMember[], windowDays?: number): ReportPayload | null {
+  if (!members || members.length === 0) return null
+  const rows = members.map((m) => ({
+    member: str(m.displayName),
+    party: str(m.party),
+    chamber: str(m.chamber),
+    trades: num(m.totalTrades),
+    buys: num(m.buys),
+    sells: num(m.sells),
+    activity: num(m.estimatedActivityUsd),
+    avgExcess: num(m.avgExcessReturnPct),
+  }))
+  return {
+    title: "Politician Trading Spotlight",
+    description: "Congressional members by disclosed trading activity.",
+    executiveSummary:
+      `${members.length} ${members.length === 1 ? "member" : "members"} in the spotlight` +
+      `${windowDays ? ` over the last ${windowDays} days` : ""}, by disclosed trade count and estimated activity. ` +
+      `Estimated activity is a midpoint of the disclosed value RANGES — Congress reports bands, not exact amounts — ` +
+      `so treat it as an order of magnitude, and excess return is versus SPY where the holding window allows it.`,
+    subtitle: windowDays ? `Window: ${windowDays} days` : undefined,
+    generatedAt: iso(),
+    topN: 3,
+    columns: [
+      { key: "member", label: "Member", format: "text" },
+      { key: "party", label: "Party", format: "text" },
+      { key: "chamber", label: "Chamber", format: "text" },
+      { key: "trades", label: "Trades", format: "number" },
+      { key: "buys", label: "Buys", format: "number" },
+      { key: "sells", label: "Sells", format: "number" },
+      { key: "activity", label: "Est. Activity", format: "currency" },
+      { key: "avgExcess", label: "Avg Excess", format: "percent" },
+    ],
+    rows,
+  }
+}
+
+// ---- Form 144 filings (proposed insider sales) --------------------------
+
+interface Form144Filing {
+  filer: string
+  filedAt: string
+  accession: string
+}
+
+export function buildForm144Report(filings: Form144Filing[]): ReportPayload | null {
+  if (!filings || filings.length === 0) return null
+  const rows = filings.map((f) => ({
+    filer: str(f.filer),
+    filedAt: str(f.filedAt),
+    accession: str(f.accession),
+  }))
+  return {
+    title: "Form 144 Watch",
+    description: "Recent Form 144 filings — notices of proposed insider sales.",
+    executiveSummary:
+      `${filings.length} recent Form 144 ${filings.length === 1 ? "filing" : "filings"}. A Form 144 is a NOTICE of ` +
+      `intent to sell restricted stock, not a completed sale — the insider may sell less, later, or not at all. It is ` +
+      `an early, soft signal, useful mainly in aggregate or alongside a completed Form 4.`,
+    subtitle: `${filings.length} filings`,
+    generatedAt: iso(),
+    topN: 3,
+    columns: [
+      { key: "filer", label: "Filer", format: "text" },
+      { key: "filedAt", label: "Filed", format: "text" },
+      { key: "accession", label: "Accession", format: "text" },
+    ],
+    rows,
+  }
+}
