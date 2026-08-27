@@ -406,6 +406,13 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
   { path: "/api/admin/members", method: "GET", schema: anyObject, budgetMs: 8000, tabs: [], needsAuth: true },
   { path: "/api/auth/session", method: "GET", schema: anyObject, budgetMs: 3000, tabs: [], needsAuth: true },
   {
+    path: "/api/report-email",
+    method: "POST",
+    skip: "Sends a real email with generated attachments; a probe would mail the prober and spend Resend quota.",
+    budgetMs: 15000,
+    tabs: [],
+  },
+  {
     path: "/api/auth/reset/request",
     method: "POST",
     skip: "Sends a real reset email and mints a token; a probe would spam the member and churn the table.",

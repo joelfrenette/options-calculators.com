@@ -44,7 +44,7 @@ const rel = (p: string) => relative(ROOT, p).split(sep).join("/")
  * `/api/sentiment-heatmap`: its measured half already existed in the
  * social-sentiment tab, and its other half asked a model for an impression.
  */
-const EXPECTED_ROUTES = 63 // ads out (2026-08-27); members, session and the two reset routes in // +/api/admin/members (private-club build, 2026-08-14)
+const EXPECTED_ROUTES = 64 // + /api/report-email (2026-08-27) // +/api/admin/members (private-club build, 2026-08-14)
 const MIN_OUTBOUND_ROUTES = 30
 
 let failures = 0
