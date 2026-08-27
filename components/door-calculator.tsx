@@ -52,8 +52,12 @@ export function DoorCalculator() {
   }
 
   const digit = (d: string) => {
+    // No leading-zero strip, deliberately: this display doubles as the code
+    // pad's feedback, and a code can start with 0 — "0" then "5" must show
+    // "05", or the press looks like it never registered (UAT 2026-08-27).
+    // parseFloat("052") is 52, so the arithmetic never notices.
     const next = fresh ? d : disp.length < 12 ? disp + d : disp
-    setDisp(next.replace(/^0(?=\d)/, ""))
+    setDisp(next)
     setFresh(false)
     setTyped(typed + d)
   }
