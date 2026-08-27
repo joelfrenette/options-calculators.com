@@ -21,16 +21,23 @@ export function buildWheelReport(results: QualifyingStock[]): ReportPayload | nu
     return typeof y === "number" && Number.isFinite(y) ? y : null
   }
 
-  // Real quotes first (ranked by yield), synthesized/unknown after.
-  const sorted = [...results].sort((a, b) => {
-    const aSynth = a.priceSource === "synthesized" ? 1 : 0
-    const bSynth = b.priceSource === "synthesized" ? 1 : 0
-    if (aSynth !== bSynth) return aSynth - bSynth
-    return (yieldOf(b) ?? -Infinity) - (yieldOf(a) ?? -Infinity)
-  })
-
   const num = (v: number | null | undefined): number | null =>
     typeof v === "number" && Number.isFinite(v) ? v : null
+  const dteOf = (s: QualifyingStock): number | null => num(s.optionDaysToExpiry ?? s.daysToExpiry)
+  const premOf = (s: QualifyingStock): number | null => num(s.optionPremium ?? s.premium)
+
+  // Owner order (2026-08-27): grouped by EXPIRY, ALL lower DTE first, then the
+  // higher DTE after, and within each expiry the HIGHEST PREMIUM leads. An
+  // unknown DTE or premium sorts to the end of its comparison so it never
+  // displaces a real reading. Synthesized rows are flagged by the "source"
+  // column, not pushed down by sort — the honesty is in the column, not the
+  // order the owner chose.
+  const sorted = [...results].sort((a, b) => {
+    const ad = dteOf(a),
+      bd = dteOf(b)
+    if (ad !== bd) return (ad ?? Infinity) - (bd ?? Infinity)
+    return (premOf(b) ?? -Infinity) - (premOf(a) ?? -Infinity)
+  })
 
   const rows = sorted.map((s) => ({
     ticker: s.ticker,
@@ -43,18 +50,27 @@ export function buildWheelReport(results: QualifyingStock[]): ReportPayload | nu
     source: s.priceSource === "synthesized" ? "synthesized (est.)" : "live quote",
   }))
 
+  // "Strongest" is the highest YIELD among live quotes — computed here rather
+  // than taken from row[0], because the table is now ordered by expiry, not
+  // yield, so the first row is no longer the richest.
   const real = sorted.filter((s) => s.priceSource !== "synthesized")
-  const best = real.length ? yieldOf(real[0]) : null
+  const bestRow = real.reduce<QualifyingStock | null>((top, s) => {
+    const y = yieldOf(s)
+    if (y === null) return top
+    return top === null || y > (yieldOf(top) ?? -Infinity) ? s : top
+  }, null)
+  const best = bestRow ? yieldOf(bestRow) : null
   const bestLine =
-    real.length && best !== null
-      ? `The strongest live-quoted opportunity is ${real[0].ticker} at a ${best.toFixed(1)}% annualized yield on a $${(real[0].optionStrike ?? real[0].putStrike).toFixed(0)} put.`
+    bestRow && best !== null
+      ? `The strongest live-quoted opportunity is ${bestRow.ticker} at a ${best.toFixed(1)}% annualized yield on a $${(bestRow.optionStrike ?? bestRow.putStrike).toFixed(0)} put.`
       : "No row carried a live option quote; every yield shown is estimated from a 35% IV assumption."
 
   const summary =
     `This cash-secured put scan qualified ${results.length} ${results.length === 1 ? "stock" : "stocks"} ` +
     `against your fundamental and technical filters. ${bestLine} ` +
-    `Rows are ranked by annualized yield, with live quotes ahead of estimated ones — an estimated yield looks ` +
-    `identical to a measured one, so treat the "source" column as part of the number. Figures are point-in-time.`
+    `Rows are grouped by expiry — all the lower days-to-expiry first, the higher ones after — and within each ` +
+    `expiry the highest premium leads. An estimated yield looks identical to a measured one, so treat the ` +
+    `"source" column as part of the number. Figures are point-in-time.`
 
   return {
     title: "Cash-Secured Put Scan",
