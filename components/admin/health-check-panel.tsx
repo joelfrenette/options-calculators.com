@@ -182,10 +182,6 @@ export function HealthCheckPanel() {
 
   return (
     <div className="space-y-6">
-      {/* Budget guard (E-5) — first, because a tripped shutoff explains any
-          AI-route failures the health check below is about to report. */}
-      <BudgetGuardPanel />
-
       {/* Run controls */}
       <Card className="bg-white">
         <CardHeader>
@@ -242,6 +238,10 @@ export function HealthCheckPanel() {
           )}
         </CardContent>
       </Card>
+      {/* Budget guard (E-5). The owner reads the live checks first (his ask,
+          2026-08-27); the guard sits second as reference. Its card still
+          explains itself when tripped, which is when it matters. */}
+      <BudgetGuardPanel />
 
       {report && (
         <>

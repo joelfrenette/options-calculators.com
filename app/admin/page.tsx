@@ -266,7 +266,7 @@ export default function AdminDashboard() {
 
         {/* Main Tabs */}
         <Tabs defaultValue="health" className="w-full" onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-9 gap-1 bg-gray-100 border border-gray-200 p-1 h-auto mb-6">
+          <TabsList className="w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-9 gap-1 bg-gray-100 border border-gray-200 p-1 h-auto mb-6">
             <TabsTrigger
               value="health"
               className="text-gray-600 data-[state=active]:bg-emerald-700 data-[state=active]:text-white text-xs md:text-sm"
