@@ -71,7 +71,9 @@ export async function POST(request: Request) {
     clearLoginFailures(ip)
     pruneLoginAttempts()
 
-    return NextResponse.json({ success: true })
+    // The role is not a secret to its own bearer: the door uses it to land
+    // admins on /admin and members on the dashboard.
+    return NextResponse.json({ success: true, role: isAdmin ? "admin" : "member" })
   } catch (error) {
     // A misconfiguration (no ADMIN_EMAIL / no password set at all) throws out of
     // verifyCredentials. Log the real reason server-side; tell the client

@@ -137,7 +137,10 @@ export function DoorCalculator() {
         body: JSON.stringify({ email, password }),
       })
       if (res.ok) {
-        window.location.assign("/")
+        const body = await res.json().catch(() => null)
+        // Admins go straight to the admin area — the dashboard carries no
+        // link to it, and the owner should never have to remember the URL.
+        window.location.assign(body?.role === "admin" ? "/admin" : "/")
         return
       }
       const body = await res.json().catch(() => null)
