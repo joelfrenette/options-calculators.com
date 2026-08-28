@@ -37,6 +37,14 @@ export interface ReportPayload {
   topN?: number
   /** Optional context line, e.g. the filters the scan used. */
   subtitle?: string
+  /**
+   * Column keys to FEATURE in the email's top-N cards, in order. The first
+   * becomes the big labelled value beside the title; the rest become labelled
+   * stat cells; unlisted columns drop to the card's fine-print line. The
+   * identity (first) column is always the card title and is ignored here.
+   * Excel and PDF are unaffected — they always show every column.
+   */
+  highlightKeys?: string[]
 }
 
 /** A safe filename stem from the title + timestamp, e.g. cash-secured-put-scan-2026-08-27-1431. */

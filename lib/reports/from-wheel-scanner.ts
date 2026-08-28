@@ -5,13 +5,12 @@ import type { ReportPayload } from "./types"
  * Shape a wheel/CSP scan's qualifying stocks into a ReportPayload — the first
  * page wired to the report-email pipeline (owner ask 2026-08-27).
  *
- * Ranking is by annualized yield DESCENDING, so the email's top 3 are the
- * richest opportunities the scan found — but only among rows with a REAL
- * quote. A synthesized premium (the 35% IV fallback, priceSource
- * "synthesized") is excluded from the ranking's leading edge the way the tab's
- * own sort warns about it: it looks identical to a measured yield and must not
- * top the list silently. Synthesized rows still appear, lower down, with their
- * source named in a column.
+ * Order (matching the tab's relaxed table): grouped by expiry, shortest DTE
+ * first, highest period Yield % within each expiry. The email's top-3 cards
+ * feature the CSP-decision fields — strike, yield, DTE and the cash the put
+ * ties up. A synthesized premium (the 35% IV fallback, priceSource
+ * "synthesized") is flagged in the "source" column, not reordered, so an
+ * estimated yield is never silently mistaken for a measured one.
  */
 export function buildWheelReport(results: QualifyingStock[]): ReportPayload | null {
   if (!results || results.length === 0) return null
@@ -45,6 +44,10 @@ export function buildWheelReport(results: QualifyingStock[]): ReportPayload | nu
     ticker: s.ticker,
     price: num(s.currentPrice),
     strike: num(s.optionStrike ?? s.putStrike),
+    cashNeeded: (() => {
+      const k = num(s.optionStrike ?? s.putStrike)
+      return k === null ? null : k * 100 // one contract secures 100 shares
+    })(),
     premium: num(s.optionPremium ?? s.premium),
     yield: rawYieldOf(s),
     annualizedYield: yieldOf(s),
@@ -78,10 +81,14 @@ export function buildWheelReport(results: QualifyingStock[]): ReportPayload | nu
     subtitle: `${results.length} qualifying · ${real.length} with a live quote`,
     generatedAt: new Date().toISOString(),
     topN: 3,
+    // The card features exactly what a CSP seller decides on: strike, the
+    // period yield, days to expiry, and the collateral it ties up.
+    highlightKeys: ["strike", "yield", "dte", "cashNeeded"],
     columns: [
       { key: "ticker", label: "Ticker", format: "text" },
       { key: "price", label: "Price", format: "currency" },
       { key: "strike", label: "Put Strike", format: "currency" },
+      { key: "cashNeeded", label: "Cash Needed", format: "currency" },
       { key: "premium", label: "Premium", format: "currency" },
       { key: "yield", label: "Yield %", format: "percent" },
       { key: "annualizedYield", label: "Annualized Yield", format: "percent" },

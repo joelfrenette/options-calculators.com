@@ -26,12 +26,30 @@ function topCards(payload: ReportPayload): string {
     return `<p style="margin:0;color:${SOFT};font-size:14px;">The scan returned no results.</p>`
   }
   const [first, ...rest] = payload.columns
+  const byKey = new Map(payload.columns.map((c) => [c.key, c]))
+  // The card's featured metrics. When a page names highlightKeys, those become
+  // big labelled stat cells; the lead number (right of the title) is the first
+  // highlight, or the first non-identity column if none are named. Everything
+  // not featured drops to the fine-print line.
+  const hlKeys = (payload.highlightKeys ?? []).filter((k) => byKey.has(k) && k !== first.key)
+  const leadKey = hlKeys[0] ?? rest[0]?.key
+  const leadCol = leadKey ? byKey.get(leadKey) : undefined
+  const chipKeys = hlKeys.slice(1)
+  const detailCols = rest.filter((c) => c.key !== leadKey && !chipKeys.includes(c.key))
+
   return top
     .map((row, i) => {
-      const lead = rest[0]
-      const leadVal = lead ? formatCell(row[lead.key], lead.format) : ""
-      const detail = rest
-        .slice(1)
+      const leadVal = leadCol ? formatCell(row[leadCol.key], leadCol.format) : ""
+      const chips = chipKeys
+        .map((k) => {
+          const c = byKey.get(k)!
+          return `<td style="padding:8px 10px 0 0;vertical-align:top;">
+                    <div style="font-size:10px;letter-spacing:0.5px;text-transform:uppercase;color:${FAINT};">${esc(c.label)}</div>
+                    <div style="font-size:15px;font-weight:bold;color:${INK};">${esc(formatCell(row[c.key], c.format))}</div>
+                  </td>`
+        })
+        .join("")
+      const detail = detailCols
         .map((c) => `<span style="color:${FAINT};">${esc(c.label)}</span> <strong style="color:${INK};">${esc(formatCell(row[c.key], c.format))}</strong>`)
         .join(`<span style="color:${RULE};padding:0 8px;">·</span>`)
       return `
@@ -44,9 +62,10 @@ function topCards(payload: ReportPayload): string {
                   <span style="display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;background:${ACCENT};color:#ffffff;border-radius:999px;font-size:13px;font-weight:bold;">${i + 1}</span>
                   <span style="font-size:17px;font-weight:bold;color:${INK};padding-left:10px;">${esc(formatCell(row[first.key], first.format))}</span>
                 </td>
-                <td align="right" style="vertical-align:middle;font-size:19px;font-weight:bold;color:${ACCENT};">${esc(leadVal)}</td>
+                ${leadCol ? `<td align="right" style="vertical-align:middle;"><span style="font-size:10px;letter-spacing:0.5px;text-transform:uppercase;color:${FAINT};display:block;">${esc(leadCol.label)}</span><span style="font-size:19px;font-weight:bold;color:${ACCENT};">${esc(leadVal)}</span></td>` : ""}
               </tr>
-              ${detail ? `<tr><td colspan="2" style="padding-top:8px;font-size:12px;line-height:1.6;">${detail}</td></tr>` : ""}
+              ${chips ? `<tr><td colspan="2" style="padding-top:10px;"><table role="presentation" cellpadding="0" cellspacing="0"><tr>${chips}</tr></table></td></tr>` : ""}
+              ${detail ? `<tr><td colspan="2" style="padding-top:10px;font-size:12px;line-height:1.6;border-top:1px solid ${PAPER};margin-top:6px;">${detail}</td></tr>` : ""}
             </table>
           </td>
         </tr>
