@@ -64,6 +64,7 @@ export function buildCongressReport(trades: CongressTrade[]): ReportPayload | nu
     subtitle: `${trades.length} trades · ${withXr} with a measured excess return`,
     generatedAt: iso(),
     topN: 3,
+    highlightKeys: ["excessReturn", "member", "action", "value"],
     columns: [
       { key: "ticker", label: "Ticker", format: "text" },
       { key: "member", label: "Member", format: "text" },
@@ -110,6 +111,7 @@ export function buildSmartMoneyReport(etfs: SmartEtf[]): ReportPayload | null {
     subtitle: `${etfs.length} ETFs · ${live} with a live quote`,
     generatedAt: iso(),
     topN: 3,
+    highlightKeys: ["changePct", "close", "category"],
     columns: [
       { key: "ticker", label: "Ticker", format: "text" },
       { key: "name", label: "Name", format: "text" },
@@ -160,6 +162,7 @@ export function buildTopPerformersReport(members: PerformerRow[], windowDays?: n
     subtitle: windowDays ? `Ranking window: ${windowDays} days` : undefined,
     generatedAt: iso(),
     topN: 3,
+    highlightKeys: ["avgExcess", "trades", "bestTicker", "bestExcess"],
     columns: [
       { key: "member", label: "Member", format: "text" },
       { key: "party", label: "Party", format: "text" },
@@ -203,6 +206,7 @@ export function buildInsiderClustersReport(clusters: InsiderCluster[], windowDay
     subtitle: windowDays ? `Window: ${windowDays} days` : undefined,
     generatedAt: iso(),
     topN: 3,
+    highlightKeys: ["dollarValue", "buyers", "totalBuys"],
     columns: [
       { key: "ticker", label: "Ticker", format: "text" },
       { key: "buyers", label: "Insiders Buying", format: "number" },
@@ -248,6 +252,7 @@ export function buildInsiderTradesReport(trades: InsiderTrade[]): ReportPayload 
     subtitle: `${trades.length} transactions`,
     generatedAt: iso(),
     topN: 3,
+    highlightKeys: ["value", "type", "owner", "date"],
     columns: [
       { key: "ticker", label: "Ticker", format: "text" },
       { key: "owner", label: "Insider", format: "text" },
@@ -298,6 +303,7 @@ export function buildPoliticianReport(members: SpotlightMember[], windowDays?: n
     subtitle: windowDays ? `Window: ${windowDays} days` : undefined,
     generatedAt: iso(),
     topN: 3,
+    highlightKeys: ["activity", "trades", "buys", "avgExcess"],
     columns: [
       { key: "member", label: "Member", format: "text" },
       { key: "party", label: "Party", format: "text" },
@@ -337,6 +343,7 @@ export function buildForm144Report(filings: Form144Filing[]): ReportPayload | nu
     subtitle: `${filings.length} filings`,
     generatedAt: iso(),
     topN: 3,
+    highlightKeys: ["filedAt", "accession"],
     columns: [
       { key: "filer", label: "Filer", format: "text" },
       { key: "filedAt", label: "Filed", format: "text" },
