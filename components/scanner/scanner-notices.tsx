@@ -111,8 +111,8 @@ export function NoTechnicalPassCard({ fundamentalCount, maxRSI }: NoTechnicalPas
           </CardHeader>
           <CardContent className="p-6">
             <p className="text-gray-700 mb-4">
-              The current technical filters are very strict. None of the {fundamentalCount} stocks from {stepLabel("fundamentals")} 3
-              passed all technical criteria.
+              The current technical filters are very strict. None of the {fundamentalCount} stocks from{" "}
+              {stepLabel("fundamentals")} passed all technical criteria.
             </p>
             <p className="text-gray-600 text-sm mb-4">Consider:</p>
             <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
