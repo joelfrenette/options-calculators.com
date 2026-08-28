@@ -156,6 +156,14 @@ export function NoRelaxedResultsCard({ fundamentalCount }: NoRelaxedResultsCardP
 
 interface EntryExclusionCardProps {
   excluded: EntryExclusion[]
+  /**
+   * "strict" (default) — the Step 4 card: everything the full policy removed.
+   * "relaxedHard" — the Step 5 card: what the HARD gates (big up day, down on
+   * the year, Stage 4 decline) kept out of the relaxed pass too (owner
+   * 2026-08-28). Two contexts, one component, so the reason chips and the
+   * nothing-removed-silently rule stay shared.
+   */
+  variant?: "strict" | "relaxedHard"
 }
 
 /**
@@ -170,19 +178,32 @@ interface EntryExclusionCardProps {
  * Renders nothing when nothing was excluded: an empty card asserting "0
  * excluded" is noise on every clean run.
  */
-export function EntryExclusionCard({ excluded }: EntryExclusionCardProps) {
+export function EntryExclusionCard({ excluded, variant = "strict" }: EntryExclusionCardProps) {
   if (excluded.length === 0) return null
   return (
     <Card className="mt-6 w-full max-w-7xl mx-auto border-amber-200">
       <CardHeader className="bg-amber-50 border-b border-amber-200">
         <CardTitle className="text-base font-bold text-amber-900 flex items-center gap-2">
           <Filter className="h-4 w-4" />
-          {excluded.length} candidate{excluded.length === 1 ? "" : "s"} excluded before pricing
+          {variant === "relaxedHard"
+            ? `${excluded.length} candidate${excluded.length === 1 ? "" : "s"} stay excluded under the hard gates`
+            : `${excluded.length} candidate${excluded.length === 1 ? "" : "s"} excluded before pricing`}
         </CardTitle>
         <CardDescription className="text-amber-800">
-          Removed from the STRICT {stepLabel("technical")} table by the entry exclusions, not by the sliders. Run
-          {" "}{stepLabel("relaxed")} to price them anyway — they appear there flagged with the reason below. A stock
-          whose history is too short to measure is excluded by the filter that needs it.
+          {variant === "relaxedHard" ? (
+            <>
+              Never shown, strict or relaxed: a big up day, a negative trailing year, or a Stage 4 decline is
+              absolute damage, not strictness — {stepLabel("relaxed")} relaxes the sliders and the trailed-SPY gate
+              only, and these were not priced.
+            </>
+          ) : (
+            <>
+              Removed from the STRICT {stepLabel("technical")} table by the entry exclusions, not by the sliders.
+              The hard gates — big up day, down on the year, Stage 4 decline — hold in {stepLabel("relaxed")} too;
+              a candidate excluded only for trailing SPY is priced there and flagged in its Beat SPY column. A stock
+              whose history is too short to measure is excluded by the filter that needs it.
+            </>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-4">

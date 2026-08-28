@@ -15,6 +15,7 @@ import { Slider } from "@/components/ui/slider"
 import { Info } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { MAX_DAY_MOVE } from "@/lib/trend-filters"
+import { stepLabel } from "./steps"
 
 interface EntryExclusionControlsProps {
   excludeBigUpDay: boolean
@@ -54,6 +55,9 @@ export function EntryExclusionControls({
         <p className="text-xs text-gray-600 mb-4">
           These four are <strong>on by default</strong> — they remove candidates rather than rank them. A stock
           whose history is too short to measure is excluded by the filter that needs it, never passed through.
+          Three are <strong>hard gates</strong> that also hold in the relaxed {stepLabel("relaxed")} pass — a big
+          up day, a down year, and a Stage 4 decline never appear on any list. Trailing SPY is the soft one:{" "}
+          {stepLabel("relaxed")} relaxes it to a Beat SPY flag.
         </p>
 
         <div className="grid gap-4 md:grid-cols-2">

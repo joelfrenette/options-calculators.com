@@ -41,10 +41,12 @@ export const SCANNER_STEPS: Record<ScannerStepKey, { n: 1 | 2 | 3 | 4 | 5; title
   technical: { n: 4, title: "Technical Criteria", action: "Run Technical Analysis" },
   /**
    * The relaxed/exploratory pass, its own step (owner 2026-08-27). It re-prices
-   * every fundamental candidate with the Step 4 filters LOOSENED — both the
-   * sliders (near-misses shown) and the entry exclusions (formerly hidden
-   * candidates now shown, flagged with their exclusion reason). Distinct from
-   * Step 4 so the button and the empty-state card read "Step 5", not "Step 4".
+   * the fundamental candidates with the Step 4 filters LOOSENED: the sliders
+   * (near-misses shown) and the soft trailed-SPY gate (shown as a Beat SPY
+   * column). The HARD gates — big up day, down on the year, Stage 4 decline —
+   * hold here too (owner 2026-08-28, tiering the 08-27 relax-everything
+   * ruling), so those candidates are never priced; a card names them. Distinct
+   * from Step 4 so the button and the empty-state card read "Step 5".
    */
   relaxed: { n: 5, title: "Relaxed Criteria", action: "View Relaxed Criteria Results" },
 }

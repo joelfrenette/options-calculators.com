@@ -59,6 +59,7 @@ export function WheelScanner() {
     excludeBenchmarkLaggard, setExcludeBenchmarkLaggard,
     excludeStage4, setExcludeStage4,
     entryExclusionSummary,
+    relaxedHardExcluded,
     universeSource,
     technicalFilterSettings,
     scanTechnicals,
@@ -374,10 +375,15 @@ export function WheelScanner() {
         </div>
       )}
 
-      {/* Step 5 (relaxed) table. Since the relaxed pass now prices the
-          entry-excluded candidates too (owner 2026-08-27), those rows are
-          flagged HERE with their exclusion reason folded into the Landmine
-          column — a relaxed exclusion must never be a silent one. */}
+      {/* Step 5 (relaxed) table. The exclusions are tiered here (owner
+          2026-08-28, superseding the 2026-08-27 relax-everything ruling): the
+          hard gates — big up day, down on the year, Stage 4 — hold in the
+          relaxed pass too, and the card above the table names what they kept
+          out. The one soft gate, trailed SPY, is relaxed and shown as the
+          table's Beat SPY column rather than folded into Landmine. */}
+      {showRelaxedResults && !isEnrichingRelaxed && relaxedHardExcluded.length > 0 && (
+        <EntryExclusionCard excluded={relaxedHardExcluded} variant="relaxedHard" />
+      )}
       {showRelaxedResults && !isEnrichingRelaxed && relaxedResults.length > 0 && (
         <RelaxedResultsTable
           relaxedResults={relaxedResults}
@@ -389,15 +395,7 @@ export function WheelScanner() {
           handleRelaxedSort={handleRelaxedSort}
           showRelaxedResults={showRelaxedResults}
           technicalFilterSettings={technicalFilterSettings}
-          getLandminesForRow={(stock) => {
-            const mines = getLandminesForRow(stock) ?? []
-            const reasons = entryExclusionSummary.find((e) => e.ticker === stock.ticker)?.reasons ?? []
-            const excl = reasons.map((r) => `Entry-excluded: ${r}`)
-            const merged = [...excl, ...mines]
-            // Preserve the "still loading" null only when there is nothing else
-            // to say — a known exclusion reason is worth showing immediately.
-            return merged.length ? merged : getLandminesForRow(stock)
-          }}
+          getLandminesForRow={getLandminesForRow}
         />
       )}
 

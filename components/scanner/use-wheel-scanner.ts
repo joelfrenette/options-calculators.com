@@ -45,9 +45,15 @@ export function useWheelScanner() {
   // and that comment were the sole occurrences of `maxPE` in the tree.
 
   const [preFilterMarketCap, setPreFilterMarketCap] = useState([7]) // 12-stop scale — see PRE_FILTER_MARKET_CAP_TIERS below; default 7 = $10B+
-  const [preFilterVolatility, setPreFilterVolatility] = useState([2]) // index into PRE_FILTER_VOLATILITY_TIERS; default 3%+ (premium-richness bias)
+  // Volatility default 2%+ and universe default Top 500 (owner, 2026-08-28):
+  // Top 50 + 3%+ selected beaten-down volatile names by construction — the day
+  // the tiered exclusions landed, all 11 Step 3 survivors were down on the
+  // year. Step 2 stays one grouped-bars call either way; Step 3's per-ticker
+  // fundamentals volume rises with the survivor count, which the batch loop
+  // and the metered-fetch budget absorb.
+  const [preFilterVolatility, setPreFilterVolatility] = useState([1]) // index into PRE_FILTER_VOLATILITY_TIERS; default 2%+
   const [preFilterLiquidity, setPreFilterLiquidity] = useState([10]) // 10M — ensure liquidity default
-  const [preFilterTopRanked, setPreFilterTopRanked] = useState([66]) // 66 = Top 50 bucket
+  const [preFilterTopRanked, setPreFilterTopRanked] = useState([16]) // 16 = Top 500 bucket
 
   const [isLoadingPreFilter, setIsLoadingPreFilter] = useState(false) // Renamed from preFilterLoading
   const [preFilterCount, setPreFilterCount] = useState(0)
@@ -117,6 +123,9 @@ export function useWheelScanner() {
   // What the exclusions removed, with reasons, so an empty Step 4 is explicable
   // rather than just empty.
   const [entryExclusionSummary, setEntryExclusionSummary] = useState<EntryExclusion[]>([])
+  // What the HARD gates kept out of the relaxed pass (owner 2026-08-28) — the
+  // relaxed table's own card, so "priced everything except these" is on screen.
+  const [relaxedHardExcluded, setRelaxedHardExcluded] = useState<EntryExclusion[]>([])
   // Which universe Step 2 actually loaded (S-7).
   const [universeSource, setUniverseSource] = useState<string | null>(null)
 
@@ -467,24 +476,48 @@ export function useWheelScanner() {
       setStep4Progress(0)
       setStep4CurrentTicker("")
       setRelaxedResults([]) // Clear previous relaxed results
+      setRelaxedHardExcluded([])
 
-      // OWNER DECISION 2026-08-27: the relaxed pass now relaxes the ENTRY
-      // EXCLUSIONS too, not only the sliders. Previously this ran the same
-      // exclusion pass as the strict path, so a gapped-up / down-year /
-      // laggard / Stage-4 stock never reached the relaxed table either. The
-      // owner wants "relaxed" to mean "loosen everything in Step 4", so every
-      // fundamental candidate is priced here. The exclusions are NOT discarded
-      // — they are computed for flagging, and each formerly-excluded row shows
-      // in the relaxed table with its reason in the Landmine column, never
-      // silently. (This reverses the earlier "protects the rule" note; showing
-      // a flagged stock in an explicitly-exploratory table is the honest half.)
-      const { excluded: relaxedEntryExcluded } = partitionByEntryExclusions(
+      // OWNER DECISION 2026-08-28: the entry exclusions are TIERED here,
+      // superseding the 2026-08-27 "relax everything" ruling after one day in
+      // production. That day's relaxed table was 30 rows of stocks down on the
+      // year — two in a Stage 4 decline — with the only trace a count inside
+      // the Landmine badge, and the owner's verdict was that the biggest red
+      // flags must never appear on any list:
+      //
+      //   HARD (hold here too): big up day, down on the year, Stage 4 decline
+      //   — plus unmeasurable history, which fails safe as everywhere else. A
+      //   CSP is a synthetic long; these are absolute damage, not strictness,
+      //   so the candidates are not even priced (which also saves the
+      //   per-ticker snapshot calls).
+      //
+      //   SOFT (relaxed here): trailed SPY. Relative shortfall is not damage —
+      //   a stock up 8% against SPY's 14% is a laggard, not broken — and when
+      //   the benchmark's year is positive that gate alone subsumes the
+      //   down-year gate (see technical-criteria.ts) and empties the list.
+      //   Relaxed rows carry a Beat SPY ✓/✗ column instead of being removed.
+      const hardGateSettings = { ...technicalFilterSettings, excludeBenchmarkLaggard: false }
+      const { kept: relaxedEligible, excluded: hardExcluded } = partitionByEntryExclusions(
         fundamentalResults,
-        technicalFilterSettings,
+        hardGateSettings,
       )
-      const entryExcludedTickers = new Set(relaxedEntryExcluded.map((e) => e.ticker))
+      setRelaxedHardExcluded(hardExcluded)
+      if (hardExcluded.length > 0) {
+        console.log(
+          `[v0] ${stepLabel("relaxed")}: ${hardExcluded.length} hard-excluded, never priced — ` +
+            hardExcluded.map((e) => `${e.ticker}(${e.reasons.join("+")})`).join(", "),
+        )
+      }
+      // Failed the FULL policy but not the hard gates = failed only trailed
+      // SPY. Strict Step 4 never showed these, so they belong in the relaxed
+      // table even when they pass every slider criterion.
+      const hardExcludedTickers = new Set(hardExcluded.map((e) => e.ticker))
+      const { excluded: fullExcluded } = partitionByEntryExclusions(fundamentalResults, technicalFilterSettings)
+      const softOnlyTickers = new Set(
+        fullExcluded.map((e) => e.ticker).filter((t) => !hardExcludedTickers.has(t)),
+      )
 
-      enrichWithOptionsData(fundamentalResults, (current, total, ticker) => {
+      enrichWithOptionsData(relaxedEligible, (current, total, ticker) => {
         setStep4Progress(Math.round((current / total) * 100))
         setStep4CurrentTicker(ticker)
       })
@@ -500,9 +533,10 @@ export function useWheelScanner() {
             // Relaxed = passes at least some criteria but NOT all (would have been in Step 3 otherwise)
             // Also include options that pass none but have valid data (exploratory)
             // A strict-passing stock is already in the Step 4 table — UNLESS
-            // it was entry-excluded, in which case Step 4 never showed it and
-            // the relaxed table is the only place it can appear.
-            if (passesAll && !entryExcludedTickers.has(stock.ticker)) {
+            // it failed only the soft trailed-SPY gate, in which case Step 4
+            // never showed it and the relaxed table is the only place it can
+            // appear. (Hard-excluded tickers never reach this filter at all.)
+            if (passesAll && !softOnlyTickers.has(stock.ticker)) {
               console.log(
                 `[v0] ${stock.ticker} $${stock.putStrike} - Passes ALL criteria (already in ${stepLabel("technical")}, excluding from ${stepLabel("relaxed")})`,
               )
@@ -578,6 +612,7 @@ export function useWheelScanner() {
     excludeBenchmarkLaggard, setExcludeBenchmarkLaggard,
     excludeStage4, setExcludeStage4,
     entryExclusionSummary,
+    relaxedHardExcluded,
     universeSource,
     technicalFilterSettings,
     scanTechnicals,

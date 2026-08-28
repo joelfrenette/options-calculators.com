@@ -329,6 +329,13 @@ export function RelaxedResultsTable({
                     </th>
                     <th
                       className="text-center p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
+                      onClick={() => handleRelaxedSort("relativeReturn12m")}
+                      title="Trailing 12-month return vs SPY. The trailed-SPY entry gate is the one exclusion this relaxed table loosens — it shows here as a flag instead of removing the row."
+                    >
+                      Beat SPY {relaxedSortColumn === "relativeReturn12m" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-center p-3 font-semibold text-purple-900 cursor-pointer hover:bg-purple-100"
                       onClick={() => handleRelaxedSort("redDay")}
                     >
                       Red Day {relaxedSortColumn === "redDay" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
@@ -512,6 +519,27 @@ export function RelaxedResultsTable({
                                   ? `Earnings ${stock.earningsDate} (${stock.daysToEarnings}d) — outside DTE window`
                                   : "No earnings scheduled within the DTE window"
                               }
+                            >
+                              ✗
+                            </span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {stock.relativeReturn12m === null || stock.relativeReturn12m === undefined ? (
+                            <span className="text-gray-400 font-bold text-lg" title="Trailing year unavailable">
+                              —
+                            </span>
+                          ) : stock.relativeReturn12m >= 0 ? (
+                            <span
+                              className="text-green-600 font-bold text-lg"
+                              title={`+${stock.relativeReturn12m.toFixed(1)} pts vs SPY over 12 months`}
+                            >
+                              ✓
+                            </span>
+                          ) : (
+                            <span
+                              className="text-red-600 font-bold text-lg"
+                              title={`${stock.relativeReturn12m.toFixed(1)} pts vs SPY over 12 months — trailed the benchmark`}
                             >
                               ✗
                             </span>

@@ -26,7 +26,7 @@
 
 | Tab id | Label | Component | File | Lines | Internal APIs |
 |---|---|---|---|---|---|
-| `wheel-scanner` | Sell Put Scanner | `WheelScanner` | `components/wheel-scanner.tsx` | 426 | none (static) |
+| `wheel-scanner` | Sell Put Scanner | `WheelScanner` | `components/wheel-scanner.tsx` | 424 | none (static) |
 | `calendar-spread-scanner` | Calendar Spreads | `CalendarSpreadScanner` | `components/calendar-spread-scanner.tsx` | 590 | `/api/strategy-scanner` |
 | `credit-spread-scanner` | Credit Spreads | `CreditSpreadScanner` | `components/credit-spread-scanner.tsx` | 428 | `/api/strategy-scanner` |
 | `iron-condor-scanner` | Iron Condors | `IronCondorScanner` | `components/iron-condor-scanner.tsx` | 429 | `/api/strategy-scanner` |
@@ -224,9 +224,10 @@ _None._
 | `lib/ccpi/scoring.ts` | 796 | 196 |
 | `app/page.tsx` | 703 | 103 |
 | `lib/api-contracts.ts` | 653 | 53 |
+| `components/scanner/use-wheel-scanner.ts` | 633 | 33 |
+| `components/scanner/relaxed-results-table.tsx` | 629 | 29 |
 | `components/admin/health-check-panel.tsx` | 622 | 22 |
 | `components/earnings-economic-calendar.tsx` | 607 | 7 |
-| `components/scanner/relaxed-results-table.tsx` | 601 | 1 |
 
 ## 6. PHASE 6 SIGN-OFF LEDGER
 
