@@ -192,9 +192,10 @@ export function EntryExclusionCard({ excluded, variant = "strict" }: EntryExclus
         <CardDescription className="text-amber-800">
           {variant === "relaxedHard" ? (
             <>
-              Never shown, strict or relaxed: a big up day, a negative trailing year, or a Stage 4 decline is
-              absolute damage, not strictness — {stepLabel("relaxed")} relaxes the sliders and the trailed-SPY gate
-              only, and these were not priced.
+              Held out of {stepLabel("relaxed")} too: a big up day, a Stage 4 decline (below a falling 150-day
+              average), a deep decline (worse than −20% on the year), or a mild decline on a sub-$20B name — the
+              genuine damage. A large (≥$20B), mildly-down, non–Stage-4 name is a pullback, not a knife, and IS
+              priced and shown in the table below.
             </>
           ) : (
             <>

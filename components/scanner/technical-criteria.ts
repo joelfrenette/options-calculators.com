@@ -3,6 +3,7 @@
 // component's slider/toggle state is passed in as a settings object.
 
 import type { QualifyingStock } from "./types"
+import { relaxedDownYearVerdict } from "@/lib/trend-filters"
 
 export interface TechnicalFilterSettings {
   maxRSI: number
@@ -122,6 +123,64 @@ export const partitionByEntryExclusions = (
     const reasons = failedEntryExclusions(stock, f)
     if (reasons.length === 0) kept.push(stock)
     else excluded.push({ ticker: stock.ticker, reasons: reasons.map((r) => ENTRY_EXCLUSION_LABELS[r] ?? r) })
+  }
+  return { kept, excluded }
+}
+
+/**
+ * The RELAXED pass's hard gates — a GRADED, more permissive form of the strict
+ * gates above (owner 2026-08-29). Returns the reasons this stock is kept out of
+ * the relaxed pass; empty means it is priced and shown.
+ *
+ * The difference from the strict gate is the down-year clause, and only that:
+ *
+ *   - big up day  — still hard (a spike inflates the strike and the IV).
+ *   - Stage 4     — still hard (below a FALLING 150-session average is the
+ *                   structural downtrend, the real knife, at any magnitude).
+ *   - down year   — GRADED, not binary. A DEEP decline (worse than
+ *                   RELAXED_DEEP_DECLINE_PCT) stays out. A MILD decline
+ *                   (between deep and flat) is admitted ONLY for a large,
+ *                   reliable name (market cap ≥ RELAXED_MILD_DOWN_MIN_CAP) —
+ *                   the pullback in a stock the owner would own at the strike.
+ *   - trailed SPY — not a gate here at all; it is the soft Beat-SPY column.
+ *
+ * Unmeasurable trailing year still fails safe (excluded) — a name whose year
+ * cannot be read cannot be judged mild.
+ */
+export const relaxedHardGateReasons = (stock: QualifyingStock, f: TechnicalFilterSettings): string[] => {
+  const reasons: string[] = []
+
+  if (f.excludeBigUpDay && !(stock.dayMovePercent !== null && stock.dayMovePercent < f.maxDayMove)) {
+    reasons.push("big up day")
+  }
+  if (f.excludeStage4 && stock.stage4Decline !== false) {
+    reasons.push("Stage 4 decline")
+  }
+  if (f.excludeDownYear) {
+    const verdict = relaxedDownYearVerdict(stock.return12m, stock.marketCap)
+    if (verdict === "unmeasurable") reasons.push("trend unavailable")
+    else if (verdict === "deep") reasons.push(`deep decline (${stock.return12m!.toFixed(0)}%)`)
+    else if (verdict === "mild-small") reasons.push("down year, under $20B")
+    // "not-down" and "mild-large" are admitted — no reason added.
+  }
+
+  return reasons
+}
+
+/**
+ * Split candidates for the RELAXED pass using the graded gates above. Mirrors
+ * partitionByEntryExclusions but permits large, mildly-down names.
+ */
+export const partitionByRelaxedEntryExclusions = (
+  stocks: QualifyingStock[],
+  f: TechnicalFilterSettings,
+): { kept: QualifyingStock[]; excluded: EntryExclusion[] } => {
+  const kept: QualifyingStock[] = []
+  const excluded: EntryExclusion[] = []
+  for (const stock of stocks) {
+    const reasons = relaxedHardGateReasons(stock, f)
+    if (reasons.length === 0) kept.push(stock)
+    else excluded.push({ ticker: stock.ticker, reasons })
   }
   return { kept, excluded }
 }

@@ -47,6 +47,62 @@ export const SESSIONS_PER_YEAR = 252
 export const MAX_DAY_MOVE = { MIN: 3, MAX: 25, DEFAULT: 10, STEP: 1 } as const
 
 /**
+ * Relaxed-pass down-year grading (owner 2026-08-29).
+ *
+ * The STRICT Step 4 gate rejects ANY negative trailing year — unchanged. The
+ * RELAXED Step 5 pass instead GRADES it, because a binary down-year gate could
+ * not tell a mega-cap down 3% from a broken stock down 40%, and on a
+ * down-breadth day it emptied Step 5 entirely (the owner ran the scanner and
+ * got zero relaxed results while AMZN / NVDA / CSCO sat excluded). The relaxed
+ * grade keeps the genuine damage out while letting a large, reliable name in a
+ * mild pullback surface as the low-risk put it actually is.
+ *
+ * DEEP: a trailing year worse than this stays HARD-excluded even in the relaxed
+ * pass. Stage 4 (price below a FALLING 150-session average) already catches the
+ * STRUCTURAL downtrend at any magnitude; this is the magnitude backstop for a
+ * steep drop that has not yet rolled its 150-day average over.
+ *
+ * MILD_MIN_CAP: a mildly-down name (between DEEP and 0) earns the relaxed pass
+ * only when it is at least this large — the "reliable large company" the owner
+ * will happily own at the strike, not a small cap that merely happens to be
+ * down a little. Above this line and not Stage 4, a mild decline is a pullback,
+ * not a knife.
+ */
+export const RELAXED_DEEP_DECLINE_PCT = -20
+export const RELAXED_MILD_DOWN_MIN_CAP = 20_000_000_000
+
+/**
+ * The graded down-year verdict for the relaxed pass. Pure so it is tested with
+ * worked numbers in scripts/check-trend-filters.ts, the same way every other
+ * gate in this file is — a mis-set threshold here silently changes which stocks
+ * a put seller is shown.
+ *
+ * Only `not-down` and `mild-large` are ADMITTED to the relaxed pass. The other
+ * three are held out: `deep` (worse than the deep threshold), `mild-small` (a
+ * mild decline but not a large, reliable name), and `unmeasurable` (no trailing
+ * year — cannot be judged mild, so fails safe).
+ *
+ * Boundaries, stated so the check can pin them: exactly the deep threshold is
+ * NOT deep (−20% admits for a large cap); exactly the cap floor IS large.
+ */
+export type RelaxedDownYearVerdict = "not-down" | "mild-large" | "mild-small" | "deep" | "unmeasurable"
+
+export function relaxedDownYearVerdict(
+  return12m: number | null,
+  marketCap: number | null,
+): RelaxedDownYearVerdict {
+  if (return12m === null) return "unmeasurable"
+  if (return12m >= 0) return "not-down"
+  if (return12m < RELAXED_DEEP_DECLINE_PCT) return "deep"
+  return (marketCap ?? 0) >= RELAXED_MILD_DOWN_MIN_CAP ? "mild-large" : "mild-small"
+}
+
+/** Whether a relaxed down-year verdict keeps the stock in the relaxed pass. */
+export function relaxedDownYearAdmitted(verdict: RelaxedDownYearVerdict): boolean {
+  return verdict === "not-down" || verdict === "mild-large"
+}
+
+/**
  * The caller's threshold, clamped to the range above.
  *
  * CLAMPED, NOT TRUSTED, and NaN does not fall through. `0` would exclude every

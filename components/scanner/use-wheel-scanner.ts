@@ -22,7 +22,11 @@ import {
 import type { QualifyingStock, RejectionSummary } from "./types"
 import { runFundamentalScan } from "./fundamental-scan"
 import { enrichWithOptionsData } from "./enrichment"
-import { partitionByEntryExclusions, type EntryExclusion } from "./technical-criteria"
+import {
+  partitionByEntryExclusions,
+  partitionByRelaxedEntryExclusions,
+  type EntryExclusion,
+} from "./technical-criteria"
 import { useLandmines } from "./use-landmines"
 import { useTechnicalFilters } from "./use-technical-filters"
 import { useScannerSorting } from "./use-scanner-sorting"
@@ -478,28 +482,27 @@ export function useWheelScanner() {
       setRelaxedResults([]) // Clear previous relaxed results
       setRelaxedHardExcluded([])
 
-      // OWNER DECISION 2026-08-28: the entry exclusions are TIERED here,
-      // superseding the 2026-08-27 "relax everything" ruling after one day in
-      // production. That day's relaxed table was 30 rows of stocks down on the
-      // year — two in a Stage 4 decline — with the only trace a count inside
-      // the Landmine badge, and the owner's verdict was that the biggest red
-      // flags must never appear on any list:
+      // OWNER DECISION 2026-08-29: the relaxed pass GRADES the down-year gate
+      // (partitionByRelaxedEntryExclusions), refining the 2026-08-28 tiering.
+      // That tiering held down-year fully HARD here, which was right in spirit
+      // but too blunt in practice: on a down-breadth day it emptied Step 5
+      // entirely — the owner ran the scanner and got zero relaxed results while
+      // AMZN / NVDA / CSCO sat excluded for being down a few percent, exactly
+      // the large reliable names a put seller wants in a pullback. The relaxed
+      // grade now is:
       //
-      //   HARD (hold here too): big up day, down on the year, Stage 4 decline
-      //   — plus unmeasurable history, which fails safe as everywhere else. A
-      //   CSP is a synthetic long; these are absolute damage, not strictness,
-      //   so the candidates are not even priced (which also saves the
-      //   per-ticker snapshot calls).
+      //   HARD here (never priced): big up day, Stage 4 decline (below a
+      //   FALLING 150-day average — the structural knife at any magnitude), a
+      //   DEEP decline (worse than −20%), and a MILD decline on a sub-$20B
+      //   name. Plus unmeasurable history, fail-safe.
       //
-      //   SOFT (relaxed here): trailed SPY. Relative shortfall is not damage —
-      //   a stock up 8% against SPY's 14% is a laggard, not broken — and when
-      //   the benchmark's year is positive that gate alone subsumes the
-      //   down-year gate (see technical-criteria.ts) and empties the list.
-      //   Relaxed rows carry a Beat SPY ✓/✗ column instead of being removed.
-      const hardGateSettings = { ...technicalFilterSettings, excludeBenchmarkLaggard: false }
-      const { kept: relaxedEligible, excluded: hardExcluded } = partitionByEntryExclusions(
+      //   ADMITTED here: a large (≥$20B), mildly-down (0 to −20%), non-Stage-4
+      //   name — the pullback, not the knife. Shown in the relaxed table.
+      //
+      //   SOFT (as before): trailed SPY — the Beat-SPY ✓/✗ column, never a gate.
+      const { kept: relaxedEligible, excluded: hardExcluded } = partitionByRelaxedEntryExclusions(
         fundamentalResults,
-        hardGateSettings,
+        technicalFilterSettings,
       )
       setRelaxedHardExcluded(hardExcluded)
       if (hardExcluded.length > 0) {
