@@ -160,7 +160,7 @@ export const relaxedHardGateReasons = (stock: QualifyingStock, f: TechnicalFilte
     const verdict = relaxedDownYearVerdict(stock.return12m, stock.marketCap)
     if (verdict === "unmeasurable") reasons.push("trend unavailable")
     else if (verdict === "deep") reasons.push(`deep decline (${stock.return12m!.toFixed(0)}%)`)
-    else if (verdict === "mild-small") reasons.push("down year, under $20B")
+    else if (verdict === "mild-small") reasons.push("down year, under $10B")
     // "not-down" and "mild-large" are admitted — no reason added.
   }
 

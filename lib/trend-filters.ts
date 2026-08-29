@@ -68,8 +68,8 @@ export const MAX_DAY_MOVE = { MIN: 3, MAX: 25, DEFAULT: 10, STEP: 1 } as const
  * down a little. Above this line and not Stage 4, a mild decline is a pullback,
  * not a knife.
  */
-export const RELAXED_DEEP_DECLINE_PCT = -20
-export const RELAXED_MILD_DOWN_MIN_CAP = 20_000_000_000
+export const RELAXED_DEEP_DECLINE_PCT = -25
+export const RELAXED_MILD_DOWN_MIN_CAP = 10_000_000_000
 
 /**
  * The graded down-year verdict for the relaxed pass. Pure so it is tested with

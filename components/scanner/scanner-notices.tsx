@@ -193,8 +193,8 @@ export function EntryExclusionCard({ excluded, variant = "strict" }: EntryExclus
           {variant === "relaxedHard" ? (
             <>
               Held out of {stepLabel("relaxed")} too: a big up day, a Stage 4 decline (below a falling 150-day
-              average), a deep decline (worse than −20% on the year), or a mild decline on a sub-$20B name — the
-              genuine damage. A large (≥$20B), mildly-down, non–Stage-4 name is a pullback, not a knife, and IS
+              average), a deep decline (worse than −25% on the year), or a mild decline on a sub-$10B name — the
+              genuine damage. A large (≥$10B), mildly-down, non–Stage-4 name is a pullback, not a knife, and IS
               priced and shown in the table below.
             </>
           ) : (

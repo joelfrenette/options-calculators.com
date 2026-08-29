@@ -493,10 +493,10 @@ export function useWheelScanner() {
       //
       //   HARD here (never priced): big up day, Stage 4 decline (below a
       //   FALLING 150-day average — the structural knife at any magnitude), a
-      //   DEEP decline (worse than −20%), and a MILD decline on a sub-$20B
+      //   DEEP decline (worse than −25%), and a MILD decline on a sub-$10B
       //   name. Plus unmeasurable history, fail-safe.
       //
-      //   ADMITTED here: a large (≥$20B), mildly-down (0 to −20%), non-Stage-4
+      //   ADMITTED here: a large (≥$10B), mildly-down (0 to −25%), non-Stage-4
       //   name — the pullback, not the knife. Shown in the relaxed table.
       //
       //   SOFT (as before): trailed SPY — the Beat-SPY ✓/✗ column, never a gate.
