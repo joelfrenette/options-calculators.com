@@ -14,7 +14,11 @@ import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Info } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { MAX_DAY_MOVE } from "@/lib/trend-filters"
+import {
+  MAX_DAY_MOVE,
+  RELAXED_DEEP_DECLINE,
+  RELAXED_MILD_DOWN_CAP_TIERS,
+} from "@/lib/trend-filters"
 import { stepLabel } from "./steps"
 
 interface EntryExclusionControlsProps {
@@ -28,6 +32,10 @@ interface EntryExclusionControlsProps {
   setExcludeBenchmarkLaggard: (value: boolean) => void
   excludeStage4: boolean
   setExcludeStage4: (value: boolean) => void
+  relaxedDeepDeclinePct: number[]
+  setRelaxedDeepDeclinePct: (value: number[]) => void
+  relaxedMildDownCapIndex: number[]
+  setRelaxedMildDownCapIndex: (value: number[]) => void
   tooltipsEnabled: boolean
 }
 
@@ -42,6 +50,10 @@ export function EntryExclusionControls({
   setExcludeBenchmarkLaggard,
   excludeStage4,
   setExcludeStage4,
+  relaxedDeepDeclinePct,
+  setRelaxedDeepDeclinePct,
+  relaxedMildDownCapIndex,
+  setRelaxedMildDownCapIndex,
   tooltipsEnabled,
 }: EntryExclusionControlsProps) {
   return (
@@ -134,6 +146,55 @@ export function EntryExclusionControls({
               checked={excludeDownYear}
               onChange={(e) => setExcludeDownYear(e.target.checked)}
               className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+            />
+          </div>
+
+          {/* Relaxed-pass grading of the down-year gate. These two touch ONLY
+              the {stepLabel("relaxed")} table — STRICT {stepLabel("technical")}
+              still rejects any negative year. They are the owner's balance
+              dial: on a down-breadth day the binary gate empties the relaxed
+              table, so a large name in a mild pullback is admitted here while
+              deep declines and small caps stay out. Re-run {stepLabel("relaxed")}
+              to apply a change. */}
+          <div className="p-3 rounded-lg border bg-blue-50/40 md:col-span-2">
+            <p className="text-xs font-semibold text-gray-900 mb-1">
+              {stepLabel("relaxed")} down-year grading
+            </p>
+            <p className="text-[11px] text-gray-600 mb-3">
+              Only the relaxed table. A large, mildly-down name is a pullback worth selling a put on; a deep
+              decline or a small cap is not.
+            </p>
+
+            <Label className="text-xs text-gray-600">
+              Keep names down to{" "}
+              <span className="font-semibold text-gray-900">{relaxedDeepDeclinePct[0]}%</span> on the year — worse
+              than that is a deep decline, held out
+            </Label>
+            <Slider
+              value={relaxedDeepDeclinePct}
+              onValueChange={setRelaxedDeepDeclinePct}
+              min={RELAXED_DEEP_DECLINE.MIN}
+              max={RELAXED_DEEP_DECLINE.MAX}
+              step={RELAXED_DEEP_DECLINE.STEP}
+              disabled={!excludeDownYear}
+              className="mt-2"
+            />
+
+            <Label className="mt-4 block text-xs text-gray-600">
+              Admit a mild decline only for names at least{" "}
+              <span className="font-semibold text-gray-900">
+                {RELAXED_MILD_DOWN_CAP_TIERS[relaxedMildDownCapIndex[0]]?.label ?? "$10B"}
+              </span>{" "}
+              in market cap
+            </Label>
+            <Slider
+              value={relaxedMildDownCapIndex}
+              onValueChange={setRelaxedMildDownCapIndex}
+              min={0}
+              max={RELAXED_MILD_DOWN_CAP_TIERS.length - 1}
+              step={1}
+              disabled={!excludeDownYear}
+              className="mt-2"
             />
           </div>
 

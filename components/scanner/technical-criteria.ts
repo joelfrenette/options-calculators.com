@@ -29,6 +29,14 @@ export interface TechnicalFilterSettings {
   excludeBenchmarkLaggard: boolean
   /** Reject a stock below a FALLING 150-session average (Weinstein Stage 4). */
   excludeStage4: boolean
+  /**
+   * RELAXED-pass down-year grading (owner-tunable, Step 5 only). A trailing
+   * year worse than `relaxedDeepDeclinePct` stays hard; a mild decline is
+   * admitted only for a name at least `relaxedMildDownMinCap` in market cap.
+   * The strict Step 4 gate ignores these — it rejects any negative year.
+   */
+  relaxedDeepDeclinePct: number
+  relaxedMildDownMinCap: number
 }
 
 /**
@@ -157,10 +165,17 @@ export const relaxedHardGateReasons = (stock: QualifyingStock, f: TechnicalFilte
     reasons.push("Stage 4 decline")
   }
   if (f.excludeDownYear) {
-    const verdict = relaxedDownYearVerdict(stock.return12m, stock.marketCap)
+    const verdict = relaxedDownYearVerdict(
+      stock.return12m,
+      stock.marketCap,
+      f.relaxedDeepDeclinePct,
+      f.relaxedMildDownMinCap,
+    )
     if (verdict === "unmeasurable") reasons.push("trend unavailable")
     else if (verdict === "deep") reasons.push(`deep decline (${stock.return12m!.toFixed(0)}%)`)
-    else if (verdict === "mild-small") reasons.push("down year, under $10B")
+    else if (verdict === "mild-small") {
+      reasons.push(`down year, under $${(f.relaxedMildDownMinCap / 1_000_000_000).toFixed(0)}B`)
+    }
     // "not-down" and "mild-large" are admitted — no reason added.
   }
 

@@ -44,6 +44,10 @@ interface Step4TechnicalCardProps {
   setExcludeBenchmarkLaggard: (value: boolean) => void
   excludeStage4: boolean
   setExcludeStage4: (value: boolean) => void
+  relaxedDeepDeclinePct: number[]
+  setRelaxedDeepDeclinePct: (value: number[]) => void
+  relaxedMildDownCapIndex: number[]
+  setRelaxedMildDownCapIndex: (value: number[]) => void
   tooltipsEnabled: boolean
 }
 
@@ -78,6 +82,10 @@ export function Step4TechnicalCard({
   setExcludeBenchmarkLaggard,
   excludeStage4,
   setExcludeStage4,
+  relaxedDeepDeclinePct,
+  setRelaxedDeepDeclinePct,
+  relaxedMildDownCapIndex,
+  setRelaxedMildDownCapIndex,
   tooltipsEnabled,
 }: Step4TechnicalCardProps) {
   return (
@@ -527,6 +535,10 @@ export function Step4TechnicalCard({
               setExcludeBenchmarkLaggard={setExcludeBenchmarkLaggard}
               excludeStage4={excludeStage4}
               setExcludeStage4={setExcludeStage4}
+              relaxedDeepDeclinePct={relaxedDeepDeclinePct}
+              setRelaxedDeepDeclinePct={setRelaxedDeepDeclinePct}
+              relaxedMildDownCapIndex={relaxedMildDownCapIndex}
+              setRelaxedMildDownCapIndex={setRelaxedMildDownCapIndex}
               tooltipsEnabled={tooltipsEnabled}
             />
           </CardContent>
