@@ -26,6 +26,38 @@ import type { NextRequest } from "next/server"
 
 const encoder = new TextEncoder()
 
+// CSRF defense for the SameSite=None session cookie (see lib/auth.ts). With
+// "none", the browser attaches the session to cross-site requests too, so we
+// reject any state-changing request whose Origin is a third party. A genuine
+// request — whether the site is used directly or embedded in the Agent OS
+// iframe — carries the site's OWN Origin (the iframe document is
+// options-calculators.com), so it passes; an attacker's page carries theirs
+// and is blocked. GETs are exempt (no state change; CORS already stops the
+// attacker reading the response). Missing Origin = a non-browser client
+// (curl, cron tooling), not a CSRF vector, so it passes.
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"])
+const ALLOWED_ORIGINS = new Set(
+  [
+    "https://www.options-calculators.com",
+    "https://options-calculators.com",
+    process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : undefined,
+  ].filter((o): o is string => Boolean(o)),
+)
+
+function isDisallowedCrossOriginWrite(request: NextRequest): boolean {
+  if (!MUTATING_METHODS.has(request.method)) return false
+  const origin = request.headers.get("origin")
+  if (!origin) return false // non-browser client; browsers always send Origin on writes
+  if (ALLOWED_ORIGINS.has(origin)) return false
+  // Preview deploys (…-git-*.vercel.app) aren't in the static list; allow a
+  // request whose Origin matches the URL it's hitting (same-origin either way).
+  if (origin === request.nextUrl.origin) return false
+  return true
+}
+
 function base64urlToBytes(s: string): Uint8Array | null {
   try {
     const b64 = s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)
@@ -84,6 +116,13 @@ async function hasValidSession(request: NextRequest): Promise<boolean> {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // CSRF gate (runs before auth routing so it also covers /api/auth/* logins).
+  // Cron routes are server-to-server with no browser Origin and gate on
+  // CRON_SECRET themselves, so they skip this.
+  if (!pathname.startsWith("/api/cron/") && isDisallowedCrossOriginWrite(request)) {
+    return NextResponse.json({ error: "Cross-origin request blocked" }, { status: 403 })
+  }
 
   // Routes that must work without a session.
   if (
