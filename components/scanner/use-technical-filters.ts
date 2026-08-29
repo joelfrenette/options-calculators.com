@@ -26,7 +26,7 @@ import {
 
 export function useTechnicalFilters() {
   // Step 3: Technical Analysis Filters
-  const [maxRSI, setMaxRSI] = useState([60]) // Default Max RSI 60 — 50 excludes normal uptrend momentum; overbought risk starts ~70
+  const [maxRSI, setMaxRSI] = useState([65]) // Default Max RSI 65 (owner 2026-08-29, was 60) — admits slightly-stronger names without chasing overbought (>70)
   const [maxStochastic, setMaxStochastic] = useState([70]) // Default Max Stochastic 70 — uptrending stocks sit high on the stochastic most of the time
   const [minATR, setMinATR] = useState([2]) // Default Min ATR 2% - min volatility
   const [maxATR, setMaxATR] = useState([15]) // Default Max ATR 15% - max volatility
@@ -36,9 +36,15 @@ export function useTechnicalFilters() {
   // Step 4 empty. Re-enable for precise pullback-entry timing.
   const [requireBollingerBands, setRequireBollingerBands] = useState(false) // Bollinger Bands Setup
   // FIX: Renamed state variables from require200SMA to requireAbove200SMA and require50SMA to requireAbove50SMA
-  const [requireAbove200SMA, setRequireAbove200SMA] = useState(true) // Above 200-day SMA
-  const [requireAbove50SMA, setRequireAbove50SMA] = useState(true) // Above 50-day SMA
-  const [requireGoldenCross, setRequireGoldenCross] = useState(true) // Golden Cross (50 > 200)
+  const [requireAbove200SMA, setRequireAbove200SMA] = useState(true) // Above 200-day SMA — KEPT ON: the long-term-uptrend guardrail
+  // Above-50-SMA + Golden-Cross default OFF (owner 2026-08-29, both were ON).
+  // They are the pullback contradiction: the richest-premium, lowest-risk CSP
+  // is a fundamentally strong company (fundamentals pass, still above its
+  // 200-day) that has DIPPED below its 50-day — and requiring price ≥ 50-SMA
+  // (and 50 > 200) rejects exactly that entry. The 200-day gate above still
+  // keeps the long-term trend intact, so this loosens timing, not quality.
+  const [requireAbove50SMA, setRequireAbove50SMA] = useState(false) // Above 50-day SMA
+  const [requireGoldenCross, setRequireGoldenCross] = useState(false) // Golden Cross (50 > 200)
   // MACD-bullish + red-day defaults are OFF: demanding a bullish crossover AND a
   // down day AND oversold AND above all SMAs simultaneously left strict Step 4
   // empty on nearly every run. Users can re-enable either for stricter entries.
@@ -59,9 +65,13 @@ export function useTechnicalFilters() {
   // useState infers the literal type `10[]` and the setter stops accepting any
   // other number.
   const [maxDayMove, setMaxDayMove] = useState<number[]>([MAX_DAY_MOVE.DEFAULT])
-  const [excludeDownYear, setExcludeDownYear] = useState(true) // trailing year negative
-  const [excludeBenchmarkLaggard, setExcludeBenchmarkLaggard] = useState(true) // trailed SPY
-  const [excludeStage4, setExcludeStage4] = useState(true) // below a FALLING 150-day MA
+  const [excludeDownYear, setExcludeDownYear] = useState(true) // trailing year negative (GRADED in the relaxed pass)
+  // Laggard-vs-SPY default OFF (owner 2026-08-29, was ON). It over-excludes on
+  // a down-breadth day (nearly everything trails SPY) and is REDUNDANT with the
+  // relaxed pass, which already surfaces relative strength as the soft Beat-SPY
+  // ✓/✗ column rather than a removal. Kept as a toggle for anyone who wants it.
+  const [excludeBenchmarkLaggard, setExcludeBenchmarkLaggard] = useState(false) // trailed SPY
+  const [excludeStage4, setExcludeStage4] = useState(true) // below a FALLING 150-day MA — KEPT ON: the falling-knife guardrail
 
   // RELAXED-pass down-year grading (owner 2026-08-29), tunable live. These
   // touch ONLY Step 5 — the strict Step 4 down-year gate rejects any negative

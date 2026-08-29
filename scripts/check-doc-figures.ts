@@ -78,7 +78,7 @@ const BASELINES = {
   // 1128 → 1137 (9 graded-down-year assertions) → 1139 (2 more when the
   // thresholds became owner-tunable sliders), 2026-08-29. Moved with the
   // CLAUDE.md prose below.
-  formulas: 1139,
+  formulas: 1140,
   remediation: 31,
   typecheckKnown: 0,
 } as const

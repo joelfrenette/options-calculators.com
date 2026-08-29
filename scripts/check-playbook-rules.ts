@@ -109,6 +109,11 @@ const gateBlock = implSrc.slice(implSrc.indexOf("export const cspEntryGates"))
 const gateKeys = [...gateBlock.slice(0, gateBlock.indexOf("})")).matchAll(/^\s{2}(\w+Check):/gm)].map((m) => m[1])
 
 const EXPECTED_GATES = 4
+// Of the four gates, three DEFAULT ON — the guardrails (big up day, down year,
+// Stage 4). The fourth, benchmark-laggard, defaults OFF (owner 2026-08-29): it
+// over-excludes on a down tape and the relaxed pass already surfaces relative
+// strength as the soft Beat-SPY column, so the strict removal is redundant.
+const EXPECTED_DEFAULT_ON = 3
 check(
   `scope: ${gateKeys.length} entry gate(s) found in ${IMPL}`,
   gateKeys.length === EXPECTED_GATES,
@@ -176,18 +181,25 @@ for (const control of enforcedBy) {
 }
 
 /**
- * The four gates default ON. The page says the scanner applies them for the
- * reader; if they shipped defaulted off, that sentence would be false for
- * anyone who never opened Step 4.
+ * Three of the four gates default ON — the guardrails the page says the
+ * scanner applies for the reader (big up day, down year, Stage 4). The
+ * benchmark-laggard gate defaults OFF by design (owner 2026-08-29), so the
+ * page copy must say THREE, not four; the assertion below pins both halves.
  */
 const hookSrc = HOOK_FILES.map((f) => readFileSync(join(ROOT, f), "utf8")).join("\n")
-const defaultsOn = ["excludeBigUpDay", "excludeDownYear", "excludeBenchmarkLaggard", "excludeStage4"].filter((s) =>
+const guardrailGates = ["excludeBigUpDay", "excludeDownYear", "excludeStage4"]
+const defaultsOn = guardrailGates.filter((s) =>
   new RegExp(`\\[${s},\\s*set\\w+\\]\\s*=\\s*useState\\(true\\)`).test(hookSrc),
 )
 check(
-  "all four exclusions still default ON",
-  defaultsOn.length === EXPECTED_GATES,
-  `${defaultsOn.length} of ${EXPECTED_GATES} — the page tells the reader the scanner applies these for them`,
+  "the three guardrail exclusions still default ON",
+  defaultsOn.length === EXPECTED_DEFAULT_ON,
+  `${defaultsOn.length} of ${EXPECTED_DEFAULT_ON} — the page tells the reader the scanner applies these for them`,
+)
+check(
+  "the benchmark-laggard gate defaults OFF (deliberate, 2026-08-29)",
+  /\[excludeBenchmarkLaggard,\s*set\w+\]\s*=\s*useState\(false\)/.test(hookSrc),
+  "expected useState(false) — it over-excludes on a down tape and is soft in the relaxed pass",
 )
 
 // ---------------------------------------------------------------------------
