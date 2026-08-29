@@ -46,7 +46,7 @@ async function fetchWithScrapingBee(url: string) {
 
   const scrapingBeeUrl = `https://app.scrapingbee.com/api/v1/?api_key=${apiKey}&url=${encodeURIComponent(url)}&render_js=false`
   console.log("[v0] Fetching with ScrapingBee:", url)
-  return fetch(scrapingBeeUrl)
+  return meteredFetch("scrapingbee", scrapingBeeUrl, { routeTag: "/api/panic-euphoria" })
 }
 
 async function getAIEstimate(indicatorName: string, context: string): Promise<number> {
@@ -284,9 +284,10 @@ async function calculatePanicEuphoria() {
     ): Promise<{ value: number; pct: number } | null> => {
       if (!fredApiKey) return null
       try {
-        const r = await fetch(
+        const r = await meteredFetch(
+          "fred",
           `https://api.stlouisfed.org/fred/series/observations?series_id=${id}&api_key=${fredApiKey}&file_type=json&limit=${limit}&sort_order=desc`,
-          { signal: AbortSignal.timeout(8000) },
+          { signal: AbortSignal.timeout(8000), routeTag: "/api/panic-euphoria" },
         )
         if (!r.ok) return null
         const j = await r.json()
@@ -372,9 +373,10 @@ async function calculatePanicEuphoria() {
     const fredSeries = async (id: string): Promise<number | null> => {
       if (!fredApiKey) return null
       try {
-        const r = await fetch(
+        const r = await meteredFetch(
+          "fred",
           `https://api.stlouisfed.org/fred/series/observations?series_id=${id}&api_key=${fredApiKey}&file_type=json&limit=1&sort_order=desc`,
-          { signal: AbortSignal.timeout(8000) },
+          { signal: AbortSignal.timeout(8000), routeTag: "/api/panic-euphoria" },
         )
         if (!r.ok) return null
         const j = await r.json()

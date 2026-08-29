@@ -6,6 +6,7 @@
  */
 import { resolveApiKey } from "@/lib/api-keys"
 import { fredLatestFromStore } from "@/lib/fred-store"
+import { meteredFetch } from "@/lib/metered-fetch"
 
 export async function fetchFREDIndicators() {
   const FRED_API_KEY = resolveApiKey("FRED_API_KEY")
@@ -80,25 +81,25 @@ export async function fetchFREDIndicators() {
 
     const [fedFundsRes, junkSpreadRes, yieldCurveRes, debtToGDPRes, dxyRes, rrpRes, treasury10YRes] =
       await Promise.all([
-        fetch(`${baseUrl}?series_id=DFF&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
+        meteredFetch("fred", `${baseUrl}?series_id=DFF&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
           signal: AbortSignal.timeout(10000),
         }),
-        fetch(`${baseUrl}?series_id=BAMLH0A0HYM2&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
+        meteredFetch("fred", `${baseUrl}?series_id=BAMLH0A0HYM2&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
           signal: AbortSignal.timeout(10000),
         }),
-        fetch(`${baseUrl}?series_id=T10Y2Y&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
+        meteredFetch("fred", `${baseUrl}?series_id=T10Y2Y&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
           signal: AbortSignal.timeout(10000),
         }),
-        fetch(`${baseUrl}?series_id=GFDEGDQ188S&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
+        meteredFetch("fred", `${baseUrl}?series_id=GFDEGDQ188S&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
           signal: AbortSignal.timeout(10000),
         }),
-        fetch(`${baseUrl}?series_id=DTWEXBGS&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
+        meteredFetch("fred", `${baseUrl}?series_id=DTWEXBGS&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
           signal: AbortSignal.timeout(10000),
         }),
-        fetch(`${baseUrl}?series_id=RRPONTSYD&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
+        meteredFetch("fred", `${baseUrl}?series_id=RRPONTSYD&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
           signal: AbortSignal.timeout(10000),
         }),
-        fetch(`${baseUrl}?series_id=DGS10&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
+        meteredFetch("fred", `${baseUrl}?series_id=DGS10&api_key=${FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`, {
           signal: AbortSignal.timeout(10000),
         }),
       ])
@@ -178,28 +179,28 @@ export async function fetchAlphaVantageIndicators() {
 
   try {
     const [nvidiaRes, soxRes, aaplRes, msftRes, googlRes, amznRes, metaRes, tslaRes] = await Promise.all([
-      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=NVDA&apikey=${ALPHA_VANTAGE_API_KEY}`, {
+      meteredFetch("alphavantage", `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=NVDA&apikey=${ALPHA_VANTAGE_API_KEY}`, {
         signal: AbortSignal.timeout(10000),
       }),
-      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=SOXX&apikey=${ALPHA_VANTAGE_API_KEY}`, {
+      meteredFetch("alphavantage", `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=SOXX&apikey=${ALPHA_VANTAGE_API_KEY}`, {
         signal: AbortSignal.timeout(10000),
       }),
-      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AAPL&apikey=${ALPHA_VANTAGE_API_KEY}`, {
+      meteredFetch("alphavantage", `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AAPL&apikey=${ALPHA_VANTAGE_API_KEY}`, {
         signal: AbortSignal.timeout(10000),
       }),
-      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=MSFT&apikey=${ALPHA_VANTAGE_API_KEY}`, {
+      meteredFetch("alphavantage", `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=MSFT&apikey=${ALPHA_VANTAGE_API_KEY}`, {
         signal: AbortSignal.timeout(10000),
       }),
-      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=GOOGL&apikey=${ALPHA_VANTAGE_API_KEY}`, {
+      meteredFetch("alphavantage", `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=GOOGL&apikey=${ALPHA_VANTAGE_API_KEY}`, {
         signal: AbortSignal.timeout(10000),
       }),
-      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AMZN&apikey=${ALPHA_VANTAGE_API_KEY}`, {
+      meteredFetch("alphavantage", `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AMZN&apikey=${ALPHA_VANTAGE_API_KEY}`, {
         signal: AbortSignal.timeout(10000),
       }),
-      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=META&apikey=${ALPHA_VANTAGE_API_KEY}`, {
+      meteredFetch("alphavantage", `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=META&apikey=${ALPHA_VANTAGE_API_KEY}`, {
         signal: AbortSignal.timeout(10000),
       }),
-      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=TSLA&apikey=${ALPHA_VANTAGE_API_KEY}`, {
+      meteredFetch("alphavantage", `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=TSLA&apikey=${ALPHA_VANTAGE_API_KEY}`, {
         signal: AbortSignal.timeout(10000),
       }),
     ])

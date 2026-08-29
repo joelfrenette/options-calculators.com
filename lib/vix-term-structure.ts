@@ -10,6 +10,7 @@
 // module's stated purpose (backwardation detection) impossible (AUDIT P3-14).
 
 import { resolveApiKey } from "@/lib/api-keys"
+import { meteredFetch } from "@/lib/metered-fetch"
 import { getSeriesHistory } from "@/lib/market-series"
 import { computeTermStructure, BASELINE_RATIO, BASELINE_SPOT } from "@/lib/vix-term"
 
@@ -42,9 +43,10 @@ function baseline(): VIXTermStructureData {
 
 /** FRED daily series can contain "." placeholders on holidays — take the most recent numeric value. */
 async function fetchLatestFredValue(seriesId: string, apiKey: string): Promise<number> {
-  const res = await fetch(
+  const res = await meteredFetch(
+    "fred",
     `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${apiKey}&file_type=json&limit=5&sort_order=desc`,
-    { signal: AbortSignal.timeout(10000) },
+    { signal: AbortSignal.timeout(10000), routeTag: "vix-term-structure" },
   )
   if (!res.ok) {
     throw new Error(`FRED API error for ${seriesId}: ${res.status}`)

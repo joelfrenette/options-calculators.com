@@ -5,6 +5,7 @@
 
 import { fetchMarketDataWithGrok } from "./grok-market-data"
 import { resolveApiKey } from "./api-keys"
+import { meteredFetch } from "./metered-fetch"
 
 export interface ScrapingBeeOptions {
   renderJs?: boolean // Render JavaScript (default: true)
@@ -45,9 +46,10 @@ export async function scrapeUrl(url: string, options: ScrapingBeeOptions = {}): 
     country_code: options.countryCode || "us",
     ...(options.customParams || {}),
   })
-  const response = await fetch(`https://app.scrapingbee.com/api/v1/?${params.toString()}`, {
+  const response = await meteredFetch("scrapingbee", `https://app.scrapingbee.com/api/v1/?${params.toString()}`, {
     headers: { Accept: "text/html, application/json, */*" },
     signal: AbortSignal.timeout(25000),
+    routeTag: "scraping-bee",
   })
 
   if (!response.ok) {

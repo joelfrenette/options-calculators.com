@@ -20,7 +20,7 @@
  */
 
 import { resolveApiKey } from "@/lib/api-keys"
-import { fetchWithTimeout } from "@/lib/fetch-timeout"
+import { meteredFetch } from "@/lib/metered-fetch"
 import { fredLatestFromStore } from "@/lib/fred-store"
 import { computeBuffettIndicator, type BuffettReading } from "@/lib/ccpi/buffett-indicator"
 
@@ -37,7 +37,7 @@ async function liveObservation(seriesId: string): Promise<{ value: number; day: 
     const url =
       `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}` +
       `&api_key=${key}&file_type=json&sort_order=desc&limit=4`
-    const res = await fetchWithTimeout(url, {}, 8000)
+    const res = await meteredFetch("fred", url, { signal: AbortSignal.timeout(8000), routeTag: "ccpi-buffett" })
     if (!res.ok) return null
     const json = await res.json()
     for (const obs of json?.observations ?? []) {

@@ -5,6 +5,7 @@
 // ============================================================================
 import { resolveApiKey } from "@/lib/api-keys"
 import { keywordScore } from "@/lib/headline-sentiment"
+import { meteredFetch } from "@/lib/metered-fetch"
 
 // The keyword scorer and its word lists moved to lib/headline-sentiment.ts
 // (P7-47), which is import-free so scripts/check-headline-sentiment.ts can
@@ -50,8 +51,9 @@ export async function getGoogleNewsSentiment(): Promise<{
   }
   try {
     console.log("[v0] Source (GoogleNews): Fetching market headlines via Serper...")
-    const res = await fetch("https://google.serper.dev/news", {
+    const res = await meteredFetch("serper", "https://google.serper.dev/news", {
       method: "POST",
+      routeTag: "sentiment-news",
       headers: { "X-API-KEY": key, "Content-Type": "application/json" },
       body: JSON.stringify({ q: "stock market", gl: "us", hl: "en", num: 40, tbs: "qdr:d" }),
       signal: AbortSignal.timeout(12000),
@@ -91,9 +93,10 @@ async function scrapeBeeHtml(targetUrl: string, renderJs = true): Promise<string
       block_resources: "false",
       timeout: "20000",
     })
-    const res = await fetch(`https://app.scrapingbee.com/api/v1/?${params.toString()}`, {
+    const res = await meteredFetch("scrapingbee", `https://app.scrapingbee.com/api/v1/?${params.toString()}`, {
       headers: { Accept: "text/html, application/json, */*" },
       signal: AbortSignal.timeout(25000),
+      routeTag: "sentiment-scrape",
     })
     if (!res.ok) {
       console.log("[v0] ScrapingBee HTTP", res.status, "for", targetUrl)

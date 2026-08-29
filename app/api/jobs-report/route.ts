@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getApiKey } from "@/lib/api-keys"
 import { fredHistoryFromStore } from "@/lib/fred-store"
+import { meteredFetch } from "@/lib/metered-fetch"
 
 // E-7d: BLS/FRED series update monthly-to-daily, never intraday. ISR caches
 // the whole response at the edge for 15 min instead of re-pulling full
@@ -30,9 +31,10 @@ async function fetchSeries(seriesId: string, apiKey: string, limit: number): Pro
     return stored.map((r) => ({ date: r.day, value: String(r.value) })).reverse()
   }
   try {
-    const res = await fetch(
+    const res = await meteredFetch(
+      "fred",
       `${FRED_BASE}?series_id=${seriesId}&api_key=${apiKey}&file_type=json&sort_order=desc&limit=${limit}`,
-      { signal: AbortSignal.timeout(10000) },
+      { signal: AbortSignal.timeout(10000), routeTag: "/api/jobs-report" },
     )
     if (!res.ok) return null
     const json = await res.json()

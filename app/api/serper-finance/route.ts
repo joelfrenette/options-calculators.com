@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { resolveApiKey } from "@/lib/api-keys"
+import { meteredFetch } from "@/lib/metered-fetch"
 
 /**
  * Serper Google Finance/Search API Proxy
@@ -47,7 +48,7 @@ export async function GET(request: Request) {
     if (endpoint === "quote" || endpoint === "summary" || !endpoint) {
       console.log("[v0] Serper Finance quote request for:", ticker)
 
-      const response = await fetch("https://google.serper.dev/search", {
+      const response = await meteredFetch("serper", "https://google.serper.dev/search", {
         method: "POST",
         headers: {
           "X-API-KEY": SERPER_API_KEY,
@@ -107,7 +108,7 @@ export async function GET(request: Request) {
     if (endpoint === "news") {
       console.log("[v0] Serper Finance news request for:", ticker)
 
-      const response = await fetch("https://google.serper.dev/news", {
+      const response = await meteredFetch("serper", "https://google.serper.dev/news", {
         method: "POST",
         headers: {
           "X-API-KEY": SERPER_API_KEY,

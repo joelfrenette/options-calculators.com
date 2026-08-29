@@ -7,6 +7,7 @@
  * a claim about this route and belongs beside the code making it.
  */
 import { resolveApiKey } from "@/lib/api-keys"
+import { meteredFetch } from "@/lib/metered-fetch"
 
 /**
  * COMPREHENSIVE DATA SOURCE ANALYSIS & FALLBACK STRATEGY
@@ -105,7 +106,7 @@ export async function fetchNYSEHighsLows(): Promise<{ highs: number; lows: numbe
 
   try {
     const url = `https://app.scrapingbee.com/api/v1/?api_key=${resolveApiKey("SCRAPINGBEE_API_KEY")}&url=https://www.barchart.com/stocks/highs-lows/highs&render_js=false`
-    const response = await fetch(url, { signal: AbortSignal.timeout(10000) })
+    const response = await meteredFetch("scrapingbee", url, { signal: AbortSignal.timeout(10000), routeTag: "barchart-highs" })
 
     if (!response.ok) {
       console.log(`[v0] ScrapingBee returned ${response.status}`)

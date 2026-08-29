@@ -1,4 +1,5 @@
 import { resolveApiKey } from "@/lib/api-keys"
+import { meteredFetch } from "@/lib/metered-fetch"
 
 // Fetch S&P 500 valuation (P/E, P/S) from Financial Modeling Prep, using SPY
 // as the market proxy. Used as the live fallback for CCPI valuation when Apify
@@ -11,9 +12,10 @@ export async function fetchFMPValuation(
   if (!key) return null
 
   try {
-    const res = await fetch(
+    const res = await meteredFetch(
+      "fmp",
       `https://financialmodelingprep.com/api/v3/key-metrics/${symbol}?limit=1&apikey=${key}`,
-      { signal: AbortSignal.timeout(10000) },
+      { signal: AbortSignal.timeout(10000), routeTag: "ccpi-valuation" },
     )
     if (!res.ok) return null
     const data = await res.json()

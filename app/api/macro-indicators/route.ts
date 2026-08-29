@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { resolveApiKey } from "@/lib/api-keys"
 import { fredLatestFromStore, fredHistoryFromStore } from "@/lib/fred-store"
+import { meteredFetch } from "@/lib/metered-fetch"
 
 // Macro Indicators API - USD Index, M2, Unemployment, Debt-to-GDP.
 // No in-repo consumer (probed by health checks only). E-7b: FRED values come
@@ -17,9 +18,10 @@ const num = (v: unknown): number | null => {
 
 async function fredLive(seriesId: string, key: string, limit: number): Promise<{ day: string; value: number }[] | null> {
   try {
-    const res = await fetch(
+    const res = await meteredFetch(
+      "fred",
       `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${key}&file_type=json&limit=${limit}&sort_order=desc`,
-      { signal: AbortSignal.timeout(10000) },
+      { signal: AbortSignal.timeout(10000), routeTag: "/api/macro-indicators" },
     )
     if (!res.ok) return null
     const j = await res.json()
@@ -42,9 +44,10 @@ export async function GET() {
     let usdIndex: number | null = null
     if (ALPHA_VANTAGE_API_KEY) {
       try {
-        const dxyRes = await fetch(
+        const dxyRes = await meteredFetch(
+          "alphavantage",
           `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=USD&to_currency=EUR&apikey=${ALPHA_VANTAGE_API_KEY}`,
-          { signal: AbortSignal.timeout(10000) },
+          { signal: AbortSignal.timeout(10000), routeTag: "/api/macro-indicators" },
         )
         if (dxyRes.ok) {
           const dxyData = await dxyRes.json()

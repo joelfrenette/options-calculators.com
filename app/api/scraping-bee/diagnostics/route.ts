@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { resolveApiKey } from "@/lib/api-keys"
+import { meteredFetch } from "@/lib/metered-fetch"
 
 /**
  * Diagnostic endpoint for ScrapingBee integration
@@ -62,8 +63,9 @@ export async function GET() {
       render_js: 'false'
     })
 
-    const response = await fetch(`https://app.scrapingbee.com/api/v1/?${params.toString()}`, {
-      signal: AbortSignal.timeout(10000)
+    const response = await meteredFetch("scrapingbee", `https://app.scrapingbee.com/api/v1/?${params.toString()}`, {
+      signal: AbortSignal.timeout(10000),
+      routeTag: "scraping-bee-diagnostics",
     })
 
     if (!response.ok) {

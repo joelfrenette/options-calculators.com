@@ -1,4 +1,5 @@
 import { getApiKey } from "@/lib/api-keys"
+import { meteredFetch } from "@/lib/metered-fetch"
 
 export async function fetchApifyYahooFinance(ticker: string) {
   const APIFY_API_TOKEN = getApiKey("APIFY_API_TOKEN")
@@ -50,7 +51,7 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const response = await fetch(url, options)
+      const response = await meteredFetch("apify", url, { ...options, routeTag: "apify-yahoo" })
 
       // If we get a 502, retry with exponential backoff
       if (response.status === 502 && attempt < maxRetries - 1) {
@@ -78,8 +79,9 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
 async function tryActor(actorId: string, actorName: string, ticker: string, token: string) {
   console.log(`[v0] Apify: Starting ${actorName} for ${ticker}...`)
 
-  const runResponse = await fetch(`https://api.apify.com/v2/acts/${actorId}/runs?token=${token}`, {
+  const runResponse = await meteredFetch("apify", `https://api.apify.com/v2/acts/${actorId}/runs?token=${token}`, {
     method: "POST",
+    routeTag: "apify-yahoo",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",

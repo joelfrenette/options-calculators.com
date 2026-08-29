@@ -4,6 +4,7 @@
  * Split out of `app/api/market-sentiment/route.ts` (P6-13) unchanged.
  */
 import { resolveApiKey } from "@/lib/api-keys"
+import { meteredFetch } from "@/lib/metered-fetch"
 
 
 export async function scrapeCNNFearGreed() {
@@ -16,7 +17,7 @@ export async function scrapeCNNFearGreed() {
     const url = `https://app.scrapingbee.com/api/v1/?api_key=${resolveApiKey("SCRAPINGBEE_API_KEY")}&url=${encodeURIComponent("https://www.cnn.com/markets/fear-and-greed")}&render_js=true&wait=5000&wait_for=.market-fng-gauge`
 
     console.log("[v0] Fetching CNN Fear & Greed page with JavaScript rendering...")
-    const response = await fetch(url, { signal: AbortSignal.timeout(30000) })
+    const response = await meteredFetch("scrapingbee", url, { signal: AbortSignal.timeout(30000), routeTag: "cnn-fear-greed" })
 
     if (!response.ok) {
       console.log(`[v0] ScrapingBee returned ${response.status}`)

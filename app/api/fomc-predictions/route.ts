@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getApiKey } from "@/lib/api-keys"
 import { fredHistoryFromStore, fredTrendFromStore, yoyTrend } from "@/lib/fred-store"
+import { meteredFetch } from "@/lib/metered-fetch"
 import { FOMC_MEETINGS, FOMC_SCHEDULE_THROUGH } from "@/lib/fomc-schedule"
 import { readYieldCurve } from "@/lib/yield-curve"
 
@@ -37,9 +38,10 @@ export async function GET() {
         // the 12-months-back base outside the window; yoyTrend aligns by date,
         // not by row offset.
         const limit = calculateYoY ? 16 : 2
-        const response = await fetch(
+        const response = await meteredFetch(
+          "fred",
           `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${fredApiKey}&file_type=json&sort_order=desc&limit=${limit}`,
-          { signal: AbortSignal.timeout(10000) },
+          { signal: AbortSignal.timeout(10000), routeTag: "/api/fomc-predictions" },
         )
         if (!response.ok) return null
         const data = await response.json()
@@ -100,8 +102,10 @@ export async function GET() {
       if (stored && stored.length > 0) return stored.map((r) => ({ date: r.day, rate: r.value }))
       if (!fredApiKey) return []
       try {
-        const response = await fetch(
+        const response = await meteredFetch(
+          "fred",
           `https://api.stlouisfed.org/fred/series/observations?series_id=DFF&api_key=${fredApiKey}&file_type=json&sort_order=desc&limit=730`,
+          { routeTag: "/api/fomc-predictions" },
         )
         if (!response.ok) return []
         const data = await response.json()

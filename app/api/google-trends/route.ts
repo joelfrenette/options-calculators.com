@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { resolveApiKey } from "@/lib/api-keys"
+import { meteredFetch } from "@/lib/metered-fetch"
 
 // Uses Serper API (requires SERPER_API_KEY)
 
@@ -23,8 +24,9 @@ export async function GET() {
       keywords.map(async (keyword) => {
         try {
           // Use Serper to get search results count/relevance as a proxy for interest
-          const response = await fetch("https://google.serper.dev/search", {
+          const response = await meteredFetch("serper", "https://google.serper.dev/search", {
             method: "POST",
+            routeTag: "/api/google-trends",
             headers: {
               "X-API-KEY": SERPER_API_KEY,
               "Content-Type": "application/json",
