@@ -14,12 +14,16 @@
  */
 
 import {
+  RELAXED_DEEP_DECLINE_PCT,
+  RELAXED_MILD_DOWN_MIN_CAP,
   SESSIONS_PER_MONTH,
   SESSIONS_PER_YEAR,
   isStage4Decline,
   momentum12m1,
   moveInAtrUnits,
   relativeReturnPoints,
+  relaxedDownYearAdmitted,
+  relaxedDownYearVerdict,
   sessionMovePercent,
   trailingReturnPercent,
 } from "../lib/trend-filters.ts"
@@ -179,6 +183,63 @@ check("a missing benchmark declines rather than comparing against zero", relativ
     "with a NEGATIVE benchmark year the two gates disagree, which is the case that motivates both",
     rel !== null && rel > 0,
     `down 5% against a market down ${Math.abs(bench)}% outperforms by ${rel} points, yet fails "down on the year"`,
+  )
+}
+
+// -------------------------------------------- relaxed-pass down-year grading
+
+// The scenario that motivated the grade: a mega-cap down a few percent is a
+// pullback the owner wants shown; a stock down 40%, or a small cap down a
+// little, is not. These assertions pin the verdicts with worked numbers so a
+// changed threshold cannot silently re-empty (or flood) Step 5.
+{
+  const bigCap = 100_000_000_000 // $100B — AMZN/NVDA/CSCO class
+  const smallCap = 5_000_000_000 // $5B
+
+  check(
+    "a mega-cap down 3% is admitted (mild-large)",
+    relaxedDownYearVerdict(-3, bigCap) === "mild-large" && relaxedDownYearAdmitted("mild-large"),
+    relaxedDownYearVerdict(-3, bigCap),
+  )
+  check(
+    "a stock down 40% is held out (deep), whatever its size",
+    relaxedDownYearVerdict(-40, bigCap) === "deep" && !relaxedDownYearAdmitted("deep"),
+    relaxedDownYearVerdict(-40, bigCap),
+  )
+  check(
+    "a small cap down 5% is held out (mild-small)",
+    relaxedDownYearVerdict(-5, smallCap) === "mild-small" && !relaxedDownYearAdmitted("mild-small"),
+    relaxedDownYearVerdict(-5, smallCap),
+  )
+  check(
+    "a name up on the year is not-down (admitted)",
+    relaxedDownYearVerdict(8, smallCap) === "not-down" && relaxedDownYearAdmitted("not-down"),
+    relaxedDownYearVerdict(8, smallCap),
+  )
+  check(
+    "an unmeasurable trailing year fails safe (held out)",
+    relaxedDownYearVerdict(null, bigCap) === "unmeasurable" && !relaxedDownYearAdmitted("unmeasurable"),
+    relaxedDownYearVerdict(null, bigCap),
+  )
+  check(
+    "exactly the deep threshold is NOT deep — a large cap at −20% is admitted",
+    relaxedDownYearVerdict(RELAXED_DEEP_DECLINE_PCT, bigCap) === "mild-large",
+    `verdict at ${RELAXED_DEEP_DECLINE_PCT}% = ${relaxedDownYearVerdict(RELAXED_DEEP_DECLINE_PCT, bigCap)}`,
+  )
+  check(
+    "just past the deep threshold IS deep",
+    relaxedDownYearVerdict(RELAXED_DEEP_DECLINE_PCT - 0.01, bigCap) === "deep",
+    relaxedDownYearVerdict(RELAXED_DEEP_DECLINE_PCT - 0.01, bigCap),
+  )
+  check(
+    "exactly the cap floor counts as large",
+    relaxedDownYearVerdict(-5, RELAXED_MILD_DOWN_MIN_CAP) === "mild-large",
+    relaxedDownYearVerdict(-5, RELAXED_MILD_DOWN_MIN_CAP),
+  )
+  check(
+    "a null market cap on a mild decline is treated as small (held out)",
+    relaxedDownYearVerdict(-5, null) === "mild-small",
+    relaxedDownYearVerdict(-5, null),
   )
 }
 
