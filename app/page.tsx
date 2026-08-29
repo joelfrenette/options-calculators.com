@@ -36,6 +36,7 @@ import { CalendarSpreadScanner } from "@/components/calendar-spread-scanner"
 import { ButterflyScanner } from "@/components/butterfly-scanner"
 import { LEAPSScanner } from "@/components/leaps-scanner"
 import { ZEBRAScanner } from "@/components/zebra-scanner"
+import { MarketClosedBanner } from "@/components/market-closed-banner"
 import { Menu, X, TrendingUp, Zap, Search, Users } from "lucide-react"
 import Image from "next/image"
 import { SessionControls } from "@/components/session-controls"
@@ -279,14 +280,34 @@ export default function Home() {
         return <TrendAnalysis />
       case "risk-management":
         return <RiskCalculator />
+      // The live market-state dashboards carry the INFO banner (owner
+      // 2026-08-29): after hours their figures are the last session's close, so
+      // a calm "live data resumes in …" note prevents the same stale-numbers
+      // confusion the scanners' hard block solves. Read-only, so nothing is
+      // disabled — the scanners keep their own louder block variant.
       case "market-sentiment":
-        return <MarketSentiment />
+        return (
+          <>
+            <MarketClosedBanner variant="info" />
+            <MarketSentiment />
+          </>
+        )
       case "panic-euphoria":
-        return <PanicEuphoria />
+        return (
+          <>
+            <MarketClosedBanner variant="info" />
+            <PanicEuphoria />
+          </>
+        )
       case "social-sentiment":
         return <SocialSentiment />
       case "ccpi":
-        return <CcpiDashboard />
+        return (
+          <>
+            <MarketClosedBanner variant="info" />
+            <CcpiDashboard />
+          </>
+        )
       case "fomc-predictions":
         return <FomcPredictions />
       case "cpi-inflation":
