@@ -13,6 +13,7 @@ import { TrendingUp, Info, Loader2, BarChart3, Filter, AlertCircle } from "lucid
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { useWheelScanner } from "@/components/scanner/use-wheel-scanner"
+import { MarketClosedBanner } from "@/components/market-closed-banner"
 import { Step1DollarFilterCard } from "@/components/scanner/step1-dollar-filter-card"
 import { Step2PreFilterCard } from "@/components/scanner/step2-prefilter-card"
 import { Step3FundamentalsCard } from "@/components/scanner/step3-fundamentals-card"
@@ -82,6 +83,10 @@ export function WheelScanner() {
 
   return (
     <TooltipProvider delayDuration={300}>
+      {/* Loud closed-market gate. Renders nothing while the market is open;
+          when closed it screams and counts down, and the scan actions in
+          use-wheel-scanner refuse to fire (no wasted API calls, no zeros). */}
+      <MarketClosedBanner />
       <Card className="w-full max-w-7xl mx-auto shadow-lg">
         <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b-2 border-blue-200">
           <div className="flex items-center justify-between">

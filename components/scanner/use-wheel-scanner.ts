@@ -29,6 +29,7 @@ import {
 } from "./technical-criteria"
 import { useLandmines } from "./use-landmines"
 import { useTechnicalFilters } from "./use-technical-filters"
+import { getMarketStatus } from "@/lib/market-hours"
 import { useScannerSorting } from "./use-scanner-sorting"
 import { stepLabel, stepTitled } from "./steps"
 
@@ -166,7 +167,24 @@ export function useWheelScanner() {
 
   const { fetchLandmines, getLandminesForRow, resetLandmines } = useLandmines()
 
+  // Market-closed backstop. Every scan step depends on live quotes; outside the
+  // regular session the provider returns nothing, so a run only burns API
+  // budget and ends in a zero. The banner (components/market-closed-banner.tsx)
+  // is the loud UI; this guard makes the block real even if a button is somehow
+  // reached, and names the reason. Checked at click time so it flips exactly at
+  // the open without a re-render race.
+  const blockedWhenClosed = (): boolean => {
+    const market = getMarketStatus()
+    if (market.isOpen) return false
+    setError(
+      `Markets are closed (${market.reason}) — scanning is paused until the next open. ` +
+        `Live option quotes aren't available now, so a scan would only return zeros.`,
+    )
+    return true
+  }
+
   const scanFundamentals = async () => {
+    if (blockedWhenClosed()) return
     console.log("[v0] 🔴🔴🔴🔴🔴 SCAN FUNDAMENTALS CALLED 🔴🔴🔴🔴🔴")
     console.log("[v0] Time:", new Date().toISOString())
 
@@ -270,6 +288,7 @@ export function useWheelScanner() {
   }
 
   const scanTechnicals = async () => {
+    if (blockedWhenClosed()) return
     setStep(3)
     setHasAttemptedTechnicalScan(true)
 
@@ -388,6 +407,7 @@ export function useWheelScanner() {
   }
 
   const loadPreFilteredTickers = async () => {
+    if (blockedWhenClosed()) return
     console.log(`[v0] 🟢 ${stepTitled("preFilter")} button clicked`)
     setIsLoadingPreFilter(true) // Renamed from preFilterLoading
 
@@ -476,6 +496,10 @@ export function useWheelScanner() {
             : 3 // Default to step 3 if no results yet but attempted scan
 
   const toggleRelaxedResults = () => {
+    // Turning the relaxed pass ON prices every candidate (an API call each), so
+    // it carries the same closed-market backstop as the other steps. Hiding it
+    // again is always allowed.
+    if (!showRelaxedResults && blockedWhenClosed()) return
     setShowRelaxedResults((prev) => !prev)
     if (!showRelaxedResults) {
       setIsEnrichingRelaxed(true)

@@ -9,6 +9,8 @@ import { Slider } from "@/components/ui/slider"
 import { DollarAmountFilter } from "@/components/dollar-amount-filter"
 import { Clock, Filter, AlertTriangle, Info, Wifi, WifiOff, TrendingUp, Activity, Shield, Percent } from "lucide-react"
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { MarketClosedBanner } from "@/components/market-closed-banner"
+import { getMarketStatus } from "@/lib/market-hours"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { yahooChartUrl } from "@/lib/ticker-links"
@@ -143,6 +145,17 @@ export function LEAPSScanner() {
   // state is not updated synchronously — and rescan with the number the
   // user just changed away from.
   const handleRefresh = async (overrideMaxDayMove?: number) => {
+    // Market-closed backstop: the strategy scanner needs live quotes, so a run
+    // outside the regular session only burns API budget and returns zeros. The
+    // banner is the loud UI; this makes the block real.
+    const marketStatus = getMarketStatus()
+    if (!marketStatus.isOpen) {
+      setError(
+        "Markets are closed (" + marketStatus.reason + ") - scanning is paused until the next open. " +
+          "Live quotes are unavailable now, so a scan would only return zeros.",
+      )
+      return
+    }
     const effectiveMaxDayMove = overrideMaxDayMove ?? maxDayMove
     setIsLoading(true)
     setError(null)
@@ -227,6 +240,7 @@ export function LEAPSScanner() {
 
   return (
     <TooltipProvider>
+      <MarketClosedBanner />
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">

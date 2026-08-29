@@ -11,6 +11,8 @@ import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { Layers, Zap, Filter, ArrowUpRight, AlertTriangle, CheckCircle2, Info, Wifi, WifiOff } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { MarketClosedBanner } from "@/components/market-closed-banner"
+import { getMarketStatus } from "@/lib/market-hours"
 import { yahooChartUrl } from "@/lib/ticker-links"
 import {
   EntryExclusionNotice,
@@ -105,6 +107,17 @@ export function IronCondorScanner() {
   // state is not updated synchronously — and rescan with the number the
   // user just changed away from.
   const handleRefresh = async (overrideMaxDayMove?: number) => {
+    // Market-closed backstop: the strategy scanner needs live quotes, so a run
+    // outside the regular session only burns API budget and returns zeros. The
+    // banner is the loud UI; this makes the block real.
+    const marketStatus = getMarketStatus()
+    if (!marketStatus.isOpen) {
+      setError(
+        "Markets are closed (" + marketStatus.reason + ") - scanning is paused until the next open. " +
+          "Live quotes are unavailable now, so a scan would only return zeros.",
+      )
+      return
+    }
     const effectiveMaxDayMove = overrideMaxDayMove ?? maxDayMove
     setIsLoading(true)
     setError(null)
@@ -188,6 +201,7 @@ export function IronCondorScanner() {
 
   return (
     <TooltipProvider>
+      <MarketClosedBanner />
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
