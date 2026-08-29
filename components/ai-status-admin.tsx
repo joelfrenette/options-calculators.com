@@ -108,7 +108,9 @@ export function AIStatusAdmin() {
             </CardTitle>
             <CardDescription>
               Generated from <code className="font-mono">lib/ai-providers.ts</code> — the same list the code walks, in
-              the same order. Key presence only: no AI provider is called to build this panel.
+              the same order. Key presence only: no AI provider is called to build this panel. Manage keys in the{" "}
+              <span className="font-semibold">Keys</span> tab (the canonical surface); the presence shown here is
+              context for the LLM chain.
             </CardDescription>
           </div>
           <Button onClick={fetchAIStatus} disabled={loading} variant="outline" size="sm">

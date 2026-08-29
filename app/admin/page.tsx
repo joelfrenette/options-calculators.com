@@ -341,6 +341,18 @@ export default function AdminDashboard() {
                 </div>
               </CardHeader>
               <CardContent>
+                {/* Key-surface dedup (admin audit 2026-08-29): key resolution
+                    is shown in three tabs. This one shows it only as CONTEXT
+                    beside each vendor probe — its unique job is vendor-endpoint
+                    REACHABILITY. The canonical place to view and manage every
+                    key is the Keys tab (with the full resolution table on the
+                    Health tab), so the note below points there rather than this
+                    tab re-claiming to be the source of truth. */}
+                <p className="text-xs text-slate-500 mb-3 border-l-2 border-slate-300 pl-2">
+                  This tab probes vendor endpoints for reachability. The key status shown per provider is context
+                  only — manage keys in the <span className="font-semibold">Keys</span> tab, and see the full
+                  resolution table on the <span className="font-semibold">Health</span> tab.
+                </p>
                 {apiStatusError ? (
                   <div className="border border-red-300 bg-red-50 rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-1">
