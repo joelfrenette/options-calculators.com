@@ -194,6 +194,7 @@ _None._
 | efts.senate.gov | `/api/insider-trading` |
 | fredaccount.stlouisfed.org | `lib/remediation/remediation-providers.ts` |
 | groqstatus.com | `lib/remediation/remediation-providers.ts` |
+| localhost | `lib/auth.ts` |
 | platform.openai.com | `lib/remediation/remediation-providers.ts` |
 | polygon.io | `lib/remediation/remediation-providers.ts` |
 | query2.finance.yahoo.com | `/api/yahoo-proxy` |
