@@ -163,10 +163,19 @@ export function isPasswordHashed(): boolean {
 
 export async function createSession(role: SessionRole = "admin", email = "") {
   const token = createToken(role, email)
+  // SameSite in production is "none" so the session survives when the site is
+  // embedded in a cross-site iframe (the Agent OS dashboard) — "lax" cookies
+  // are dropped from a third-party frame, which is why an embedded sign-in
+  // "worked" but never stuck. "none" REQUIRES Secure, which production has.
+  // CSRF protection that SameSite=Lax used to provide is restored by the
+  // Origin allowlist in middleware.ts (mutating requests from a third-party
+  // Origin are rejected). Dev stays "lax"+insecure so http://localhost login
+  // keeps working and is never embedded anyway.
+  const embeddable = process.env.NODE_ENV === "production"
   ;(await cookies()).set(COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: embeddable,
+    sameSite: embeddable ? "none" : "lax",
     maxAge: SESSION_MAX_AGE,
   })
   return token
