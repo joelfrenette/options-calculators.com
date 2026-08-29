@@ -65,14 +65,6 @@ export function ApiKeysManager() {
       required: true,
     },
     {
-      name: "TWELVE_DATA_API_KEY",
-      label: "TwelveData API Key",
-      description: "Technical indicators and fundamentals (accepts TWELVEDATA_API_KEY)",
-      configured: false,
-      envVarName: "TWELVE_DATA_API_KEY",
-      category: "Market & Economic Data",
-    },
-    {
       name: "FMP_API_KEY",
       label: "Financial Modeling Prep API Key",
       description: "Financial statements and valuation ratios",
@@ -129,17 +121,8 @@ export function ApiKeysManager() {
       envVarName: "SERPER_API_KEY",
       category: "Scraping & Search",
     },
-    {
-      name: "SERPAPI_KEY",
-      label: "SerpAPI Key",
-      // Google Trends is served by SERPER_API_KEY (/api/google-trends).
-      // SERPAPI_KEY is read by nothing except the api-status probe — kept
-      // because it is re-enableable, but it currently serves no feature.
-      description: "No route reads this key — retained as a re-enableable provider, currently unused",
-      configured: false,
-      envVarName: "SERPAPI_KEY",
-      category: "Scraping & Search",
-    },
+    // SERPAPI_KEY manager entry removed 2026-08-29 (admin audit): purged —
+    // Google Trends is served by SERPER_API_KEY (/api/google-trends).
     // Email
     {
       name: "RESEND_API_KEY",

@@ -53,13 +53,15 @@ const KEYS: KeySummary[] = [
     gates: ["/api/fmp-proxy"],
   },
   {
-    name: "TWELVE_DATA_API_KEY",
-    aliases: ["TWELVE_DATA_API_KEY", "TWELVEDATA_API_KEY"],
-    // AUDIT_BACKLOG P0-5: set under the non-canonical spelling.
-    resolvedVia: "TWELVEDATA_API_KEY",
+    // Was TWELVE_DATA_API_KEY; swapped to APIFY when that provider was purged
+    // (2026-08-29 admin audit). APIFY has the same two-alias shape, so it still
+    // exercises the "key set under the non-canonical spelling" path (P0-5).
+    name: "APIFY_API_TOKEN",
+    aliases: ["APIFY_API_TOKEN", "APIFY_API_KEY"],
+    resolvedVia: "APIFY_API_KEY",
     configured: true,
     disabled: false,
-    gates: ["/api/twelve-data-proxy"],
+    gates: ["/api/apify-proxy"],
   },
 ]
 
@@ -77,10 +79,10 @@ const CASES: Case[] = [
   {
     label: "blocked / DISABLED_APIS kill switch",
     input: result({
-      path: "/api/twelve-data-proxy",
+      path: "/api/apify-proxy",
       status: "blocked",
-      detail: "Disabled via DISABLED_APIS: TWELVE_DATA_API_KEY",
-      missingKeys: ["TWELVE_DATA_API_KEY"],
+      detail: "Disabled via DISABLED_APIS: APIFY_API_TOKEN",
+      missingKeys: ["APIFY_API_TOKEN"],
       latencyMs: null,
     }),
     owner: "owner",
@@ -89,15 +91,15 @@ const CASES: Case[] = [
   {
     label: "blocked / key not configured",
     input: result({
-      path: "/api/twelve-data-proxy",
+      path: "/api/apify-proxy",
       status: "blocked",
-      detail: "Key(s) not configured: TWELVE_DATA_API_KEY",
-      missingKeys: ["TWELVE_DATA_API_KEY"],
+      detail: "Key(s) not configured: APIFY_API_TOKEN",
+      missingKeys: ["APIFY_API_TOKEN"],
       latencyMs: null,
     }),
     owner: "owner",
     // The missing-key remediation must name every accepted alias.
-    mentions: "TWELVEDATA_API_KEY",
+    mentions: "APIFY_API_KEY",
   },
   {
     label: "blocked / auth-gated with no session cookie",
@@ -307,10 +309,10 @@ const CASES: Case[] = [
   },
   {
     label: "alias mismatch on a passing route (AUDIT_BACKLOG P0-5)",
-    input: result({ path: "/api/twelve-data-proxy", status: "pass", httpStatus: 200, detail: null, tabs: [] }),
+    input: result({ path: "/api/apify-proxy", status: "pass", httpStatus: 200, detail: null, tabs: [] }),
     ctx: { keys: KEYS },
     owner: "owner",
-    mentions: "TWELVEDATA_API_KEY",
+    mentions: "APIFY_API_KEY",
   },
   {
     label: "unrecognised detail admits it has no rule",

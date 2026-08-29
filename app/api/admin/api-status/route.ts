@@ -106,14 +106,8 @@ const PROVIDERS: ProviderSpec[] = [
     probeUrl: (key) =>
       `https://api.stlouisfed.org/fred/series/observations?series_id=DFF&api_key=${key}&file_type=json&limit=1&sort_order=desc`,
   },
-  {
-    id: "twelvedata",
-    name: "Twelve Data",
-    keyName: "TWELVE_DATA_API_KEY",
-    endpoint: "https://api.twelvedata.com/time_series",
-    usedIn: ["Indicator backup source (RSI / MACD / SMA / Bollinger)"],
-    probeUrl: (key) => `https://api.twelvedata.com/time_series?symbol=AAPL&interval=1day&outputsize=1&apikey=${key}`,
-  },
+  // Twelve Data probe removed 2026-08-29 (admin audit): purged dead provider —
+  // its indicator job is computed locally from Polygon OHLCV.
   {
     id: "fmp",
     name: "Financial Modeling Prep",
@@ -166,16 +160,9 @@ const PROVIDERS: ProviderSpec[] = [
     usedIn: ["Google Trends proxy", "Serper finance news", "Social sentiment"],
     noProbeReason: BILLABLE("a /search or /news query, which consumes a search credit"),
   },
-  {
-    id: "serpapi",
-    name: "SerpAPI.com",
-    keyName: "SERPAPI_KEY",
-    endpoint: "— (no call site)",
-    usedIn: [],
-    unused: true,
-    noProbeReason:
-      "not probed — no code path in this repo calls SerpAPI. The key is registered in lib/api-keys.ts (and billed if the plan is active), but nothing consumes it, so there is no app endpoint to probe.",
-  },
+  // SerpAPI entry removed 2026-08-29 (admin audit): purged dead provider — its
+  // Google-Trends job migrated to Serper. Was previously kept only to flag the
+  // registered-but-unused key; now the key itself is gone from lib/api-keys.ts.
   // ------------------------------------------------------------------ email
   {
     id: "resend",

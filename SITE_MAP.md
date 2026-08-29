@@ -76,7 +76,7 @@ Every route: HTTP verbs, segment config, upstream hosts, env keys, timeout wirin
 | Route | Verbs | Config | Upstream hosts | Env keys | Timeout? | Consumers |
 |---|---|---|---|---|---|---|
 | `/api/admin/api-keys` | GET, POST | dynamic="force-dynamic" | — | ENCRYPTION_KEY | yes | `components/api-keys-manager.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
-| `/api/admin/api-status` | GET | dynamic="force-dynamic"<br>maxDuration=60 | api.anthropic.com<br>api.apify.com<br>api.groq.com<br>api.openai.com<br>api.perplexity.ai<br>api.polygon.io<br>api.resend.com<br>api.stlouisfed.org<br>api.twelvedata.com<br>api.x.ai<br>app.scrapingbee.com<br>financialmodelingprep.com<br>finnhub.io<br>generativelanguage.googleapis.com<br>google.serper.dev<br>openrouter.ai<br>production.dataviz.cnn.io<br>www.alphavantage.co | — | yes | `app/admin/page.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
+| `/api/admin/api-status` | GET | dynamic="force-dynamic"<br>maxDuration=60 | api.anthropic.com<br>api.apify.com<br>api.groq.com<br>api.openai.com<br>api.perplexity.ai<br>api.polygon.io<br>api.resend.com<br>api.stlouisfed.org<br>api.x.ai<br>app.scrapingbee.com<br>financialmodelingprep.com<br>finnhub.io<br>generativelanguage.googleapis.com<br>google.serper.dev<br>openrouter.ai<br>production.dataviz.cnn.io<br>www.alphavantage.co | — | yes | `app/admin/page.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/admin/backup` | GET | — | vercel.com | — | **no** | `app/admin/page.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/admin/budget-guard` | GET, POST | dynamic="force-dynamic" | — | — | **no** | `components/admin/budget-guard-panel.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/admin/ccpi-backtest` | GET | dynamic="force-dynamic"<br>maxDuration=120 | — | — | **no** | `lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts`<br>`app/api/ccpi-signals/route.ts` |
@@ -184,7 +184,6 @@ _None._
 | aistudio.google.com | `lib/remediation/remediation-providers.ts` |
 | api.resend.com | `/api/admin/api-status` |
 | api.stocktwits.com | `/api/social-sentiment` |
-| api.twelvedata.com | `/api/admin/api-status` |
 | cdn.cboe.com | `/api/admin/source-probe` |
 | console.anthropic.com | `lib/remediation/remediation-providers.ts` |
 | console.apify.com | `lib/remediation/remediation-providers.ts` |
@@ -200,7 +199,6 @@ _None._
 | query2.finance.yahoo.com | `/api/yahoo-proxy` |
 | resend-status.com | `lib/remediation/remediation-providers.ts` |
 | resend.com | `lib/remediation/remediation-providers.ts` |
-| serpapi.com | `lib/remediation/remediation-providers.ts` |
 | site.financialmodelingprep.com | `lib/remediation/remediation-providers.ts` |
 | staging.options-calculators.com | `lib/remediation/remediation-branches.ts` |
 | status.anthropic.com | `lib/remediation/remediation-providers.ts` |
@@ -209,8 +207,6 @@ _None._
 | status.openai.com | `lib/remediation/remediation-providers.ts` |
 | status.openrouter.ai | `lib/remediation/remediation-providers.ts` |
 | status.polygon.io | `lib/remediation/remediation-providers.ts` |
-| status.twelvedata.com | `lib/remediation/remediation-providers.ts` |
-| twelvedata.com | `lib/remediation/remediation-providers.ts` |
 | worldtimeapi.org | `/api/time-server` |
 | www.bls.gov | `components/jobs-report/historical-table-card.tsx` |
 | www.example.com | `/api/scraping-bee/diagnostics` |

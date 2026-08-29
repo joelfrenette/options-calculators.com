@@ -56,17 +56,8 @@ export const API_COSTS: ApiCost[] = [
     provides: "Fed Funds, CPI, VIX, yield curve, jobs, credit spreads",
     replacement: "Already free & unlimited",
   },
-  {
-    key: "TWELVE_DATA_API_KEY",
-    vendor: "TwelveData",
-    category: "Market & Economic Data",
-    monthlyCost: 79,
-    targetCost: 0,
-    status: "eliminate",
-    billing: "flat",
-    provides: "RSI, MACD, SMA, Bollinger, OHLCV",
-    replacement: "Computed locally from Polygon OHLCV (simple formulas)",
-  },
+  // TWELVE_DATA_API_KEY entry removed 2026-08-29 (admin audit): purged as dead —
+  // its RSI/MACD/SMA/OHLCV job is computed locally from Polygon.
   {
     key: "FMP_API_KEY",
     vendor: "Financial Modeling Prep",
@@ -135,17 +126,8 @@ export const API_COSTS: ApiCost[] = [
     provides: "Google search / news (ticker headlines, landmine checks)",
     replacement: "",
   },
-  {
-    key: "SERPAPI_KEY",
-    vendor: "SerpAPI.com",
-    category: "Scraping & Search",
-    monthlyCost: 75,
-    targetCost: 0,
-    status: "eliminate",
-    billing: "flat",
-    provides: "Google Trends fear/greed search volume",
-    replacement: "Not must-keep; Serper.dev free can cover if needed",
-  },
+  // SERPAPI_KEY entry removed 2026-08-29 (admin audit): purged as dead — its
+  // Google-Trends job migrated to Serper (/api/google-trends uses SERPER_API_KEY).
   {
     key: "QUIVER_API_KEY",
     vendor: "Quiver Quantitative",
@@ -283,7 +265,8 @@ export const MODEL_TOKEN_PRICES: Record<string, TokenPrice> = {
   "openrouter/free": { inputPerM: 0, outputPerM: 0, note: "OpenRouter free auto-router; capped by request count, not billed" },
   "llama-3.3-70b-versatile": { inputPerM: 0, outputPerM: 0, note: "Groq free tier" },
   "gemini-2.0-flash": { inputPerM: 0, outputPerM: 0, note: "Google AI Studio free tier" },
-  "gemini-2.0-flash-exp": { inputPerM: 0, outputPerM: 0, note: "Google AI Studio free tier" },
+  // gemini-2.0-flash-exp price entry removed 2026-08-29 (admin audit): no code
+  // ever requested that model id — a dead defensive constant.
   // Pay-per-use. These are the ones that can run a bill up.
   "gpt-4o-mini": { inputPerM: 0.15, outputPerM: 0.6 },
   "claude-3-5-sonnet-20241022": { inputPerM: 3, outputPerM: 15 },

@@ -16,7 +16,6 @@ import type { RemediationLink } from "./remediation-types.ts"
 export const KEY_ALIASES: Record<string, string[]> = {
   POLYGON_API_KEY: ["POLYGON_API_KEY"],
   FRED_API_KEY: ["FRED_API_KEY"],
-  TWELVE_DATA_API_KEY: ["TWELVE_DATA_API_KEY", "TWELVEDATA_API_KEY"],
   FMP_API_KEY: ["FMP_API_KEY"],
   ALPHA_VANTAGE_API_KEY: ["ALPHA_VANTAGE_API_KEY"],
   FINNHUB_API_KEY: ["FINNHUB_API_KEY"],
@@ -24,7 +23,6 @@ export const KEY_ALIASES: Record<string, string[]> = {
   QUIVER_API_KEY: ["QUIVER_API_KEY", "QUIVER_QUANT_API_KEY"],
   SCRAPINGBEE_API_KEY: ["SCRAPINGBEE_API_KEY"],
   SERPER_API_KEY: ["SERPER_API_KEY"],
-  SERPAPI_KEY: ["SERPAPI_KEY"],
   RESEND_API_KEY: ["RESEND_API_KEY"],
   OPENAI_API_KEY: ["OPENAI_API_KEY"],
   ANTHROPIC_API_KEY: ["ANTHROPIC_API_KEY"],
@@ -47,7 +45,6 @@ interface Provider {
 export const PROVIDERS: Record<string, Provider> = {
   POLYGON_API_KEY: { label: "Polygon.io", dashboard: "https://polygon.io/dashboard", status: "https://status.polygon.io" },
   FRED_API_KEY: { label: "FRED (St. Louis Fed)", dashboard: "https://fredaccount.stlouisfed.org/apikeys" },
-  TWELVE_DATA_API_KEY: { label: "Twelve Data", dashboard: "https://twelvedata.com/account", status: "https://status.twelvedata.com" },
   FMP_API_KEY: { label: "Financial Modeling Prep", dashboard: "https://site.financialmodelingprep.com/developer/docs/dashboard" },
   ALPHA_VANTAGE_API_KEY: { label: "Alpha Vantage", dashboard: "https://www.alphavantage.co/support/#api-key" },
   FINNHUB_API_KEY: { label: "Finnhub", dashboard: "https://finnhub.io/dashboard", status: "https://status.finnhub.io" },
@@ -55,7 +52,6 @@ export const PROVIDERS: Record<string, Provider> = {
   QUIVER_API_KEY: { label: "Quiver Quantitative", dashboard: "https://www.quiverquant.com/pricing/" },
   SCRAPINGBEE_API_KEY: { label: "ScrapingBee", dashboard: "https://app.scrapingbee.com/account/dashboard" },
   SERPER_API_KEY: { label: "Serper", dashboard: "https://serper.dev/dashboard" },
-  SERPAPI_KEY: { label: "SerpApi", dashboard: "https://serpapi.com/dashboard" },
   RESEND_API_KEY: { label: "Resend", dashboard: "https://resend.com/api-keys", status: "https://resend-status.com" },
   OPENAI_API_KEY: { label: "OpenAI", dashboard: "https://platform.openai.com/account/billing", status: "https://status.openai.com" },
   ANTHROPIC_API_KEY: { label: "Anthropic", dashboard: "https://console.anthropic.com/settings/billing", status: "https://status.anthropic.com" },

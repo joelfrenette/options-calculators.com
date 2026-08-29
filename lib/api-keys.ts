@@ -25,7 +25,9 @@ export const API_KEY_ALIASES: Record<string, string[]> = {
   // Market & economic data
   POLYGON_API_KEY: ["POLYGON_API_KEY"],
   FRED_API_KEY: ["FRED_API_KEY"],
-  TWELVE_DATA_API_KEY: ["TWELVE_DATA_API_KEY", "TWELVEDATA_API_KEY"],
+  // Twelve Data + SerpAPI purged 2026-08-29 (admin audit): registered/probed/
+  // costed but called nowhere — Twelve Data's QQQ-technicals job moved to
+  // Polygon, SerpAPI's Google-Trends job moved to Serper.
   FMP_API_KEY: ["FMP_API_KEY"],
   ALPHA_VANTAGE_API_KEY: ["ALPHA_VANTAGE_API_KEY"],
   FINNHUB_API_KEY: ["FINNHUB_API_KEY"],
@@ -36,7 +38,6 @@ export const API_KEY_ALIASES: Record<string, string[]> = {
   // Scraping & search
   SCRAPINGBEE_API_KEY: ["SCRAPINGBEE_API_KEY"],
   SERPER_API_KEY: ["SERPER_API_KEY"],
-  SERPAPI_KEY: ["SERPAPI_KEY"],
   // Email
   RESEND_API_KEY: ["RESEND_API_KEY"],
   // AI / LLM providers
@@ -187,8 +188,6 @@ function isOverridden(name: string): boolean {
 // Backwards-compatible interface (kept for existing imports).
 export interface ApiKeyConfig {
   POLYGON_API_KEY?: string
-  TWELVE_DATA_API_KEY?: string
-  TWELVEDATA_API_KEY?: string
   FMP_API_KEY?: string
   FRED_API_KEY?: string
   APIFY_API_TOKEN?: string
