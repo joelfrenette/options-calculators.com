@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { BudgetGuardPanel } from "@/components/admin/budget-guard-panel"
 import {
   DollarSign,
   TrendingDown,
@@ -277,8 +278,8 @@ export function CostsUsageAdmin() {
                   so "under budget" read as a verdict on total spend. */}
               <span className="block mt-1 text-slate-500">
                 Flat plan fees only. Pay-per-use AI spend is not in this number and is not governed by this variable —
-                it runs against <code>DAILY_BUDGET_HARD_STOP</code> / <code>MONTHLY_BUDGET_HARD_STOP</code> on the
-                Budget Guard panel. Neither figure includes the other.
+                it runs against <code>DAILY_BUDGET_HARD_STOP</code> / <code>MONTHLY_BUDGET_HARD_STOP</code>, shown in
+                the Budget Guard panel below. Total monthly cost = this flat figure + that measured spend.
               </span>
             </CardDescription>
           </CardHeader>
@@ -303,6 +304,15 @@ export function CostsUsageAdmin() {
           </CardHeader>
         </Card>
       </div>
+
+      {/* Budget consolidation (admin audit 2026-08-29). The flat-fee target
+          above and the pay-per-use spend-vs-hard-stops below are the site's two
+          budget surfaces — previously split across the Costs and Health tabs,
+          which the flat-fee disclaimer had to apologise for ("Neither figure
+          includes the other"). Colocating the self-contained Budget Guard panel
+          here puts both in one place, so total monthly cost = flat plan fees
+          (above) + measured pay-per-use spend (below). */}
+      <BudgetGuardPanel />
 
       {/* Kill-switch control panel */}
       <Card className="bg-slate-50 border-slate-300">
