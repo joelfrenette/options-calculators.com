@@ -72,6 +72,34 @@ export const RELAXED_DEEP_DECLINE_PCT = -25
 export const RELAXED_MILD_DOWN_MIN_CAP = 10_000_000_000
 
 /**
+ * Slider range for the deep-decline cutoff (owner tunes the relaxed balance
+ * live). MIN is the strictest useful setting (only very mild declines admit),
+ * MAX the loosest before it overlaps the everyday range. DEFAULT is the
+ * constant above, so the slider and the fallback cannot silently disagree.
+ */
+export const RELAXED_DEEP_DECLINE = {
+  MIN: -40,
+  MAX: -10,
+  DEFAULT: RELAXED_DEEP_DECLINE_PCT,
+  STEP: 1,
+} as const
+
+/**
+ * The large-cap floor as a stepped ladder, so the slider offers the sizes a
+ * trader actually thinks in rather than an arbitrary dollar figure. Indexed by
+ * the slider's position; DEFAULT_INDEX points at the constant above ($10B).
+ */
+export const RELAXED_MILD_DOWN_CAP_TIERS = [
+  { value: 2_000_000_000, label: "$2B" },
+  { value: 5_000_000_000, label: "$5B" },
+  { value: 10_000_000_000, label: "$10B" },
+  { value: 25_000_000_000, label: "$25B" },
+  { value: 50_000_000_000, label: "$50B" },
+  { value: 100_000_000_000, label: "$100B" },
+] as const
+export const RELAXED_MILD_DOWN_CAP_DEFAULT_INDEX = 2 // $10B
+
+/**
  * The graded down-year verdict for the relaxed pass. Pure so it is tested with
  * worked numbers in scripts/check-trend-filters.ts, the same way every other
  * gate in this file is — a mis-set threshold here silently changes which stocks
@@ -90,11 +118,13 @@ export type RelaxedDownYearVerdict = "not-down" | "mild-large" | "mild-small" | 
 export function relaxedDownYearVerdict(
   return12m: number | null,
   marketCap: number | null,
+  deepDeclinePct: number = RELAXED_DEEP_DECLINE_PCT,
+  mildDownMinCap: number = RELAXED_MILD_DOWN_MIN_CAP,
 ): RelaxedDownYearVerdict {
   if (return12m === null) return "unmeasurable"
   if (return12m >= 0) return "not-down"
-  if (return12m < RELAXED_DEEP_DECLINE_PCT) return "deep"
-  return (marketCap ?? 0) >= RELAXED_MILD_DOWN_MIN_CAP ? "mild-large" : "mild-small"
+  if (return12m < deepDeclinePct) return "deep"
+  return (marketCap ?? 0) >= mildDownMinCap ? "mild-large" : "mild-small"
 }
 
 /** Whether a relaxed down-year verdict keeps the stock in the relaxed pass. */

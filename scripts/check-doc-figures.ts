@@ -75,9 +75,10 @@ function walk(dir: string, match: (p: string) => boolean): string[] {
  * future check will do the same, and the failure will say so by name.
  */
 const BASELINES = {
-  // 1128 → 1137 when check-trend-filters gained 9 graded-down-year assertions
-  // (2026-08-29, the relaxed-pass grade). Moved with the CLAUDE.md prose below.
-  formulas: 1137,
+  // 1128 → 1137 (9 graded-down-year assertions) → 1139 (2 more when the
+  // thresholds became owner-tunable sliders), 2026-08-29. Moved with the
+  // CLAUDE.md prose below.
+  formulas: 1139,
   remediation: 31,
   typecheckKnown: 0,
 } as const

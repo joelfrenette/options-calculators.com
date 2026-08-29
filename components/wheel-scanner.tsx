@@ -58,6 +58,8 @@ export function WheelScanner() {
     excludeDownYear, setExcludeDownYear,
     excludeBenchmarkLaggard, setExcludeBenchmarkLaggard,
     excludeStage4, setExcludeStage4,
+    relaxedDeepDeclinePct, setRelaxedDeepDeclinePct,
+    relaxedMildDownCapIndex, setRelaxedMildDownCapIndex,
     entryExclusionSummary,
     relaxedHardExcluded,
     universeSource,
@@ -275,6 +277,10 @@ export function WheelScanner() {
           setExcludeBenchmarkLaggard={setExcludeBenchmarkLaggard}
           excludeStage4={excludeStage4}
           setExcludeStage4={setExcludeStage4}
+          relaxedDeepDeclinePct={relaxedDeepDeclinePct}
+          setRelaxedDeepDeclinePct={setRelaxedDeepDeclinePct}
+          relaxedMildDownCapIndex={relaxedMildDownCapIndex}
+          setRelaxedMildDownCapIndex={setRelaxedMildDownCapIndex}
           tooltipsEnabled={tooltipsEnabled}
         />
       )}

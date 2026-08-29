@@ -241,6 +241,22 @@ check("a missing benchmark declines rather than comparing against zero", relativ
     relaxedDownYearVerdict(-5, null) === "mild-small",
     relaxedDownYearVerdict(-5, null),
   )
+
+  // The thresholds are OWNER-TUNABLE (the Step 5 sliders pass them in). A
+  // looser deep cutoff must admit a steeper decline; a higher cap floor must
+  // demote a name that qualified at a lower one — otherwise the sliders would
+  // move the label but not the decision.
+  check(
+    "a looser deep cutoff (−35%) admits a −30% large cap that is deep at default",
+    relaxedDownYearVerdict(-30, bigCap) === "deep" && relaxedDownYearVerdict(-30, bigCap, -35) === "mild-large",
+    `default ${relaxedDownYearVerdict(-30, bigCap)} vs at −35% ${relaxedDownYearVerdict(-30, bigCap, -35)}`,
+  )
+  check(
+    "a higher cap floor ($50B) demotes a $15B mild decline that passed at $10B",
+    relaxedDownYearVerdict(-5, 15_000_000_000) === "mild-large" &&
+      relaxedDownYearVerdict(-5, 15_000_000_000, RELAXED_DEEP_DECLINE_PCT, 50_000_000_000) === "mild-small",
+    relaxedDownYearVerdict(-5, 15_000_000_000, RELAXED_DEEP_DECLINE_PCT, 50_000_000_000),
+  )
 }
 
 // --------------------------------------------------------------- constants

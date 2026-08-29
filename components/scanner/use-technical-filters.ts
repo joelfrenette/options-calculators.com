@@ -17,7 +17,12 @@ import {
   type TechnicalFilterSettings,
 } from "./technical-criteria"
 import type { QualifyingStock } from "./types"
-import { MAX_DAY_MOVE } from "@/lib/trend-filters"
+import {
+  MAX_DAY_MOVE,
+  RELAXED_DEEP_DECLINE,
+  RELAXED_MILD_DOWN_CAP_TIERS,
+  RELAXED_MILD_DOWN_CAP_DEFAULT_INDEX,
+} from "@/lib/trend-filters"
 
 export function useTechnicalFilters() {
   // Step 3: Technical Analysis Filters
@@ -58,6 +63,16 @@ export function useTechnicalFilters() {
   const [excludeBenchmarkLaggard, setExcludeBenchmarkLaggard] = useState(true) // trailed SPY
   const [excludeStage4, setExcludeStage4] = useState(true) // below a FALLING 150-day MA
 
+  // RELAXED-pass down-year grading (owner 2026-08-29), tunable live. These
+  // touch ONLY Step 5 — the strict Step 4 down-year gate rejects any negative
+  // year regardless. `deepDecline` is a percent (e.g. −25); the cap floor is a
+  // ladder INDEX into RELAXED_MILD_DOWN_CAP_TIERS so the slider offers real
+  // sizes rather than an arbitrary dollar figure.
+  const [relaxedDeepDeclinePct, setRelaxedDeepDeclinePct] = useState<number[]>([RELAXED_DEEP_DECLINE.DEFAULT])
+  const [relaxedMildDownCapIndex, setRelaxedMildDownCapIndex] = useState<number[]>([
+    RELAXED_MILD_DOWN_CAP_DEFAULT_INDEX,
+  ])
+
   // S-8. **These two are HIDDEN GATES: they filter Step 3 results and no UI
   // control exposes them.** `technical-criteria.ts` tests `yieldCheck` on
   // `minYield` and `volumeCheck` on `minVolumeTechnicals`, so a stock can be
@@ -92,6 +107,10 @@ export function useTechnicalFilters() {
     excludeDownYear,
     excludeBenchmarkLaggard,
     excludeStage4,
+    relaxedDeepDeclinePct: relaxedDeepDeclinePct[0],
+    relaxedMildDownMinCap:
+      RELAXED_MILD_DOWN_CAP_TIERS[relaxedMildDownCapIndex[0]]?.value ??
+      RELAXED_MILD_DOWN_CAP_TIERS[RELAXED_MILD_DOWN_CAP_DEFAULT_INDEX].value,
   }
 
   const checkTechnicalCriteria = (stock: QualifyingStock) => checkCriteriaWithSettings(stock, technicalFilterSettings)
@@ -112,6 +131,8 @@ export function useTechnicalFilters() {
     excludeDownYear, setExcludeDownYear,
     excludeBenchmarkLaggard, setExcludeBenchmarkLaggard,
     excludeStage4, setExcludeStage4,
+    relaxedDeepDeclinePct, setRelaxedDeepDeclinePct,
+    relaxedMildDownCapIndex, setRelaxedMildDownCapIndex,
     minYield, setMinYield,
     minVolumeTechnicals, setMinVolumeTechnicals,
     technicalFilterSettings,
