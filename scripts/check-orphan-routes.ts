@@ -212,9 +212,14 @@ const KNOWN_ORPHANS: ReadonlySet<string> = new Set([
   // no feature caller — a tab rendering it would spend outbound requests on
   // every page load to answer a question asked twice a year.
   "/api/admin/source-probe",
+  // 2026-08-29 admin audit: its only caller was the "APIs" tab (vendor-endpoint
+  // reachability probe), folded away because the Health tab already probes
+  // every /api route and exercises the same vendors. The route is retained —
+  // admin-gated, harmless, re-wireable — but is now deliberately caller-less.
+  "/api/admin/api-status",
 ])
 
-const KNOWN_ORPHAN_BASELINE = 13
+const KNOWN_ORPHAN_BASELINE = 14
 
 check(
   `the known-orphan list still holds ${KNOWN_ORPHAN_BASELINE} entries`,

@@ -1,6 +1,5 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,10 +9,6 @@ import {
   Download,
   LogOut,
   Database,
-  Activity,
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
   BarChart3,
   Github,
   ExternalLink,
@@ -21,8 +16,6 @@ import {
   Key,
   DollarSign,
   HeartPulse,
-  MinusCircle,
-  PowerOff,
   Users,
 } from "lucide-react"
 import { ApiKeysManager } from "@/components/api-keys-manager"
@@ -35,133 +28,22 @@ import { AIStatusAdmin } from "@/components/ai-status-admin"
 import { CostsUsageAdmin } from "@/components/costs-usage-admin"
 import { HealthCheckPanel } from "@/components/admin/health-check-panel"
 
-/**
- * Shape emitted by GET /api/admin/api-status. Every field is the route's own
- * diagnosis — this component derives nothing about health on its own, it only
- * renders what the route measured (or states that it did not measure).
- */
-interface ApiStatus {
-  id: string
-  name: string
-  /** Raw env var was present (says nothing about whether it is usable). */
-  rawPresent: boolean
-  /** Kill-switched via DISABLED_APIS — never probed, never "online". */
-  disabled: boolean
-  /** Which env var / alias actually resolved, or null if none did. */
-  resolvedVia: string | null
-  /** False means no network request was made: status is a claim, not a measurement. */
-  probed: boolean
-  httpStatus: number | null
-  status: "ok" | "error" | "disabled" | "unknown"
-  /** The route's plain-language reason. Always rendered. */
-  message: string
-  endpoint?: string
-  usedIn?: string[]
-}
-
-type Chip = { label: string; className: string; Icon: typeof CheckCircle2 }
-
-/**
- * One derived chip per provider — the single source of truth for the row's
- * colour. Order matters: a kill-switched provider can never read as healthy,
- * and an unprobed provider can never read as "online".
- */
-function deriveChip(api: ApiStatus): Chip {
-  if (api.disabled || api.status === "disabled") {
-    return {
-      label: "DISABLED (kill switch)",
-      className: "bg-slate-200 text-slate-700 border-slate-300",
-      Icon: PowerOff,
-    }
-  }
-  if (api.status === "ok") {
-    return {
-      label: api.httpStatus ? `OK (HTTP ${api.httpStatus})` : "OK",
-      className: "bg-green-100 text-green-800 border-green-300",
-      Icon: CheckCircle2,
-    }
-  }
-  if (api.status === "error") {
-    return {
-      label: api.httpStatus ? `ERROR (HTTP ${api.httpStatus})` : "ERROR",
-      className: "bg-red-100 text-red-800 border-red-300",
-      Icon: XCircle,
-    }
-  }
-  if (!api.probed) {
-    return {
-      label: "NOT PROBED",
-      className: "bg-slate-100 text-slate-700 border-slate-300",
-      Icon: MinusCircle,
-    }
-  }
-  return {
-    label: "UNKNOWN",
-    className: "bg-amber-100 text-amber-900 border-amber-300",
-    Icon: AlertCircle,
-  }
-}
-
-/** Key provenance is descriptive text, never a status badge. */
-function keyLine(api: ApiStatus): string {
-  if (api.disabled) {
-    return api.rawPresent
-      ? "Key present in the environment, but the provider is kill-switched — the key is not used."
-      : "No key configured; the provider is kill-switched regardless."
-  }
-  if (api.resolvedVia) return `Key resolved via ${api.resolvedVia}`
-  if (api.rawPresent) return "Key present in the environment but did not resolve (alias or kill-switch)"
-  return "No key configured"
-}
-
 export default function AdminDashboard() {
   const router = useRouter()
-  const [loading, setLoading] = useState(false)
-  const [apiStatuses, setApiStatuses] = useState<ApiStatus[]>([])
-  const [apiStatusError, setApiStatusError] = useState<string | null>(null)
-  const [apiStatusLoaded, setApiStatusLoaded] = useState(false)
-  const [activeTab, setActiveTab] = useState("health")
 
-  useEffect(() => {
-    // Don't auto-fetch on mount, let user click tabs
-  }, [])
-
-  useEffect(() => {
-    if (activeTab === "status" && !apiStatusLoaded) {
-      fetchApiStatus()
-    }
-  }, [activeTab, apiStatusLoaded])
+  // The standalone "APIs" tab (vendor-endpoint reachability probe) was folded
+  // away 2026-08-29 (admin audit): the Health tab already probes every /api
+  // route, which exercises the same vendors, so the separate vendor probe was
+  // the weakest, most-redundant surface. Its state + fetch + render are gone —
+  // and with them the `loading` and `activeTab` state, whose only readers lived
+  // in that tab (the Tabs component tracks its own active tab via defaultValue).
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" })
     router.push("/login")
   }
 
-  const fetchApiStatus = async () => {
-    setLoading(true)
-    setApiStatusError(null)
-    try {
-      const response = await fetch("/api/admin/api-status")
-      if (!response.ok) {
-        throw new Error(`/api/admin/api-status returned HTTP ${response.status}`)
-      }
-      const data = await response.json()
-      setApiStatuses(Array.isArray(data?.apis) ? data.apis : [])
-      setApiStatusLoaded(true)
-    } catch (error) {
-      console.error("Failed to fetch API status:", error)
-      setApiStatuses([])
-      setApiStatusLoaded(true)
-      setApiStatusError(error instanceof Error ? error.message : "Unknown error")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-
-
   const handleBackup = async () => {
-    setLoading(true)
     try {
       const response = await fetch("/api/admin/backup")
       if (!response.ok) throw new Error("Backup check failed")
@@ -169,8 +51,6 @@ export default function AdminDashboard() {
       alert(`Backup Information:\n\n${data.instructions.join("\n\n")}`)
     } catch (error) {
       alert("Unable to check backup status")
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -223,8 +103,8 @@ export default function AdminDashboard() {
         </div>
 
         {/* Main Tabs */}
-        <Tabs defaultValue="health" className="w-full" onValueChange={setActiveTab}>
-          <TabsList className="w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-9 gap-1 bg-gray-100 border border-gray-200 p-1 h-auto mb-6">
+        <Tabs defaultValue="health" className="w-full">
+          <TabsList className="w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-1 bg-gray-100 border border-gray-200 p-1 h-auto mb-6">
             <TabsTrigger
               value="health"
               className="text-gray-600 data-[state=active]:bg-emerald-700 data-[state=active]:text-white text-xs md:text-sm"
@@ -238,13 +118,6 @@ export default function AdminDashboard() {
             >
               <DollarSign className="h-4 w-4 mr-1 md:mr-2" />
               Costs
-            </TabsTrigger>
-            <TabsTrigger
-              value="status"
-              className="text-gray-600 data-[state=active]:bg-emerald-700 data-[state=active]:text-white text-xs md:text-sm"
-            >
-              <Activity className="h-4 w-4 mr-1 md:mr-2" />
-              APIs
             </TabsTrigger>
             <TabsTrigger
               value="ai-status"
@@ -304,126 +177,6 @@ export default function AdminDashboard() {
 
           <TabsContent value="sources">
             <ApiDataSourceStatus />
-          </TabsContent>
-
-          <TabsContent value="status">
-            <Card className="bg-white">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Activity className="h-5 w-5 text-blue-600" />
-                      API Status & Key Management
-                    </CardTitle>
-                    <CardDescription>
-                      One derived status per provider, straight from the route&apos;s own diagnosis. A key being
-                      present is not a health signal and is never shown as one.
-                    </CardDescription>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button onClick={fetchApiStatus} disabled={loading}>
-                      {loading ? "Checking..." : "Refresh Status"}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() =>
-                        window.open(
-                          "https://vercel.com/joelfrenettes/options-calculators-com/settings/environment-variables",
-                          "_blank",
-                        )
-                      }
-                      className="bg-transparent"
-                    >
-                      <ExternalLink className="mr-2 h-4 w-4" />
-                      Update Keys
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {/* Key-surface dedup (admin audit 2026-08-29): key resolution
-                    is shown in three tabs. This one shows it only as CONTEXT
-                    beside each vendor probe — its unique job is vendor-endpoint
-                    REACHABILITY. The canonical place to view and manage every
-                    key is the Keys tab (with the full resolution table on the
-                    Health tab), so the note below points there rather than this
-                    tab re-claiming to be the source of truth. */}
-                <p className="text-xs text-slate-500 mb-3 border-l-2 border-slate-300 pl-2">
-                  This tab probes vendor endpoints for reachability. The key status shown per provider is context
-                  only — manage keys in the <span className="font-semibold">Keys</span> tab, and see the full
-                  resolution table on the <span className="font-semibold">Health</span> tab.
-                </p>
-                {apiStatusError ? (
-                  <div className="border border-red-300 bg-red-50 rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <XCircle className="h-5 w-5 text-red-600" />
-                      <p className="font-semibold text-red-900">Could not load API status</p>
-                    </div>
-                    <p className="text-sm text-red-800 font-mono">{apiStatusError}</p>
-                    <p className="text-sm text-red-800 mt-2">
-                      Nothing below is measured — this panel is reporting its own failure, not a healthy stack.
-                    </p>
-                    <Button onClick={fetchApiStatus} disabled={loading} size="sm" className="mt-3">
-                      Retry
-                    </Button>
-                  </div>
-                ) : !apiStatusLoaded ? (
-                  <p className="text-sm text-slate-600 py-6 text-center">
-                    {loading ? "Probing providers…" : "Click “Refresh Status” to probe the providers."}
-                  </p>
-                ) : apiStatuses.length === 0 ? (
-                  <div className="border border-amber-300 bg-amber-50 rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <AlertCircle className="h-5 w-5 text-amber-700" />
-                      <p className="font-semibold text-amber-900">No providers returned</p>
-                    </div>
-                    <p className="text-sm text-amber-900">
-                      The route responded successfully but listed zero providers. That is a fault in
-                      /api/admin/api-status, not an all-clear.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {apiStatuses.map((api) => {
-                      const chip = deriveChip(api)
-                      return (
-                        <div
-                          key={api.id || api.name}
-                          className="flex items-start gap-4 p-4 border rounded-lg hover:bg-slate-50 transition-colors"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex flex-wrap items-center gap-2 mb-1">
-                              <p className="font-bold text-gray-900">{api.name}</p>
-                              <span
-                                className={`text-xs px-2 py-1 rounded font-semibold border inline-flex items-center gap-1 ${chip.className}`}
-                              >
-                                <chip.Icon className="h-3.5 w-3.5" />
-                                {chip.label}
-                              </span>
-                              {!api.probed && !api.disabled && (
-                                <span className="text-xs text-gray-500">no network request was made</span>
-                              )}
-                            </div>
-                            <p className="text-sm text-slate-800">{api.message || "No diagnosis reported."}</p>
-                            <p className="text-xs text-slate-600 mt-1">{keyLine(api)}</p>
-                            {api.endpoint && (
-                              <p className="text-xs text-slate-600 mt-2 font-mono bg-slate-100 px-2 py-1 rounded break-all">
-                                {api.endpoint}
-                              </p>
-                            )}
-                            {api.usedIn && api.usedIn.length > 0 && (
-                              <p className="text-sm text-slate-600 mt-1">
-                                <span className="font-semibold">Used in:</span> {api.usedIn.join(", ")}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           </TabsContent>
 
           <TabsContent value="keys">
