@@ -41,7 +41,6 @@ export const API_KEY_ALIASES: Record<string, string[]> = {
   // Email
   RESEND_API_KEY: ["RESEND_API_KEY"],
   // AI / LLM providers
-  OPENAI_API_KEY: ["OPENAI_API_KEY"],
   ANTHROPIC_API_KEY: ["ANTHROPIC_API_KEY"],
   GROQ_API_KEY: ["GROQ_API_KEY"],
   XAI_API_KEY: ["XAI_API_KEY", "GROK_XAI_API_KEY"],

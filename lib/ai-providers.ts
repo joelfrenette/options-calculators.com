@@ -100,16 +100,15 @@ const providerConfigs = [
       }),
     model: "grok-4.6",
   },
-  {
-    name: "openai" as const,
-    displayName: "OpenAI (GPT-5.4 Nano)",
-    keyName: "OPENAI_API_KEY",
-    tier: "paid" as const,
-    endpoint: "https://api.openai.com/v1/chat/completions",
-    key: () => resolveApiKey("OPENAI_API_KEY"),
-    create: () => createOpenAI({ apiKey: resolveApiKey("OPENAI_API_KEY") }),
-    model: "gpt-5.4-nano",
-  },
+  // OpenAI removed 2026-08-30, at the owner's direction, after the ledger
+  // reported `billing` — "You have no credits remaining" — on its first real
+  // call. Three facts made removal the better option than funding it: the
+  // account is empty, the `gpt-5.4-nano` slug was NEVER verified (the billing
+  // failure fired before the model id could be validated, so a model_not_found
+  // may still be waiting behind it), and six other providers remain.
+  //
+  // Re-adding is a clean revert of this commit plus its key-registry entry —
+  // nothing here is one-way.
   {
     name: "google" as const,
     displayName: "Google (Gemini 3.5 Flash-Lite)",

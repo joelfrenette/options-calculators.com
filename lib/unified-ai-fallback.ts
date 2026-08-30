@@ -1,13 +1,4 @@
 import {
-  fetchBuffettIndicatorWithOpenAI,
-  fetchPutCallRatioWithOpenAI,
-  fetchAAIIBullishWithOpenAI,
-  fetchVIXWithOpenAI,
-  fetchNVIDIAPriceWithOpenAI,
-  fetchSOXIndexWithOpenAI,
-} from "./openai-market-data"
-
-import {
   fetchBuffettIndicatorWithAnthropic,
   fetchPutCallRatioWithAnthropic,
   fetchAAIIBullishWithAnthropic,
@@ -29,10 +20,19 @@ import { fetchMarketDataWithGrok } from "./grok-market-data"
 import { getMeteringSupabaseConfig } from "./metered-fetch"
 
 /**
- * Unified AI Fallback System - OPTIMIZED FOR SPEED
- * Hierarchy: Grok xAI (FASTEST) → Groq Llama (FAST) → Anthropic Claude → OpenAI GPT-4o → Baseline
+ * Unified AI Fallback System — the NUMBER-RECALL chain.
  *
- * Prioritizes speed while maintaining accuracy with multiple fallbacks.
+ * Hierarchy: Grok xAI (FASTEST) → Groq Llama (FAST) → Anthropic Claude → null.
+ * The OpenAI leg was removed 2026-08-30 with the provider; "OpenAI GPT-4o" had
+ * in any case outlived that model id by two generations while this line went on
+ * naming it.
+ *
+ * NOT the reasoning chain. `lib/ai-providers.ts` serves the CCPI summary and
+ * chat and leads with the best available model; this one asks a model to recall
+ * a published market number and parses the reply, which is a job no LLM does
+ * reliably. It is deliberately last-resort, deliberately cheap, and its callers
+ * in lib/ccpi/route/market-data.ts now invoke it ONLY where a real feed came up
+ * empty. Do not "upgrade" it to match the other chain.
  */
 
 /**
@@ -67,7 +67,7 @@ const AI_ESTIMATE_TTL_HOURS = (() => {
   return Number.isFinite(raw) && raw > 0 ? raw : 18
 })()
 
-type AiSource = "grok" | "groq" | "anthropic" | "openai"
+type AiSource = "grok" | "groq" | "anthropic"
 
 /**
  * The chain's result. `value` is null when no provider produced a plausible
@@ -101,7 +101,7 @@ async function readCachedEstimate(
     // the row was written must invalidate stale cache, not resurrect it.
     if (!isPlausible(value, range)) return null
     const source = rows[0].source as AiSource
-    if (!["grok", "groq", "anthropic", "openai"].includes(source)) return null
+    if (!["grok", "groq", "anthropic"].includes(source)) return null
     return { value, source }
   } catch {
     return null
@@ -133,7 +133,6 @@ async function fetchWithAIFallback(
   grokFunc: () => Promise<number | null>,
   groqLLMFunc: () => Promise<number | null>,
   anthropicFunc: () => Promise<number | null>,
-  openaiFunc: () => Promise<number | null>,
   range: PlausibleRange,
 ): Promise<AIFallbackResult> {
   // Cache first (E-7a): a fresh-enough live estimate serves every request in
@@ -168,25 +167,21 @@ async function fetchWithAIFallback(
     // Silently continue to next fallback
   }
 
-  // Fallback to Anthropic Claude (SLOWER - typically 5-8 seconds)
+  // Fallback to Anthropic Claude (SLOWER - typically 5-8 seconds).
+  //
+  // This is now the LAST leg. The OpenAI leg that sat behind it was removed
+  // 2026-08-30 with the provider itself: the ledger reported `billing` — "You
+  // have no credits remaining" — on its first real call, and its model slug was
+  // never verified because the billing failure fired before the id could be
+  // validated. A fourth leg that cannot answer is not depth, it is latency: it
+  // was described here as "SLOWEST - typically 10-15 seconds", spent on the way
+  // to a guaranteed failure.
   try {
     const anthropicValue = await anthropicFunc()
     if (isPlausible(anthropicValue, range)) {
       console.log(`[v0] ⚠ ${indicatorName}: Falling back to Anthropic Claude (${anthropicValue})`)
       writeCachedEstimate(indicatorName, anthropicValue, "anthropic")
       return { value: anthropicValue, source: "anthropic" }
-    }
-  } catch (error) {
-    // Silently continue to next fallback
-  }
-
-  // Fallback to OpenAI GPT-4o (SLOWEST - typically 10-15 seconds)
-  try {
-    const openaiValue = await openaiFunc()
-    if (isPlausible(openaiValue, range)) {
-      console.log(`[v0] ⚠ ${indicatorName}: Falling back to OpenAI GPT-4o (${openaiValue})`)
-      writeCachedEstimate(indicatorName, openaiValue, "openai")
-      return { value: openaiValue, source: "openai" }
     }
   } catch (error) {
     console.warn(`[v0] All AI providers failed for ${indicatorName}`)
@@ -207,7 +202,6 @@ export async function getBuffettIndicator(): Promise<AIFallbackResult> {
     async () => await fetchMarketDataWithGrok("Buffett Indicator (Market Cap to GDP ratio)", "Current percentage"),
     fetchBuffettIndicatorWithGroqLLM,
     fetchBuffettIndicatorWithAnthropic,
-    fetchBuffettIndicatorWithOpenAI,
     { min: 50, max: 300 },
   )
 }
@@ -218,7 +212,6 @@ export async function getPutCallRatio(): Promise<AIFallbackResult> {
     async () => await fetchMarketDataWithGrok("CBOE Put/Call Ratio", "Current equity put/call ratio"),
     fetchPutCallRatioWithGroqLLM,
     fetchPutCallRatioWithAnthropic,
-    fetchPutCallRatioWithOpenAI,
     { min: 0.3, max: 2.5 },
   )
 }
@@ -230,7 +223,6 @@ export async function getAAIIBullish(): Promise<AIFallbackResult> {
       await fetchMarketDataWithGrok("AAII Bullish Sentiment Percentage", "Current bullish investor percentage"),
     fetchAAIIBullishWithGroqLLM,
     fetchAAIIBullishWithAnthropic,
-    fetchAAIIBullishWithOpenAI,
     { min: 5, max: 80 },
   )
 }
@@ -241,7 +233,6 @@ export async function getVIX(): Promise<AIFallbackResult> {
     async () => await fetchMarketDataWithGrok("CBOE Volatility Index (VIX)", "Current VIX level"),
     fetchVIXWithGroqLLM,
     fetchVIXWithAnthropic,
-    fetchVIXWithOpenAI,
     { min: 5, max: 100 },
   )
 }
@@ -252,7 +243,6 @@ export async function getNVIDIAPrice(): Promise<AIFallbackResult> {
     async () => await fetchMarketDataWithGrok("NVIDIA (NVDA) stock price", "Current NVDA price in USD"),
     fetchNVIDIAPriceWithGroqLLM,
     fetchNVIDIAPriceWithAnthropic,
-    fetchNVIDIAPriceWithOpenAI,
     { min: 10, max: 5000 },
   )
 }
@@ -263,7 +253,6 @@ export async function getSOXIndex(): Promise<AIFallbackResult> {
     async () => await fetchMarketDataWithGrok("PHLX Semiconductor Index (SOX)", "Current SOX index level"),
     fetchSOXIndexWithGroqLLM,
     fetchSOXIndexWithAnthropic,
-    fetchSOXIndexWithOpenAI,
     { min: 1000, max: 20000 },
   )
 }

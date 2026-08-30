@@ -166,7 +166,7 @@ Provide 3-5 signals max, ordered by importance. Keep it tight and specific to th
       return NextResponse.json(
         dryRunPayload(
           "/api/insider-trading/ai-insights",
-          "generateWithFallback (preferred: openai)",
+          "generateWithFallback (chain order)",
           systemPrompt.length + userPrompt.length,
         ),
       )
@@ -177,7 +177,11 @@ Provide 3-5 signals max, ordered by importance. Keep it tight and specific to th
       prompt: userPrompt,
       temperature: 0.6,
       maxTokens: 1500,
-      preferredProvider: "openai",
+      // `preferredProvider: "openai"` removed 2026-08-30 with OpenAI itself.
+      // This route now takes the chain in its declared order, which since the
+      // quality-first reorder means Claude Opus 5 first — a better model for
+      // the JSON-structured reasoning this route asks for than the one it was
+      // pinned to, and no longer pinned to a provider whose account is empty.
     })
 
     let parsed: any = null

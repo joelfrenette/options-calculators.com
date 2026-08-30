@@ -134,14 +134,6 @@ export function ApiKeysManager() {
     },
     // AI / LLM providers (fallback chain)
     {
-      name: "OPENAI_API_KEY",
-      label: "OpenAI API Key",
-      description: "Primary AI fallback (sentiment, CCPI summaries)",
-      configured: false,
-      envVarName: "OPENAI_API_KEY",
-      category: "AI / LLM Providers",
-    },
-    {
       name: "ANTHROPIC_API_KEY",
       label: "Anthropic Claude API Key",
       description: "Secondary AI fallback, market data validation",

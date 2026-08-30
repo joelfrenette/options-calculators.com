@@ -177,17 +177,13 @@ export const API_COSTS: ApiCost[] = [
     provides: "Secondary AI (free tier)",
     replacement: "Free — backup AI summary provider",
   },
-  {
-    key: "OPENAI_API_KEY",
-    vendor: "OpenAI",
-    category: "AI / LLM Providers",
-    monthlyCost: 5,
-    targetCost: 0,
-    status: "eliminate",
-    billing: "per-token",
-    provides: "AI fallback (pay-per-use)",
-    replacement: "Groq + Gemini free cover AI summaries",
-  },
+  // OPENAI_API_KEY row removed 2026-08-30: the provider is gone from every code
+  // path, so a cost row for it would be the dead-provider pattern purged from
+  // this same table on 2026-08-29 (Twelve Data, SerpAPI). Its `status:
+  // "eliminate"` recommendation, written months earlier, turned out to be
+  // right — just not for the reason given. The replacement note said "Groq +
+  // Gemini free cover AI summaries", and that is exactly what happened: when
+  // OpenAI's account emptied, Groq answered.
   {
     key: "ANTHROPIC_API_KEY",
     vendor: "Anthropic",
@@ -280,7 +276,11 @@ export const MODEL_TOKEN_PRICES: Record<string, TokenPrice> = {
   // counts as unaccounted. See the 2026-08-30 CHANGELOG entry.
   //
   // Pay-per-use. These are the ones that can run a bill up.
-  "gpt-5.4-nano": { inputPerM: 0.2, outputPerM: 1.25 },
+  // gpt-5.4-nano price entry removed 2026-08-30 with the OpenAI provider — no
+  // code requests it any more. Worth recording that this id was NEVER
+  // validated: the account's `billing` failure fired before the model could be
+  // checked, so it may also have been wrong. Two faults can hide behind one
+  // error, and only the first one gets reported.
   "claude-opus-5": {
     inputPerM: 5,
     outputPerM: 25,

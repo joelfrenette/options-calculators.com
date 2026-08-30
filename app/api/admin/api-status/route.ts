@@ -196,7 +196,6 @@ const PROVIDERS: ProviderSpec[] = [
       ["openrouter", "OpenRouter (free model)", "OPENROUTER_API_KEY", "https://openrouter.ai/api/v1/chat/completions"],
       ["groq", "Groq", "GROQ_API_KEY", "https://api.groq.com/openai/v1/chat/completions"],
       ["google", "Google Gemini", "GOOGLE_AI_API_KEY", "https://generativelanguage.googleapis.com/v1beta/models"],
-      ["openai", "OpenAI", "OPENAI_API_KEY", "https://api.openai.com/v1/chat/completions"],
       ["xai", "xAI (Grok)", "XAI_API_KEY", "https://api.x.ai/v1/chat/completions"],
       ["anthropic", "Anthropic Claude", "ANTHROPIC_API_KEY", "https://api.anthropic.com/v1/messages"],
       ["perplexity", "Perplexity", "PERPLEXITY_API_KEY", "https://api.perplexity.ai/chat/completions"],

@@ -43,15 +43,11 @@ function getAIProvider() {
       tag: "groq",
     }
   }
-  const openaiKey = resolveApiKey("OPENAI_API_KEY")
-  if (openaiKey) {
-    return {
-      provider: createOpenAI({ apiKey: openaiKey }),
-      model: "gpt-5.4-nano",
-      name: "OpenAI",
-      tag: "openai",
-    }
-  }
+  // The OpenAI third choice was removed 2026-08-30 with the provider: the
+  // ledger reported `billing` ("no credits remaining") on its first real call,
+  // and its model id was never validated because the billing failure fired
+  // first. A third choice that cannot answer only adds latency on the way to
+  // returning null.
   return null
 }
 

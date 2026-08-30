@@ -17,7 +17,7 @@
  * keyword silently stops covering a file when someone rewords a comment:
  *
  *   1. Every `recordAiCall({ ... ok: false ... })` call passes an `error`.
- *   2. Every catch block in the four lib/*-market-data.ts fetchers that can
+ *   2. Every catch block in the three lib/*-market-data.ts fetchers that can
  *      return from a failed generateText reaches a recordAiCall.
  *
  * AND IT ASSERTS ITS OWN SCOPE SIZE (CLAUDE.md P6-75/P6-77). A check that
@@ -65,15 +65,15 @@ const callers = sources
 
 // --------------------------------------------------------------- scope size
 
-// 6 files call recordAiCall: the 4 lib/*-market-data.ts fetchers, the provider
+// 5 files call recordAiCall: the 3 lib/*-market-data.ts fetchers, the provider
 // chain, and the metering module that defines it.
 //
-// Was 7. app/api/ccpi/executive-summary/route.ts dropped off the list when its
-// private copy of the provider chain was deleted in favour of
-// `generateWithFallback` — it no longer meters anything itself because it no
-// longer calls a model itself. This assertion is what made that a DELIBERATE
-// edit rather than a silent narrowing of scope.
-const EXPECTED_CALLER_FILES = 6
+// 7 -> 6 when app/api/ccpi/executive-summary/route.ts dropped its private copy
+// of the chain for `generateWithFallback` (it no longer meters, because it no
+// longer calls a model itself). 6 -> 5 when lib/openai-market-data.ts was
+// deleted with the OpenAI provider. Both times THIS assertion is what forced a
+// deliberate edit instead of a silent narrowing of scope.
+const EXPECTED_CALLER_FILES = 5
 check(
   "scope: every file calling recordAiCall is in scope",
   callers.length === EXPECTED_CALLER_FILES,
@@ -121,11 +121,12 @@ for (const { file, text } of callers) {
   }
 }
 
-// 7 failure sites: 3 in lib/ai-providers.ts (generate catch, stream .catch,
-// stream catch) and 1 each in the 4 lib/*-market-data.ts fetchers.
+// 6 failure sites: 3 in lib/ai-providers.ts (generate catch, stream .catch,
+// stream catch) and 1 each in the 3 lib/*-market-data.ts fetchers.
 //
-// Was 8; executive-summary's site went with its deleted chain copy.
-const EXPECTED_FAILURE_SITES = 7
+// 8 -> 7 with executive-summary's deleted chain copy; 7 -> 6 with
+// lib/openai-market-data.ts.
+const EXPECTED_FAILURE_SITES = 6
 check(
   "scope: every ok:false recordAiCall site is in scope",
   failureSites === EXPECTED_FAILURE_SITES,
@@ -140,9 +141,9 @@ check(
 // ------------------------- rule 2: the market-data fetchers meter on failure
 
 const fetchers = callers.filter((c) => /^lib\/[a-z-]+-market-data\.ts$/.test(c.file))
-const EXPECTED_FETCHERS = 4
+const EXPECTED_FETCHERS = 3
 check(
-  "scope: all four lib/*-market-data.ts fetchers are in scope",
+  "scope: all three lib/*-market-data.ts fetchers are in scope",
   fetchers.length === EXPECTED_FETCHERS,
   `${fetchers.length} — ${fetchers.map((f) => f.file).join(", ")}`,
 )
@@ -243,7 +244,7 @@ for (const { file, text } of fetchers) {
 // Scope assertion for the rule above: 4 fetchers, one model-guarding catch
 // each. If a fetcher grows a second model call, or loses its only one, this
 // moves deliberately rather than the check quietly covering less.
-const EXPECTED_MODEL_CATCHES = 4
+const EXPECTED_MODEL_CATCHES = 3
 check(
   "scope: every catch guarding a generateText is in scope",
   modelCatches === EXPECTED_MODEL_CATCHES,
@@ -389,8 +390,8 @@ const nonLiteralSlugs = [...providersSrc.matchAll(/^\s*model:\s*([A-Z_][A-Z0-9_]
 // and therefore cannot be checked statically — its default is priced by name.
 check(
   "scope: every provider in the chain contributes a model slug",
-  chainSlugs.length + nonLiteralSlugs.length === 7,
-  `${chainSlugs.length} literal + ${nonLiteralSlugs.length} env-driven, want 7 total`,
+  chainSlugs.length + nonLiteralSlugs.length === 6,
+  `${chainSlugs.length} literal + ${nonLiteralSlugs.length} env-driven, want 6 total`,
 )
 
 const unpriced = chainSlugs.filter((slug) => !(slug in MODEL_TOKEN_PRICES))
@@ -409,8 +410,8 @@ const fetcherSlugs = fetchers
   .filter((s): s is string => typeof s === "string")
 check(
   "scope: each market-data fetcher pins one model slug",
-  fetcherSlugs.length === 3,
-  `${fetcherSlugs.length} — grok-market-data picks its slug at runtime, so 3 of 4 are static`,
+  fetcherSlugs.length === 2,
+  `${fetcherSlugs.length} — grok-market-data picks its slug at runtime, so 2 of 3 are static`,
 )
 const unpricedFetchers = fetcherSlugs.filter((slug) => !(slug in MODEL_TOKEN_PRICES))
 check(
