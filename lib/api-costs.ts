@@ -188,24 +188,27 @@ export const API_COSTS: ApiCost[] = [
     key: "ANTHROPIC_API_KEY",
     vendor: "Anthropic",
     category: "AI / LLM Providers",
-    monthlyCost: 5,
-    targetCost: 0,
-    status: "eliminate",
+    // Was monthlyCost 5 / targetCost 0 / status "eliminate" / provides "AI
+    // fallback (pay-per-use)" / replacement "Groq + Gemini free cover AI
+    // summaries". Every one of those was written when Anthropic sat at slot 6
+    // behind a free auto-router and was never reached. It is now slot 1 and
+    // serves the CCPI executive summary and the dashboard chat on Claude Opus
+    // 5, at the owner's direction, because six-figure decisions are made on
+    // that output and two users make the cost immaterial. A cost table that
+    // still recommended eliminating the primary reasoning model would be the
+    // same false claim this audit removes from UI copy.
+    monthlyCost: 10,
+    targetCost: 10,
+    status: "keep-paid",
     billing: "per-token",
-    provides: "AI fallback (pay-per-use)",
-    replacement: "Groq + Gemini free cover AI summaries",
+    provides: "PRIMARY reasoning model (Claude Opus 5) — CCPI summary, dashboard chat, insider insights",
+    replacement: "Groq free answers if this fails, at lower quality",
   },
-  {
-    key: "XAI_API_KEY",
-    vendor: "xAI Grok",
-    category: "AI / LLM Providers",
-    monthlyCost: 5,
-    targetCost: 0,
-    status: "eliminate",
-    billing: "per-token",
-    provides: "AI fallback (pay-per-use)",
-    replacement: "Groq + Gemini free cover AI summaries",
-  },
+  // XAI_API_KEY row removed 2026-08-30 with the provider: 401 failures out of
+  // 401 since metering began, cause `auth: Forbidden`. Its "eliminate"
+  // recommendation was right for a reason nobody had checked — it was not
+  // costing $5/month, it was costing nothing, because it never once completed
+  // a call.
   {
     key: "OPENROUTER_API_KEY",
     vendor: "OpenRouter",
@@ -289,14 +292,10 @@ export const MODEL_TOKEN_PRICES: Record<string, TokenPrice> = {
   // Kept: still requested by lib/anthropic-market-data.ts, which stays on a
   // cheap model deliberately (a better model cannot recall today's VIX).
   "claude-haiku-4-5": { inputPerM: 1, outputPerM: 5 },
-  // Cheap tier, used ONLY by lib/grok-market-data.ts — the number-recall path,
-  // which is deliberately not on the flagship. See that file's comment.
-  "grok-4.3": { inputPerM: 1.25, outputPerM: 2.5 },
-  "grok-4.6": {
-    inputPerM: 2,
-    outputPerM: 6,
-    note: "below 200K-token prompts; xAI doubles to $4/$12 for the WHOLE request once a prompt crosses 200K — not modelled here, and unreachable on these 50-token calls",
-  },
+  // grok-4.3 and grok-4.6 price entries removed 2026-08-30 with the xAI
+  // provider. No code requests either id any more. Both were priced from xAI's
+  // published rates and neither ever billed a cent, because not one of the 401
+  // calls to that key completed.
   "llama-3.1-sonar-large-128k-online": {
     inputPerM: 1,
     outputPerM: 1,

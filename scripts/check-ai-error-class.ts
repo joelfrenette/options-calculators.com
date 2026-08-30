@@ -73,7 +73,7 @@ const callers = sources
 // longer calls a model itself). 6 -> 5 when lib/openai-market-data.ts was
 // deleted with the OpenAI provider. Both times THIS assertion is what forced a
 // deliberate edit instead of a silent narrowing of scope.
-const EXPECTED_CALLER_FILES = 5
+const EXPECTED_CALLER_FILES = 4
 check(
   "scope: every file calling recordAiCall is in scope",
   callers.length === EXPECTED_CALLER_FILES,
@@ -126,7 +126,7 @@ for (const { file, text } of callers) {
 //
 // 8 -> 7 with executive-summary's deleted chain copy; 7 -> 6 with
 // lib/openai-market-data.ts.
-const EXPECTED_FAILURE_SITES = 6
+const EXPECTED_FAILURE_SITES = 5
 check(
   "scope: every ok:false recordAiCall site is in scope",
   failureSites === EXPECTED_FAILURE_SITES,
@@ -141,9 +141,9 @@ check(
 // ------------------------- rule 2: the market-data fetchers meter on failure
 
 const fetchers = callers.filter((c) => /^lib\/[a-z-]+-market-data\.ts$/.test(c.file))
-const EXPECTED_FETCHERS = 3
+const EXPECTED_FETCHERS = 2
 check(
-  "scope: all three lib/*-market-data.ts fetchers are in scope",
+  "scope: both lib/*-market-data.ts fetchers are in scope",
   fetchers.length === EXPECTED_FETCHERS,
   `${fetchers.length} — ${fetchers.map((f) => f.file).join(", ")}`,
 )
@@ -244,7 +244,7 @@ for (const { file, text } of fetchers) {
 // Scope assertion for the rule above: 4 fetchers, one model-guarding catch
 // each. If a fetcher grows a second model call, or loses its only one, this
 // moves deliberately rather than the check quietly covering less.
-const EXPECTED_MODEL_CATCHES = 3
+const EXPECTED_MODEL_CATCHES = 2
 check(
   "scope: every catch guarding a generateText is in scope",
   modelCatches === EXPECTED_MODEL_CATCHES,
@@ -390,8 +390,8 @@ const nonLiteralSlugs = [...providersSrc.matchAll(/^\s*model:\s*([A-Z_][A-Z0-9_]
 // and therefore cannot be checked statically — its default is priced by name.
 check(
   "scope: every provider in the chain contributes a model slug",
-  chainSlugs.length + nonLiteralSlugs.length === 6,
-  `${chainSlugs.length} literal + ${nonLiteralSlugs.length} env-driven, want 6 total`,
+  chainSlugs.length + nonLiteralSlugs.length === 5,
+  `${chainSlugs.length} literal + ${nonLiteralSlugs.length} env-driven, want 5 total`,
 )
 
 const unpriced = chainSlugs.filter((slug) => !(slug in MODEL_TOKEN_PRICES))

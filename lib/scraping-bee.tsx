@@ -3,7 +3,7 @@
  * Web scraping service for extracting data from websites
  */
 
-import { fetchMarketDataWithGrok } from "./grok-market-data"
+import { fetchMarketDataWithGroqLLM } from "./groq-llm-market-data"
 import { resolveApiKey } from "./api-keys"
 import { meteredFetch } from "./metered-fetch"
 
@@ -193,7 +193,7 @@ export async function scrapePutCallRatio(): Promise<{
   // `putCallRatio`, worth 29 of Risk Appetite's 100 points, by a self-report.
   status: "live" | "ai-estimate" | "baseline"
 }> {
-  // CBOE FIRST (P7-72). Grok used to run before it: the model was asked to
+  // CBOE FIRST (P7-72). An LLM used to run before it: the model was asked to
   // recall the CBOE put/call ratio, and any answer between 0.3 and 3 was
   // returned immediately as `ai-estimate` — so the REAL source was only ever
   // reached when the guess failed. P6-72 had correctly stopped that guess from
@@ -236,19 +236,19 @@ export async function scrapePutCallRatio(): Promise<{
   }
 
   // Only now the model, and only ever as `ai-estimate`, which does not score.
-  console.log("[v0] Put/Call: CBOE unavailable, trying Grok (ai-estimate, does not score)...")
+  console.log("[v0] Put/Call: CBOE unavailable, trying Groq (ai-estimate, does not score)...")
   try {
-    const grokValue = await fetchMarketDataWithGrok(
+    const llmValue = await fetchMarketDataWithGroqLLM(
       "CBOE equity put/call ratio",
       "Current CBOE total equity put/call ratio (CPCE index). Return just the decimal number like 0.85 or 1.05",
     )
 
-    if (grokValue && grokValue > 0.3 && grokValue < 3) {
-      console.log(`[v0] Put/Call: Grok value ${grokValue} (ai-estimate — excluded from scoring)`)
-      return { ratio: grokValue, status: "ai-estimate" }
+    if (llmValue && llmValue > 0.3 && llmValue < 3) {
+      console.log(`[v0] Put/Call: Groq value ${llmValue} (ai-estimate — excluded from scoring)`)
+      return { ratio: llmValue, status: "ai-estimate" }
     }
-  } catch (grokError) {
-    console.log("[v0] Grok Put/Call fetch failed:", grokError)
+  } catch (llmError) {
+    console.log("[v0] Groq Put/Call fetch failed:", llmError)
   }
 
   // The Alpha Vantage branch that used to sit here computed
@@ -278,7 +278,7 @@ export async function scrapeAAIISentiment(): Promise<{
   bearish: number
   neutral: number
   spread: number
-  // "ai-estimate" added for the Grok path below — see P6-72.
+  // "ai-estimate" added for the LLM path below — see P6-72.
   status: "live" | "ai-estimate" | "baseline"
 }> {
   try {
@@ -317,10 +317,10 @@ export async function scrapeAAIISentiment(): Promise<{
     } else {
       console.error("[v0] AAII sentiment scraping failed:", error)
     }
-    console.log("[v0] AAII: Trying Grok AI fallback...")
+    console.log("[v0] AAII: Trying Groq AI fallback...")
 
     try {
-      const bullishValue = await fetchMarketDataWithGrok(
+      const bullishValue = await fetchMarketDataWithGroqLLM(
         "AAII Bullish Sentiment Percentage",
         "Current American Association of Individual Investors (AAII) bullish sentiment survey percentage",
       )
@@ -339,7 +339,7 @@ export async function scrapeAAIISentiment(): Promise<{
         const bearish = Math.max(15, Math.min(50, 65 - bullishValue))
         const neutral = 100 - bullishValue - bearish
 
-        console.log(`[v0] AAII bullish ${bullishValue} from Grok (ai-estimate — does not score)`)
+        console.log(`[v0] AAII bullish ${bullishValue} from Groq (ai-estimate — does not score)`)
         return {
           bullish: bullishValue,
           bearish: Number.parseFloat(bearish.toFixed(1)),
@@ -348,11 +348,11 @@ export async function scrapeAAIISentiment(): Promise<{
           status: "ai-estimate",
         }
       }
-    } catch (grokError) {
-      console.log("[v0] Grok AAII fetch failed:", grokError)
+    } catch (llmError) {
+      console.log("[v0] Groq AAII fetch failed:", llmError)
     }
 
-    console.log("[v0] AAII: All sources including Grok failed, using baseline")
+    console.log("[v0] AAII: All sources including Groq failed, using baseline")
     return {
       bullish: 35,
       bearish: 30,

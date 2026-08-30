@@ -16,16 +16,24 @@ import {
   fetchSOXIndexWithGroqLLM,
 } from "./groq-llm-market-data"
 
-import { fetchMarketDataWithGrok } from "./grok-market-data"
 import { getMeteringSupabaseConfig } from "./metered-fetch"
 
 /**
  * Unified AI Fallback System — the NUMBER-RECALL chain.
  *
- * Hierarchy: Grok xAI (FASTEST) → Groq Llama (FAST) → Anthropic Claude → null.
- * The OpenAI leg was removed 2026-08-30 with the provider; "OpenAI GPT-4o" had
- * in any case outlived that model id by two generations while this line went on
- * naming it.
+ * Hierarchy: Groq Llama → Anthropic Claude → null.
+ *
+ * Two legs were removed on 2026-08-30, both with their providers, and both on
+ * evidence rather than preference:
+ *   - Grok xAI led this chain and failed 401 times out of 401 since metering
+ *     began. Cause, once the ledger could report one: `auth: Forbidden` — the
+ *     key is rejected, not the model. Every indicator paid its latency first.
+ *   - OpenAI trailed it, documented here as "SLOWEST - typically 10-15
+ *     seconds", and returned `billing: no credits remaining`.
+ *
+ * This header also claimed the chain ended in "OpenAI GPT-4o" — a model id two
+ * generations dead, still named in prose long after the code had moved on. That
+ * is the same defect as the six rotted slugs, just written in a comment.
  *
  * NOT the reasoning chain. `lib/ai-providers.ts` serves the CCPI summary and
  * chat and leads with the best available model; this one asks a model to recall
@@ -67,7 +75,7 @@ const AI_ESTIMATE_TTL_HOURS = (() => {
   return Number.isFinite(raw) && raw > 0 ? raw : 18
 })()
 
-type AiSource = "grok" | "groq" | "anthropic"
+type AiSource = "groq" | "anthropic"
 
 /**
  * The chain's result. `value` is null when no provider produced a plausible
@@ -101,7 +109,7 @@ async function readCachedEstimate(
     // the row was written must invalidate stale cache, not resurrect it.
     if (!isPlausible(value, range)) return null
     const source = rows[0].source as AiSource
-    if (!["grok", "groq", "anthropic"].includes(source)) return null
+    if (!["groq", "anthropic"].includes(source)) return null
     return { value, source }
   } catch {
     return null
@@ -130,7 +138,6 @@ function writeCachedEstimate(key: string, value: number, source: AiSource): void
 
 async function fetchWithAIFallback(
   indicatorName: string,
-  grokFunc: () => Promise<number | null>,
   groqLLMFunc: () => Promise<number | null>,
   anthropicFunc: () => Promise<number | null>,
   range: PlausibleRange,
@@ -145,17 +152,12 @@ async function fetchWithAIFallback(
 
   console.log(`[v0] AI Fallback: Fetching ${indicatorName}...`)
 
-  try {
-    const grokValue = await grokFunc()
-    if (isPlausible(grokValue, range)) {
-      console.log(`[v0] ✓ ${indicatorName}: Using Grok xAI (${grokValue})`)
-      writeCachedEstimate(indicatorName, grokValue, "grok")
-      return { value: grokValue, source: "grok" }
-    }
-  } catch (error) {
-    // Silently continue to next fallback
-  }
-
+  // The Grok xAI leg that led this chain was removed 2026-08-30 with the
+  // provider. It failed 401 times out of 401 between 2026-08-08 and that date —
+  // never once succeeded — and the cause, once the ledger could report one, was
+  // `auth: Forbidden`: the KEY is rejected, not the model. It was slot 1 of all
+  // six chains, so every indicator paid its latency before reaching a provider
+  // that could answer.
   try {
     const groqLLMValue = await groqLLMFunc()
     if (isPlausible(groqLLMValue, range)) {
@@ -199,7 +201,6 @@ async function fetchWithAIFallback(
 export async function getBuffettIndicator(): Promise<AIFallbackResult> {
   return fetchWithAIFallback(
     "Buffett Indicator",
-    async () => await fetchMarketDataWithGrok("Buffett Indicator (Market Cap to GDP ratio)", "Current percentage"),
     fetchBuffettIndicatorWithGroqLLM,
     fetchBuffettIndicatorWithAnthropic,
     { min: 50, max: 300 },
@@ -209,7 +210,6 @@ export async function getBuffettIndicator(): Promise<AIFallbackResult> {
 export async function getPutCallRatio(): Promise<AIFallbackResult> {
   return fetchWithAIFallback(
     "Put/Call Ratio",
-    async () => await fetchMarketDataWithGrok("CBOE Put/Call Ratio", "Current equity put/call ratio"),
     fetchPutCallRatioWithGroqLLM,
     fetchPutCallRatioWithAnthropic,
     { min: 0.3, max: 2.5 },
@@ -219,8 +219,6 @@ export async function getPutCallRatio(): Promise<AIFallbackResult> {
 export async function getAAIIBullish(): Promise<AIFallbackResult> {
   return fetchWithAIFallback(
     "AAII Bullish %",
-    async () =>
-      await fetchMarketDataWithGrok("AAII Bullish Sentiment Percentage", "Current bullish investor percentage"),
     fetchAAIIBullishWithGroqLLM,
     fetchAAIIBullishWithAnthropic,
     { min: 5, max: 80 },
@@ -230,7 +228,6 @@ export async function getAAIIBullish(): Promise<AIFallbackResult> {
 export async function getVIX(): Promise<AIFallbackResult> {
   return fetchWithAIFallback(
     "VIX",
-    async () => await fetchMarketDataWithGrok("CBOE Volatility Index (VIX)", "Current VIX level"),
     fetchVIXWithGroqLLM,
     fetchVIXWithAnthropic,
     { min: 5, max: 100 },
@@ -240,7 +237,6 @@ export async function getVIX(): Promise<AIFallbackResult> {
 export async function getNVIDIAPrice(): Promise<AIFallbackResult> {
   return fetchWithAIFallback(
     "NVIDIA Price",
-    async () => await fetchMarketDataWithGrok("NVIDIA (NVDA) stock price", "Current NVDA price in USD"),
     fetchNVIDIAPriceWithGroqLLM,
     fetchNVIDIAPriceWithAnthropic,
     { min: 10, max: 5000 },
@@ -250,7 +246,6 @@ export async function getNVIDIAPrice(): Promise<AIFallbackResult> {
 export async function getSOXIndex(): Promise<AIFallbackResult> {
   return fetchWithAIFallback(
     "SOX Index",
-    async () => await fetchMarketDataWithGrok("PHLX Semiconductor Index (SOX)", "Current SOX index level"),
     fetchSOXIndexWithGroqLLM,
     fetchSOXIndexWithAnthropic,
     { min: 1000, max: 20000 },

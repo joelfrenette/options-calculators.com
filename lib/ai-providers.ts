@@ -17,12 +17,14 @@
  * first does.
  *
  * 1. Anthropic (claude-opus-5)      - best available, primary
- * 2. xAI/Grok (grok-4.6)            - KEY FORBIDDEN in prod, see below
- * 3. OpenAI (gpt-5.4-nano)          - ACCOUNT OUT OF CREDITS, see below
- * 4. Google (gemini-3.5-flash-lite) - corrected by the vendor, see below
- * 5. Groq (openai/gpt-oss-120b)     - free, fast; currently the one answering
- * 6. OpenRouter (:free model)       - free last resort
- * 7. Perplexity                     - search-augmented; slug NOT verified
+ * 2. Google (gemini-3.5-flash-lite) - corrected by the vendor, see below
+ * 3. Groq (openai/gpt-oss-120b)     - free, fast; currently the one answering
+ * 4. OpenRouter (:free model)       - free last resort
+ * 5. Perplexity                     - search-augmented; slug NOT verified
+ *
+ * Seven providers became five on 2026-08-30. xAI and OpenAI were removed on
+ * evidence, not preference — see the ledger findings below. Neither had ever
+ * answered a single request.
  *
  * THIS IS NOT THE CHAIN FOR RECALLING MARKET NUMBERS. lib/*-market-data.ts asks
  * a model for "the current VIX" and parses the reply. A better model there
@@ -46,16 +48,22 @@
  * fixed it. OpenAI's key is valid and its ACCOUNT is empty — a distinction the
  * old `ok:false`-and-nothing-else ledger could not express at all.
  *
- * Fixed here: the temperature bug (ours) and the Google slug, which the vendor
+ * Fixed: the temperature bug (ours) and the Google slug, which the vendor
  * supplied in its own error text — "Please update your code to use
- * models/gemini-3.5-flash-lite". The xAI key and the OpenAI balance are the
- * owner's to resolve; until then the chain falls through to Groq and answers.
+ * models/gemini-3.5-flash-lite".
  *
- * SLUG PROVENANCE. claude-opus-5 and grok-4.6 are confirmed against Anthropic's
- * and xAI's own documentation; gemini-3.5-flash-lite is confirmed by Google's
- * own error response. `gpt-5.4-nano` remains UNVERIFIED — the account ran out
- * of credits before the model id was ever validated, so a `model_not_found` may
- * still be waiting behind the billing failure. Perplexity has never been called.
+ * xAI and OpenAI were then REMOVED rather than repaired, at the owner's
+ * direction. Neither failure was fixable in this file: one is a rejected key,
+ * the other an empty account. A provider that cannot answer is not depth in a
+ * fallback chain, it is latency in front of one that can.
+ *
+ * SLUG PROVENANCE. `claude-opus-5` is confirmed against Anthropic's own
+ * documentation; `gemini-3.5-flash-lite` is confirmed by Google's own error
+ * response, making it the better-attested of the two. Perplexity's
+ * `llama-3.1-sonar-large-128k-online` has NEVER been called and is therefore
+ * unverified in both directions — it is the last 2024-era slug left in this
+ * file, and the only reason it survived the sweep is that no evidence exists
+ * either way. Treat it as suspect.
  */
 
 import { generateText, streamText, type CoreMessage } from "ai"
@@ -86,20 +94,13 @@ const providerConfigs = [
     create: () => createAnthropic({ apiKey: resolveApiKey("ANTHROPIC_API_KEY") }),
     model: "claude-opus-5",
   },
-  {
-    name: "xai" as const,
-    displayName: "xAI (Grok 4.6)",
-    keyName: "XAI_API_KEY",
-    tier: "paid" as const,
-    endpoint: "https://api.x.ai/v1/chat/completions",
-    key: () => resolveApiKey("XAI_API_KEY"),
-    create: () =>
-      createOpenAI({
-        apiKey: resolveApiKey("XAI_API_KEY"),
-        baseURL: "https://api.x.ai/v1",
-      }),
-    model: "grok-4.6",
-  },
+  // xAI removed 2026-08-30, at the owner's direction. It failed 401 times out
+  // of 401 between 2026-08-08 and that date — not once successful — and the
+  // cause, the moment the ledger could express one, was `auth: Forbidden`. The
+  // key is rejected, so no slug change could ever have fixed it; the retired
+  // grok-2-latest that this audit spent a day chasing was a second fault hiding
+  // behind the first. Re-adding is a clean revert once a working key exists.
+  //
   // OpenAI removed 2026-08-30, at the owner's direction, after the ledger
   // reported `billing` — "You have no credits remaining" — on its first real
   // call. Three facts made removal the better option than funding it: the

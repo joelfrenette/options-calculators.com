@@ -19,7 +19,7 @@ function getGroqProvider() {
   })
 }
 
-async function fetchMarketDataWithGroqLLM(indicator: string, specificData = "Current value"): Promise<number | null> {
+export async function fetchMarketDataWithGroqLLM(indicator: string, specificData = "Current value"): Promise<number | null> {
   // Hoisted above the try so the catch can report how long the failed call
   // took. A failure with no duration cannot be told apart from one that never
   // left the process.

@@ -71,7 +71,7 @@ export function measured<T>(value: T, tier: Tier): T | null {
  * and suppressed from the canaries. The difference is that "unavailable" now
  * carries a null value, so there is nothing left to accidentally read.
  */
-export function aiTier(source: "grok" | "groq" | "anthropic" | "openai" | "unavailable"): Tier {
+export function aiTier(source: "groq" | "anthropic" | "unavailable"): Tier {
   return source === "unavailable" ? "baseline" : "ai-estimate"
 }
 

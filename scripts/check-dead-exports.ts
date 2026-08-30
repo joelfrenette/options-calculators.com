@@ -99,7 +99,20 @@ const LIB_FILES = walk(join(ROOT, "lib"), (p) => p.endsWith(".ts") && !p.endsWit
 const ALL_SOURCE = [
   ...walk(join(ROOT, "app"), (p) => p.endsWith(".ts") || p.endsWith(".tsx")),
   ...walk(join(ROOT, "components"), (p) => p.endsWith(".ts") || p.endsWith(".tsx")),
-  ...walk(join(ROOT, "lib"), (p) => p.endsWith(".ts")),
+  // `.tsx` added 2026-08-30. This referrer scan filtered `lib/` to `.ts` while
+  // app/, components/ and hooks/ all included `.tsx` — so an export used ONLY
+  // from a `lib/*.tsx` was invisible to the reference count and read as dead.
+  // `lib/scraping-bee.tsx` is the file this hid: it is the sole caller of
+  // `fetchMarketDataWithGroqLLM`, and the check reported that export as newly
+  // unreferenced the moment it was made public.
+  //
+  // A false POSITIVE is the benign direction for this particular hole, because
+  // it fails loudly. The same gap in the other direction is not benign, and it
+  // is still open: LIB_FILES above also filters `.ts`, so exports DEFINED in a
+  // `lib/*.tsx` are not checked for deadness at all. Closing that is its own
+  // change — it will surface a fresh list needing a decision each, which is the
+  // P7-9 discipline, not a drive-by.
+  ...walk(join(ROOT, "lib"), (p) => p.endsWith(".ts") || p.endsWith(".tsx")),
   ...walk(join(ROOT, "scripts"), (p) => p.endsWith(".ts")),
   ...walk(join(ROOT, "hooks"), (p) => p.endsWith(".ts") || p.endsWith(".tsx")),
 ]
