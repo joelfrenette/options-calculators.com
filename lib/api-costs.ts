@@ -264,10 +264,10 @@ export const MODEL_TOKEN_PRICES: Record<string, TokenPrice> = {
   // Free tiers — $0 marginal. Rate-limited, not billed.
   "openrouter/free": { inputPerM: 0, outputPerM: 0, note: "OpenRouter free auto-router; capped by request count, not billed" },
   "openai/gpt-oss-120b": { inputPerM: 0, outputPerM: 0, note: "Groq free tier" },
-  "gemini-2.5-flash-lite": {
+  "gemini-3.5-flash-lite": {
     inputPerM: 0,
     outputPerM: 0,
-    note: "Google AI Studio free tier — Google's own migration target from the shut-down gemini-2.0-flash, and priced $0 here for the same reason the Groq and OpenRouter entries are: the chain classifies it tier:'free' and only ever calls it on the free tier. Paid rates if that tier is exceeded are $0.10/$0.40 per 1M.",
+    note: "Google AI Studio free tier. This slug came from Google's OWN error text — gemini-2.5-flash-lite returned 'no longer available to new users. Please update your code to use models/gemini-3.5-flash-lite' — so it is vendor-confirmed, unlike the 2.5 slug it replaces. Priced $0 for the same reason the Groq and OpenRouter entries are: the chain classifies it tier:'free' and only calls it on the free tier. Paid rates are NOT confirmed for this tier; 2.5-flash-lite was $0.10/$0.40 per 1M.",
   },
   // gemini-2.0-flash-exp price entry removed 2026-08-29 (admin audit): no code
   // ever requested that model id — a dead defensive constant.

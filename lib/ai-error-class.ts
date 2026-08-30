@@ -38,6 +38,7 @@
 export type AiErrorClass =
   | "model_not_found"
   | "auth"
+  | "billing"
   | "rate_limit"
   | "bad_request"
   | "upstream"
@@ -101,6 +102,18 @@ function readMessage(err: unknown): string {
 export function classifyAiError(err: unknown): ClassifiedAiError {
   const status = readStatus(err)
   const detail = truncate(readMessage(err))
+
+  // BILLING, checked before status. Added 2026-08-30 after the first real
+  // production call: OpenAI answered "You have no credits remaining. Add credits
+  // to continue using the API", and the classifier filed it as `unknown` —
+  // correct by its own rules, and useless to the reader. An exhausted balance is
+  // not an auth problem (the key is valid), not a rate limit (waiting will not
+  // help), and not a bad request (the request was fine). It has its own fix:
+  // pay. Vendors report it inconsistently — 402, 403, and 429 are all in use —
+  // so the message is the reliable signal here and the status is not.
+  if (/\b(no credits|insufficient[_ ](?:credit|quota|funds|balance)|billing|payment required|quota exceeded for your plan)\b/i.test(detail)) {
+    return { status, errorClass: "billing", detail }
+  }
 
   if (status !== null) {
     if (status === 404) return { status, errorClass: "model_not_found", detail }

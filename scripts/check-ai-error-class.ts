@@ -280,6 +280,20 @@ const cls = (err: unknown) => classifyAiError(err).errorClass
 
 check("404 → model_not_found (a retired slug, not a dead key)", cls(apiError(404, "model not found")) === "model_not_found")
 check("401 → auth", cls(apiError(401, "invalid api key")) === "auth")
+// Worked from the real production message, 2026-08-30 21:36Z. The classifier
+// filed this as `unknown` on the first live call — correct by its own rules and
+// useless to the reader. A spent balance is not auth (the key is valid), not a
+// rate limit (waiting will not help), and not a bad request.
+check(
+  "an exhausted balance → billing, not unknown",
+  cls(apiError(429, "You have no credits remaining. Add credits to continue using the API")) === "billing",
+)
+check(
+  "billing beats the status code, because vendors disagree on which to send",
+  cls(apiError(403, "insufficient_quota")) === "billing",
+  "402, 403 and 429 are all in use for this; the message is the reliable signal",
+)
+check("a plain 403 with no billing language is still auth", cls(apiError(403, "Forbidden")) === "auth")
 check("403 → auth", cls(apiError(403, "forbidden")) === "auth")
 check("429 → rate_limit", cls(apiError(429, "rate limit exceeded")) === "rate_limit")
 check("500 → upstream (theirs, not ours)", cls(apiError(500, "internal error")) === "upstream")

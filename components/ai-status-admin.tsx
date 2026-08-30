@@ -136,6 +136,7 @@ function observedChip(provider: AIProvider, windowDays: number) {
 const ERROR_CLASS_HINT: Record<string, string> = {
   model_not_found: "the model id is retired or misspelled — change the slug",
   auth: "the key was rejected — rotate it",
+  billing: "the account balance is exhausted — add credits",
   rate_limit: "quota or rate cap hit — back off or upgrade",
   bad_request: "the request itself was rejected — fix the call",
   upstream: "the vendor returned a server error — not ours",

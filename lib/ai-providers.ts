@@ -17,10 +17,10 @@
  * first does.
  *
  * 1. Anthropic (claude-opus-5)      - best available, primary
- * 2. xAI/Grok (grok-4.6)            - current flagship
- * 3. OpenAI (gpt-5.4-nano)          - SLUG UNCONFIRMED, see note below
- * 4. Google (gemini-2.5-flash-lite) - SLUG UNCONFIRMED, see note below
- * 5. Groq (openai/gpt-oss-120b)     - free, fast
+ * 2. xAI/Grok (grok-4.6)            - KEY FORBIDDEN in prod, see below
+ * 3. OpenAI (gpt-5.4-nano)          - ACCOUNT OUT OF CREDITS, see below
+ * 4. Google (gemini-3.5-flash-lite) - corrected by the vendor, see below
+ * 5. Groq (openai/gpt-oss-120b)     - free, fast; currently the one answering
  * 6. OpenRouter (:free model)       - free last resort
  * 7. Perplexity                     - search-augmented; slug NOT verified
  *
@@ -30,13 +30,32 @@
  * VIX. Those fetchers deliberately stay on cheap models, and the real fix there
  * is a data feed, not a bigger model. Do not "upgrade" them to match this list.
  *
+ * WHAT THE FIRST REAL CALL FOUND (2026-08-30 21:36Z). The `error_class` column
+ * added the same day turned a week of guessing into one page load. Every
+ * provider named its own cause, and no two were the same problem:
+ *
+ *   anthropic  claude-opus-5   bad_request      "`temperature` is deprecated
+ *                                                for this model."  <- OURS
+ *   xai        grok-4.6        auth             "Forbidden"        <- key
+ *   openai     gpt-5.4-nano    unknown          "no credits remaining" <- billing
+ *   google     gemini-2.5-...  model_not_found  vendor named the replacement
+ *   groq       gpt-oss-120b    ok               answered, 1003 in / 400 out
+ *
+ * So the original "xAI failed 401 times" mystery was never only the retired
+ * slug: **the xAI key itself is Forbidden**, and no slug change could have
+ * fixed it. OpenAI's key is valid and its ACCOUNT is empty — a distinction the
+ * old `ok:false`-and-nothing-else ledger could not express at all.
+ *
+ * Fixed here: the temperature bug (ours) and the Google slug, which the vendor
+ * supplied in its own error text — "Please update your code to use
+ * models/gemini-3.5-flash-lite". The xAI key and the OpenAI balance are the
+ * owner's to resolve; until then the chain falls through to Groq and answers.
+ *
  * SLUG PROVENANCE. claude-opus-5 and grok-4.6 are confirmed against Anthropic's
- * and xAI's own current model documentation. The OpenAI and Google slugs came
- * from secondary sources and have NOT been confirmed against those vendors'
- * model-list endpoints — the same weakness that let six 2024-era slugs rot here
- * unnoticed. They are left in place rather than swapped for another guess;
- * `error_class: "model_not_found"` (lib/ai-error-class.ts, added the same day)
- * now names that failure on the first call, so verifying them is cheap.
+ * and xAI's own documentation; gemini-3.5-flash-lite is confirmed by Google's
+ * own error response. `gpt-5.4-nano` remains UNVERIFIED — the account ran out
+ * of credits before the model id was ever validated, so a `model_not_found` may
+ * still be waiting behind the billing failure. Perplexity has never been called.
  */
 
 import { generateText, streamText, type CoreMessage } from "ai"
@@ -93,13 +112,13 @@ const providerConfigs = [
   },
   {
     name: "google" as const,
-    displayName: "Google (Gemini 2.5 Flash-Lite)",
+    displayName: "Google (Gemini 3.5 Flash-Lite)",
     keyName: "GOOGLE_AI_API_KEY",
     tier: "free" as const,
     endpoint: "https://generativelanguage.googleapis.com/v1beta/models",
     key: () => resolveApiKey("GOOGLE_AI_API_KEY"),
     create: () => createGoogleGenerativeAI({ apiKey: resolveApiKey("GOOGLE_AI_API_KEY") }),
-    model: "gemini-2.5-flash-lite",
+    model: "gemini-3.5-flash-lite",
   },
   // --- free tiers, now the SAFETY NET rather than the default. They answer
   //     when every paid provider is down or the E-5 budget guard has tripped,
@@ -153,6 +172,31 @@ const providerConfigs = [
 ]
 
 export type ProviderName = (typeof providerConfigs)[number]["name"]
+
+/**
+ * Whether a model still accepts sampling parameters (`temperature`, `top_p`,
+ * `top_k`).
+ *
+ * Anthropic REMOVED them on the Opus 5 / Opus 4.8 / Opus 4.7 / Sonnet 5 /
+ * Fable 5 family: sending `temperature` returns a 400. Promoting claude-opus-5
+ * to the front of this chain therefore broke it on the first real call, and the
+ * ledger said so in as many words —
+ *
+ *     provider=anthropic model=claude-opus-5 ok=false
+ *     error_class=bad_request  detail="`temperature` is deprecated for this model."
+ *
+ * That is exactly the diagnosis `error_class` was added for the same day, on a
+ * failure that would previously have recorded `ok:false` and nothing else. The
+ * chain silently fell through to Groq and still answered, so nothing user-facing
+ * broke and nothing would ever have pointed here.
+ *
+ * Matched by prefix rather than an exact list so a dated snapshot of the same
+ * family (`claude-opus-5-20260xxx`) is covered too. Reasoning depth on these
+ * models is controlled by `output_config.effort`, not by temperature.
+ */
+function acceptsSampling(model: string): boolean {
+  return !/^claude-(opus-5|opus-4-8|opus-4-7|sonnet-5|fable-5|mythos-5)/.test(model)
+}
 
 /**
  * Read-only description of one link in the REAL fallback chain.
@@ -269,7 +313,7 @@ export async function generateWithFallback(options: AIGenerateOptions): Promise<
         // The cast covers the caller-supplied-neither case, which the SDK rejects at runtime as before.
         ...(messages !== undefined ? { messages } : { prompt: prompt as string }),
         system,
-        temperature,
+        ...(acceptsSampling(config.model) ? { temperature } : {}),
         maxOutputTokens: maxTokens,
         abortSignal,
       })
@@ -386,7 +430,7 @@ export async function streamWithFallback(options: AIGenerateOptions) {
         // The cast covers the caller-supplied-neither case, which the SDK rejects at runtime as before.
         ...(messages !== undefined ? { messages } : { prompt: prompt as string }),
         system,
-        temperature,
+        ...(acceptsSampling(config.model) ? { temperature } : {}),
         maxOutputTokens: maxTokens,
         abortSignal,
       })
