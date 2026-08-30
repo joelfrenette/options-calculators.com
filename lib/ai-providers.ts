@@ -1,16 +1,42 @@
 /**
  * AI Provider Configuration with Fallback Support
  *
- * Priority order (FREE providers first to minimize cost):
- * 1. OpenRouter (:free model) - $0 per token, primary
- * 2. Groq (openai/gpt-oss-120b) - free tier backup
- * 3. Google (gemini-2.5-flash-lite) - free tier backup
- * --- paid fallbacks below; only used if all free providers fail AND the key
- *     is set. Disable via DISABLED_APIS to guarantee $0. ---
- * 4. OpenAI (gpt-5.4-nano)
- * 5. xAI/Grok (grok-4.6)
- * 6. Anthropic (claude-haiku-4-5)
- * 7. Perplexity - search-augmented
+ * ORDER CHANGED 2026-08-30: QUALITY FIRST, not cost first.
+ *
+ * This chain serves the REASONING paths — the CCPI executive summary and the
+ * dashboard chat — where the model reads numbers this site has already measured
+ * and says what they mean. The owner makes six-figure decisions on that output
+ * and has stated cost is not a constraint at two users, so the best available
+ * model goes first.
+ *
+ * WHY THE ORDER IS THE WHOLE CHANGE, not the slugs. `generateWithFallback`
+ * returns on the FIRST provider that succeeds. Under the old cost-first order a
+ * free auto-router answered essentially every request, so upgrading Anthropic
+ * from slot 6 would have changed nothing at all — slot 6 was never reached.
+ * Putting a better model in a chain does not make the chain better; putting it
+ * first does.
+ *
+ * 1. Anthropic (claude-opus-5)      - best available, primary
+ * 2. xAI/Grok (grok-4.6)            - current flagship
+ * 3. OpenAI (gpt-5.4-nano)          - SLUG UNCONFIRMED, see note below
+ * 4. Google (gemini-2.5-flash-lite) - SLUG UNCONFIRMED, see note below
+ * 5. Groq (openai/gpt-oss-120b)     - free, fast
+ * 6. OpenRouter (:free model)       - free last resort
+ * 7. Perplexity                     - search-augmented; slug NOT verified
+ *
+ * THIS IS NOT THE CHAIN FOR RECALLING MARKET NUMBERS. lib/*-market-data.ts asks
+ * a model for "the current VIX" and parses the reply. A better model there
+ * returns a more CONFIDENT wrong number, not a truer one — no LLM knows today's
+ * VIX. Those fetchers deliberately stay on cheap models, and the real fix there
+ * is a data feed, not a bigger model. Do not "upgrade" them to match this list.
+ *
+ * SLUG PROVENANCE. claude-opus-5 and grok-4.6 are confirmed against Anthropic's
+ * and xAI's own current model documentation. The OpenAI and Google slugs came
+ * from secondary sources and have NOT been confirmed against those vendors'
+ * model-list endpoints — the same weakness that let six 2024-era slugs rot here
+ * unnoticed. They are left in place rather than swapped for another guess;
+ * `error_class: "model_not_found"` (lib/ai-error-class.ts, added the same day)
+ * now names that failure on the first call, so verifying them is cheap.
  */
 
 import { generateText, streamText, type CoreMessage } from "ai"
@@ -30,58 +56,16 @@ const OPENROUTER_FREE_MODEL = process.env.OPENROUTER_FREE_MODEL || "openrouter/f
 
 const providerConfigs = [
   {
-    // PRIMARY — OpenRouter free model. $0 per token; one-time $10 deposit
-    // raises the daily cap to 1,000 requests.
-    name: "openrouter" as const,
-    displayName: "OpenRouter (free model)",
-    keyName: "OPENROUTER_API_KEY",
-    tier: "free" as const,
-    endpoint: "https://openrouter.ai/api/v1/chat/completions",
-    key: () => resolveApiKey("OPENROUTER_API_KEY"),
-    create: () =>
-      createOpenAI({
-        apiKey: resolveApiKey("OPENROUTER_API_KEY"),
-        baseURL: "https://openrouter.ai/api/v1",
-      }),
-    model: OPENROUTER_FREE_MODEL,
-  },
-  {
-    // Free backup.
-    name: "groq" as const,
-    displayName: "Groq (GPT-OSS 120B)",
-    keyName: "GROQ_API_KEY",
-    tier: "free" as const,
-    endpoint: "https://api.groq.com/openai/v1/chat/completions",
-    key: () => resolveApiKey("GROQ_API_KEY"),
-    create: () =>
-      createOpenAI({
-        apiKey: resolveApiKey("GROQ_API_KEY"),
-        baseURL: "https://api.groq.com/openai/v1",
-      }),
-    model: "openai/gpt-oss-120b",
-  },
-  {
-    // Free backup.
-    name: "google" as const,
-    displayName: "Google (Gemini 2.5 Flash-Lite)",
-    keyName: "GOOGLE_AI_API_KEY",
-    tier: "free" as const,
-    endpoint: "https://generativelanguage.googleapis.com/v1beta/models",
-    key: () => resolveApiKey("GOOGLE_AI_API_KEY"),
-    create: () => createGoogleGenerativeAI({ apiKey: resolveApiKey("GOOGLE_AI_API_KEY") }),
-    model: "gemini-2.5-flash-lite",
-  },
-  // --- paid fallbacks below; reachable only if all free providers fail AND
-  //     their keys are set (disable via DISABLED_APIS to guarantee $0). ---
-  {
-    name: "openai" as const,
-    displayName: "OpenAI (GPT-5.4 Nano)",
-    keyName: "OPENAI_API_KEY",
+    // PRIMARY — best available model. Paid and first on purpose: see the
+    // quality-first note in this file's header.
+    name: "anthropic" as const,
+    displayName: "Anthropic (Claude Opus 5)",
+    keyName: "ANTHROPIC_API_KEY",
     tier: "paid" as const,
-    endpoint: "https://api.openai.com/v1/chat/completions",
-    key: () => resolveApiKey("OPENAI_API_KEY"),
-    create: () => createOpenAI({ apiKey: resolveApiKey("OPENAI_API_KEY") }),
-    model: "gpt-5.4-nano",
+    endpoint: "https://api.anthropic.com/v1/messages",
+    key: () => resolveApiKey("ANTHROPIC_API_KEY"),
+    create: () => createAnthropic({ apiKey: resolveApiKey("ANTHROPIC_API_KEY") }),
+    model: "claude-opus-5",
   },
   {
     name: "xai" as const,
@@ -98,14 +82,59 @@ const providerConfigs = [
     model: "grok-4.6",
   },
   {
-    name: "anthropic" as const,
-    displayName: "Anthropic (Claude Haiku 4.5)",
-    keyName: "ANTHROPIC_API_KEY",
+    name: "openai" as const,
+    displayName: "OpenAI (GPT-5.4 Nano)",
+    keyName: "OPENAI_API_KEY",
     tier: "paid" as const,
-    endpoint: "https://api.anthropic.com/v1/messages",
-    key: () => resolveApiKey("ANTHROPIC_API_KEY"),
-    create: () => createAnthropic({ apiKey: resolveApiKey("ANTHROPIC_API_KEY") }),
-    model: "claude-haiku-4-5",
+    endpoint: "https://api.openai.com/v1/chat/completions",
+    key: () => resolveApiKey("OPENAI_API_KEY"),
+    create: () => createOpenAI({ apiKey: resolveApiKey("OPENAI_API_KEY") }),
+    model: "gpt-5.4-nano",
+  },
+  {
+    name: "google" as const,
+    displayName: "Google (Gemini 2.5 Flash-Lite)",
+    keyName: "GOOGLE_AI_API_KEY",
+    tier: "free" as const,
+    endpoint: "https://generativelanguage.googleapis.com/v1beta/models",
+    key: () => resolveApiKey("GOOGLE_AI_API_KEY"),
+    create: () => createGoogleGenerativeAI({ apiKey: resolveApiKey("GOOGLE_AI_API_KEY") }),
+    model: "gemini-2.5-flash-lite",
+  },
+  // --- free tiers, now the SAFETY NET rather than the default. They answer
+  //     when every paid provider is down or the E-5 budget guard has tripped,
+  //     which is exactly when a cheaper answer beats no answer. ---
+  {
+    name: "groq" as const,
+    displayName: "Groq (GPT-OSS 120B)",
+    keyName: "GROQ_API_KEY",
+    tier: "free" as const,
+    endpoint: "https://api.groq.com/openai/v1/chat/completions",
+    key: () => resolveApiKey("GROQ_API_KEY"),
+    create: () =>
+      createOpenAI({
+        apiKey: resolveApiKey("GROQ_API_KEY"),
+        baseURL: "https://api.groq.com/openai/v1",
+      }),
+    model: "openai/gpt-oss-120b",
+  },
+  {
+    // $0 per token; one-time $10 deposit raises the daily cap to 1,000
+    // requests. Was slot 1 under the old cost-first order, which is why it
+    // served nearly every request and why the five providers behind it could
+    // rot unnoticed for weeks.
+    name: "openrouter" as const,
+    displayName: "OpenRouter (free model)",
+    keyName: "OPENROUTER_API_KEY",
+    tier: "free" as const,
+    endpoint: "https://openrouter.ai/api/v1/chat/completions",
+    key: () => resolveApiKey("OPENROUTER_API_KEY"),
+    create: () =>
+      createOpenAI({
+        apiKey: resolveApiKey("OPENROUTER_API_KEY"),
+        baseURL: "https://openrouter.ai/api/v1",
+      }),
+    model: OPENROUTER_FREE_MODEL,
   },
   {
     name: "perplexity" as const,

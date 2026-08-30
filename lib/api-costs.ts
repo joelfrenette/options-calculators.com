@@ -281,6 +281,13 @@ export const MODEL_TOKEN_PRICES: Record<string, TokenPrice> = {
   //
   // Pay-per-use. These are the ones that can run a bill up.
   "gpt-5.4-nano": { inputPerM: 0.2, outputPerM: 1.25 },
+  "claude-opus-5": {
+    inputPerM: 5,
+    outputPerM: 25,
+    note: "primary reasoning model as of 2026-08-30 — first in the chain by design, not last",
+  },
+  // Kept: still requested by lib/anthropic-market-data.ts, which stays on a
+  // cheap model deliberately (a better model cannot recall today's VIX).
   "claude-haiku-4-5": { inputPerM: 1, outputPerM: 5 },
   "grok-4.6": {
     inputPerM: 2,
