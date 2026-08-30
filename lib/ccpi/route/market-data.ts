@@ -15,6 +15,7 @@ import {
   getPutCallRatio,
   getSOXIndex,
   getVIX,
+  type AIFallbackResult,
 } from "@/lib/unified-ai-fallback"
 import { scrapeAAIISentiment, scrapePutCallRatio } from "@/lib/scraping-bee"
 import { fetchFredBuffett } from "./fred-buffett"
@@ -38,39 +39,31 @@ export async function fetchMarketData() {
     aaii: { live: false, source: "baseline", lastUpdated: now() },
   }
 
-  // P7-89: five getters left this batch with the inputs they served —
-  // shillerCAPE, shortInterest, mag7Concentration, qqqPE and ismPMI were
-  // dropped from the weights (LLM-only, never scored), so recalling them
-  // burned five model calls per uncached load for numbers nothing consumed.
-  const [buffettResult, putCallResult, aaiiBullishResult, vixAiResult, nvidiaPriceResult, soxIndexResult] =
-    await Promise.all([
-      getBuffettIndicator(),
-      getPutCallRatio(),
-      getAAIIBullish(),
-      getVIX(),
-      getNVIDIAPrice(),
-      getSOXIndex(),
-    ])
-
-  // Spot VIX is a PUBLISHED NUMBER, and the site already stores it: the
+  // MEASURE FIRST, ASK THE MODEL ONLY FOR THE GAPS (2026-08-30).
+  //
+  // P7-89 removed five getters that burned a model call per load for numbers
+  // nothing consumed. This is that lesson one step further. The remaining six
+  // still fired UNCONDITIONALLY, from a `Promise.all` that ran BEFORE the real
+  // feeds — so on a healthy load five or six model answers were produced, paid
+  // for, and then discarded in favour of the measurement that was always going
+  // to win.
+  //
+  // That is the direct mechanism behind xAI's 401 recorded calls: it is slot 1
+  // of all six chains, it fired on every uncached load, and its answer was
+  // thrown away. Every one of those calls also failed, which is how a dead
+  // provider stayed invisible — nothing downstream depended on it succeeding.
+  //
+  // Now the feeds run first and the model is asked only for what they could
+  // not supply. On a fully healthy load that is ZERO model calls.
+  //
+  // Spot VIX is a PUBLISHED NUMBER and the site already stores it: the
   // market-snapshot cron writes FRED VIXCLS daily. Asking an LLM to recall
-  // today's VIX — which is what the fallback chain did whenever the term
-  // structure fetch failed — is guessing at a fact, and `isPlausible` waves
-  // through anything between 5 and 100 (P6-31b). Read the store first; the AI
-  // chain is now the third choice, behind two real sources.
+  // today's VIX is guessing at a fact, and `isPlausible` waves through anything
+  // between 5 and 100 (P6-31b). Store first, term structure second, model third.
   const vixFromStore = await fredLatestFromStore("VIXCLS")
-  const vixResult = vixFromStore ? { value: vixFromStore.value, source: "fred-store" as const } : vixAiResult
   if (vixFromStore) {
     console.log(`[v0] ✓ VIX from FRED store: ${vixFromStore.value} (${vixFromStore.day})`)
   }
-
-  console.log("[v0] AI Fallback Summary:")
-  console.log(`  Buffett Indicator: ${buffettResult.value} (${buffettResult.source})`)
-  console.log(`  Put/Call Ratio: ${putCallResult.value} (${putCallResult.source})`)
-  console.log(`  AAII Bullish: ${aaiiBullishResult.value} (${aaiiBullishResult.source})`)
-  console.log(`  VIX: ${vixResult.value} (${vixResult.source})`)
-  console.log(`  NVIDIA Price: ${nvidiaPriceResult.value} (${nvidiaPriceResult.source})`)
-  console.log(`  SOX Index: ${soxIndexResult.value} (${soxIndexResult.source})`)
 
   const results = await Promise.allSettled([
     fetchQQQTechnicalsData(),
@@ -99,25 +92,64 @@ export async function fetchMarketData() {
   const fearGreedData = results[5].status === "fulfilled" ? results[5].value : { fearGreed: null, dataSource: "failed" }
   const fredBuffett = results[6].status === "fulfilled" ? results[6].value : null
   const soxMeasured = results[7].status === "fulfilled" ? results[7].value : null
-  const putCallData =
-    results[8].status === "fulfilled"
-      ? results[8].value
-      : { ratio: putCallResult.value, status: "baseline" as const }
+  const putCallScrape = results[8].status === "fulfilled" ? results[8].value : null
+  const aaiScrape = results[9].status === "fulfilled" ? results[9].value : null
+
+  // --- the gaps, and only the gaps -----------------------------------------
+
+  /**
+   * An indicator with no model answer. `"unavailable"` is the same source tag
+   * `fetchWithAIFallback` returns when no provider produced a value, so it
+   * already tiers as baseline and is already excluded from scoring — a skipped
+   * call and a failed one are indistinguishable downstream, which is correct:
+   * in both cases we do not have a number from a model.
+   */
+  const NO_AI: AIFallbackResult = { value: null, source: "unavailable" }
+  const askAi = (needed: boolean, get: () => Promise<AIFallbackResult>): Promise<AIFallbackResult> =>
+    needed ? get() : Promise.resolve(NO_AI)
+
+  const alphaVantageIsLive = alphaVantageData?.source === "live"
+
+  const [buffettResult, putCallResult, aaiiBullishResult, vixAiResult, nvidiaPriceResult, soxIndexResult] =
+    await Promise.all([
+      askAi(!fredBuffett, getBuffettIndicator),
+      // A fulfilled-but-not-live scrape still falls back to the model for both
+      // the value and the source label, so "fulfilled" is not the test — "live" is.
+      askAi(putCallScrape?.status !== "live", getPutCallRatio),
+      askAi(aaiScrape?.status !== "live", getAAIIBullish),
+      askAi(!vixFromStore, getVIX),
+      askAi(!alphaVantageIsLive || alphaVantageData?.nvidiaPrice == null, getNVIDIAPrice),
+      askAi(!soxMeasured || !alphaVantageIsLive, getSOXIndex),
+    ])
+
+  const vixResult = vixFromStore ? { value: vixFromStore.value, source: "fred-store" as const } : vixAiResult
+
+  const asked = [buffettResult, putCallResult, aaiiBullishResult, vixAiResult, nvidiaPriceResult, soxIndexResult].filter(
+    (r) => r !== NO_AI,
+  ).length
+  console.log(`[v0] AI Fallback Summary (${asked}/6 asked; the rest were measured):`)
+  console.log(`  Buffett Indicator: ${buffettResult.value} (${buffettResult.source})`)
+  console.log(`  Put/Call Ratio: ${putCallResult.value} (${putCallResult.source})`)
+  console.log(`  AAII Bullish: ${aaiiBullishResult.value} (${aaiiBullishResult.source})`)
+  console.log(`  VIX: ${vixResult.value} (${vixResult.source})`)
+  console.log(`  NVIDIA Price: ${nvidiaPriceResult.value} (${nvidiaPriceResult.source})`)
+  console.log(`  SOX Index: ${soxIndexResult.value} (${soxIndexResult.source})`)
+
+  const putCallData = putCallScrape ?? { ratio: putCallResult.value, status: "baseline" as const }
   const aaiData =
-    results[9].status === "fulfilled"
-      ? results[9].value
-      : // bearish/neutral/spread were literals — 30, 35, 5 — invented whenever
-        // the AAII scrape failed. They are read only on the `live` branch today,
-        // so nothing consumed them, but an invented constant parked where a
-        // future caller will find it and believe it is exactly the shape P7-10
-        // warned about. Null means "not measured".
-        {
-          bullish: aaiiBullishResult.value,
-          bearish: null,
-          neutral: null,
-          spread: null,
-          status: "baseline" as const,
-        }
+    aaiScrape ??
+    // bearish/neutral/spread were literals — 30, 35, 5 — invented whenever the
+    // AAII scrape failed. They are read only on the `live` branch today, so
+    // nothing consumed them, but an invented constant parked where a future
+    // caller will find it and believe it is exactly the shape P7-10 warned
+    // about. Null means "not measured".
+    {
+      bullish: aaiiBullishResult.value,
+      bearish: null,
+      neutral: null,
+      spread: null,
+      status: "baseline" as const,
+    }
   const spxVal =
     results[10].status === "fulfilled"
       ? results[10].value
