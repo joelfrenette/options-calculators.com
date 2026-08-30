@@ -130,10 +130,23 @@ function persistToSupabase(call: MeteredCall): void {
   }
 }
 
+/**
+ * Canonical lowercase provider tag. Collapses the casing/label variants that
+ * different call sites pass for the same provider — `xai` vs `xAI`, `groq` vs
+ * `Groq`, `openrouter` vs `OpenRouter (free)` — so one provider is one row in
+ * every rollup (the monthly view, the budget guard's per-provider sums) instead
+ * of being fragmented. The `budget-guard.ts` header flags this drift; this is
+ * the single point that removes it, applied to EVERY recorded call below.
+ */
+function canonicalProvider(provider: string): string {
+  return provider.toLowerCase().replace(/\s*\(free\)\s*/g, "").trim()
+}
+
 function record(call: MeteredCall): void {
-  ring.push(call)
+  const normalized: MeteredCall = { ...call, provider: canonicalProvider(call.provider) }
+  ring.push(normalized)
   if (ring.length > RING_CAP) ring.splice(0, ring.length - RING_CAP)
-  persistToSupabase(call)
+  persistToSupabase(normalized)
 }
 
 /**
@@ -190,10 +203,19 @@ export async function meteredFetch(
 // use. `recordAiCall` is the equivalent entry point for them: same table, same
 // fire-and-forget contract, plus token counts and an estimated cost.
 
-/** Token usage as reported by the AI SDK. Fields are optional — some providers omit them. */
+/**
+ * Token usage as reported by the AI SDK. Fields are optional — some providers
+ * omit them. Both the v5 shape (`inputTokens`/`outputTokens`) and the older
+ * OpenAI/v4 shape (`promptTokens`/`completionTokens`) are accepted, because the
+ * OpenAI-compatible adapter pointed at some endpoints (xAI) has been observed
+ * to surface neither v5 field — leaving grok-2-latest, a PAID model, recorded
+ * as unpriced. Reading both is a cheap best-effort to capture whatever arrives.
+ */
 export interface AiUsage {
   inputTokens?: number
   outputTokens?: number
+  promptTokens?: number
+  completionTokens?: number
 }
 
 /**
@@ -212,8 +234,11 @@ export function recordAiCall(args: {
   usage?: AiUsage | null
 }): void {
   try {
-    const inputTokens = Number.isFinite(args.usage?.inputTokens) ? (args.usage!.inputTokens as number) : null
-    const outputTokens = Number.isFinite(args.usage?.outputTokens) ? (args.usage!.outputTokens as number) : null
+    // Accept either usage shape (v5 input/output, or v4/OpenAI prompt/completion).
+    const rawIn = args.usage?.inputTokens ?? args.usage?.promptTokens
+    const rawOut = args.usage?.outputTokens ?? args.usage?.completionTokens
+    const inputTokens = Number.isFinite(rawIn) ? (rawIn as number) : null
+    const outputTokens = Number.isFinite(rawOut) ? (rawOut as number) : null
 
     // No token counts means no defensible cost. Say so rather than guessing —
     // and mark it unpriced so the guard counts it as unaccounted, not free.
