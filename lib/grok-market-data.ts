@@ -98,6 +98,10 @@ Respond with ONLY the number, nothing else.`
         ms: Date.now() - started,
         ok: false,
         usage: null,
+        // This is the site's hottest AI path — grok is slot 1 of all six CCPI
+        // fallbacks — and it is the one whose 401-of-401 failure rate went
+        // unread for three weeks because this row carried no cause.
+        error: sdkError,
       })
       return null
     }

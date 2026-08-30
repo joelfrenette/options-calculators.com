@@ -227,6 +227,7 @@ Make it professional, data-driven, and immediately actionable for sophisticated 
             ms: Date.now() - started,
             ok: false,
             usage: null,
+            error,
           })
         }
         lastError = error instanceof Error ? error : new Error(String(error))

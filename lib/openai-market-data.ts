@@ -17,14 +17,16 @@ function getOpenAIProvider() {
 }
 
 async function fetchMarketDataWithOpenAI(indicator: string, specificData = "Current value"): Promise<number | null> {
+  // Hoisted above the try so the catch can report how long the failed call
+  // took. A failure with no duration cannot be told apart from one that never
+  // left the process.
+  const started = Date.now()
   try {
     const openai = getOpenAIProvider()
     if (!openai) {
       console.log(`[v0] OpenAI: No API key available`)
       return null
     }
-
-    const started = Date.now()
     const result = await generateText({
       model: openai(MODEL),
       prompt: `You are a financial data expert. Provide ONLY the current numeric value for: ${indicator}.
@@ -60,8 +62,27 @@ Value:`,
 
     return null
   } catch (error) {
-    // The system is designed to try OpenAI → Anthropic → Groq → Groq
-    // Logging errors here creates noise when the fallback is working as intended
+    // This was the most silent failure path in the codebase: no log, no
+    // metering, just `return null`. The comment that stood here justified it —
+    // "logging errors here creates noise when the fallback is working as
+    // intended" — and described a chain order ("OpenAI → Anthropic → Groq →
+    // Groq") that does not exist; lib/unified-ai-fallback.ts tries
+    // grok → groq → anthropic → openai, and OpenAI is LAST, not first.
+    //
+    // Quiet logs are a defensible taste. An unrecorded failure is not: a
+    // fallback "working as intended" and a fallback whose every provider is
+    // dead produce the identical empty ledger, which is exactly the state that
+    // let xAI fail 401 times out of 401 unnoticed. The console stays quiet;
+    // the row does not.
+    recordAiCall({
+      provider: "openai",
+      model: MODEL,
+      route: "lib/openai-market-data",
+      ms: Date.now() - started,
+      ok: false,
+      usage: null,
+      error,
+    })
     return null
   }
 }

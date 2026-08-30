@@ -20,6 +20,10 @@ function getGroqProvider() {
 }
 
 async function fetchMarketDataWithGroqLLM(indicator: string, specificData = "Current value"): Promise<number | null> {
+  // Hoisted above the try so the catch can report how long the failed call
+  // took. A failure with no duration cannot be told apart from one that never
+  // left the process.
+  const started = Date.now()
   try {
     const groq = getGroqProvider()
     if (!groq) {
@@ -28,7 +32,6 @@ async function fetchMarketDataWithGroqLLM(indicator: string, specificData = "Cur
     }
 
     // Use groq("model") instead of just "model" string
-    const started = Date.now()
     const result = await generateText({
       model: groq(MODEL),
       prompt: `You are a financial data expert. Provide ONLY the current numeric value for: ${indicator}.
@@ -64,15 +67,28 @@ Value:`,
 
     return null
   } catch (error) {
-    // Check for rate limit errors
+    // EVERY failure is recorded — see the note in lib/anthropic-market-data.ts.
+    // This catch used to return null unmetered, which is why groq's ledger
+    // history stops dead at 2026-08-14 with 203 successes and no failures
+    // after: the successes were recorded and the failures were not, so the
+    // provider reads as healthy-then-idle rather than healthy-then-broken.
+    recordAiCall({
+      provider: "groq",
+      model: MODEL,
+      route: "lib/groq-llm-market-data",
+      ms: Date.now() - started,
+      ok: false,
+      usage: null,
+      error,
+    })
+
+    // Rate limits stay out of the console; they are on the row above.
     if (
       error instanceof Error &&
       (error.message.includes("429") || error.message.includes("rate") || error.message.includes("quota"))
     ) {
-      // Silently return null for rate limits
       return null
     }
-    // Log other errors
     console.error(`[v0] Groq LLM error for ${indicator}:`, error instanceof Error ? error.message : String(error))
     return null
   }

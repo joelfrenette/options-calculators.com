@@ -17,14 +17,16 @@ function getAnthropicProvider() {
 }
 
 async function fetchMarketDataWithAnthropic(indicator: string, specificData = "Current value"): Promise<number | null> {
+  // Hoisted above the try so the catch can report how long the failed call
+  // took. A failure with no duration cannot be told apart from one that never
+  // left the process.
+  const started = Date.now()
   try {
     const anthropic = getAnthropicProvider()
     if (!anthropic) {
       console.log(`[v0] Anthropic: No API key available`)
       return null
     }
-
-    const started = Date.now()
     const result = await generateText({
       model: anthropic(MODEL),
       prompt: `You are a financial data expert. Provide ONLY the current numeric value for: ${indicator}.
@@ -60,15 +62,30 @@ Value:`,
 
     return null
   } catch (error) {
-    // Check for rate limit errors
+    // EVERY failure is recorded. This catch used to `return null` without
+    // metering at all, so a provider that never once succeeded left no trace
+    // in the ledger — indistinguishable from a provider that was never tried.
+    // The rate-limit branch below silences the CONSOLE, which is a log-noise
+    // decision; it must not silence the accounting record. `error_class` tells
+    // the two apart properly (rate_limit vs auth vs model_not_found).
+    recordAiCall({
+      provider: "anthropic",
+      model: MODEL,
+      route: "lib/anthropic-market-data",
+      ms: Date.now() - started,
+      ok: false,
+      usage: null,
+      error,
+    })
+
+    // Rate limits are expected traffic, not an incident: keep them out of the
+    // console, but they are already on the row above.
     if (
       error instanceof Error &&
       (error.message.includes("429") || error.message.includes("rate") || error.message.includes("quota"))
     ) {
-      // Silently return null for rate limits
       return null
     }
-    // Log other errors
     console.error(`[v0] Anthropic error for ${indicator}:`, error instanceof Error ? error.message : String(error))
     return null
   }

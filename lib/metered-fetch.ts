@@ -24,6 +24,7 @@
 // This module is edge-runtime safe (no Node-only imports).
 
 import { estimateAiCallCost } from "@/lib/api-costs"
+import { classifyAiError } from "@/lib/ai-error-class"
 
 export interface MeteredCall {
   provider: string
@@ -45,6 +46,15 @@ export interface MeteredCall {
   costUsd?: number | null
   /** False when the model had no price on file. */
   costKnown?: boolean | null
+  /**
+   * Why an LLM call failed — see lib/ai-error-class.ts. NULL on success and on
+   * plain fetches. Before this existed a failed AI call recorded `ok: false`
+   * and nothing else, which is how a 401-of-401 xAI failure rate stayed
+   * invisible for three weeks.
+   */
+  errorClass?: string | null
+  /** Short truncated message behind `errorClass`. NULL on success. */
+  errorDetail?: string | null
 }
 
 export interface ProviderCallStats {
@@ -118,6 +128,8 @@ function persistToSupabase(call: MeteredCall): void {
         output_tokens: call.outputTokens ?? null,
         cost_usd: call.costUsd ?? null,
         cost_known: call.costKnown ?? null,
+        error_class: call.errorClass ?? null,
+        error_detail: call.errorDetail ?? null,
       }),
       signal: AbortSignal.timeout(3000),
     })
@@ -232,6 +244,13 @@ export function recordAiCall(args: {
   ms: number
   ok: boolean
   usage?: AiUsage | null
+  /**
+   * The thrown error, on the `ok: false` path. REQUIRED in spirit whenever ok
+   * is false — scripts/check-ai-error-class.ts fails the suite on a failure
+   * site that omits it. Without it the row says a call failed and nothing
+   * about why, which is the state that hid xAI's 401-of-401 failure rate.
+   */
+  error?: unknown
 }): void {
   try {
     // Accept either usage shape (v5 input/output, or v4/OpenAI prompt/completion).
@@ -250,12 +269,20 @@ export function recordAiCall(args: {
       costKnown = !estimate.unpriced
     }
 
+    // A failure carries its cause. `status` used to be hardcoded to 0 on the
+    // failure path, which discarded the upstream status the SDK error was
+    // already carrying — the single most diagnostic field available. It is now
+    // read off the error when present, and only falls back to 0 for calls that
+    // never got an HTTP response at all (timeout, DNS, TLS).
+    const failure = args.ok ? null : classifyAiError(args.error)
+
     record({
       provider: args.provider,
       route: args.route,
-      // Not an HTTP call from our side; the SDK owns the transport. 200/0
-      // mirrors the ok/failed convention the rest of the ledger uses.
-      status: args.ok ? 200 : 0,
+      // Not an HTTP call from our side; the SDK owns the transport. 200 on
+      // success mirrors the ok/failed convention the rest of the ledger uses;
+      // on failure the real upstream status is preferred over the 0 sentinel.
+      status: args.ok ? 200 : (failure?.status ?? 0),
       ms: args.ms,
       ts: new Date().toISOString(),
       ok: args.ok,
@@ -264,6 +291,8 @@ export function recordAiCall(args: {
       outputTokens,
       costUsd,
       costKnown,
+      errorClass: failure?.errorClass ?? null,
+      errorDetail: failure?.detail ?? null,
     })
   } catch (err) {
     warnSupabaseOnce("recordAiCall", err)

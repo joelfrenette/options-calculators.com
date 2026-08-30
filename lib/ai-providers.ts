@@ -271,6 +271,10 @@ export async function generateWithFallback(options: AIGenerateOptions): Promise<
         ok: false,
         // No usage on a thrown call — the row lands unpriced rather than $0.
         usage: null,
+        // The cause travels with the row. Without it a fallback that silently
+        // burns through every provider looks identical to one that was never
+        // tried — see lib/ai-error-class.ts.
+        error,
       })
       lastError = error instanceof Error ? error : new Error(String(error))
       // Continue to next provider
@@ -349,7 +353,7 @@ export async function streamWithFallback(options: AIGenerateOptions) {
             usage,
           }),
         )
-        .catch(() =>
+        .catch((error: unknown) =>
           recordAiCall({
             provider: config.name,
             model: config.model,
@@ -357,6 +361,10 @@ export async function streamWithFallback(options: AIGenerateOptions) {
             ms: Date.now() - started,
             ok: false,
             usage: null,
+            // This callback used to discard its argument. A stream that fails
+            // mid-flight is the hardest failure to reproduce, so it is the one
+            // that most needs its cause on the row.
+            error,
           }),
         )
 
@@ -374,6 +382,7 @@ export async function streamWithFallback(options: AIGenerateOptions) {
         ms: Date.now() - started,
         ok: false,
         usage: null,
+        error,
       })
       lastError = error instanceof Error ? error : new Error(String(error))
       // Continue to next provider
