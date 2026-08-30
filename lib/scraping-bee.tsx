@@ -28,7 +28,7 @@ export interface ScrapingBeeResponse {
 /**
  * Scrape a URL using ScrapingBee
  */
-export async function scrapeUrl(url: string, options: ScrapingBeeOptions = {}): Promise<ScrapingBeeResponse> {
+async function scrapeUrl(url: string, options: ScrapingBeeOptions = {}): Promise<ScrapingBeeResponse> {
   // Short-circuit when ScrapingBee is unconfigured/disabled. (The original
   // implementation used a relative `/api/scraping-bee` fetch which is invalid
   // server-side and always threw — callers swallowed the rejection and fell
@@ -67,121 +67,25 @@ export async function scrapeUrl(url: string, options: ScrapingBeeOptions = {}): 
     },
   }
 }
-
-/**
- * Extract text content from a webpage
- */
-export async function extractText(url: string): Promise<string> {
-  const result = await scrapeUrl(url, { renderJs: true })
-
-  if (typeof result.data === "string") {
-    // Strip HTML tags and return clean text
-    return result.data
-      .replace(/<[^>]*>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-  }
-
-  return JSON.stringify(result.data)
-}
-
-/**
- * Extract structured data from a webpage using CSS selectors
- */
-export async function extractData(url: string, selectors: Record<string, string>): Promise<Record<string, string>> {
-  const result = await scrapeUrl(url, { renderJs: true })
-  const html = typeof result.data === "string" ? result.data : ""
-
-  // Simple extraction (for more complex cases, use a server-side parser)
-  const extracted: Record<string, string> = {}
-
-  for (const [key, selector] of Object.entries(selectors)) {
-    const regex = new RegExp(`<[^>]*class="${selector}"[^>]*>([^<]*)<`, "i")
-    const match = html.match(regex)
-    extracted[key] = match ? match[1].trim() : ""
-  }
-
-  return extracted
-}
-
-/**
- * Check if a website is accessible
- */
-export async function checkWebsite(url: string): Promise<boolean> {
-  try {
-    const result = await scrapeUrl(url, { renderJs: false })
-    return result.success
-  } catch {
-    return false
-  }
-}
-
-/**
- * Scrape financial data from a webpage
- */
-export async function scrapeFinancialData(url: string): Promise<any> {
-  const result = await scrapeUrl(url, {
-    renderJs: true,
-    premiumProxy: true, // Use premium proxy for financial sites
-  })
-
-  return {
-    raw: result.data,
-    metadata: result.metadata,
-  }
-}
-
-export async function scrapeBuffettIndicator(): Promise<{
-  ratio: number
-  status: "live" | "baseline"
-}> {
-  try {
-    const result = await scrapeUrl("https://www.gurufocus.com/stock-market-valuations.php", {
-      renderJs: true,
-      premiumProxy: true,
-    })
-
-    const html = typeof result.data === "string" ? result.data : ""
-
-    // Parse the clearly stated ratio from GuruFocus
-    const patterns = [
-      /currently at\s+<strong>(\d+\.\d+)%<\/strong>/,
-      /Ratio = \*\*(\d+\.\d+)%\*\*/,
-      /(\d+\.\d+)%.*?Significantly Overvalued/s,
-      /total market cap.*?GDP.*?(\d+\.\d+)%/is,
-    ]
-
-    for (const pattern of patterns) {
-      const match = html.match(pattern)
-      if (match) {
-        const ratio = Number.parseFloat(match[1])
-        if (ratio > 50 && ratio < 300) {
-          // Sanity check
-          console.log("[v0] Buffett Indicator scraped successfully:", ratio)
-          return {
-            ratio,
-            status: "live",
-          }
-        }
-      }
-    }
-
-    throw new Error("Could not parse Buffett Indicator")
-  } catch (error) {
-    // "not configured" is the user's deliberate choice (DISABLED_APIS) -> info, not error.
-    const msg = error instanceof Error ? error.message : String(error)
-    if (msg.includes("not configured")) {
-      console.log("[v0] Buffett Indicator: ScrapingBee disabled — using baseline")
-    } else {
-      console.error("[v0] Buffett Indicator scraping failed:", error)
-    }
-    return {
-      ratio: 180, // Baseline: moderately elevated
-      status: "baseline",
-    }
-  }
-}
-
+// Deleted 2026-08-30, the moment check-dead-exports could finally see this
+// file: `extractText`, `extractData`, `checkWebsite`, `scrapeFinancialData` and
+// `scrapeBuffettIndicator` — five exports, zero callers between them. The check
+// filtered lib/ to `.ts`, so nothing defined in a lib/*.tsx had EVER been
+// examined for deadness; widening it surfaced these six (scrapeUrl was the
+// sixth and is genuinely used, so it is now private rather than exported).
+//
+// The last of them is why the blind spot mattered. `scrapeBuffettIndicator`
+// ended:
+//
+//     return { ratio: 180, // Baseline: moderately elevated
+//              status: "baseline" }
+//
+// A hardcoded Buffett Indicator of 180 presented with a status field — exactly
+// the invented-constant pattern this audit has spent a fortnight removing,
+// sitting in a file no check could read. It was already superseded by
+// fetchFredBuffett (P7-73a retired the GuruFocus scrape for this input), so
+// nothing called it; but "dead" and "harmless" are not the same word, and a
+// constant like that survives until someone wires it back up.
 export async function scrapePutCallRatio(): Promise<{
   /** NULL when nothing measured or estimated one. Never a stand-in number. */
   ratio: number | null

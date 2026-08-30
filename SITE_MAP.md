@@ -94,7 +94,7 @@ Every route: HTTP verbs, segment config, upstream hosts, env keys, timeout wirin
 | `/api/auth/session` | GET | dynamic="force-dynamic" | — | — | **no** | `components/session-controls.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/breadth` | GET | dynamic="force-dynamic" | — | — | yes | `lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/breadth-backtest` | GET | dynamic="force-dynamic"<br>maxDuration=120 | — | — | yes | `lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
-| `/api/ccpi` | GET | — | api.groq.com<br>api.polygon.io<br>api.stlouisfed.org<br>app.scrapingbee.com<br>financialmodelingprep.com<br>production.dataviz.cnn.io<br>query1.finance.yahoo.com<br>www.aaii.com<br>www.cboe.com<br>www.gurufocus.com<br>www.multpl.com<br>www.options-calculators.com | AI_ESTIMATE_TTL_HOURS<br>ANTHROPIC_API_KEY<br>FMP_API_KEY<br>FRED_API_KEY<br>GROQ_API_KEY<br>POLYGON_API_KEY<br>SCRAPINGBEE_API_KEY | yes | `components/ccpi-audit-admin.tsx`<br>`components/ccpi-dashboard.tsx`<br>`lib/api-contracts.ts`<br>`lib/ccpi/buffett-indicator.ts`<br>`lib/market-sentiment/stored-indicators.ts`<br>`lib/scraping-bee.tsx`<br>`lib/spx-valuation.ts`<br>`app/api/admin/run-health-checks/route.ts`<br>`app/api/data-source-status/route.ts`<br>`app/api/market-sentiment/route.ts` |
+| `/api/ccpi` | GET | — | api.groq.com<br>api.polygon.io<br>api.stlouisfed.org<br>app.scrapingbee.com<br>financialmodelingprep.com<br>production.dataviz.cnn.io<br>query1.finance.yahoo.com<br>www.aaii.com<br>www.cboe.com<br>www.multpl.com<br>www.options-calculators.com | AI_ESTIMATE_TTL_HOURS<br>ANTHROPIC_API_KEY<br>FMP_API_KEY<br>FRED_API_KEY<br>GROQ_API_KEY<br>POLYGON_API_KEY<br>SCRAPINGBEE_API_KEY | yes | `components/ccpi-audit-admin.tsx`<br>`components/ccpi-dashboard.tsx`<br>`lib/api-contracts.ts`<br>`lib/ccpi/buffett-indicator.ts`<br>`lib/market-sentiment/stored-indicators.ts`<br>`lib/scraping-bee.tsx`<br>`lib/spx-valuation.ts`<br>`app/api/admin/run-health-checks/route.ts`<br>`app/api/data-source-status/route.ts`<br>`app/api/market-sentiment/route.ts` |
 | `/api/ccpi-signals` | GET | dynamic="force-dynamic"<br>revalidate=0<br>maxDuration=60 | — | — | **no** | `components/ccpi/trigger-section.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/ccpi/chat` | POST | maxDuration=30 | — | — | **no** | `components/ccpi-chat-modal.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/ccpi/executive-summary` | POST | — | — | — | yes | `components/ccpi-dashboard.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
@@ -178,7 +178,6 @@ _None._
 | www.barchart.com | `/api/market-sentiment`<br>`lib/market-sentiment/upstream.ts` |
 | www.cboe.com | `/api/ccpi`<br>`lib/scraping-bee.tsx` |
 | www.cnn.com | `/api/market-sentiment`<br>`lib/market-sentiment/cnn-scrape.ts` |
-| www.gurufocus.com | `/api/ccpi`<br>`lib/scraping-bee.tsx` |
 | aistudio.google.com | `lib/remediation/remediation-providers.ts` |
 | api.resend.com | `/api/admin/api-status` |
 | api.stocktwits.com | `/api/social-sentiment` |

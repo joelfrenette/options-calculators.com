@@ -93,7 +93,13 @@ const stripComments = (src: string): string =>
     m.startsWith("/*") ? " " + "\n".repeat((m.match(/\n/g) || []).length) : (pre ?? ""),
   )
 
-const LIB_FILES = walk(join(ROOT, "lib"), (p) => p.endsWith(".ts") && !p.endsWith(".d.ts"))
+// `.tsx` added 2026-08-30, closing the other half of the hole documented in
+// ALL_SOURCE below. This is the file set whose exports are CHECKED, and it
+// filtered to `.ts` — so an export DEFINED in a `lib/*.tsx` was never examined
+// for deadness at all. That direction fails silently, which is the dangerous
+// one: the PASS line reads identically whether the check covers 103 files or
+// 104 (P6-75/P6-77).
+const LIB_FILES = walk(join(ROOT, "lib"), (p) => (p.endsWith(".ts") || p.endsWith(".tsx")) && !p.endsWith(".d.ts"))
 
 /** Every file that could reference a lib symbol. */
 const ALL_SOURCE = [
