@@ -94,7 +94,7 @@ Every route: HTTP verbs, segment config, upstream hosts, env keys, timeout wirin
 | `/api/auth/session` | GET | dynamic="force-dynamic" | — | — | **no** | `components/session-controls.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/breadth` | GET | dynamic="force-dynamic" | — | — | yes | `lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/breadth-backtest` | GET | dynamic="force-dynamic"<br>maxDuration=120 | — | — | yes | `lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
-| `/api/ccpi` | GET | — | api.groq.com<br>api.polygon.io<br>api.stlouisfed.org<br>api.x.ai<br>app.scrapingbee.com<br>financialmodelingprep.com<br>production.dataviz.cnn.io<br>query1.finance.yahoo.com<br>www.aaii.com<br>www.alphavantage.co<br>www.cboe.com<br>www.gurufocus.com<br>www.multpl.com<br>www.options-calculators.com | AI_ESTIMATE_TTL_HOURS<br>ALPHA_VANTAGE_API_KEY<br>ANTHROPIC_API_KEY<br>FMP_API_KEY<br>FRED_API_KEY<br>GROQ_API_KEY<br>OPENAI_API_KEY<br>POLYGON_API_KEY<br>SCRAPINGBEE_API_KEY<br>XAI_API_KEY | yes | `components/ccpi-audit-admin.tsx`<br>`components/ccpi-dashboard.tsx`<br>`lib/api-contracts.ts`<br>`lib/ccpi/buffett-indicator.ts`<br>`lib/market-sentiment/stored-indicators.ts`<br>`lib/scraping-bee.tsx`<br>`lib/spx-valuation.ts`<br>`app/api/admin/run-health-checks/route.ts`<br>`app/api/data-source-status/route.ts`<br>`app/api/market-sentiment/route.ts` |
+| `/api/ccpi` | GET | — | api.groq.com<br>api.polygon.io<br>api.stlouisfed.org<br>api.x.ai<br>app.scrapingbee.com<br>financialmodelingprep.com<br>production.dataviz.cnn.io<br>query1.finance.yahoo.com<br>www.aaii.com<br>www.cboe.com<br>www.gurufocus.com<br>www.multpl.com<br>www.options-calculators.com | AI_ESTIMATE_TTL_HOURS<br>ANTHROPIC_API_KEY<br>FMP_API_KEY<br>FRED_API_KEY<br>GROQ_API_KEY<br>OPENAI_API_KEY<br>POLYGON_API_KEY<br>SCRAPINGBEE_API_KEY<br>XAI_API_KEY | yes | `components/ccpi-audit-admin.tsx`<br>`components/ccpi-dashboard.tsx`<br>`lib/api-contracts.ts`<br>`lib/ccpi/buffett-indicator.ts`<br>`lib/market-sentiment/stored-indicators.ts`<br>`lib/scraping-bee.tsx`<br>`lib/spx-valuation.ts`<br>`app/api/admin/run-health-checks/route.ts`<br>`app/api/data-source-status/route.ts`<br>`app/api/market-sentiment/route.ts` |
 | `/api/ccpi-signals` | GET | dynamic="force-dynamic"<br>revalidate=0<br>maxDuration=60 | — | — | **no** | `components/ccpi/trigger-section.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/ccpi/chat` | POST | maxDuration=30 | — | — | **no** | `components/ccpi-chat-modal.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
 | `/api/ccpi/executive-summary` | POST | — | — | — | yes | `components/ccpi-dashboard.tsx`<br>`lib/api-contracts.ts`<br>`app/api/admin/run-health-checks/route.ts` |
@@ -151,7 +151,7 @@ _None._
 
 | Host | Used by |
 |---|---|
-| api.polygon.io | `/api/admin/api-status`<br>`/api/ccpi`<br>`/api/earnings-calendar`<br>`/api/polygon-proxy`<br>`/api/polygon-tickers`<br>`/api/smart-money-etfs`<br>`/api/social-sentiment`<br>`/api/strategy-scanner`<br>`lib/market-snapshot.ts`<br>`lib/qqq-technicals.ts`<br>`lib/strategy-scanner/entry-exclusions.ts`<br>`lib/strategy-scanner/market-data.ts` |
+| api.polygon.io | `/api/admin/api-status`<br>`/api/ccpi`<br>`/api/earnings-calendar`<br>`/api/polygon-proxy`<br>`/api/polygon-tickers`<br>`/api/smart-money-etfs`<br>`/api/social-sentiment`<br>`/api/strategy-scanner`<br>`lib/ccpi/route/indicators.ts`<br>`lib/market-snapshot.ts`<br>`lib/qqq-technicals.ts`<br>`lib/strategy-scanner/entry-exclusions.ts`<br>`lib/strategy-scanner/market-data.ts` |
 | api.stlouisfed.org | `/api/admin/api-status`<br>`/api/ccpi`<br>`/api/cpi-inflation`<br>`/api/fomc-predictions`<br>`/api/jobs-report`<br>`/api/macro-indicators`<br>`/api/panic-euphoria`<br>`components/cpi-inflation/methodology-card.tsx`<br>`lib/ccpi/route/fred-buffett.ts`<br>`lib/ccpi/route/indicators.ts`<br>`lib/market-snapshot.ts`<br>`lib/vix-term-structure.ts` |
 | app.scrapingbee.com | `/api/admin/api-status`<br>`/api/ccpi`<br>`/api/market-sentiment`<br>`/api/panic-euphoria`<br>`/api/scraping-bee`<br>`/api/scraping-bee/diagnostics`<br>`/api/social-sentiment`<br>`lib/market-sentiment/cnn-scrape.ts`<br>`lib/market-sentiment/upstream.ts`<br>`lib/remediation/remediation-providers.ts`<br>`lib/scraping-bee.tsx`<br>`lib/sentiment-sources.ts` |
 | finnhub.io | `/api/admin/api-status`<br>`/api/earnings-calendar`<br>`/api/insider-clusters`<br>`/api/insider-trading`<br>`/api/landmine-check`<br>`/api/social-sentiment`<br>`/api/strategy-scanner`<br>`lib/remediation/remediation-providers.ts`<br>`lib/strategy-scanner/market-data.ts` |
@@ -160,7 +160,6 @@ _None._
 | api.groq.com | `/api/admin/api-status`<br>`/api/ccpi`<br>`lib/ai-providers.ts`<br>`lib/grok-market-data.ts`<br>`lib/groq-llm-market-data.ts` |
 | google.serper.dev | `/api/admin/api-status`<br>`/api/google-trends`<br>`/api/serper-finance`<br>`/api/social-sentiment`<br>`lib/sentiment-sources.ts` |
 | vercel.com | `/api/admin/backup`<br>`app/admin/page.tsx`<br>`components/api-keys-manager.tsx`<br>`lib/remediation/remediation-branches.ts`<br>`lib/remediation/remediation-providers.ts` |
-| www.alphavantage.co | `/api/admin/api-status`<br>`/api/ccpi`<br>`/api/macro-indicators`<br>`lib/ccpi/route/indicators.ts`<br>`lib/remediation/remediation-providers.ts` |
 | api.quiverquant.com | `/api/cron/quiver-probe`<br>`/api/insider-trading`<br>`/api/panic-euphoria`<br>`lib/quiver.ts` |
 | api.x.ai | `/api/admin/api-status`<br>`/api/ccpi`<br>`lib/ai-providers.ts`<br>`lib/grok-market-data.ts` |
 | financialmodelingprep.com | `/api/admin/api-status`<br>`/api/ccpi`<br>`/api/polygon-tickers`<br>`lib/fmp-valuation.ts` |
@@ -168,6 +167,7 @@ _None._
 | api.apify.com | `/api/admin/api-status`<br>`/api/apify-proxy`<br>`lib/apify-yahoo-finance.ts` |
 | openrouter.ai | `/api/admin/api-status`<br>`lib/ai-providers.ts`<br>`lib/remediation/remediation-providers.ts` |
 | www.aaii.com | `/api/admin/source-probe`<br>`/api/ccpi`<br>`lib/scraping-bee.tsx` |
+| www.alphavantage.co | `/api/admin/api-status`<br>`/api/macro-indicators`<br>`lib/remediation/remediation-providers.ts` |
 | www.multpl.com | `/api/admin/source-probe`<br>`/api/ccpi`<br>`lib/spx-valuation.ts` |
 | www.sec.gov | `/api/form-144`<br>`/api/hedge-fund-13f`<br>`/api/insider-trading` |
 | api.anthropic.com | `/api/admin/api-status`<br>`lib/ai-providers.ts` |

@@ -23,7 +23,7 @@ import { fetchSoxIndex } from "./sox-index"
 import { fetchSpxValuation } from "@/lib/spx-valuation"
 import type { Tier } from "@/lib/ccpi/scoring"
 import { type APIStatusTracker, type TierMaps, aiTier, weakerTier } from "./provenance"
-import { fetchAlphaVantageIndicators, fetchEquityFearGreed, fetchFREDIndicators } from "./indicators"
+import { fetchNvidiaQuote, fetchEquityFearGreed, fetchFREDIndicators } from "./indicators"
 
 export async function fetchMarketData() {
   const now = () => new Date().toISOString()
@@ -69,7 +69,7 @@ export async function fetchMarketData() {
     fetchQQQTechnicalsData(),
     fetchVIXTermStructure(),
     fetchFREDIndicators(),
-    fetchAlphaVantageIndicators(),
+    fetchNvidiaQuote(),
     fetchApifyYahooFinanceUtil("SPY"),
     fetchEquityFearGreed(),
     // P7-73a: the Buffett Indicator comes from FRED (store, then live API),
@@ -303,7 +303,7 @@ export async function fetchMarketData() {
 
     // Volatility. Priority: real FRED spot VIX (VIXCLS, fetched by
     // fetchVIXTermStructure) → AI fallback → its baseline. Previously
-    // `alphaVantageData?.vix || vixResult.value`, where fetchAlphaVantageIndicators
+    // `alphaVantageData?.vix || vixResult.value`, where fetchNvidiaQuote
     // returned a hardcoded vix: 18 on BOTH its success and failure paths — so the
     // flagship crash index was permanently insensitive to actual volatility: the
     // VIX>35 crash amplifier and the VIX canaries could never fire (P0).
@@ -347,7 +347,7 @@ export async function fetchMarketData() {
     // Phase 1 indicators
     //
     // 2026-08-30: this read `nvidiaPriceResult.value` unconditionally — an LLM
-    // asked "what is the current NVDA price" — while `fetchAlphaVantageIndicators`
+    // asked "what is the current NVDA price" — while `fetchNvidiaQuote`
     // was fetching a REAL, metered NVDA quote in the same request and throwing it
     // away. It was the only indicator on this route with no feed in front of the
     // model; every other one here reads its real source first and treats the AI

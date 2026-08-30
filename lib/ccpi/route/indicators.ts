@@ -149,8 +149,15 @@ export async function fetchFREDIndicators() {
   }
 }
 
-export async function fetchAlphaVantageIndicators() {
-  const ALPHA_VANTAGE_API_KEY = resolveApiKey("ALPHA_VANTAGE_API_KEY")
+/**
+ * NVDA's previous close and the momentum derived from it.
+ *
+ * RENAMED from `fetchAlphaVantageIndicators` 2026-08-30, because that name had
+ * become a claim this function no longer honoured — it no longer calls Alpha
+ * Vantage, and it never fetched more than one indicator anything actually read.
+ */
+export async function fetchNvidiaQuote() {
+  const POLYGON_API_KEY = resolveApiKey("POLYGON_API_KEY")
 
   // P7-10. **This is where the fabricated 50 actually came from.** The caller
   // reads `alphaVantageData?.nvidiaMomentum ?? null`, and that `??` never fired:
@@ -159,62 +166,51 @@ export async function fetchAlphaVantageIndicators() {
   // looking exactly like measurements. A default written at the source outlives
   // every null-guard written at the call site.
   //
-  // Only `nvidiaMomentum` and `source` are read from this object at all
-  // (`nvidiaPrice` and `soxIndex` are taken from their own AI-fallback results,
-  // and `mag7Concentration` has no reader), so the other three were invented
-  // constants sitting where a future caller would have found them and believed
-  // them. All four are null; `source: "baseline"` is what the tier map reads to
-  // exclude the input from scoring.
+  // `soxIndex` and `mag7Concentration` are no longer returned at all: the first
+  // is superseded by the measured `fetchSoxIndex()`, the second lost its last
+  // reader when P7-89 dropped it from the weights. Nulls left in a return type
+  // are still somewhere a future caller can find a value and believe it.
+  // `source: "baseline"` is what the tier map reads to exclude the input from
+  // scoring.
   const baselineValues = {
     nvidiaPrice: null,
     nvidiaMomentum: null,
-    soxIndex: null,
-    mag7Concentration: null,
     source: "baseline" as const,
   }
 
-  if (!ALPHA_VANTAGE_API_KEY) {
+  if (!POLYGON_API_KEY) {
     return baselineValues
   }
 
   try {
-    const [nvidiaRes, soxRes, aaplRes, msftRes, googlRes, amznRes, metaRes, tslaRes] = await Promise.all([
-      meteredFetch("alphavantage", `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=NVDA&apikey=${ALPHA_VANTAGE_API_KEY}`, {
-        signal: AbortSignal.timeout(10000),
-      }),
-      meteredFetch("alphavantage", `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=SOXX&apikey=${ALPHA_VANTAGE_API_KEY}`, {
-        signal: AbortSignal.timeout(10000),
-      }),
-      meteredFetch("alphavantage", `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AAPL&apikey=${ALPHA_VANTAGE_API_KEY}`, {
-        signal: AbortSignal.timeout(10000),
-      }),
-      meteredFetch("alphavantage", `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=MSFT&apikey=${ALPHA_VANTAGE_API_KEY}`, {
-        signal: AbortSignal.timeout(10000),
-      }),
-      meteredFetch("alphavantage", `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=GOOGL&apikey=${ALPHA_VANTAGE_API_KEY}`, {
-        signal: AbortSignal.timeout(10000),
-      }),
-      meteredFetch("alphavantage", `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AMZN&apikey=${ALPHA_VANTAGE_API_KEY}`, {
-        signal: AbortSignal.timeout(10000),
-      }),
-      meteredFetch("alphavantage", `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=META&apikey=${ALPHA_VANTAGE_API_KEY}`, {
-        signal: AbortSignal.timeout(10000),
-      }),
-      meteredFetch("alphavantage", `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=TSLA&apikey=${ALPHA_VANTAGE_API_KEY}`, {
-        signal: AbortSignal.timeout(10000),
-      }),
-    ])
-
-    const [nvidiaData, soxData, aaplData, msftData, googlData, amznData, metaData, tslaData] = await Promise.all([
-      nvidiaRes.json(),
-      soxRes.json(),
-      aaplRes.json(),
-      msftRes.json(),
-      googlRes.json(),
-      amznRes.json(),
-      metaRes.json(),
-      tslaRes.json(),
-    ])
+    // ONE request, for the one ticker anything reads.
+    //
+    // This used to issue EIGHT Alpha Vantage GLOBAL_QUOTE calls — NVDA, SOXX,
+    // AAPL, MSFT, GOOGL, AMZN, META, TSLA — against a free tier of 25 CALLS PER
+    // DAY. Three page loads exhausted the daily quota, and every load after
+    // that got HTTP 200 with an `Information` throttle body and no quote, which
+    // is how the `|| "800"` literals below it came to be fabricating an NVDA
+    // price and a momentum of exactly 50 on most loads.
+    //
+    // Seven of those eight were pure waste even when they worked. Only
+    // `nvidiaPrice`, `nvidiaMomentum` and `source` are read from this function
+    // at all: `soxIndex` is superseded by the measured `fetchSoxIndex()`, and
+    // `mag7Concentration` lost its last reader when P7-89 dropped it from the
+    // weights. Both are gone from the return type rather than left as nulls for
+    // a future caller to find and believe.
+    //
+    // Polygon is already wired, already metered, and not rate-limited into
+    // uselessness — so this is one vendor REMOVED, not a second one bought.
+    const res = await meteredFetch(
+      "polygon",
+      `https://api.polygon.io/v2/aggs/ticker/NVDA/prev?apiKey=${POLYGON_API_KEY}`,
+      { signal: AbortSignal.timeout(10000), routeTag: "ccpi-nvidia" },
+    )
+    if (!res.ok) {
+      console.log(`[v0] Polygon NVDA quote failed: HTTP ${res.status} — reporting baseline, not a guess`)
+      return baselineValues
+    }
+    const bar = (await res.json())?.results?.[0]
 
     // P7-10 FINISHED, 2026-08-30. That finding removed the invented numbers from
     // the `baselineValues` path — key missing, or the fetch threw — and the
@@ -237,48 +233,30 @@ export async function fetchAlphaVantageIndicators() {
     // Missing data is null. If Alpha Vantage did not return a usable NVDA quote
     // there is nothing to report, and the whole batch falls back to
     // `baselineValues`, whose `source: "baseline"` excludes it from scoring.
-    const quote = (d: unknown, field: string): number | null => {
-      const raw = (d as Record<string, Record<string, string>> | null | undefined)?.["Global Quote"]?.[field]
-      if (typeof raw !== "string" || raw.trim() === "") return null
-      const n = Number.parseFloat(raw.replace("%", ""))
-      return Number.isFinite(n) ? n : null
-    }
-
-    const nvidiaPrice = quote(nvidiaData, "05. price")
-    const nvidiaChangePercent = quote(nvidiaData, "10. change percent")
-    if (nvidiaPrice === null || nvidiaChangePercent === null) {
-      console.log("[v0] Alpha Vantage: no usable NVDA quote (free tier is 25/day and throttles with HTTP 200) — reporting baseline, not a guess")
+    // Polygon's prev-day bar: `c` close, `o` open. Both must be real numbers —
+    // a partial bar yields no reading, never a substituted one.
+    const close = typeof bar?.c === "number" && bar.c > 0 ? bar.c : null
+    const open = typeof bar?.o === "number" && bar.o > 0 ? bar.o : null
+    if (close === null || open === null) {
+      console.log("[v0] Polygon: no usable NVDA bar — reporting baseline, not a guess")
       return baselineValues
     }
 
+    const nvidiaChangePercent = ((close - open) / open) * 100
     // Map momentum to 0-100 scale: -10% = 100 (high risk), 0% = 50, +10% = 0 (low risk)
     const nvidiaMomentum = Math.min(100, Math.max(0, 50 - nvidiaChangePercent * 5))
 
-    const soxIndex = quote(soxData, "05. price")
-
-    // Concentration proxy. Every constituent must be present: averaging a
-    // missing ticker as 0% change is the same invented-data move as the
-    // literals above, one aggregation removed. Null when any leg is missing.
-    const mag7Changes = [aaplData, msftData, googlData, amznData, metaData, tslaData, nvidiaData].map((d) =>
-      quote(d, "10. change percent"),
-    )
-    const mag7Concentration = mag7Changes.some((c) => c === null)
-      ? null
-      : 55 + (mag7Changes.reduce((a, b) => (a as number) + (b as number), 0)! / 7 > 0 ? 5 : -5)
-
     console.log(
-      `[v0] Alpha Vantage Phase 2: NVDA=${nvidiaPrice}, Change=${nvidiaChangePercent}%, Momentum=${nvidiaMomentum.toFixed(1)}, SOX=${soxIndex ?? "—"}, Mag7=${mag7Concentration === null ? "—" : `${mag7Concentration.toFixed(1)}%`}`,
+      `[v0] Polygon NVDA: ${close}, Change=${nvidiaChangePercent.toFixed(2)}%, Momentum=${nvidiaMomentum.toFixed(1)}`,
     )
 
     return {
-      nvidiaPrice,
+      nvidiaPrice: close,
       nvidiaMomentum,
-      soxIndex,
-      mag7Concentration,
       source: "live" as const,
     }
   } catch (error) {
-    console.error("[v0] Alpha Vantage error:", error)
+    console.error("[v0] Polygon NVDA error:", error)
     return baselineValues
   }
 }

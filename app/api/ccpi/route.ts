@@ -46,7 +46,7 @@ import {
 } from "@/lib/ccpi/route/provenance"
 import { calculateEquityRiskPremium, fetchMarketData } from "@/lib/ccpi/route/market-data"
 import {
-  fetchAlphaVantageIndicators,
+  fetchNvidiaQuote,
   fetchEquityFearGreed,
   fetchFREDIndicators,
 } from "@/lib/ccpi/route/indicators"
