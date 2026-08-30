@@ -37,7 +37,13 @@ Fundamentals are Finnhub-first.
 
 - **CRLF** line endings — perl one-liners must match `\r?\n`, not `\n`.
 - Commit to `main`; every material fix gets a self-contained `CHANGELOG.md`
-  entry at the repo root (fork-maintainer discipline).
+  entry at the repo root (fork-maintainer discipline). **`CHANGELOG.md` was
+  created 2026-08-30 — until then this rule named a file that had never
+  existed in 645 commits, so the "discipline" was unenforceable.** It is
+  backfilled to 2026-08-27 (the private-club / export / scanner-gate /
+  admin-metering arc); earlier history stays in `git log` and
+  `AUDIT_BACKLOG.md` rather than being copied. Nothing in the check suite
+  enforces the entry-per-fix rule — it holds by discipline only.
 - End every reply with an `AskUserQuestion` multiSelect menu of next steps,
   most-recommended-first (owner-enforced via a global Stop hook).
 - **Deploy:** the standing rule is staging-first, but the owner directed
@@ -58,8 +64,25 @@ Fundamentals are Finnhub-first.
 1. Verify the **xAI (grok) usage-shape fallback** actually records tokens —
    needs ONE live paid xAI call (~cents); xai cost currently reads
    null/unpriced. Confirm `recordAiCall` captures real input/output tokens.
-2. Normalize provider tags at the **LLM call-sites** too (the central
-   `canonicalProvider` covers recorded calls; call-site tags are only partly done).
+   **Narrowed 2026-08-30 by inspection — the code path is already proven
+   sound, only a live sample is missing.** `grok-2-latest` *is* in
+   `MODEL_TOKEN_PRICES` (`lib/api-costs.ts`), and the call site *does* pass
+   `result.usage` from the AI SDK (`lib/grok-market-data.ts:88`). The newest
+   xai row in the ledger is `2026-08-29 03:50Z`; the both-shapes fix committed
+   `2026-08-30 01:57` — so **all 387 unpriced xai rows predate the fix** and
+   prove nothing about it. One live call settles it. Note `anthropic`,
+   `openai` and `google` are also 100% unpriced, but at 3 calls each they look
+   like a single test run, not a hot path.
+2. ~~Normalize provider tags at the **LLM call-sites** too.~~ **CLOSED
+   2026-08-30 — nothing to do; this item was based on a false premise.**
+   `canonicalProvider()` runs inside `record()` (`lib/metered-fetch.ts:146`),
+   which *every* metered call and *every* `recordAiCall` passes through, so a
+   call site cannot reintroduce the drift. The call-site vocabularies already
+   agree independently: `providerConfigs` in `lib/ai-providers.ts` and the
+   `tag` values in `lib/grok-market-data.ts` both use `xai`/`groq`/`openai`,
+   and `anthropic`/`openai`/`groq` are hardcoded to match. Verified against
+   the live ledger: 14 provider tags, all lowercase canonical, zero casing
+   fragments — the 29-row backfill held.
 3. **CSP scanner:** if live results are still too thin during market hours, the
    last lever is loosening the delta / thresholds further.
 4. Re-read `ADMIN_AUDIT_2026-08-29.md` + the top `CHANGELOG.md` entries to
