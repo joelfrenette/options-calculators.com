@@ -21,6 +21,39 @@ entry records what was done, not proof that it still holds.
 ## 2026-08-30
 
 ### Changed
+- **The provider chain stops being written down in five places.**
+  `/api/ccpi/executive-summary` carried a private copy of the whole chain plus a
+  60-line fallback loop, and it had drifted exactly the way `/api/ccpi/chat`'s
+  copy did before that one was deleted (P7-9): **six providers against the
+  canonical seven, with Perplexity simply absent** — so the route gave up one
+  fallback earlier than every other AI route, and returned drifted provider
+  names ("OpenRouter (free)", "xAI") to the client. The sharp end is a
+  provenance defect, not untidiness: the admin AI tab renders
+  `getProviderChain()` as "the live fallback chain, in the exact order the
+  generate/stream loops try it", so the panel was describing a chain this route
+  did not use. It now calls `generateWithFallback`. The copy's one real
+  justification — treating an **empty completion as a failure** and falling
+  through to the next provider — moved *into* `generateWithFallback`, so every
+  caller gets it; previously any caller could silently receive `""`, and on this
+  route that empty string would have been rendered as the executive summary.
+  The empty-response row is still recorded `ok: true`, deliberately: a provider
+  that returns nothing still consumed tokens and still bills.
+
+### Removed
+- **`getAIEstimate` in `/api/panic-euphoria` — 75 dead lines, four rule
+  violations.** Defined, never called, and a *fifth* hand-written copy of the
+  provider chain. It ended **`return 0`** on every failure path while typed
+  `Promise<number>` — the strongest possible reading of a normalized −1..+1
+  indicator returned as its not-found value, against the first data-integrity
+  rule in `CLAUDE.md`. It also used raw `fetch` (so neither AI call reached the
+  ledger or the budget guard, on a route that otherwise meters correctly),
+  `getApiKey` instead of `resolveApiKey` (bypassing DISABLED_APIS and the E-5
+  kill switch, with a hand-duplicated key-alias list), and `model: "grok-2"` —
+  retired, and spelled differently enough from `grok-2-latest` to survive the
+  slug sweep in this same release. Deleted rather than repaired, on P6-34's
+  precedent: an LLM asked to guess an indicator, falling back to a constant, is
+  the invented-data layer wearing a different import path.
+
 - **Every model slug in the AI chain was 2024 vintage; five are now current.**
   The chain had rotted where nobody could see it, and the vendors' own calendars
   confirm it: **`gemini-2.0-flash` was shut down 2026-06-01**;

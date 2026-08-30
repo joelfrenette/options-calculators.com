@@ -49,82 +49,27 @@ async function fetchWithScrapingBee(url: string) {
   return meteredFetch("scrapingbee", scrapingBeeUrl, { routeTag: "/api/panic-euphoria" })
 }
 
-async function getAIEstimate(indicatorName: string, context: string): Promise<number> {
-  console.log(`[v0] Getting AI estimate for ${indicatorName}`)
-
-  // Try Grok first (fastest)
-  const grokKey = getApiKey("XAI_API_KEY") || getApiKey("GROK_XAI_API_KEY")
-  if (grokKey) {
-    try {
-      const response = await fetch("https://api.x.ai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${grokKey}`,
-        },
-        body: JSON.stringify({
-          model: "grok-2",
-          messages: [
-            {
-              role: "user",
-              content: `You are a financial data expert. Estimate the current ${indicatorName} based on this context: ${context}. Respond with ONLY a number, no explanation.`,
-            },
-          ],
-          temperature: 0.1,
-        }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        const estimate = Number.parseFloat(data.choices[0].message.content.trim())
-        if (!isNaN(estimate)) {
-          console.log(`[v0] Grok estimate for ${indicatorName}: ${estimate}`)
-          return estimate
-        }
-      }
-    } catch (error) {
-      console.log(`[v0] Grok failed for ${indicatorName}:`, error)
-    }
-  }
-
-  // Fallback to Groq
-  const groqKey = getApiKey("GROQ_API_KEY")
-  if (groqKey) {
-    try {
-      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${groqKey}`,
-        },
-        body: JSON.stringify({
-          model: "openai/gpt-oss-120b",
-          messages: [
-            {
-              role: "user",
-              content: `Estimate current ${indicatorName} value. Context: ${context}. Reply with just the number.`,
-            },
-          ],
-          temperature: 0.1,
-        }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        const estimate = Number.parseFloat(data.choices[0].message.content.trim())
-        if (!isNaN(estimate)) {
-          console.log(`[v0] Groq estimate for ${indicatorName}: ${estimate}`)
-          return estimate
-        }
-      }
-    } catch (error) {
-      console.log(`[v0] Groq failed for ${indicatorName}:`, error)
-    }
-  }
-
-  return 0
-}
-
+// Removed 2026-08-30: `getAIEstimate(indicatorName, context)`, 75 lines, defined
+// and never called. It was a FIFTH hand-written copy of the provider chain and
+// carried four separate violations of rules this repo already has:
+//
+//   1. `return 0` on every failure path, typed `Promise<number>`. "Missing data
+//      is null, never 0 or an invented constant" is the first data-integrity
+//      rule in CLAUDE.md, and this returned the strongest possible reading of a
+//      normalized -1..+1 indicator as its not-found value.
+//   2. Raw `fetch` to api.x.ai and api.groq.com — unmetered, so neither call
+//      reached the ledger or the budget guard, on a route that otherwise uses
+//      `meteredFetch` correctly (see fetchWithScrapingBee above).
+//   3. `getApiKey` instead of `resolveApiKey`, bypassing DISABLED_APIS and the
+//      E-5 kill switch, and hand-duplicating the XAI_API_KEY/GROK_XAI_API_KEY
+//      alias list that lib/api-keys.ts owns.
+//   4. `model: "grok-2"` — retired by xAI, and spelled differently enough from
+//      "grok-2-latest" to survive the 2026-08-30 slug sweep.
+//
+// Deleted rather than repaired: nothing called it, and this is the same
+// judgement P6-34 made about the four `return value || <constant>` helpers in
+// lib/grok-market-data.ts. An LLM asked to guess an indicator, falling back to
+// a constant, is the invented-data layer wearing a different import path.
 async function calculatePanicEuphoria() {
   try {
     console.log("[v0] Fetching Panic/Euphoria model data with live sources...")

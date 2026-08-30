@@ -1,68 +1,11 @@
 import { NextResponse } from "next/server"
-import { generateText } from "ai"
-import { createOpenAI } from "@ai-sdk/openai"
-import { createAnthropic } from "@ai-sdk/anthropic"
-import { createGoogleGenerativeAI } from "@ai-sdk/google"
-import { resolveApiKey } from "@/lib/api-keys"
-import { recordAiCall } from "@/lib/metered-fetch"
+import { generateWithFallback } from "@/lib/ai-providers"
 import { ensureBudgetGuardFresh } from "@/lib/budget-guard"
 import { TOTAL_SCORED_INDICATORS } from "@/lib/ccpi/scoring"
 import { isDryRun, dryRunPayload } from "@/lib/dry-run"
 
-const OPENROUTER_FREE_MODEL = process.env.OPENROUTER_FREE_MODEL || "openrouter/free"
-
-const providerConfigs = [
-  {
-    // PRIMARY — OpenRouter free model ($0 per token).
-    name: "OpenRouter (free)",
-    key: () => resolveApiKey("OPENROUTER_API_KEY"),
-    create: () =>
-      createOpenAI({
-        apiKey: resolveApiKey("OPENROUTER_API_KEY"),
-        baseURL: "https://openrouter.ai/api/v1",
-      }),
-    model: OPENROUTER_FREE_MODEL,
-  },
-  {
-    name: "Groq",
-    key: () => resolveApiKey("GROQ_API_KEY"),
-    create: () =>
-      createOpenAI({
-        apiKey: resolveApiKey("GROQ_API_KEY"),
-        baseURL: "https://api.groq.com/openai/v1",
-      }),
-    model: "openai/gpt-oss-120b",
-  },
-  {
-    name: "Google",
-    key: () => resolveApiKey("GOOGLE_AI_API_KEY"),
-    create: () => createGoogleGenerativeAI({ apiKey: resolveApiKey("GOOGLE_AI_API_KEY") }),
-    model: "gemini-2.5-flash-lite",
-  },
-  // --- paid fallbacks; disable via DISABLED_APIS to guarantee $0 ---
-  {
-    name: "OpenAI",
-    key: () => resolveApiKey("OPENAI_API_KEY"),
-    create: () => createOpenAI({ apiKey: resolveApiKey("OPENAI_API_KEY") }),
-    model: "gpt-5.4-nano",
-  },
-  {
-    name: "xAI",
-    key: () => resolveApiKey("XAI_API_KEY"),
-    create: () =>
-      createOpenAI({
-        apiKey: resolveApiKey("XAI_API_KEY"),
-        baseURL: "https://api.x.ai/v1",
-      }),
-    model: "grok-4.6",
-  },
-  {
-    name: "Anthropic",
-    key: () => resolveApiKey("ANTHROPIC_API_KEY"),
-    create: () => createAnthropic({ apiKey: resolveApiKey("ANTHROPIC_API_KEY") }),
-    model: "claude-haiku-4-5",
-  },
-]
+// The provider chain and its fallback loop used to be duplicated here, in full.
+// Deleted in favour of `generateWithFallback` — see the note at the call site.
 
 export async function POST(request: Request) {
   try {
@@ -171,71 +114,41 @@ Make it professional, data-driven, and immediately actionable for sophisticated 
     // guard that fails to refresh is exactly the kind of silent spend-control
     // break this route had no test for at all.
     if (isDryRun(request, body)) {
-      return NextResponse.json(dryRunPayload("/api/ccpi/executive-summary", "providerConfigs chain", prompt.length))
+      return NextResponse.json(
+        dryRunPayload("/api/ccpi/executive-summary", "lib/ai-providers.ts fallback chain", prompt.length),
+      )
     }
 
-    let lastError: Error | null = null
+    // P7-9 again, one route over. This used to be a PRIVATE COPY of the
+    // provider chain and its fallback loop — the fourth written-down copy of
+    // the provider vocabulary — and it had drifted exactly the way
+    // /api/ccpi/chat's copy did before that one was deleted: **six providers
+    // against the canonical seven, with Perplexity simply absent**, so this
+    // route gave up one fallback earlier than every other AI route. Its `name`
+    // strings had drifted too ("OpenRouter (free)", "Groq", "xAI" against the
+    // canonical "openrouter", "groq", "xai"), and those names were handed to
+    // the client in the response's `provider` field.
+    //
+    // The sharp end is the same as last time: `getProviderChain()` is what the
+    // admin AI tab renders as "the live fallback chain, in the exact order the
+    // generate/stream loops try it" — derived from the canonical array — so the
+    // panel was describing a chain this route did not use. That is a provenance
+    // defect, not a tidiness one.
+    //
+    // The empty-response check that was this copy's one real justification now
+    // lives inside `generateWithFallback`, where every caller gets it.
+    const result = await generateWithFallback({
+      prompt,
+      temperature: 0.7,
+      // ai v5 renamed this from `maxTokens`. Under the old name the option was
+      // silently dropped, so output length was unbounded on the paid fallbacks
+      // — a real spend leak, not just a type error.
+      maxTokens: 300,
+      abortSignal: AbortSignal.timeout(30000),
+      routeTag: "/api/ccpi/executive-summary",
+    })
 
-    for (const config of providerConfigs) {
-      if (!config.key()) continue
-
-      const started = Date.now()
-      // The call is metered exactly once. Without this the "empty response"
-      // throw below would fall into the catch and log a second row for the
-      // same call, inflating both the count and the cost.
-      let metered = false
-      try {
-        console.log(`[AI] Trying ${config.name} for executive summary...`)
-        const provider = config.create()
-        const model = provider(config.model)
-
-        const result = await generateText({
-          model,
-          prompt,
-          temperature: 0.7,
-          // ai v5 renamed this from `maxTokens`. Under the old name the option
-          // was silently dropped, so output length was unbounded on the paid
-          // fallbacks — a real spend leak, not just a type error.
-          maxOutputTokens: 300,
-          abortSignal: AbortSignal.timeout(30000),
-        })
-        const text = result.text
-
-        recordAiCall({
-          provider: config.name,
-          model: config.model,
-          route: "/api/ccpi/executive-summary",
-          ms: Date.now() - started,
-          ok: true,
-          usage: result.usage,
-        })
-        metered = true
-
-        if (!text || text.trim().length === 0) {
-          throw new Error("AI returned empty response")
-        }
-
-        console.log(`[AI] Success with ${config.name}`)
-        return NextResponse.json({ summary: text.trim(), provider: config.name })
-      } catch (error) {
-        console.error(`[AI] ${config.name} failed:`, error instanceof Error ? error.message : error)
-        if (!metered) {
-          recordAiCall({
-            provider: config.name,
-            model: config.model,
-            route: "/api/ccpi/executive-summary",
-            ms: Date.now() - started,
-            ok: false,
-            usage: null,
-            error,
-          })
-        }
-        lastError = error instanceof Error ? error : new Error(String(error))
-        // Continue to next provider
-      }
-    }
-
-    throw lastError || new Error("No AI providers available")
+    return NextResponse.json({ summary: result.text.trim(), provider: result.provider })
   } catch (error) {
     console.error("[AI] Executive summary error:", error)
 

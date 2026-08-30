@@ -65,9 +65,15 @@ const callers = sources
 
 // --------------------------------------------------------------- scope size
 
-// 7 files call recordAiCall: the 4 lib/*-market-data.ts fetchers, the provider
-// chain, the metering module that defines it, and the executive-summary route.
-const EXPECTED_CALLER_FILES = 7
+// 6 files call recordAiCall: the 4 lib/*-market-data.ts fetchers, the provider
+// chain, and the metering module that defines it.
+//
+// Was 7. app/api/ccpi/executive-summary/route.ts dropped off the list when its
+// private copy of the provider chain was deleted in favour of
+// `generateWithFallback` — it no longer meters anything itself because it no
+// longer calls a model itself. This assertion is what made that a DELIBERATE
+// edit rather than a silent narrowing of scope.
+const EXPECTED_CALLER_FILES = 6
 check(
   "scope: every file calling recordAiCall is in scope",
   callers.length === EXPECTED_CALLER_FILES,
@@ -115,10 +121,11 @@ for (const { file, text } of callers) {
   }
 }
 
-// 8 failure sites: 3 in lib/ai-providers.ts (generate catch, stream .catch,
-// stream catch), 1 each in the 4 lib/*-market-data.ts fetchers, 1 in
-// app/api/ccpi/executive-summary/route.ts.
-const EXPECTED_FAILURE_SITES = 8
+// 7 failure sites: 3 in lib/ai-providers.ts (generate catch, stream .catch,
+// stream catch) and 1 each in the 4 lib/*-market-data.ts fetchers.
+//
+// Was 8; executive-summary's site went with its deleted chain copy.
+const EXPECTED_FAILURE_SITES = 7
 check(
   "scope: every ok:false recordAiCall site is in scope",
   failureSites === EXPECTED_FAILURE_SITES,

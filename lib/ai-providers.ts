@@ -225,6 +225,10 @@ export async function generateWithFallback(options: AIGenerateOptions): Promise<
     if (!config || !config.key()) continue
 
     const started = Date.now()
+    // The call is metered exactly once. The empty-response throw below lands in
+    // the catch, which would otherwise log a SECOND row for the same call and
+    // inflate both the count and the cost.
+    let metered = false
     try {
       console.log(`[AI] Trying ${config.displayName}...`)
       const provider = config.create()
@@ -241,12 +245,16 @@ export async function generateWithFallback(options: AIGenerateOptions): Promise<
         abortSignal,
       })
 
-      console.log(`[AI] Success with ${config.displayName}`)
-
       // Spend accounting (E-5). A failed attempt is recorded too: a provider
       // that errors after consuming tokens still bills, and a fallback chain
       // that burns three paid providers per request is exactly the runaway
       // pattern the guard needs to see.
+      //
+      // Recorded as ok:true BEFORE the empty-text check, and deliberately so:
+      // a provider that returns nothing still consumed tokens and still bills.
+      // Marking that row ok:false would say the call failed when it was
+      // charged, which is the opposite error from the one this ledger exists
+      // to prevent.
       recordAiCall({
         provider: config.name,
         model: config.model,
@@ -255,6 +263,19 @@ export async function generateWithFallback(options: AIGenerateOptions): Promise<
         ok: true,
         usage: result.usage,
       })
+      metered = true
+
+      // An empty completion is a FAILED completion, and the chain must fall
+      // through to the next provider rather than hand "" back to the caller.
+      // This check lived only in /api/ccpi/executive-summary's private copy of
+      // this loop; every other caller of generateWithFallback could silently
+      // receive an empty string and render it. On that route the empty string
+      // would have been displayed AS the executive summary.
+      if (!result.text || result.text.trim().length === 0) {
+        throw new Error(`${config.displayName} returned an empty response`)
+      }
+
+      console.log(`[AI] Success with ${config.displayName}`)
 
       return {
         text: result.text,
@@ -263,6 +284,11 @@ export async function generateWithFallback(options: AIGenerateOptions): Promise<
       }
     } catch (error) {
       console.error(`[AI] ${config.displayName} failed:`, error instanceof Error ? error.message : error)
+      if (metered) {
+        // Already counted above; only the fallthrough matters here.
+        lastError = error instanceof Error ? error : new Error(String(error))
+        continue
+      }
       recordAiCall({
         provider: config.name,
         model: config.model,
