@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { AlertCircle, CheckCircle2, MinusCircle, PowerOff, RefreshCw, XCircle, Zap } from "lucide-react"
+import { AlertCircle, AlertTriangle, CheckCircle2, MinusCircle, PowerOff, RefreshCw, XCircle, Zap } from "lucide-react"
 
 /**
  * Admin AI tab (AUDIT_BACKLOG A-7).
@@ -29,6 +29,16 @@ interface AIProvider {
   disabled: boolean
   willBeTried: boolean
   latencyMs: number | null
+  // --- Observed liveness, from the metering ledger (see lib/ai-provider-health.ts).
+  // Everything above answers "is a key set". These answer "did calls succeed",
+  // which is a different question and the one this panel used not to ask.
+  observedState: "working" | "failing" | "degraded" | "untried" | "unknown"
+  observedCalls: number
+  observedOk: number
+  observedFailed: number
+  observedLastOk: string | null
+  observedLastFailure: string | null
+  observedErrorClass: string | null
 }
 
 interface AIStatusData {
@@ -45,9 +55,18 @@ interface AIStatusData {
     firstAttempted: string | null
     firstAttemptedIsPaid: boolean
   }
+  livenessUnavailableReason: string | null
+  observedWindowDays: number
   providers: AIProvider[]
 }
 
+/**
+ * CONFIGURATION chip. Deliberately no longer green on its own: a resolved key
+ * says the chain will TRY this provider, not that the provider works. xAI wore
+ * a green "KEY RESOLVED" badge here through 401 consecutive failures. Green is
+ * now reserved for the observed chip beside it, which is the one backed by
+ * calls that actually happened.
+ */
 function statusChip(provider: AIProvider) {
   if (provider.disabled) {
     return {
@@ -59,7 +78,7 @@ function statusChip(provider: AIProvider) {
   if (provider.willBeTried) {
     return {
       label: "KEY RESOLVED — in the chain",
-      className: "bg-green-100 text-green-800 border-green-300",
+      className: "bg-slate-100 text-slate-700 border-slate-300",
       Icon: CheckCircle2,
     }
   }
@@ -68,6 +87,61 @@ function statusChip(provider: AIProvider) {
     className: "bg-red-100 text-red-800 border-red-300",
     Icon: XCircle,
   }
+}
+
+/**
+ * OBSERVED chip — what the ledger saw, not what the config claims.
+ *
+ * `untried` is its own state and is deliberately neutral, not green: a provider
+ * nobody called is neither healthy nor broken, and collapsing it either way is
+ * exactly how a dead provider reads as fine.
+ */
+function observedChip(provider: AIProvider, windowDays: number) {
+  const seen = `${provider.observedOk}/${provider.observedCalls} ok · ${windowDays}d`
+  switch (provider.observedState) {
+    case "working":
+      return {
+        label: `WORKING — ${seen}`,
+        className: "bg-green-100 text-green-800 border-green-300",
+        Icon: CheckCircle2,
+      }
+    case "degraded":
+      return {
+        label: `INTERMITTENT — ${seen}`,
+        className: "bg-amber-100 text-amber-900 border-amber-300",
+        Icon: AlertTriangle,
+      }
+    case "failing":
+      return {
+        label: `FAILING — every call failed (${provider.observedCalls} in ${windowDays}d)`,
+        className: "bg-red-100 text-red-800 border-red-300",
+        Icon: XCircle,
+      }
+    case "untried":
+      return {
+        label: `NOT CALLED in ${windowDays}d`,
+        className: "bg-slate-100 text-slate-600 border-slate-300",
+        Icon: MinusCircle,
+      }
+    default:
+      return {
+        label: "LIVENESS UNREADABLE",
+        className: "bg-slate-100 text-slate-600 border-slate-300",
+        Icon: MinusCircle,
+      }
+  }
+}
+
+/** Plain-English fix for a recorded cause. Never invents one for a null. */
+const ERROR_CLASS_HINT: Record<string, string> = {
+  model_not_found: "the model id is retired or misspelled — change the slug",
+  auth: "the key was rejected — rotate it",
+  rate_limit: "quota or rate cap hit — back off or upgrade",
+  bad_request: "the request itself was rejected — fix the call",
+  upstream: "the vendor returned a server error — not ours",
+  timeout: "we gave up waiting",
+  transport: "never reached the vendor — network, DNS or TLS",
+  unknown: "unclassified — read the detail on the row",
 }
 
 export function AIStatusAdmin() {
@@ -108,9 +182,12 @@ export function AIStatusAdmin() {
             </CardTitle>
             <CardDescription>
               Generated from <code className="font-mono">lib/ai-providers.ts</code> — the same list the code walks, in
-              the same order. Key presence only: no AI provider is called to build this panel. Manage keys in the{" "}
-              <span className="font-semibold">Keys</span> tab (the canonical surface); the presence shown here is
-              context for the LLM chain.
+              the same order. Two different facts per provider:{" "}
+              <span className="font-semibold">KEY RESOLVED</span> means the chain will try it;{" "}
+              <span className="font-semibold">WORKING / FAILING</span> is what the metering ledger actually observed
+              over the last 7 days. A resolved key is not a working provider — no AI provider is called to build this
+              panel, so both come from code and from recorded calls, never from a probe. Manage keys in the{" "}
+              <span className="font-semibold">Keys</span> tab (the canonical surface).
             </CardDescription>
           </div>
           <Button onClick={fetchAIStatus} disabled={loading} variant="outline" size="sm">
@@ -186,6 +263,8 @@ export function AIStatusAdmin() {
               {data.providers.map((provider) => {
                 const chip = statusChip(provider)
                 const Icon = chip.Icon
+                const observed = observedChip(provider, data.observedWindowDays)
+                const ObservedIcon = observed.Icon
                 return (
                   <div
                     key={provider.name}
@@ -215,7 +294,38 @@ export function AIStatusAdmin() {
                           <Icon className="h-3 w-3" />
                           {chip.label}
                         </span>
+                        <span
+                          className={`inline-flex items-center gap-1 rounded border px-2 py-1 text-xs font-semibold ${observed.className}`}
+                        >
+                          <ObservedIcon className="h-3 w-3" />
+                          {observed.label}
+                        </span>
                       </div>
+
+                      {provider.observedState === "failing" || provider.observedState === "degraded" ? (
+                        <p className="mb-1 rounded border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-900">
+                          <span className="font-semibold">Last failure:</span>{" "}
+                          {provider.observedLastFailure
+                            ? new Date(provider.observedLastFailure).toLocaleString()
+                            : "—"}
+                          {" · "}
+                          <span className="font-semibold">Cause:</span>{" "}
+                          {provider.observedErrorClass ? (
+                            <>
+                              <span className="font-mono">{provider.observedErrorClass}</span>
+                              {ERROR_CLASS_HINT[provider.observedErrorClass]
+                                ? ` — ${ERROR_CLASS_HINT[provider.observedErrorClass]}`
+                                : ""}
+                            </>
+                          ) : (
+                            // NOT RECORDED, which is not the same as "no cause".
+                            // Failures logged before migration 0015 carry none.
+                            <span className="italic">
+                              not recorded — these failures predate cause logging (migration 0015)
+                            </span>
+                          )}
+                        </p>
+                      ) : null}
 
                       <p className="mb-1 break-all rounded bg-slate-100 px-2 py-1 font-mono text-xs text-slate-700">
                         model: {provider.model} · {provider.endpoint}

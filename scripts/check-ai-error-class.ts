@@ -306,6 +306,51 @@ check(
   readdirSync(join(ROOT, "supabase", "migrations")).some((f) => /error_class\.sql$/.test(f)),
 )
 
+// -------------------------------------- the admin surfaces OBSERVED liveness
+
+// Recording a cause is only half the fix. The admin AI tab reported
+// `willBeTried: p.hasKey` — key presence — and rendered it as a GREEN chip, so
+// xAI showed healthy and first-in-chain through 401 consecutive failures. These
+// assertions keep the second, ledger-backed fact on screen.
+
+const statusRoute = readFileSync(join(ROOT, "app", "api", "ai-status", "route.ts"), "utf8")
+const aiTab = readFileSync(join(ROOT, "components", "ai-status-admin.tsx"), "utf8")
+
+check(
+  "the AI tab route reads observed liveness from the ledger",
+  /getAiProviderHealth\s*\(/.test(statusRoute) && /observedState:\s*observedState\(/.test(statusRoute),
+)
+check(
+  "liveness is read, never probed — the route makes no upstream AI call",
+  !/generateText\s*\(|streamText\s*\(/.test(statusRoute),
+  "every AI endpoint the app calls is a chat completion; a probe here would bill the owner to render a status light",
+)
+check(
+  "the route distinguishes 'could not look' from 'no failures'",
+  /livenessUnavailableReason/.test(statusRoute),
+)
+check(
+  "the AI tab renders the observed chip, not only the config chip",
+  /observedChip\s*\(/.test(aiTab) && /\{observed\.label\}/.test(aiTab),
+)
+check(
+  "a resolved key is no longer painted green on its own",
+  !/label:\s*"KEY RESOLVED[^"]*",\s*\n\s*className:\s*"bg-green/.test(aiTab),
+  "green must mean observed-working, not merely configured",
+)
+check(
+  "'never called' is its own state, not folded into healthy or broken",
+  /case "untried"/.test(aiTab) && /"untried"/.test(readFileSync(join(ROOT, "lib", "ai-provider-health.ts"), "utf8")),
+)
+check(
+  "a null cause renders as NOT RECORDED rather than as fine",
+  /not recorded/i.test(aiTab),
+)
+check(
+  "the provider-health view migration exists",
+  readdirSync(join(ROOT, "supabase", "migrations")).some((f) => /provider_health\.sql$/.test(f)),
+)
+
 console.log(
   failures === 0
     ? `\nAll AI error-class checks passed — ${failureSites} failure sites across ${callers.length} files.`

@@ -20,7 +20,52 @@ entry records what was done, not proof that it still holds.
 
 ## 2026-08-30
 
+### Added
+- **The admin AI tab shows whether a provider *works*, not just whether a key
+  resolves.** It reported `willBeTried: p.hasKey` and painted it green, so xAI
+  wore a green "KEY RESOLVED — in the chain" badge through 401 consecutive
+  failures. A resolvable key and a working provider are different facts and only
+  one was on screen. Each provider now carries a second, ledger-backed chip —
+  `WORKING` / `INTERMITTENT` / `FAILING` / `NOT CALLED` over a trailing 7 days —
+  and a failing provider shows its last failure time and dominant cause with the
+  fix it implies ("the model id is retired — change the slug"). Green now means
+  observed-working; a resolved key is neutral grey. **Nothing is probed**: every
+  AI endpoint the app calls is a chat completion, so a liveness probe would bill
+  the owner to render a status light. The numbers come from calls the app
+  already made, via new Supabase view `api_provider_health` (migration `0016`,
+  applied to production). `NOT CALLED` is deliberately its own state — a
+  provider nobody called is neither healthy nor broken, and collapsing it either
+  way is how a dead provider reads as fine. Where a failure predates cause
+  logging the panel says "not recorded" rather than showing nothing. (`d571c1d`+)
+
 ### Fixed
+- **A failed AI call now records *why* it failed.** It used to record `ok: false`
+  and nothing else — `recordAiCall` hardcoded `status: 0` on the failure path,
+  discarding the upstream status the SDK error already carried. Three of the four
+  `lib/*-market-data.ts` fetchers were worse still: they caught, returned `null`,
+  and never metered at all, two of them under a comment explaining the silence.
+  **The cost: xAI failed 401 times out of 401 between 2026-08-08 and 2026-08-30 —
+  a 100% failure rate on the first provider of all six CCPI fallback chains,
+  feeding the site's default landing page — durably recorded and completely
+  unreadable.** It was investigated for three weeks as a token-accounting
+  question, because unpriced rows are what you see when you cannot see the cause.
+  There were no tokens to record; there had never been a successful call.
+  New `lib/ai-error-class.ts` classifies a thrown error into one of eight causes
+  chosen to separate the *different fixes* they need — `model_not_found` (change
+  the slug), `auth` (rotate the key), `rate_limit` (back off), plus
+  `bad_request` / `upstream` / `timeout` / `transport` / `unknown`. `unknown`
+  admits it has no rule rather than defaulting into a neighbouring class: a wrong
+  class sends you to rotate a key that was fine. Migration `0015` adds
+  `error_class` and `error_detail` (nullable, no backfill — rows written before
+  this have no cause on file and read NULL rather than a guessed one), applied to
+  production. Enforced by `scripts/check-ai-error-class.ts`, which scopes itself
+  from structure rather than prose and asserts its own scope sizes. (`d571c1d`)
+- **Three providers recorded no failures at all.** `anthropic`, `groq` and
+  `openai` market-data fetchers now meter every failed call. Their rate-limit
+  branches still keep quiet in the *console* — a log-noise decision — but no
+  longer keep quiet in the accounting record. A fallback "working as intended"
+  and a fallback whose every provider is dead produced the identical empty
+  ledger. (`d571c1d`)
 - **Provider tags are canonicalised at the single write point.** Different call
   sites had been writing `xai` vs `xAI`, `groq` vs `Groq`, `openrouter` vs
   `OpenRouter (free)` into the metering ledger, so one provider fragmented into
