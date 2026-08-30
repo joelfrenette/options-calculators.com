@@ -19,7 +19,7 @@ function getAIProvider() {
         apiKey: xaiKey,
         baseURL: "https://api.x.ai/v1",
       }),
-      model: "grok-2-latest",
+      model: "grok-4.6",
       name: "xAI",
       tag: "xai",
     }
@@ -31,7 +31,7 @@ function getAIProvider() {
         apiKey: groqKey,
         baseURL: "https://api.groq.com/openai/v1",
       }),
-      model: "llama-3.3-70b-versatile",
+      model: "openai/gpt-oss-120b",
       name: "Groq",
       tag: "groq",
     }
@@ -40,7 +40,7 @@ function getAIProvider() {
   if (openaiKey) {
     return {
       provider: createOpenAI({ apiKey: openaiKey }),
-      model: "gpt-4o-mini",
+      model: "gpt-5.4-nano",
       name: "OpenAI",
       tag: "openai",
     }

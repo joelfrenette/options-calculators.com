@@ -3,13 +3,13 @@
  *
  * Priority order (FREE providers first to minimize cost):
  * 1. OpenRouter (:free model) - $0 per token, primary
- * 2. Groq (llama-3.3-70b) - free tier backup
- * 3. Google (gemini-2.0-flash) - free tier backup
+ * 2. Groq (openai/gpt-oss-120b) - free tier backup
+ * 3. Google (gemini-2.5-flash-lite) - free tier backup
  * --- paid fallbacks below; only used if all free providers fail AND the key
  *     is set. Disable via DISABLED_APIS to guarantee $0. ---
- * 4. OpenAI (gpt-4o-mini)
- * 5. xAI/Grok (grok-2)
- * 6. Anthropic (claude-3-5-sonnet)
+ * 4. OpenAI (gpt-5.4-nano)
+ * 5. xAI/Grok (grok-4.6)
+ * 6. Anthropic (claude-haiku-4-5)
  * 7. Perplexity - search-augmented
  */
 
@@ -48,7 +48,7 @@ const providerConfigs = [
   {
     // Free backup.
     name: "groq" as const,
-    displayName: "Groq (Llama 3.3 70B)",
+    displayName: "Groq (GPT-OSS 120B)",
     keyName: "GROQ_API_KEY",
     tier: "free" as const,
     endpoint: "https://api.groq.com/openai/v1/chat/completions",
@@ -58,34 +58,34 @@ const providerConfigs = [
         apiKey: resolveApiKey("GROQ_API_KEY"),
         baseURL: "https://api.groq.com/openai/v1",
       }),
-    model: "llama-3.3-70b-versatile",
+    model: "openai/gpt-oss-120b",
   },
   {
     // Free backup.
     name: "google" as const,
-    displayName: "Google (Gemini 2.0 Flash)",
+    displayName: "Google (Gemini 2.5 Flash-Lite)",
     keyName: "GOOGLE_AI_API_KEY",
     tier: "free" as const,
     endpoint: "https://generativelanguage.googleapis.com/v1beta/models",
     key: () => resolveApiKey("GOOGLE_AI_API_KEY"),
     create: () => createGoogleGenerativeAI({ apiKey: resolveApiKey("GOOGLE_AI_API_KEY") }),
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash-lite",
   },
   // --- paid fallbacks below; reachable only if all free providers fail AND
   //     their keys are set (disable via DISABLED_APIS to guarantee $0). ---
   {
     name: "openai" as const,
-    displayName: "OpenAI (GPT-4o Mini)",
+    displayName: "OpenAI (GPT-5.4 Nano)",
     keyName: "OPENAI_API_KEY",
     tier: "paid" as const,
     endpoint: "https://api.openai.com/v1/chat/completions",
     key: () => resolveApiKey("OPENAI_API_KEY"),
     create: () => createOpenAI({ apiKey: resolveApiKey("OPENAI_API_KEY") }),
-    model: "gpt-4o-mini",
+    model: "gpt-5.4-nano",
   },
   {
     name: "xai" as const,
-    displayName: "xAI (Grok 2)",
+    displayName: "xAI (Grok 4.6)",
     keyName: "XAI_API_KEY",
     tier: "paid" as const,
     endpoint: "https://api.x.ai/v1/chat/completions",
@@ -95,17 +95,17 @@ const providerConfigs = [
         apiKey: resolveApiKey("XAI_API_KEY"),
         baseURL: "https://api.x.ai/v1",
       }),
-    model: "grok-2-latest",
+    model: "grok-4.6",
   },
   {
     name: "anthropic" as const,
-    displayName: "Anthropic (Claude 3.5 Sonnet)",
+    displayName: "Anthropic (Claude Haiku 4.5)",
     keyName: "ANTHROPIC_API_KEY",
     tier: "paid" as const,
     endpoint: "https://api.anthropic.com/v1/messages",
     key: () => resolveApiKey("ANTHROPIC_API_KEY"),
     create: () => createAnthropic({ apiKey: resolveApiKey("ANTHROPIC_API_KEY") }),
-    model: "claude-3-5-sonnet-20241022",
+    model: "claude-haiku-4-5",
   },
   {
     name: "perplexity" as const,

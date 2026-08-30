@@ -263,14 +263,30 @@ export interface TokenPrice {
 export const MODEL_TOKEN_PRICES: Record<string, TokenPrice> = {
   // Free tiers — $0 marginal. Rate-limited, not billed.
   "openrouter/free": { inputPerM: 0, outputPerM: 0, note: "OpenRouter free auto-router; capped by request count, not billed" },
-  "llama-3.3-70b-versatile": { inputPerM: 0, outputPerM: 0, note: "Groq free tier" },
-  "gemini-2.0-flash": { inputPerM: 0, outputPerM: 0, note: "Google AI Studio free tier" },
+  "openai/gpt-oss-120b": { inputPerM: 0, outputPerM: 0, note: "Groq free tier" },
+  "gemini-2.5-flash-lite": {
+    inputPerM: 0,
+    outputPerM: 0,
+    note: "Google AI Studio free tier — Google's own migration target from the shut-down gemini-2.0-flash, and priced $0 here for the same reason the Groq and OpenRouter entries are: the chain classifies it tier:'free' and only ever calls it on the free tier. Paid rates if that tier is exceeded are $0.10/$0.40 per 1M.",
+  },
   // gemini-2.0-flash-exp price entry removed 2026-08-29 (admin audit): no code
   // ever requested that model id — a dead defensive constant.
+  //
+  // The six slugs this table used to carry — llama-3.3-70b-versatile,
+  // gemini-2.0-flash, gpt-4o-mini, claude-3-5-sonnet-20241022, grok-2-latest —
+  // were all 2024-vintage and all retired by their vendors. Prices move in the
+  // SAME commit as lib/ai-providers.ts: a bumped slug against a stale table
+  // records cost_known:false, which is the "unpriced" state the budget guard
+  // counts as unaccounted. See the 2026-08-30 CHANGELOG entry.
+  //
   // Pay-per-use. These are the ones that can run a bill up.
-  "gpt-4o-mini": { inputPerM: 0.15, outputPerM: 0.6 },
-  "claude-3-5-sonnet-20241022": { inputPerM: 3, outputPerM: 15 },
-  "grok-2-latest": { inputPerM: 2, outputPerM: 10 },
+  "gpt-5.4-nano": { inputPerM: 0.2, outputPerM: 1.25 },
+  "claude-haiku-4-5": { inputPerM: 1, outputPerM: 5 },
+  "grok-4.6": {
+    inputPerM: 2,
+    outputPerM: 6,
+    note: "below 200K-token prompts; xAI doubles to $4/$12 for the WHOLE request once a prompt crosses 200K — not modelled here, and unreachable on these 50-token calls",
+  },
   "llama-3.1-sonar-large-128k-online": {
     inputPerM: 1,
     outputPerM: 1,

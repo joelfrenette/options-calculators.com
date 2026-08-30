@@ -33,6 +33,7 @@ import { readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 
 import { classifyAiError } from "../lib/ai-error-class.ts"
+import { MODEL_TOKEN_PRICES } from "../lib/api-costs.ts"
 
 let failures = 0
 function check(name: string, passed: boolean, detail = ""): void {
@@ -349,6 +350,52 @@ check(
 check(
   "the provider-health view migration exists",
   readdirSync(join(ROOT, "supabase", "migrations")).some((f) => /provider_health\.sql$/.test(f)),
+)
+
+// ------------------------------- every chain model has a price on file
+
+// The gap that let a whole chain rot: a model slug and its price live in two
+// different files, and nothing tied them together. Six slugs went stale and the
+// prices went stale with them; bumping one without the other silently records
+// `cost_known: false`, which the budget guard counts as unaccounted spend — a
+// bill you cannot see is the same failure as a failure you cannot read.
+
+const providersSrc = readFileSync(join(ROOT, "lib", "ai-providers.ts"), "utf8")
+const chainSlugs = [...providersSrc.matchAll(/^\s*model:\s*"([^"]+)"/gm)].map((m) => m[1])
+const nonLiteralSlugs = [...providersSrc.matchAll(/^\s*model:\s*([A-Z_][A-Z0-9_]*)\s*,/gm)].map((m) => m[1])
+
+// 7 providers: 6 literal slugs + OPENROUTER_FREE_MODEL, which is env-overridable
+// and therefore cannot be checked statically — its default is priced by name.
+check(
+  "scope: every provider in the chain contributes a model slug",
+  chainSlugs.length + nonLiteralSlugs.length === 7,
+  `${chainSlugs.length} literal + ${nonLiteralSlugs.length} env-driven, want 7 total`,
+)
+
+const unpriced = chainSlugs.filter((slug) => !(slug in MODEL_TOKEN_PRICES))
+check(
+  "every model in the chain has a MODEL_TOKEN_PRICES entry",
+  unpriced.length === 0,
+  unpriced.length === 0
+    ? `${chainSlugs.length} slugs priced`
+    : `unpriced: ${unpriced.join(", ")} — bump lib/api-costs.ts in the SAME commit`,
+)
+
+// The market-data fetchers each pin their own slug, a third copy of the same
+// vocabulary. They must be priced too, for the same reason.
+const fetcherSlugs = fetchers
+  .map(({ text }) => /^const MODEL = "([^"]+)"/m.exec(text)?.[1])
+  .filter((s): s is string => typeof s === "string")
+check(
+  "scope: each market-data fetcher pins one model slug",
+  fetcherSlugs.length === 3,
+  `${fetcherSlugs.length} — grok-market-data picks its slug at runtime, so 3 of 4 are static`,
+)
+const unpricedFetchers = fetcherSlugs.filter((slug) => !(slug in MODEL_TOKEN_PRICES))
+check(
+  "every market-data fetcher's model has a price on file",
+  unpricedFetchers.length === 0,
+  unpricedFetchers.length === 0 ? fetcherSlugs.join(", ") : `unpriced: ${unpricedFetchers.join(", ")}`,
 )
 
 console.log(

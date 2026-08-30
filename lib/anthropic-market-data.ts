@@ -3,7 +3,7 @@ import { createAnthropic } from "@ai-sdk/anthropic"
 import { resolveApiKey } from "@/lib/api-keys"
 import { recordAiCall } from "@/lib/metered-fetch"
 
-const MODEL = "claude-3-5-sonnet-20241022"
+const MODEL = "claude-haiku-4-5"
 
 // Keys resolve through lib/api-keys.ts, not process.env directly. Reading the
 // env var here bypassed DISABLED_APIS — and would have bypassed the E-5 budget

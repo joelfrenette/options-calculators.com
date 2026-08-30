@@ -3,7 +3,7 @@ import { createOpenAI } from "@ai-sdk/openai"
 import { resolveApiKey } from "@/lib/api-keys"
 import { recordAiCall } from "@/lib/metered-fetch"
 
-const MODEL = "gpt-4o-mini"
+const MODEL = "gpt-5.4-nano"
 
 // Keys resolve through lib/api-keys.ts, not process.env directly. Reading the
 // env var here bypassed DISABLED_APIS — and would have bypassed the E-5 budget

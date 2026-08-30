@@ -31,20 +31,20 @@ const providerConfigs = [
         apiKey: resolveApiKey("GROQ_API_KEY"),
         baseURL: "https://api.groq.com/openai/v1",
       }),
-    model: "llama-3.3-70b-versatile",
+    model: "openai/gpt-oss-120b",
   },
   {
     name: "Google",
     key: () => resolveApiKey("GOOGLE_AI_API_KEY"),
     create: () => createGoogleGenerativeAI({ apiKey: resolveApiKey("GOOGLE_AI_API_KEY") }),
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash-lite",
   },
   // --- paid fallbacks; disable via DISABLED_APIS to guarantee $0 ---
   {
     name: "OpenAI",
     key: () => resolveApiKey("OPENAI_API_KEY"),
     create: () => createOpenAI({ apiKey: resolveApiKey("OPENAI_API_KEY") }),
-    model: "gpt-4o-mini",
+    model: "gpt-5.4-nano",
   },
   {
     name: "xAI",
@@ -54,13 +54,13 @@ const providerConfigs = [
         apiKey: resolveApiKey("XAI_API_KEY"),
         baseURL: "https://api.x.ai/v1",
       }),
-    model: "grok-2-latest",
+    model: "grok-4.6",
   },
   {
     name: "Anthropic",
     key: () => resolveApiKey("ANTHROPIC_API_KEY"),
     create: () => createAnthropic({ apiKey: resolveApiKey("ANTHROPIC_API_KEY") }),
-    model: "claude-3-5-sonnet-20241022",
+    model: "claude-haiku-4-5",
   },
 ]
 

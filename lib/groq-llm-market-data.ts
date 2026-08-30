@@ -3,7 +3,7 @@ import { createOpenAI } from "@ai-sdk/openai"
 import { resolveApiKey } from "@/lib/api-keys"
 import { recordAiCall } from "@/lib/metered-fetch"
 
-const MODEL = "llama-3.3-70b-versatile"
+const MODEL = "openai/gpt-oss-120b"
 
 // Keys resolve through lib/api-keys.ts, not process.env directly, so
 // DISABLED_APIS applies here like everywhere else. Groq is free-tier, so this

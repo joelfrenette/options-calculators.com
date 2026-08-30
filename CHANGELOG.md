@@ -20,6 +20,29 @@ entry records what was done, not proof that it still holds.
 
 ## 2026-08-30
 
+### Changed
+- **Every model slug in the AI chain was 2024 vintage; five are now current.**
+  The chain had rotted where nobody could see it, and the vendors' own calendars
+  confirm it: **`gemini-2.0-flash` was shut down 2026-06-01**;
+  **`llama-3.3-70b-versatile` was deprecated 2026-06-17 and stopped being served
+  during August 2026** — the ledger's last successful Groq call is
+  **2026-08-14**, which is the vendor's notice and this site's data agreeing
+  independently; `grok-2-latest` predates grok-3 and grok-4, both of which xAI
+  retired on 2026-05-15. Only `openrouter/free` — an auto-router, pinned to no
+  version — still resolved, which is why it was the one provider still working.
+  Bumped: groq → `openai/gpt-oss-120b` (Groq's own recommended replacement),
+  google → `gemini-2.5-flash-lite` (Google's own migration target), openai →
+  `gpt-5.4-nano`, xai → `grok-4.6`, anthropic → `claude-haiku-4-5`. Perplexity's
+  slug is left alone: it sits in cold slot 7, has never been called, and there
+  is therefore no evidence either way — an unverified change is not an
+  improvement. **`MODEL_TOKEN_PRICES` moved in the same commit**, because a
+  bumped slug against a stale price table records `cost_known: false`, which the
+  budget guard counts as unaccounted spend. Display names moved too — the admin
+  rendered "Groq (Llama 3.3 70B)" and "xAI (Grok 2)", and a label is a claim.
+  A new assertion now **fails the suite if any chain or fetcher model has no
+  price on file**, which is the tie that was missing between the two files.
+  **Note this ends a $0 bill:** the chain cost nothing because it failed.
+
 ### Added
 - **The admin AI tab shows whether a provider *works*, not just whether a key
   resolves.** It reported `willBeTried: p.hasKey` and painted it green, so xAI

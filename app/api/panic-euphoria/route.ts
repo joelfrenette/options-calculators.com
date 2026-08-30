@@ -98,7 +98,7 @@ async function getAIEstimate(indicatorName: string, context: string): Promise<nu
           Authorization: `Bearer ${groqKey}`,
         },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
+          model: "openai/gpt-oss-120b",
           messages: [
             {
               role: "user",
