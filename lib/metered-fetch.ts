@@ -286,6 +286,48 @@ export interface DailyRollupRow {
   errors: number
 }
 
+export interface MonthlyUsageRow {
+  /** First day of the month, YYYY-MM-DD (date_trunc('month', ts)). */
+  month: string
+  provider: string
+  calls: number
+  /** Priced marginal USD (LLM rows only); 0 for flat-rate data providers. */
+  cost_usd: number
+  /** Calls whose model had no price on file — never summed into cost_usd. */
+  unpriced_calls: number
+}
+
+/**
+ * Per-month, per-provider rollup from the Supabase `api_usage_monthly` view
+ * (durable tier, migration 0014). Returns null when Supabase is not configured,
+ * the query fails, OR the view does not exist yet (migration not applied) — the
+ * caller renders an empty table in that case rather than erroring.
+ */
+export async function getSupabaseMonthlyByProvider(months = 6): Promise<MonthlyUsageRow[] | null> {
+  const cfg = getSupabaseConfig()
+  if (!cfg) return null
+  try {
+    const limit = Math.max(1, months) * 25 // generous: up to ~25 providers per month
+    const res = await fetch(
+      `${cfg.url}/rest/v1/api_usage_monthly?select=month,provider,calls,cost_usd,unpriced_calls&order=month.desc,provider.asc&limit=${limit}`,
+      {
+        headers: { apikey: cfg.key, Authorization: `Bearer ${cfg.key}` },
+        signal: AbortSignal.timeout(5000),
+        cache: "no-store",
+      },
+    )
+    if (!res.ok) {
+      warnSupabaseOnce(`monthly HTTP ${res.status}`, res.statusText)
+      return null
+    }
+    const rows = await res.json()
+    return Array.isArray(rows) ? (rows as MonthlyUsageRow[]) : null
+  } catch (err) {
+    warnSupabaseOnce("monthly", err)
+    return null
+  }
+}
+
 /**
  * Daily rollup from the Supabase `api_calls_daily` view (durable tier).
  * Returns null when Supabase is not configured or the query fails —

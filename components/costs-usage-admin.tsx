@@ -43,10 +43,21 @@ interface ServiceCost {
  * defensively because their exact columns depend on the metering backend,
  * and the whole block may be absent on older deployments (deploy-order safety).
  */
+interface MonthlyUsageRow {
+  month: string
+  provider: string
+  calls: number
+  cost_usd: number
+  unpriced_calls: number
+}
+
 interface RealUsage {
   source?: string // "supabase" | "memory-ephemeral"
   stats?: unknown
   recent?: unknown
+  /** Per-month, per-provider rollup (Supabase api_usage_monthly, migration
+   *  0014). Null until that migration is applied; absent on older deployments. */
+  monthly?: MonthlyUsageRow[] | null
 }
 
 interface UsageData {
@@ -227,6 +238,53 @@ export function CostsUsageAdmin() {
                 <UsageRowsTable rows={recentRows} maxRows={20} />
               </div>
             )}
+
+            {/* Monthly by provider (admin audit 2026-08-29 follow-on). Durable
+                per-month per-provider totals from the Supabase api_usage_monthly
+                view (migration 0014) — the measured call volume beside the
+                flat-fee estimate. cost_usd is $0 for flat-rate data providers;
+                only the pay-per-use LLM rows carry a dollar figure. */}
+            <div>
+              <p className="text-xs font-semibold text-slate-500 mb-1">Monthly by provider</p>
+              {real?.monthly && real.monthly.length > 0 ? (
+                <div className="overflow-x-auto rounded border border-slate-200">
+                  <table className="w-full text-xs">
+                    <thead className="bg-slate-50 text-slate-500">
+                      <tr>
+                        <th className="text-left font-semibold px-2 py-1.5">Month</th>
+                        <th className="text-left font-semibold px-2 py-1.5">Provider</th>
+                        <th className="text-right font-semibold px-2 py-1.5">Calls</th>
+                        <th className="text-right font-semibold px-2 py-1.5">Est. $</th>
+                        <th className="text-right font-semibold px-2 py-1.5">Unpriced</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {real.monthly.map((r, i) => (
+                        <tr key={`${r.month}-${r.provider}-${i}`} className="border-t border-slate-100">
+                          <td className="px-2 py-1 font-mono text-slate-600">{String(r.month).slice(0, 7)}</td>
+                          <td className="px-2 py-1 font-medium text-slate-900">{r.provider}</td>
+                          <td className="px-2 py-1 text-right tabular-nums text-slate-700">
+                            {Number(r.calls).toLocaleString()}
+                          </td>
+                          <td className="px-2 py-1 text-right tabular-nums text-slate-900">
+                            {Number(r.cost_usd) > 0 ? `$${Number(r.cost_usd).toFixed(2)}` : "—"}
+                          </td>
+                          <td className="px-2 py-1 text-right tabular-nums text-amber-700">
+                            {Number(r.unpriced_calls) > 0 ? Number(r.unpriced_calls).toLocaleString() : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-[11px] text-slate-400">
+                  No monthly rollup yet — apply migration{" "}
+                  <code className="font-mono">0014_api_usage_monthly.sql</code>, then it fills as calls accrue.
+                </p>
+              )}
+            </div>
+
             <p className="text-[11px] text-slate-400">
               Per-call cost math (count × unit cost) appears here once the metering table has accumulated data.
             </p>

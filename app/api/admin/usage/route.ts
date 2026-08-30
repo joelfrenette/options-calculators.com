@@ -6,8 +6,10 @@ import {
   getCallStats,
   getRecentCalls,
   getSupabaseDailyRollup,
+  getSupabaseMonthlyByProvider,
   isSupabaseMeteringConfigured,
   type DailyRollupRow,
+  type MonthlyUsageRow,
 } from "@/lib/metered-fetch"
 
 export async function GET() {
@@ -53,8 +55,15 @@ export async function GET() {
   // every serverless cold start — labeled "memory-ephemeral" so nobody mistakes
   // it for complete accounting.
   let dailyRollup: DailyRollupRow[] | null = null
+  let monthlyByProvider: MonthlyUsageRow[] | null = null
   if (isSupabaseMeteringConfigured()) {
-    dailyRollup = await getSupabaseDailyRollup(30)
+    // Both durable rollups in parallel — the daily table and the per-month
+    // per-provider view (migration 0014). Monthly is null until that migration
+    // is applied, and the UI renders an empty state for that.
+    ;[dailyRollup, monthlyByProvider] = await Promise.all([
+      getSupabaseDailyRollup(30),
+      getSupabaseMonthlyByProvider(6),
+    ])
   }
   const realUsage = {
     source: dailyRollup !== null ? ("supabase" as const) : ("memory-ephemeral" as const),
@@ -63,6 +72,7 @@ export async function GET() {
         ? "Durable per-call metering from the Supabase api_calls_daily rollup (last 30 days), plus this instance's live ring buffer."
         : "Per-instance in-memory ring buffer only: counts reset on every serverless cold start and are not shared across instances. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY for durable metering.",
     daily: dailyRollup, // null when Supabase is unavailable
+    monthly: monthlyByProvider, // null when Supabase is unavailable or 0014 not yet applied
     stats: getCallStats(),
     recent: getRecentCalls().slice(-50),
   }
