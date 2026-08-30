@@ -216,26 +216,58 @@ export async function fetchAlphaVantageIndicators() {
       tslaRes.json(),
     ])
 
-    const nvidiaPrice = Number.parseFloat(nvidiaData?.["Global Quote"]?.["05. price"] || "800")
-    const nvidiaChangePercent = Number.parseFloat(
-      nvidiaData?.["Global Quote"]?.["10. change percent"]?.replace("%", "") || "0",
-    )
+    // P7-10 FINISHED, 2026-08-30. That finding removed the invented numbers from
+    // the `baselineValues` path — key missing, or the fetch threw — and the
+    // comment above it warns that "a default written at the source outlives
+    // every null-guard written at the call site". Three more such defaults were
+    // sitting eight lines below it, on the path that actually fires:
+    //
+    //     Number.parseFloat(quote?.["05. price"] || "800")     // NVDA
+    //     Number.parseFloat(quote?.["05. price"] || "5000")    // SOX
+    //     Number.parseFloat(quote?.["10. change percent"] || "0")
+    //
+    // The Alpha Vantage FREE TIER IS 25 CALLS/DAY AND ANSWERS HTTP 200 WITH AN
+    // `Information` KEY once throttled — no `Global Quote` at all. This block
+    // fetches EIGHT quotes per load, so the throttle is the normal case, not the
+    // edge case. On every throttled load it produced NVDA = $800, SOX = 5000 and
+    // a 0% change, and `50 - 0 * 5` made `nvidiaMomentum` exactly **50** — the
+    // fabricated neutral P7-10 exists to prevent — while `source` stayed
+    // `"live"`, so the tier map SCORED it as a measurement.
+    //
+    // Missing data is null. If Alpha Vantage did not return a usable NVDA quote
+    // there is nothing to report, and the whole batch falls back to
+    // `baselineValues`, whose `source: "baseline"` excludes it from scoring.
+    const quote = (d: unknown, field: string): number | null => {
+      const raw = (d as Record<string, Record<string, string>> | null | undefined)?.["Global Quote"]?.[field]
+      if (typeof raw !== "string" || raw.trim() === "") return null
+      const n = Number.parseFloat(raw.replace("%", ""))
+      return Number.isFinite(n) ? n : null
+    }
+
+    const nvidiaPrice = quote(nvidiaData, "05. price")
+    const nvidiaChangePercent = quote(nvidiaData, "10. change percent")
+    if (nvidiaPrice === null || nvidiaChangePercent === null) {
+      console.log("[v0] Alpha Vantage: no usable NVDA quote (free tier is 25/day and throttles with HTTP 200) — reporting baseline, not a guess")
+      return baselineValues
+    }
+
     // Map momentum to 0-100 scale: -10% = 100 (high risk), 0% = 50, +10% = 0 (low risk)
     const nvidiaMomentum = Math.min(100, Math.max(0, 50 - nvidiaChangePercent * 5))
 
-    const soxIndex = Number.parseFloat(soxData?.["Global Quote"]?.["05. price"] || "5000")
+    const soxIndex = quote(soxData, "05. price")
 
-    // This is a proxy based on stock price strength
-    const mag7Avg =
-      [aaplData, msftData, googlData, amznData, metaData, tslaData, nvidiaData]
-        .map((d) => Number.parseFloat(d?.["Global Quote"]?.["10. change percent"]?.replace("%", "") || "0"))
-        .reduce((a, b) => a + b, 0) / 7
-
-    // Higher = more concentrated (using simplified proxy)
-    const mag7Concentration = 55 + (mag7Avg > 0 ? 5 : -5)
+    // Concentration proxy. Every constituent must be present: averaging a
+    // missing ticker as 0% change is the same invented-data move as the
+    // literals above, one aggregation removed. Null when any leg is missing.
+    const mag7Changes = [aaplData, msftData, googlData, amznData, metaData, tslaData, nvidiaData].map((d) =>
+      quote(d, "10. change percent"),
+    )
+    const mag7Concentration = mag7Changes.some((c) => c === null)
+      ? null
+      : 55 + (mag7Changes.reduce((a, b) => (a as number) + (b as number), 0)! / 7 > 0 ? 5 : -5)
 
     console.log(
-      `[v0] Alpha Vantage Phase 2: NVDA=${nvidiaPrice}, Change=${nvidiaChangePercent}%, Momentum=${nvidiaMomentum.toFixed(1)}, SOX=${soxIndex}, Mag7=${mag7Concentration.toFixed(1)}%`,
+      `[v0] Alpha Vantage Phase 2: NVDA=${nvidiaPrice}, Change=${nvidiaChangePercent}%, Momentum=${nvidiaMomentum.toFixed(1)}, SOX=${soxIndex ?? "—"}, Mag7=${mag7Concentration === null ? "—" : `${mag7Concentration.toFixed(1)}%`}`,
     )
 
     return {

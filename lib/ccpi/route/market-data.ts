@@ -106,7 +106,18 @@ export async function fetchMarketData() {
   const aaiData =
     results[9].status === "fulfilled"
       ? results[9].value
-      : { bullish: aaiiBullishResult.value, bearish: 30, neutral: 35, spread: 5, status: "baseline" as const }
+      : // bearish/neutral/spread were literals — 30, 35, 5 — invented whenever
+        // the AAII scrape failed. They are read only on the `live` branch today,
+        // so nothing consumed them, but an invented constant parked where a
+        // future caller will find it and believe it is exactly the shape P7-10
+        // warned about. Null means "not measured".
+        {
+          bullish: aaiiBullishResult.value,
+          bearish: null,
+          neutral: null,
+          spread: null,
+          status: "baseline" as const,
+        }
   const spxVal =
     results[10].status === "fulfilled"
       ? results[10].value
@@ -302,7 +313,16 @@ export async function fetchMarketData() {
     aaiiSpread: aaiData.status === "live" ? aaiData.spread : undefined,
 
     // Phase 1 indicators
-    nvidiaPrice: nvidiaPriceResult.value,
+    //
+    // 2026-08-30: this read `nvidiaPriceResult.value` unconditionally — an LLM
+    // asked "what is the current NVDA price" — while `fetchAlphaVantageIndicators`
+    // was fetching a REAL, metered NVDA quote in the same request and throwing it
+    // away. It was the only indicator on this route with no feed in front of the
+    // model; every other one here reads its real source first and treats the AI
+    // as a fallback. A price is a published fact, not something to recall.
+    //
+    // Measured first, model second, exactly like VIX above.
+    nvidiaPrice: alphaVantageData?.nvidiaPrice ?? nvidiaPriceResult.value,
     // Was read from fredData, which never carries this field — the momentum
     // actually computed from the Alpha Vantage NVDA quote was discarded and the
     // indicator was permanently 50 (neutral).
