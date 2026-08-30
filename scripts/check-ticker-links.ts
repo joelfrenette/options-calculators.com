@@ -76,7 +76,7 @@ const isSource = (p: string) => p.endsWith(".ts") || p.endsWith(".tsx")
 const CANDIDATES = [
   ...walk(join(ROOT, "app"), isSource),
   ...walk(join(ROOT, "components"), isSource),
-  ...walk(join(ROOT, "lib"), (p) => p.endsWith(".ts")),
+  ...walk(join(ROOT, "lib"), (p) => p.endsWith(".ts") || p.endsWith(".tsx")),
   ...walk(join(ROOT, "hooks"), isSource),
 ].filter((p) => rel(p) !== OWNER)
 

@@ -99,7 +99,7 @@ const SELF = join(ROOT, "scripts", "check-orphan-routes.ts")
 const REFERRERS = [
   ...walk(join(ROOT, "app"), (p) => p.endsWith(".ts") || p.endsWith(".tsx")),
   ...walk(join(ROOT, "components"), (p) => p.endsWith(".ts") || p.endsWith(".tsx")),
-  ...walk(join(ROOT, "lib"), (p) => p.endsWith(".ts")),
+  ...walk(join(ROOT, "lib"), (p) => p.endsWith(".ts") || p.endsWith(".tsx")),
   ...walk(join(ROOT, "hooks"), (p) => p.endsWith(".ts") || p.endsWith(".tsx")),
 ].filter((p) => p !== SELF && !INFRASTRUCTURE.includes(rel(p)))
 

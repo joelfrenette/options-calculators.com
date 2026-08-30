@@ -97,7 +97,7 @@ const COMPONENT_FILES = walk(join(ROOT, "components"), (p) => isSource(p) && !p.
 const ALL_SOURCE = [
   ...walk(join(ROOT, "app"), isSource),
   ...walk(join(ROOT, "components"), isSource),
-  ...walk(join(ROOT, "lib"), (p) => p.endsWith(".ts")),
+  ...walk(join(ROOT, "lib"), (p) => p.endsWith(".ts") || p.endsWith(".tsx")),
   ...walk(join(ROOT, "hooks"), isSource),
 ]
 

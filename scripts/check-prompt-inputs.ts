@@ -81,7 +81,7 @@ const REACHES_MODEL =
 
 const ALL = [
   ...walk(join(ROOT, "app"), (p) => p.endsWith(".ts") || p.endsWith(".tsx")),
-  ...walk(join(ROOT, "lib"), (p) => p.endsWith(".ts")),
+  ...walk(join(ROOT, "lib"), (p) => p.endsWith(".ts") || p.endsWith(".tsx")),
 ]
 const AI_FILES = ALL.filter((f) => REACHES_MODEL.test(readFileSync(f, "utf8")))
 
