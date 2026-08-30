@@ -19,7 +19,14 @@ function getAIProvider() {
         apiKey: xaiKey,
         baseURL: "https://api.x.ai/v1",
       }),
-      model: "grok-4.6",
+      // DELIBERATELY NOT the flagship grok-4.6 that lib/ai-providers.ts leads
+      // with. This module does not reason about anything — it asks a model for
+      // "the current VIX" and runs parseFloat over the reply. No LLM knows
+      // today's VIX, so a stronger model here buys a more CONFIDENT wrong
+      // number, not a truer one: a weaker model's hedge fails parseFloat and
+      // correctly becomes null, while a fluent guess sails through. Keep this
+      // cheap and keep it last-resort; the real fix is a data feed.
+      model: "grok-4.3",
       name: "xAI",
       tag: "xai",
     }

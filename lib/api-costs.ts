@@ -289,6 +289,9 @@ export const MODEL_TOKEN_PRICES: Record<string, TokenPrice> = {
   // Kept: still requested by lib/anthropic-market-data.ts, which stays on a
   // cheap model deliberately (a better model cannot recall today's VIX).
   "claude-haiku-4-5": { inputPerM: 1, outputPerM: 5 },
+  // Cheap tier, used ONLY by lib/grok-market-data.ts — the number-recall path,
+  // which is deliberately not on the flagship. See that file's comment.
+  "grok-4.3": { inputPerM: 1.25, outputPerM: 2.5 },
   "grok-4.6": {
     inputPerM: 2,
     outputPerM: 6,
