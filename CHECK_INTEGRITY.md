@@ -87,6 +87,56 @@ Three times the baseline looked stale and the check was broken instead.
 
 ---
 
+---
+
+## A second class: nine defects no check was designed to catch
+
+The six above are defects **in** the checks. This is different — nine real
+defects in the app that every existing check passed, because none of them was
+asking the question.
+
+Nine localStorage caches served a reading without ever comparing its age:
+
+| | Cache | What was wrong |
+|---|---|---|
+| 1 | CCPI snapshot | `cachedAt` written since the file was created, never once read |
+| 2–7 | Six scanner caches | No age check at all — and the stored timestamp was `new Date().toLocaleString()`, a locale **display** string that could not have supported one |
+| 8 | Fear & Greed | ISO timestamp written, read, **displayed**, never compared. The serve decision checked the payload's shape and a `CACHE_VERSION` instead |
+| 9 | Social sentiment | Epoch timestamp read only for "last updated"; the serve decision was `if (cached)` |
+
+Six of those were **scanner tables** — strike, max profit, max loss, probability
+of profit — every figure computed off an underlying price that had since moved,
+rendering identically whether the scan was thirty seconds or thirty days old.
+
+### Why every existing rule passed
+
+This suite's data-integrity checks ask whether a number was **measured**. They
+do not ask whether it is still **true**.
+
+A cached reading passes all of them. It *was* measured. It *was not* invented.
+Its provenance is honest and its label is accurate. It is simply no longer
+current — and that is a property none of `check-provenance`, `check-null-guards`
+or the invented-constant rules were built to test.
+
+That is worth stating precisely because the fix is not "add more of the same
+checks". It is a different question, and it needed its own:
+`scripts/check-cache-ttl.ts` asserts that every file reading `localStorage` and
+serving it also compares a stored time against `Date.now()`.
+
+### The shape, for recognising the tenth
+
+**A timestamp that is stored, often read, and used for the label rather than the
+decision.** Nothing fails; the label is even correct. In eight of the nine the
+timestamp was right there in the read path, one line from the `if` that decided
+whether to serve.
+
+`components/scanner/scan-cache.ts` is the counter-example and the model: it had
+`isCacheValid()` and removed expired entries before any of this was written. It
+is the CSP wheel scanner's cache — the most consequential one in the app — and
+it was the one already done right.
+
+---
+
 ## Two lessons worth carrying
 
 **A check cannot be trusted until it has failed.** Every fix here was verified by
