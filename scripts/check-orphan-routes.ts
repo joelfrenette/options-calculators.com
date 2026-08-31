@@ -87,8 +87,31 @@ const INFRASTRUCTURE = [
   "app/api/admin/run-health-checks/route.ts",
   "lib/api-contracts.ts",
   "lib/remediation.ts",
+  // Added 2026-08-30. P7-82 split lib/remediation.ts into lib/remediation/*,
+  // and THIS LIST WAS NEVER UPDATED. The route->key map moved with the split:
+  // remediation-providers.ts now holds 17 route-path literals in real code
+  // (not comments, so the stripper does not remove them), and helpers.ts one
+  // more. Both therefore counted as FEATURE CALLERS of every route they name.
+  //
+  // The visible symptom was a NOTE claiming four known-orphans — google-trends,
+  // serper-finance, macro-indicators, scraping-bee — were "now called". Not one
+  // of them is called by anything. They are named by the remediation map, which
+  // is the definition of infrastructure this list exists to exclude.
+  //
+  // The under-reporting direction is the dangerous one: any route that loses
+  // its last real caller still reads as referenced if the remediation map names
+  // it, and 17 of the 65 routes are named there.
+  //
+  // NOTE WHY THE SIZE ASSERTION BELOW DID NOT CATCH THIS. It fails when the
+  // list SHRINKS. A module SPLIT does not shrink the list — it creates new
+  // files that should have been ADDED, and no count of the old list can notice
+  // an absence. Size assertions catch drift, not omission; this is the same
+  // shape as check-dead-exports' `.tsx` filter, which was wrong from birth
+  // rather than narrowed later.
+  "lib/remediation/remediation-providers.ts",
+  "lib/remediation/remediation-helpers.ts",
 ]
-const EXPECTED_INFRASTRUCTURE = 3
+const EXPECTED_INFRASTRUCTURE = 5
 check(
   `the infrastructure list still holds ${EXPECTED_INFRASTRUCTURE} file(s)`,
   INFRASTRUCTURE.length === EXPECTED_INFRASTRUCTURE,
