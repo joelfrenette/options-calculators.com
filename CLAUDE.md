@@ -110,6 +110,23 @@ so the rule that exists to catch silent breakage was teaching the reader to expe
 wrong number. The route and contract counts are DERIVED from disk; the PASS baselines
 are PINNED to a constant in that script, so prose and constant must move together.
 
+**Two pins agreeing with each other is not verification.** `check-doc-figures.ts`
+compares the prose above against its own constant and nothing else, so moving both to
+the same wrong number PASSES. Set the figure from a measured count —
+`pnpm check:formulas > f.log 2>&1` then `grep -c '^PASS' f.log` — never from the pins
+agreeing. (Redirect first: piping straight into `grep -c` under-reports here.)
+
+**The checks themselves need auditing, and six defects were found in them on
+2026-08-30 — every one of them PASSING.** See `CHECK_INTEGRITY.md` for the taxonomy
+and the list. The two rules worth knowing before touching a check script:
+- **Size assertions catch drift, not omission.** They fail when a scope SHRINKS. A
+  scope that was never right, or that a module split left behind, shrinks nothing —
+  so its count stays "correct" while it covers less. Assert the PROPERTY, not the size.
+- **A rename is a scope change.** Deleting a module silently disabled a rule that
+  matched on its name, and the suite went on passing. A pattern used as a FILTER goes
+  quiet when it matches nothing; a pattern used as an ASSERTION fails loudly. Only the
+  first kind needs a floor on its match count.
+
 **A finding's status lives in AUDIT_BACKLOG.md's §STATUS LEDGER and nowhere else.**
 Write the narrative in the finding row; write `open` / `fixed` / `wontfix` /
 `verified-ok` in the ledger. Do not add a summary line of what is still open — the file
