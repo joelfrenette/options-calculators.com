@@ -110,8 +110,41 @@ const INFRASTRUCTURE = [
   // rather than narrowed later.
   "lib/remediation/remediation-providers.ts",
   "lib/remediation/remediation-helpers.ts",
+  // Found by the omission guard below, on its first run, immediately after the
+  // two above were added by hand. A fourth file from the same split, and one a
+  // manual sweep missed: it names five routes inside remediation PROSE —
+  // `${result.path} answered ...`, "Live precedent this session: /api/vix ...".
+  // Those are template literals, not comments, so the stripper leaves them and
+  // they counted as calls.
+  //
+  // That is the argument for the guard in one line: three files were found by
+  // reasoning about the split, and the fourth was found by asserting the
+  // property. Reasoning about a refactor finds what you remember about it.
+  "lib/remediation/remediation-branches.ts",
 ]
-const EXPECTED_INFRASTRUCTURE = 5
+const EXPECTED_INFRASTRUCTURE = 6
+
+/**
+ * THE OMISSION GUARD.
+ *
+ * The size assertion below cannot notice a file that SHOULD have been added —
+ * that is how a route->key map survived a module split and started counting as
+ * a feature caller. So this asserts the property directly instead of the count:
+ *
+ *   every file that enumerates route paths in bulk is EITHER declared
+ *   infrastructure OR is a real caller.
+ *
+ * "In bulk" is the discriminator, and it is deliberately structural. A feature
+ * calls one or two routes; a registry, contract table or remediation map names
+ * many. Anything naming BULK_ROUTE_THRESHOLD or more distinct routes and not on
+ * the INFRASTRUCTURE list is either a new map nobody declared (in which case
+ * this check has silently started excusing every route it names), or a genuine
+ * hub worth an explicit decision. Both deserve a failure rather than silence.
+ *
+ * This is the guard the previous three defects all needed and none had: a rule
+ * about what the scope MUST contain, not merely about how big it is.
+ */
+const BULK_ROUTE_THRESHOLD = 5
 check(
   `the infrastructure list still holds ${EXPECTED_INFRASTRUCTURE} file(s)`,
   INFRASTRUCTURE.length === EXPECTED_INFRASTRUCTURE,
@@ -177,6 +210,29 @@ const referencesPath = (src: string, path: string): boolean => {
     if (next === undefined || !/[\w\-/]/.test(next)) return true
     from = at + 1
   }
+}
+
+// --- the omission guard, run before the orphan sweep uses sourceByFile -------
+{
+  const allPaths = ROUTE_FILES.map(routePath)
+  const undeclaredBulk: string[] = []
+  for (const [file, src] of sourceByFile) {
+    const relPath = rel(file)
+    if (INFRASTRUCTURE.includes(relPath)) continue
+    // A route file naming its own siblings is not a registry.
+    if (relPath.startsWith("app/api/")) continue
+    const named = allPaths.filter((p) => referencesPath(src, p))
+    if (named.length >= BULK_ROUTE_THRESHOLD) {
+      undeclaredBulk.push(`${relPath} (${named.length} routes)`)
+    }
+  }
+  check(
+    "no undeclared file enumerates routes in bulk",
+    undeclaredBulk.length === 0,
+    undeclaredBulk.length === 0
+      ? `every bulk route list is declared infrastructure (threshold ${BULK_ROUTE_THRESHOLD})`
+      : `${undeclaredBulk.join(", ")} — add to INFRASTRUCTURE (and move EXPECTED_INFRASTRUCTURE with it) or confirm it is a real caller`,
+  )
 }
 
 const orphans: string[] = []
