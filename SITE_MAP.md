@@ -218,6 +218,7 @@ _None._
 | `components/scanner/use-wheel-scanner.ts` | 664 | 64 |
 | `lib/api-contracts.ts` | 653 | 53 |
 | `components/scanner/relaxed-results-table.tsx` | 629 | 29 |
+| `components/market-sentiment.tsx` | 624 | 24 |
 | `components/admin/health-check-panel.tsx` | 622 | 22 |
 | `components/calendar-spread-scanner.tsx` | 607 | 7 |
 | `components/earnings-economic-calendar.tsx` | 607 | 7 |

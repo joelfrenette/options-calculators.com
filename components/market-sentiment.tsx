@@ -147,8 +147,32 @@ export function MarketSentiment() {
     const cachedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY)
     const cacheVersion = localStorage.getItem(CACHE_VERSION_KEY)
 
-    // Check cache version and if data is from cache
-    const isDataFromCache = cachedData && cachedTimestamp && cacheVersion === CACHE_VERSION
+    // AGE, not just shape and version.
+    //
+    // `cachedTimestamp` has always been written as an ISO string and READ ONLY
+    // FOR DISPLAY — `setLastUpdated(new Date(cachedTimestamp))` below. The
+    // validity predicate that follows checks the payload's SHAPE and the
+    // CACHE_VERSION, then returns early with "don't auto-fetch when cache is
+    // valid". Neither of those is time: a code change could invalidate this
+    // cache, but the passage of a day could not, so a Fear & Greed reading from
+    // any distance in the past rendered as the current one.
+    //
+    // Seventh instance of this shape found on 2026-08-30 — after the CCPI
+    // snapshot and the six scanner caches. Four hours, matching the CCPI cache
+    // rather than the scanners' thirty minutes, because this is the same KIND
+    // of reading: a slow-moving sentiment index, not strike-level option
+    // pricing that moves continuously.
+    const CACHE_TTL_MS = 4 * 60 * 60 * 1000
+    const cachedAgeMs = cachedTimestamp ? Date.now() - Date.parse(cachedTimestamp) : Number.NaN
+    const cacheIsFresh = Number.isFinite(cachedAgeMs) && cachedAgeMs <= CACHE_TTL_MS
+    if (cachedTimestamp && !cacheIsFresh) {
+      console.log(
+        `[v0] Fear & Greed cache is ${Math.round(cachedAgeMs / 60000)} min old (TTL ${CACHE_TTL_MS / 60000} min) — refetching rather than showing a stale reading as current`,
+      )
+    }
+
+    // Check cache version, age, and if data is from cache
+    const isDataFromCache = cachedData && cachedTimestamp && cacheVersion === CACHE_VERSION && cacheIsFresh
 
     if (isDataFromCache) {
       try {
