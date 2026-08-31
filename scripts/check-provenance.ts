@@ -861,13 +861,30 @@ check(
 //
 // A module is in scope if it CALLS a provider SDK or imports a module that
 // does — both of which require an edit to the module's actual behaviour.
-const AI_HELPER_IMPORT = /from\s+["'](?:\.\.?\/|@\/lib\/)(grok-market-data|unified-ai-fallback|ai-providers|earnings-calendar-ai)["']/
+// `grok-market-data` removed from this list 2026-08-30: the module was deleted
+// with the xAI provider. `groq-llm-market-data` and `anthropic-market-data` are
+// the two that remain, and are named here because lib/scraping-bee.tsx imports
+// the first directly.
+const AI_HELPER_IMPORT =
+  /from\s+["'](?:\.\.?\/|@\/lib\/)(groq-llm-market-data|anthropic-market-data|unified-ai-fallback|ai-providers|earnings-calendar-ai)["']/
 const AI_MODULES = walk(join(ROOT, "lib"), (p) => p.endsWith(".ts") || p.endsWith(".tsx")).filter((f) => {
   const src = code(f)
   return PROVIDER_MARKER.test(src) || AI_HELPER_IMPORT.test(src)
 })
+/**
+ * Call sites that reach a model. Named from what the codebase actually calls
+ * today, not from one provider's helper family — the previous form hard-coded
+ * "Grok" three ways and emptied itself when that provider was removed.
+ */
+const AI_CALL_SITE =
+  /\b(?:fetchMarketDataWith\w+|\w+With(?:GroqLLM|Anthropic)|generateWithFallback|streamWithFallback)\s*\(/
+
+/** Floor for AI_CALL_SITE matches. Below this, the pattern has stopped working. */
+const MIN_AI_CALL_SITES = 10
+
 const aiConstants: string[] = []
 const aiLiveClaims: string[] = []
+let aiCallSites = 0
 for (const f of AI_MODULES) {
   const src = code(f)
   src.split("\n").forEach((line, i) => {
@@ -887,11 +904,36 @@ for (const f of AI_MODULES) {
   // 30 lines covers every current call site with room to spare.
   const lines = src.split("\n")
   lines.forEach((line, i) => {
-    if (!/WithGrok\(|fetchMarketDataWithGrok\(|generateWithFallback\(/.test(line)) return
+    if (!AI_CALL_SITE.test(line)) return
+    aiCallSites++
     const window = lines.slice(i, i + 30).join("\n")
     if (/status:\s*["']live["']/.test(window)) aiLiveClaims.push(`${rel(f)}:${i + 1}`)
   })
 }
+
+// THIS RULE WAS SWITCHED OFF BY A RENAME, 2026-08-30, and it passed silently.
+//
+// The pattern was `/WithGrok\(|fetchMarketDataWithGrok\(|generateWithFallback\(/`.
+// Removing the xAI provider deleted lib/grok-market-data.ts and repointed
+// lib/scraping-bee.tsx at `fetchMarketDataWithGroqLLM` — so two of the three
+// alternatives stopped matching anything, and scraping-bee's AI calls left the
+// rule's coverage entirely.
+//
+// The comment above names the exact case now uncovered: `scrapeAAIISentiment`
+// has 16 lines between its model call and its `status: "live"`, which is why
+// the window was widened from 8 to 30 after a human found it. That instance was
+// walked straight back out of scope by a rename, in a check written to catch
+// scope decay, with a PASS line that did not change by one character.
+//
+// Two fixes, because either alone repeats the failure. The pattern is now
+// derived from the call NAMES the codebase actually uses, and the number of
+// matched CALL SITES is asserted — the module floor above counts modules, not
+// call sites, so it could not have noticed.
+check(
+  "scope: the AI call-site rule still matches call sites",
+  aiCallSites >= MIN_AI_CALL_SITES,
+  `${aiCallSites} call site(s), floor ${MIN_AI_CALL_SITES} — a rename that empties this pattern must FAIL, not pass quietly`,
+)
 // The count that P6-75 quietly changed from 12 to 11 is now asserted, not just
 // printed. This is the specific instance the floors above generalise.
 check(

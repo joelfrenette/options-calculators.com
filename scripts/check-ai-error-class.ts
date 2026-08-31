@@ -156,9 +156,10 @@ check(
  * OWN try block actually invokes the model. An outer catch that wraps key
  * resolution and prompt construction has no call to record — metering it would
  * inflate the ledger with calls that were never made, which is the same class
- * of lie as not recording the ones that were. lib/grok-market-data.ts has
- * exactly this shape: an inner try around generateText that must meter, inside
- * an outer try that must not.
+ * of lie as not recording the ones that were. lib/grok-market-data.ts had
+ * exactly this shape (deleted 2026-08-30 with the xAI provider): an inner try
+ * around generateText that had to meter, inside an outer try that must not. The
+ * rule is kept because the shape recurs, not because that file still exists.
  */
 function tryCatchPairs(text: string): { tryBody: string; catchBody: string }[] {
   const pairs: { tryBody: string; catchBody: string }[] = []
@@ -411,7 +412,7 @@ const fetcherSlugs = fetchers
 check(
   "scope: each market-data fetcher pins one model slug",
   fetcherSlugs.length === 2,
-  `${fetcherSlugs.length} — grok-market-data picks its slug at runtime, so 2 of 3 are static`,
+  `${fetcherSlugs.length} static slug(s) — both remaining fetchers pin a const MODEL`,
 )
 const unpricedFetchers = fetcherSlugs.filter((slug) => !(slug in MODEL_TOKEN_PRICES))
 check(
