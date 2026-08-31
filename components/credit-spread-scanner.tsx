@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { loadScanFromCache } from "@/lib/scanner-cache"
 import { Metric, PricingProvenance } from "@/components/pricing-provenance"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -70,12 +71,13 @@ export function CreditSpreadScanner() {
   const [maxMargin, setMaxMargin] = useState(1000) // Step 1 dollar filter: max buying-power reduction per spread ($)
 
   useEffect(() => {
-    const cached = localStorage.getItem("credit-spread-scanner-cache")
+    // Age-checked: an expired scan returns null and the table stays empty,
+    // rather than restoring strikes priced off an underlying that has moved.
+    const cached = loadScanFromCache<Parameters<typeof setSetups>[0]>("credit-spread-scanner-cache")
     if (cached) {
       try {
-        const { data, timestamp } = JSON.parse(cached)
-        setSetups(data)
-        setLastUpdated(timestamp)
+        setSetups(cached.data)
+        setLastUpdated(cached.timestamp)
       } catch {
         // Invalid cache, will fetch fresh
       }
@@ -140,6 +142,7 @@ export function CreditSpreadScanner() {
         localStorage.setItem(
           "credit-spread-scanner-cache",
           JSON.stringify({
+            savedAt: new Date().toISOString(),
             data: data.creditSpreads,
             timestamp: new Date().toISOString(),
 

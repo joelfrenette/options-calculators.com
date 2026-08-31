@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { loadScanFromCache } from "@/lib/scanner-cache"
 import { Metric, PricingProvenance } from "@/components/pricing-provenance"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -93,12 +94,13 @@ export function CalendarSpreadScanner() {
   const [tooltipsEnabled, setTooltipsEnabled] = useState(true)
 
   useEffect(() => {
-    const cached = localStorage.getItem("calendar-spread-scanner-cache")
+    // Age-checked: an expired scan returns null and the table stays empty,
+    // rather than restoring strikes priced off an underlying that has moved.
+    const cached = loadScanFromCache<Parameters<typeof setSpreads>[0]>("calendar-spread-scanner-cache")
     if (cached) {
       try {
-        const { data, timestamp } = JSON.parse(cached)
-        setSpreads(data)
-        setLastUpdated(timestamp)
+        setSpreads(cached.data)
+        setLastUpdated(cached.timestamp)
       } catch {
         // Invalid cache
       }
@@ -176,6 +178,7 @@ export function CalendarSpreadScanner() {
         localStorage.setItem(
           "calendar-spread-scanner-cache",
           JSON.stringify({
+            savedAt: new Date().toISOString(),
             data: data.calendarSpreads,
             timestamp,
             isLive: data.isLive || false,

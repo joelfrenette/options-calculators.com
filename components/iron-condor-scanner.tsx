@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { loadScanFromCache } from "@/lib/scanner-cache"
 import { Metric, PricingProvenance } from "@/components/pricing-provenance"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -69,12 +70,13 @@ export function IronCondorScanner() {
   const [maxMargin, setMaxMargin] = useState(1000) // Step 1 dollar filter: max buying-power reduction per condor ($)
 
   useEffect(() => {
-    const cached = localStorage.getItem("iron-condor-scanner-cache")
+    // Age-checked: an expired scan returns null and the table stays empty,
+    // rather than restoring strikes priced off an underlying that has moved.
+    const cached = loadScanFromCache<Parameters<typeof setSetups>[0]>("iron-condor-scanner-cache")
     if (cached) {
       try {
-        const { data, timestamp } = JSON.parse(cached)
-        setSetups(data)
-        setLastUpdated(timestamp)
+        setSetups(cached.data)
+        setLastUpdated(cached.timestamp)
       } catch {
         // Invalid cache
       }
@@ -141,6 +143,7 @@ export function IronCondorScanner() {
         localStorage.setItem(
           "iron-condor-scanner-cache",
           JSON.stringify({
+            savedAt: new Date().toISOString(),
             data: data.ironCondors,
             timestamp: new Date().toISOString(),
 

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { loadScanFromCache } from "@/lib/scanner-cache"
 import { Metric, PricingProvenance } from "@/components/pricing-provenance"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -101,12 +102,13 @@ export function ButterflyScanner() {
   const [maxDebit, setMaxDebit] = useState(1000) // Step 1 dollar filter: max net debit / capital at risk per spread ($)
 
   useEffect(() => {
-    const cached = localStorage.getItem("butterfly-scanner-cache")
+    // Age-checked: an expired scan returns null and the table stays empty,
+    // rather than restoring strikes priced off an underlying that has moved.
+    const cached = loadScanFromCache<Parameters<typeof setSetups>[0]>("butterfly-scanner-cache")
     if (cached) {
       try {
-        const { data, timestamp } = JSON.parse(cached)
-        setSetups(data)
-        setLastUpdated(timestamp)
+        setSetups(cached.data)
+        setLastUpdated(cached.timestamp)
       } catch {
         // Invalid cache
       }
@@ -181,7 +183,7 @@ export function ButterflyScanner() {
 
         localStorage.setItem(
           "butterfly-scanner-cache",
-          JSON.stringify({ data: data.butterflies, timestamp }),
+          JSON.stringify({ data: data.butterflies, timestamp, savedAt: new Date().toISOString() }),
         )
       } else {
         setError("No butterfly setups found. Try adjusting filters.")

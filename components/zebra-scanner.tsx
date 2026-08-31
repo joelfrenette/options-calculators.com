@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { loadScanFromCache } from "@/lib/scanner-cache"
 import { Metric, PricingProvenance } from "@/components/pricing-provenance"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -101,12 +102,13 @@ export function ZEBRAScanner() {
   const [maxDebit, setMaxDebit] = useState(1000) // Step 1 dollar filter: max net debit per spread ($)
 
   useEffect(() => {
-    const cached = localStorage.getItem("zebra-scanner-cache")
+    // Age-checked: an expired scan returns null and the table stays empty,
+    // rather than restoring strikes priced off an underlying that has moved.
+    const cached = loadScanFromCache<Parameters<typeof setSetups>[0]>("zebra-scanner-cache")
     if (cached) {
       try {
-        const { data, timestamp } = JSON.parse(cached)
-        setSetups(data)
-        setLastUpdated(timestamp)
+        setSetups(cached.data)
+        setLastUpdated(cached.timestamp)
       } catch {
         // Invalid cache
       }
@@ -171,7 +173,7 @@ export function ZEBRAScanner() {
 
         localStorage.setItem(
           "zebra-scanner-cache",
-          JSON.stringify({ data: data.zebra, timestamp }),
+          JSON.stringify({ data: data.zebra, timestamp, savedAt: new Date().toISOString() }),
         )
       } else {
         setError("No ZEBRA setups found. Try adjusting filters.")
