@@ -22,7 +22,7 @@
 // chains, which is exactly the disclosure `run-health-checks` is gated for.
 
 import { NextResponse } from "next/server"
-import { isAuthenticated } from "@/lib/auth"
+import { isAdmin } from "@/lib/auth"
 import { fetchWithTimeout } from "@/lib/fetch-timeout"
 
 export const dynamic = "force-dynamic"
@@ -282,7 +282,7 @@ async function loadCcpi(origin: string): Promise<{ payload: CcpiPayload; from: s
 }
 
 export async function GET(request: Request) {
-  if (!(await isAuthenticated())) {
+  if (!(await isAdmin())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 

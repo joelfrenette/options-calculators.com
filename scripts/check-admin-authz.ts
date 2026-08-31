@@ -23,8 +23,10 @@
  * docstring asserted exactly this rule, and it was false when written or false
  * within days of it. A rule that describes other files cannot verify itself.
  *
- * Scope is structural: every `route.ts` under app/api/admin/. Nothing here
- * depends on prose, naming conventions or a hand-maintained list.
+ * Scope is structural for rules 1-2: every `route.ts` under app/api/admin/.
+ * Rule 3 scopes by the CLAIM instead, because two routes OUTSIDE that directory
+ * said "admin-gated" in their own headers and were not. Nothing here
+ * depends on naming conventions or a hand-maintained list.
  *
  * Run: node scripts/check-admin-authz.ts
  */
@@ -130,9 +132,57 @@ check(
     : `${ungated.join(", ")} — an ungated handler in a gated FILE is how api-keys POST stayed member-writable`,
 )
 
+// --- rule 3: a route that CLAIMS admin-gating must actually be admin-gated --
+//
+// The directory is not the boundary. Two routes OUTSIDE app/api/admin/ said so
+// in their own headers and were on the role-blind gate anyway:
+//
+//   app/api/ai-status          "Admin-gated (A-9): the payload discloses which
+//                               AI keys are configured."
+//   app/api/data-source-status "It is admin-gated (A-9): it enumerates the
+//                               provider stack and the fallback chains, which is
+//                               exactly the disclosure run-health-checks is
+//                               gated for."
+//
+// Both sentences were false from 2026-08-27, when members split the role and
+// `isAuthenticated` stopped meaning "the owner". Rules 1 and 2 above would never
+// have found them — they scope by directory, and these are not in it.
+//
+// This rule scopes by the CLAIM, which is the one case where reading prose is
+// correct rather than fragile: the prose IS the thing being verified. It is the
+// same discipline as check-provenance.ts — a label is a claim, and a claim about
+// access control is worth no less than one about a data source. Reword the
+// comment away and the route simply leaves this rule's scope, which is honest:
+// there is then no claim left to break.
+
+const ALL_ROUTES = walk(join(ROOT, "app", "api")).map((f) => ({
+  file: rel(f),
+  raw: readFileSync(f, "utf8"),
+  src: code(readFileSync(f, "utf8")),
+}))
+
+const CLAIMS_ADMIN = /admin[- ]gated|admin[- ]only/i
+
+const claimants = ALL_ROUTES.filter((r) => CLAIMS_ADMIN.test(r.raw))
+const EXPECTED_CLAIMANTS = 7
+check(
+  "scope: every route claiming admin-gating is in scope",
+  claimants.length === EXPECTED_CLAIMANTS,
+  `${claimants.length} route(s) claim it, want ${EXPECTED_CLAIMANTS} — ${claimants.map((c) => c.file).join(", ")}`,
+)
+
+const brokenClaims = claimants.filter((r) => !ADMIN_GATE.test(r.src)).map((r) => r.file)
+check(
+  "every route claiming admin-gating actually checks admin",
+  brokenClaims.length === 0,
+  brokenClaims.length === 0
+    ? `${claimants.length} claim(s) hold`
+    : `${brokenClaims.join(", ")} — the comment says admin-gated and the code does not`,
+)
+
 console.log(
   failures === 0
-    ? `\nAll admin-authz checks passed — ${handlers} handler(s) across ${ADMIN_ROUTES.length} route file(s).`
+    ? `\nAll admin-authz checks passed — ${handlers} handler(s) across ${ADMIN_ROUTES.length} route file(s), ${claimants.length} admin claim(s) verified.`
     : `\n${failures} admin-authz check(s) FAILED.`,
 )
 process.exit(failures === 0 ? 0 : 1)
