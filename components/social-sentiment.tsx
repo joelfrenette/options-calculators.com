@@ -87,10 +87,23 @@ export function SocialSentiment() {
     const cached = localStorage.getItem(CACHE_KEY)
     const cacheTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY)
 
-    if (cached) {
+    // AGE, not just presence. `cacheTimestamp` was read only to render "last
+    // updated" — the decision to serve the cache was `if (cached)` and nothing
+    // else, so a social-sentiment reading from any distance in the past
+    // rendered as current beside an accurate timestamp nothing compared against
+    // the clock. Ninth instance of this shape found 2026-08-30.
+    //
+    // Four hours, matching the CCPI and Fear & Greed caches: this is a
+    // slow-moving sentiment reading, not strike-level option pricing (the
+    // scanner caches use thirty minutes for that reason).
+    const CACHE_TTL_MS = 4 * 60 * 60 * 1000
+    const savedAtMs = cacheTimestamp ? Number.parseInt(cacheTimestamp, 10) : Number.NaN
+    const cacheIsFresh = Number.isFinite(savedAtMs) && Date.now() - savedAtMs <= CACHE_TTL_MS
+
+    if (cached && cacheIsFresh) {
       try {
         setData(JSON.parse(cached))
-        setLastUpdated(cacheTimestamp ? new Date(Number.parseInt(cacheTimestamp)) : null)
+        setLastUpdated(new Date(savedAtMs))
         setIsFromCache(true)
       } catch {
         // Cache parse failed, need to fetch

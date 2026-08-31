@@ -17,7 +17,7 @@
 | `risk-management` | CBOE VIX Volatility Index | `RiskCalculator` | `components/risk-calculator.tsx` | 577 | `/api/vix`<br>`/api/vix-history` |
 | `market-sentiment` | CNN's Fear & Greed | — | — | — | none (static) |
 | `panic-euphoria` | Citibank's Panic & Euphoria Index | — | — | — | none (static) |
-| `social-sentiment` | Social Sentiment Index | `SocialSentiment` | `components/social-sentiment.tsx` | 165 | `/api/social-sentiment` |
+| `social-sentiment` | Social Sentiment Index | `SocialSentiment` | `components/social-sentiment.tsx` | 178 | `/api/social-sentiment` |
 | `fomc-predictions` | FOMC Fed Rate Forecaster | `FomcPredictions` | `components/fomc-predictions.tsx` | 550 | `/api/fomc-predictions` |
 | `cpi-inflation` | BLS CPI Inflation Forecaster | `CpiInflationAnalysis` | `components/cpi-inflation-analysis.tsx` | 153 | `/api/cpi-inflation` |
 | `jobs` | BLS Jobs Rate Forecaster | `JobsReportDashboard` | `components/jobs-report-dashboard.tsx` | 170 | `/api/jobs-report` |
