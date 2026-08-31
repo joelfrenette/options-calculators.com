@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { isAuthenticated } from "@/lib/auth"
+import { isAdmin } from "@/lib/auth"
 import { getProviderChain } from "@/lib/ai-providers"
 import { hasRawKey, isServiceDisabled } from "@/lib/api-keys"
 import { getAiProviderHealth, observedState } from "@/lib/ai-provider-health"
@@ -24,7 +24,7 @@ import { getAiProviderHealth, observedState } from "@/lib/ai-provider-health"
 export const dynamic = "force-dynamic"
 
 export async function GET() {
-  if (!(await isAuthenticated())) {
+  if (!(await isAdmin())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 

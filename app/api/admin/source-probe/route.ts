@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { isAuthenticated } from "@/lib/auth"
+import { isAdmin } from "@/lib/auth"
 import { looksBlocked, parseMultplPE, parseMultplPS } from "@/lib/valuation-parsers"
 
 export const dynamic = "force-dynamic"
@@ -115,7 +115,7 @@ function extractCboeRatio(csv: string): string | null {
 }
 
 export async function GET(request: NextRequest) {
-  if (!(await isAuthenticated())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const results = await Promise.all([
     probe(

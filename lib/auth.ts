@@ -190,8 +190,32 @@ export async function deleteSession() {
 }
 
 /** Any valid session — member or admin. The middleware's question. */
+/**
+ * ANY valid session — admin OR member.
+ *
+ * Read the name literally. Since members shipped (2026-08-27) this answers
+ * "is someone signed in", not "may they be here", and eight /api/admin routes
+ * were using it as though it still meant the latter. See {@link isAdmin}.
+ */
 export async function isAuthenticated() {
   return verifyToken(await getSession()) !== null
+}
+
+/**
+ * ADMIN ONLY, boolean form.
+ *
+ * `verifyAuth` already existed and is correct, but returns `{authenticated,
+ * error}`; the eight routes that needed fixing all had the shape
+ * `if (!(await isAuthenticated()))`. Giving the admin check the same boolean
+ * shape made those a one-word change instead of nine hand-restructured
+ * handlers — the smaller diff is the safer one on an auth path.
+ *
+ * Use this or `verifyAuth` for anything under /api/admin.
+ * `scripts/check-admin-authz.ts` fails the suite if an admin route reaches for
+ * `isAuthenticated` instead.
+ */
+export async function isAdmin(): Promise<boolean> {
+  return verifyToken(await getSession())?.role === "admin"
 }
 
 /** The session's role and email for the UI (e.g. showing the Admin button
@@ -203,10 +227,25 @@ export async function getSessionInfo(): Promise<{ role: SessionRole; email: stri
 }
 
 /**
- * ADMIN-ONLY gate. Every existing /api/admin route calls this, so the safe
- * default when members arrived was to keep its meaning: a member session is
- * NOT authenticated here. Anything both roles may use checks isAuthenticated
- * (or is covered by the middleware gate) instead.
+ * ADMIN-ONLY gate, object form. `{authenticated, error}`; see {@link isAdmin}
+ * for the boolean equivalent.
+ *
+ * THIS DOCSTRING USED TO CLAIM "Every existing /api/admin route calls this",
+ * AND IT WAS FALSE. When members shipped on 2026-08-27 only two routes did —
+ * this file's own reasoning about the safe default was correct, and eight
+ * /api/admin routes were left on `isAuthenticated()`, which a member passes.
+ * Middleware did not cover them either: it makes a session-only routing
+ * decision and says so, delegating role checks to "admin routes [which] still
+ * run their own verifyAuth (role-aware) on the node side". Eight of them did
+ * not.
+ *
+ * The sharpest case was inverted — /api/admin/api-keys GET required admin while
+ * its POST accepted any member, so writing keys was less protected than reading
+ * them.
+ *
+ * A comment asserting a property of code elsewhere is a claim, and this one
+ * outlived its truth by four days. `scripts/check-admin-authz.ts` now enforces
+ * it instead of asserting it.
  */
 export async function verifyAuth(_request?: Request) {
   const session = await getSession()

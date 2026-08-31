@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { isAuthenticated, isPasswordHashed } from "@/lib/auth"
+import { isAdmin, isPasswordHashed } from "@/lib/auth"
 import { API_KEY_ALIASES, getDisabledServices, hasRawKey, resolveApiKey } from "@/lib/api-keys"
 import { ROUTE_CONTRACTS, type RouteContract, errorShape, routesByRequiredKey } from "@/lib/api-contracts"
 import { getSeriesCoverage } from "@/lib/market-series"
@@ -441,7 +441,7 @@ async function universeFreshnessReport() {
 }
 
 export async function GET(request: NextRequest) {
-  if (!(await isAuthenticated())) {
+  if (!(await isAdmin())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 

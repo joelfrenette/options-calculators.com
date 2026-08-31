@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { isAuthenticated } from "@/lib/auth"
+import { isAdmin } from "@/lib/auth"
 import { API_COSTS, getCostSummary } from "@/lib/api-costs"
 import { hasRawKey, isServiceDisabled, getDisabledServices, getMonthlyBudgetTarget } from "@/lib/api-keys"
 import {
@@ -13,7 +13,7 @@ import {
 } from "@/lib/metered-fetch"
 
 export async function GET() {
-  if (!(await isAuthenticated())) {
+  if (!(await isAdmin())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 

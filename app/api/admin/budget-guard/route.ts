@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { isAuthenticated } from "@/lib/auth"
+import { isAdmin } from "@/lib/auth"
 import {
   getGuardStatus,
   clearBudgetGuard,
@@ -25,7 +25,7 @@ import { TOKEN_PRICES_AS_OF } from "@/lib/api-costs"
 export const dynamic = "force-dynamic"
 
 export async function GET() {
-  if (!(await isAuthenticated())) {
+  if (!(await isAdmin())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
@@ -43,7 +43,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await isAuthenticated())) {
+  if (!(await isAdmin())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 

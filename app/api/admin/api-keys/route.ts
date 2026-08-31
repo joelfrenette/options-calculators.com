@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { verifyAuth, isAuthenticated } from "@/lib/auth"
+import { verifyAuth, isAdmin } from "@/lib/auth"
 import { API_KEY_ALIASES, getConfiguredKeys, getKeySource, hasRawKey, isServiceDisabled } from "@/lib/api-keys"
 import {
   clearOverride,
@@ -79,7 +79,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!(await isAuthenticated())) {
+  if (!(await isAdmin())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
