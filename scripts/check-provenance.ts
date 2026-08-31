@@ -486,10 +486,18 @@ for (const field of ["priceSource", "deltaSource"]) {
 // only walked `catch`, and the very next 200-on-error found in this sweep sat
 // in an ordinary `if (!response.ok)` branch — the shape of the defect has
 // nothing to do with exceptions.
+/**
+ * Floor for JSON-response call sites across the route files. Below this, the
+ * response idiom has moved and the rule below has stopped covering anything.
+ */
+const MIN_JSON_RESPONSES = 100
+
 const badStatus: string[] = []
+let jsonResponses = 0
 for (const f of API_FILES) {
   const src = code(f)
   for (const m of src.matchAll(/(?:NextResponse|Response)\.json\(/g)) {
+    jsonResponses++
     let i = m.index! + m[0].length
     let depth = 1
     while (i < src.length && depth > 0) {
@@ -520,6 +528,21 @@ for (const f of API_FILES) {
     badStatus.push(`${rel(f)}${statusArg ? "" : " (no status — defaults to 200)"}`)
   }
 }
+// A FILTER THAT MATCHES NOTHING REPORTS NOTHING, which is indistinguishable
+// from a clean sweep. `API_FILES` is floored above, but the response idiom
+// INSIDE those files was not: move the codebase to a `jsonError()` helper, or
+// let Next.js change its shorthand, and this regex matches zero call sites, the
+// rule covers nothing, and the PASS line reads exactly as it does today.
+//
+// This is the same shape as the AI call-site rule a rename emptied earlier in
+// this session, applied to a more important rule: HTTP-200-with-an-error-body is
+// a CLAUDE.md house rule that has already been violated NINE times, three of
+// them with a comment explaining the downgrade.
+check(
+  "scope: the JSON-response idiom still matches call sites",
+  jsonResponses >= MIN_JSON_RESPONSES,
+  `${jsonResponses} response(s) across ${API_FILES.length} route file(s), floor ${MIN_JSON_RESPONSES}`,
+)
 check(
   "no catch block returns an error body at HTTP 200",
   badStatus.length === 0,
