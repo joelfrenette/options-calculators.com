@@ -123,15 +123,34 @@ export async function confirmPasswordReset(token: string, password: string): Pro
       return "That link is invalid or has expired — request a new one"
     }
 
-    const updated = await setMemberPassword(row.member_id, password)
-    if (!updated) return "Reset is not available right now"
-
-    await fetch(`${cfg.url}/rest/v1/password_resets?id=eq.${row.id}`, {
+    // ATOMIC single-use claim, BEFORE the password is set (2026-08-31).
+    //
+    // The read above and the write below used to be separate steps with the
+    // password change between them, so two concurrent submits of the same valid
+    // token both passed `!row.used_at` and both proceeded. Only the token-holder
+    // could trigger it, so it was low severity — but single-use is a property
+    // worth actually enforcing rather than checking-then-hoping.
+    //
+    // The `used_at=is.null` filter makes the database the arbiter: of two racing
+    // PATCHes only one matches an unused row and updates it; the other affects
+    // zero rows. `return=representation` lets us read the affected count. Claim
+    // first, set password second — so if the password write then fails the token
+    // is already burned (fail-closed: request a new one), never left reusable.
+    const claim = await fetch(`${cfg.url}/rest/v1/password_resets?id=eq.${row.id}&used_at=is.null`, {
       method: "PATCH",
-      headers: headers(cfg.key),
+      headers: { ...headers(cfg.key), Prefer: "return=representation" },
       body: JSON.stringify({ used_at: new Date().toISOString() }),
       signal: AbortSignal.timeout(5000),
     })
+    if (!claim.ok) return "Reset is not available right now"
+    const claimed = await claim.json()
+    if (!Array.isArray(claimed) || claimed.length === 0) {
+      // Another request consumed the token between our read and this claim.
+      return "That link is invalid or has expired — request a new one"
+    }
+
+    const updated = await setMemberPassword(row.member_id, password)
+    if (!updated) return "Reset is not available right now"
     return null
   } catch {
     return "Reset is not available right now"
