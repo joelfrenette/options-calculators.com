@@ -464,11 +464,13 @@ recomputes it.
 | P7-87 | P2 | fixed | The TED spread input was a corpse scored as live: FRED discontinued TEDRATE 2022-01-21, the desc/limit-1 fetch returned the terminal observation forever, and it tiered "live" at 13/100 of Macro daily — missing-data guards ask if a value exists, never when it is from, and the store staleness gate had been set to Infinity to accommodate exactly this. Retired: null on both paths, macro renormalises (ceiling 87), stored tail kept. Whether the weight moves to a SOFR-era successor is the owner's call. |
 | P7-88 | P2 | fixed | The CCPI subtitle claimed "AI-led market correction early warning oracle" — false twice: AI cannot move the score (P6-34), and the walk-forward confirmed zero early-warning candidates (§6b). Subtitle corrected; honesty line added under the gauge and PINNED to the §6b verdict heading it quotes (negative-tested both directions); oracle phrase retired. CSP verbs live on the allocation bands (cspAction), one ladder not two. |
 | P7-89 | P1 | fixed | Real data only, executed: the six LLM-only inputs (89/400 pts) and the dead TED spread dropped; per-pillar weights rescaled to exactly 100 (RA 37/30/33 · Val 32/21/29/18 · Macro 21/19/17/15/14/14); SOX measured via Yahoo; buffett ladder points 29 with cutoffs unchanged and table-equality asserted; canaries, payload, provenance, admin audit panels, UI counts, tooltips and five checks moved together. Ceilings 100/79/70 recomputed and pinned; five LLM calls per load removed. Provider-level fetcher corpses removed the same day: 15 functions (5 each across the OpenAI, Anthropic and Groq provider files) plus their 15 import lines; the shared prompt helpers keep their six surviving callers. |
+| P8-1 | P1 | fixed | Admin authorization gap. When members shipped (2026-08-27) `isAuthenticated()` changed meaning from "the owner" to "anyone signed in", and 8 `/api/admin` routes plus 2 disclosure routes that CLAIMED admin-gating stayed on it — member-reachable for days. api-keys POST was member-WRITABLE while its GET required admin. Closed via a new `isAdmin()` on all 10 routes; enforced per-HANDLER (not per-file) and by-claim by `scripts/check-admin-authz.ts`. |
+| P8-2 | P2 | open | Session role fails open to admin. `lib/auth.ts` maps any token whose role is not exactly `"member"` to `"admin"` — a compatibility shim for legacy `{exp}`-only tokens. Not exploitable (HMAC-gated), but a default that outlives its reason (P7-10 shape). Legacy tokens all expire by 2026-09-03 (members shipped 08-27, 7-day max age); flip it to reject unknown roles on or after that date. |
 | P7-15 | P3 | wontfix | `daysBetween` is written three times because two of the modules must stay import-free to remain loadable by their check scripts. Collapsing it would cost test coverage. |
 
 ### The open list, by severity
 
-293 findings recorded · **256 fixed · 9 wontfix · 2 verified-ok · 26 open.**
+295 findings recorded · **257 fixed · 9 wontfix · 2 verified-ok · 27 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -5642,3 +5644,15 @@ dropped inputs and gained the rescale's (net −9), and both scope pins moved de
 | ID | Sev | Area | Finding |
 |----|-----|------|---------|
 | P7-89 | P1 | ANALYZE → CCPI | The P6-35 decision executed with P7-87's retirement: six never-live inputs (89 weight points) and the dead TED spread left the tables; survivors rescaled to 100 per pillar; SOX gained a measured Yahoo source; every ladder, canary, payload key, admin-audit claim, UI label and check moved in one commit. Ceilings recomputed and pinned: 100 / 79 / 70. Every scored input now has a live path — the composite can no longer be accused of scoring a guess. |
+
+## Session 2026-08-30/31 — AI-chain, cache, check-integrity and authorization audit
+
+The narrative for this session's fixed work lives in `CHANGELOG.md` (the AI-chain
+arc), `CHECK_INTEGRITY.md` (six check defects + the nine-instance stale-cache
+class), and the commit log. Two findings are recorded here because they are the
+security pair, and because one is still open with a date attached.
+
+| ID | Sev | Area | Finding |
+|----|-----|------|---------|
+| P8-1 | P1 | auth / authorization | 8 `/api/admin` routes and 2 disclosure routes (ai-status, data-source-status) gated on `isAuthenticated()`, which any member passes since the role split on 2026-08-27; `verifyAuth`'s own docstring falsely claimed every admin route called it. api-keys POST was member-writable while GET required admin — the mutating handler less protected than the read. Closed with `isAdmin()` across all 10; `check-admin-authz.ts` now enforces it per-handler and by-claim (a route whose comment says "admin-gated" must actually gate). |
+| P8-2 | P2 | auth / authentication | `verifyToken` maps any role that is not exactly `"member"` to `"admin"` — fail-open to the highest privilege. A deliberate shim so legacy `{exp}`-only tokens keep the owner signed in; not exploitable (the HMAC is verified first). Every legacy token expires by 2026-09-03 (members shipped 08-27, `SESSION_MAX_AGE` 7 days), after which the shim guards nothing and should be flipped to reject unknown roles. |
