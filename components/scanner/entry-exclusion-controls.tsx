@@ -65,12 +65,14 @@ export function EntryExclusionControls({
       <div className="mt-8 pt-6 border-t border-blue-200">
         <h4 className="text-sm font-bold text-gray-900 mb-1">Entry exclusions</h4>
         <p className="text-xs text-gray-600 mb-4">
-          Three of these are <strong>on by default</strong> — the guardrails: a big up day, a down year, and a
-          Stage 4 decline. They remove candidates rather than rank them, and hold in the relaxed{" "}
-          {stepLabel("relaxed")} pass too (a down year is graded there — a large, mildly-down name is admitted). A
-          stock whose history is too short to measure is excluded by the filter that needs it, never passed
-          through. <strong>Trailing SPY is off by default</strong> — it over-excludes on a down market, and the{" "}
-          {stepLabel("relaxed")} pass already shows relative strength as a Beat SPY flag rather than a removal.
+          Two of these are <strong>on by default</strong> — the real CSP guardrails: a big up day (don&apos;t sell a
+          put into a spike) and a Stage 4 decline (a falling knife, below a falling 150-day average). They remove
+          candidates rather than rank them. A stock whose history is too short to measure is excluded by the filter
+          that needs it, never passed through. <strong>Down-year and above-200-SMA are off by default</strong> —
+          both are momentum filters, and the point of a cash-secured put is to be paid to own a quality company at a
+          pullback, which is often down on the year and below its 200-day. Turn them on for a strength-only screen.
+          The relaxed {stepLabel("relaxed")} pass still grades a down year (a large, mildly-down name is admitted)
+          and shows relative strength as a Beat SPY flag rather than a removal.
         </p>
 
         <div className="grid gap-4 md:grid-cols-2">

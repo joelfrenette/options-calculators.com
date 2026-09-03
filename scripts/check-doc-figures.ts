@@ -76,11 +76,12 @@ function walk(dir: string, match: (p: string) => boolean): string[] {
  */
 const BASELINES = {
   // 1154 → 1183 (29 ai-error-class) → 1191 (8 AI-tab liveness)
-  // → 1195 (4 model-price-coverage) → 1198 (3 billing-class) → 1197 (OpenAI removed) → 1196 (xAI removed) → 1197 (orphan omission guard) → 1198 (AI call-site floor) → 1199 (JSON-response floor) → 1202 (cache-TTL guard) → 1206 (admin-authz guard) → 1208 (admin-claim rule) → 1211 (postgrest-column check), 2026-08-30.
+  // → 1195 (4 model-price-coverage) → 1198 (3 billing-class) → 1197 (OpenAI removed) → 1196 (xAI removed) → 1197 (orphan omission guard) → 1198 (AI call-site floor) → 1199 (JSON-response floor) → 1202 (cache-TTL guard) → 1206 (admin-authz guard) → 1208 (admin-claim rule) → 1211 (postgrest-column check), 2026-08-30
+  // → 1213 (CSP value defaults: down-year + above-200-SMA OFF), 2026-08-31.
   // 1128 → 1137 (9 graded-down-year assertions) → 1139 (2 tunable-threshold)
   // → 1140 (laggard-default-off split) → 1154 (14 market-hours assertions),
   // 2026-08-29. Moved with the CLAUDE.md prose below.
-  formulas: 1211,
+  formulas: 1213,
   remediation: 31,
   typecheckKnown: 0,
 } as const

@@ -385,6 +385,19 @@ export function useWheelScanner() {
       setTechnicalResults(filteredStocks)
       fetchLandmines(filteredStocks)
 
+      // Auto-surface the relaxed pass when the strict pass came back empty
+      // (owner 2026-08-31). The relaxed candidates are exactly what a user
+      // reaches for next; hiding them behind a button they had to find is why
+      // one owner turned off the guardrails by hand instead. Markets are known
+      // open here — scanTechnicals returned early at blockedWhenClosed() — so
+      // the relaxed pricing calls are safe. Only fires when there are
+      // fundamentals to relax against, so an empty Step 3 does not trigger it.
+      if (filteredStocks.length === 0 && fundamentalResults.length > 0) {
+        console.log(`[v0] ${stepLabel("technical")} returned zero — auto-running the relaxed pass`)
+        setShowRelaxedResults(true)
+        runRelaxedPass()
+      }
+
       console.log(
         `[v0] ✅ ${stepLabel("technical")} Complete: ${filteredStocks.length} stocks passed technical filters (and enriched with options data)`,
       )
@@ -495,13 +508,13 @@ export function useWheelScanner() {
             ? 4 // This means step 3 finished and produced results (or was attempted and not yet shown)
             : 3 // Default to step 3 if no results yet but attempted scan
 
-  const toggleRelaxedResults = () => {
-    // Turning the relaxed pass ON prices every candidate (an API call each), so
-    // it carries the same closed-market backstop as the other steps. Hiding it
-    // again is always allowed.
-    if (!showRelaxedResults && blockedWhenClosed()) return
-    setShowRelaxedResults((prev) => !prev)
-    if (!showRelaxedResults) {
+  // The relaxed pass, factored out (owner 2026-08-31) so it runs from BOTH the
+  // manual toggle AND the automatic surface when strict Step 4 comes back
+  // empty. A user should not have to discover a button — or disable the
+  // guardrails by hand, which is what one owner did — to see the relaxed
+  // candidates the design already computes. Callers own the market-closed gate
+  // and the showRelaxedResults flag; this just does the work.
+  const runRelaxedPass = () => {
       setIsEnrichingRelaxed(true)
       setStep4Progress(0)
       setStep4CurrentTicker("")
@@ -594,7 +607,16 @@ export function useWheelScanner() {
           setError("Failed to enrich relaxed criteria results.")
           setIsEnrichingRelaxed(false)
         })
-    }
+  }
+
+  const toggleRelaxedResults = () => {
+    // Turning the relaxed pass ON prices every candidate (an API call each), so
+    // it carries the same closed-market backstop as the other steps. Hiding it
+    // again is always allowed.
+    if (!showRelaxedResults && blockedWhenClosed()) return
+    const willShow = !showRelaxedResults
+    setShowRelaxedResults(willShow)
+    if (willShow) runRelaxedPass()
   }
 
   // Verbatim from the Step-3 "no stocks passed" card's button (Phase 4 extraction).

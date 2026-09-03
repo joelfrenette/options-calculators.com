@@ -36,7 +36,15 @@ export function useTechnicalFilters() {
   // Step 4 empty. Re-enable for precise pullback-entry timing.
   const [requireBollingerBands, setRequireBollingerBands] = useState(false) // Bollinger Bands Setup
   // FIX: Renamed state variables from require200SMA to requireAbove200SMA and require50SMA to requireAbove50SMA
-  const [requireAbove200SMA, setRequireAbove200SMA] = useState(true) // Above 200-day SMA — KEPT ON: the long-term-uptrend guardrail
+  // Above-200-SMA default OFF (owner 2026-08-31, was ON). It is a
+  // buy-strength / momentum filter, and the stated CSP thesis is buy-quality-
+  // weakness: the richest-premium, lowest-risk cash-secured put is a
+  // fundamentally strong company that has PULLED BACK — often below its 200-day
+  // — to a level you would happily own it at. Requiring it above the 200 asks
+  // for the opposite of a bargain, and with excludeDownYear it was half of why
+  // Step 4 returned zero on any tape that was not roaring. The falling-knife
+  // risk is covered by excludeStage4 (a FALLING 150-day MA), which stays on.
+  const [requireAbove200SMA, setRequireAbove200SMA] = useState(false) // Above 200-day SMA — OFF: momentum filter, fights the bargain thesis
   // Above-50-SMA + Golden-Cross default OFF (owner 2026-08-29, both were ON).
   // They are the pullback contradiction: the richest-premium, lowest-risk CSP
   // is a fundamentally strong company (fundamentals pass, still above its
@@ -65,7 +73,15 @@ export function useTechnicalFilters() {
   // useState infers the literal type `10[]` and the setter stops accepting any
   // other number.
   const [maxDayMove, setMaxDayMove] = useState<number[]>([MAX_DAY_MOVE.DEFAULT])
-  const [excludeDownYear, setExcludeDownYear] = useState(true) // trailing year negative (GRADED in the relaxed pass)
+  // Down-year default OFF (owner 2026-08-31, was ON). A bargain is very often
+  // DOWN on the year — that is what makes it a bargain — so excluding down-year
+  // names removes the exact candidates a value CSP wants. It was the other half
+  // of the Step-4-returns-zero problem. The dangerous down-year names (falling
+  // knives) are still removed by excludeStage4; a quality name down YTD but NOT
+  // below a falling 150-day MA is a mild pullback, which is the target profile.
+  // Still GRADED in the relaxed pass and available as a toggle for anyone who
+  // wants a strength-only screen.
+  const [excludeDownYear, setExcludeDownYear] = useState(false) // trailing year negative — OFF: a bargain is often down YTD; Stage 4 guards the rest
   // Laggard-vs-SPY default OFF (owner 2026-08-29, was ON). It over-excludes on
   // a down-breadth day (nearly everything trails SPY) and is REDUNDANT with the
   // relaxed pass, which already surfaces relative strength as the soft Beat-SPY

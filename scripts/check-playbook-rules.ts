@@ -109,11 +109,19 @@ const gateBlock = implSrc.slice(implSrc.indexOf("export const cspEntryGates"))
 const gateKeys = [...gateBlock.slice(0, gateBlock.indexOf("})")).matchAll(/^\s{2}(\w+Check):/gm)].map((m) => m[1])
 
 const EXPECTED_GATES = 4
-// Of the four gates, three DEFAULT ON — the guardrails (big up day, down year,
-// Stage 4). The fourth, benchmark-laggard, defaults OFF (owner 2026-08-29): it
-// over-excludes on a down tape and the relaxed pass already surfaces relative
-// strength as the soft Beat-SPY column, so the strict removal is redundant.
-const EXPECTED_DEFAULT_ON = 3
+// Of the four gates, TWO default ON — the real CSP guardrails: big up day
+// (don't sell a put into a spike) and Stage 4 (a falling knife). Down-year and
+// benchmark-laggard both default OFF:
+//   - benchmark-laggard OFF (owner 2026-08-29): over-excludes on a down tape;
+//     the relaxed pass shows relative strength as the soft Beat-SPY column.
+//   - down-year OFF (owner 2026-08-31): a bargain is often down on the year,
+//     which is the whole CSP thesis — being paid to own a quality name at a
+//     pullback. Excluding down-year removed exactly those candidates and was
+//     half of why Step 4 returned zero. Stage 4 still guards the falling knives.
+// (Above-200-SMA, a separate technical-filter default in the same hook, also
+// moved to OFF the same day for the same reason; pinned by its own assertion
+// below rather than left as an unenforced comment.)
+const EXPECTED_DEFAULT_ON = 2
 check(
   `scope: ${gateKeys.length} entry gate(s) found in ${IMPL}`,
   gateKeys.length === EXPECTED_GATES,
@@ -181,25 +189,35 @@ for (const control of enforcedBy) {
 }
 
 /**
- * Three of the four gates default ON — the guardrails the page says the
- * scanner applies for the reader (big up day, down year, Stage 4). The
- * benchmark-laggard gate defaults OFF by design (owner 2026-08-29), so the
- * page copy must say THREE, not four; the assertion below pins both halves.
+ * TWO of the four gates default ON — the real CSP guardrails the page says the
+ * scanner applies for the reader (big up day, Stage 4). Down-year and
+ * benchmark-laggard default OFF by design, so the page copy must say TWO; the
+ * assertions below pin every half.
  */
 const hookSrc = HOOK_FILES.map((f) => readFileSync(join(ROOT, f), "utf8")).join("\n")
-const guardrailGates = ["excludeBigUpDay", "excludeDownYear", "excludeStage4"]
+const guardrailGates = ["excludeBigUpDay", "excludeStage4"]
 const defaultsOn = guardrailGates.filter((s) =>
   new RegExp(`\\[${s},\\s*set\\w+\\]\\s*=\\s*useState\\(true\\)`).test(hookSrc),
 )
 check(
-  "the three guardrail exclusions still default ON",
+  "the two guardrail exclusions still default ON",
   defaultsOn.length === EXPECTED_DEFAULT_ON,
-  `${defaultsOn.length} of ${EXPECTED_DEFAULT_ON} — the page tells the reader the scanner applies these for them`,
+  `${defaultsOn.length} of ${EXPECTED_DEFAULT_ON} — big up day + Stage 4, the gates the page tells the reader it applies`,
 )
 check(
   "the benchmark-laggard gate defaults OFF (deliberate, 2026-08-29)",
   /\[excludeBenchmarkLaggard,\s*set\w+\]\s*=\s*useState\(false\)/.test(hookSrc),
   "expected useState(false) — it over-excludes on a down tape and is soft in the relaxed pass",
+)
+check(
+  "the down-year gate defaults OFF (deliberate, 2026-08-31)",
+  /\[excludeDownYear,\s*set\w+\]\s*=\s*useState\(false\)/.test(hookSrc),
+  "expected useState(false) — a bargain is often down YTD; Stage 4 still guards the falling knives",
+)
+check(
+  "require-above-200-SMA defaults OFF (deliberate, 2026-08-31)",
+  /\[requireAbove200SMA,\s*set\w+\]\s*=\s*useState\(false\)/.test(hookSrc),
+  "expected useState(false) — a momentum filter; a pullback dips below the 200, which is the CSP entry, not a disqualifier",
 )
 
 // ---------------------------------------------------------------------------
