@@ -10,6 +10,7 @@ import type { QualifyingStock } from "./types"
 import { evaluateCriteria, type TechnicalFilterSettings } from "./technical-criteria"
 import { stepLabel } from "./steps"
 import { yahooChartUrl } from "@/lib/ticker-links"
+import { ResearchButton } from "@/components/research/research-button"
 import { ExportMenu } from "@/components/export-menu"
 import { buildWheelReport } from "@/lib/reports/from-wheel-scanner"
 
@@ -251,14 +252,17 @@ export function StrictResultsTable({
                         className={`border-b hover:bg-green-50 ${idx % 2 === 0 ? "bg-white" : "bg-green-50"}`}
                       >
                         <td className="p-3 font-semibold text-green-700">
-                          <a
-                            href={yahooChartUrl(stock.ticker) ?? undefined}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="hover:underline"
-                          >
-                            {stock.ticker}
-                          </a>
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={yahooChartUrl(stock.ticker) ?? undefined}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="hover:underline"
+                            >
+                              {stock.ticker}
+                            </a>
+                            <ResearchButton ticker={stock.ticker} variant="ghost" compact />
+                          </div>
                         </td>
                         <td className="text-right p-3">${stock.currentPrice.toFixed(2)}</td>
                         {/* CHANGE: Display actual DTE from stock data without fallback that masks errors */}

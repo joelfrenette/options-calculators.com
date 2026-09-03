@@ -10,6 +10,7 @@ import { EarningsVolatilityCalculator } from "@/components/earnings-volatility-c
 import { FomcPredictions } from "@/components/fomc-predictions"
 import { TrendAnalysis } from "@/components/trend-analysis"
 import { WheelScanner } from "@/components/wheel-scanner"
+import { ResearchTab } from "@/components/research/research-tab"
 import { CpiInflationAnalysis } from "@/components/cpi-inflation-analysis"
 import { CcpiDashboard } from "@/components/ccpi-dashboard"
 import { SocialSentiment } from "@/components/social-sentiment"
@@ -170,6 +171,7 @@ const SCAN_TABS = [
   { id: "butterfly-scanner", label: "Butterflies" },
   { id: "leaps-scanner", label: "LEAPS" },
   { id: "zebra-scanner", label: "ZEBRA" },
+  { id: "research-queue", label: "Research Queue" },
 ]
 
 // COPY — follow-the-smart-money tools (insiders + politicians + funds)
@@ -336,6 +338,8 @@ export default function Home() {
       // SCAN tabs
       case "wheel-scanner":
         return <WheelScanner />
+      case "research-queue":
+        return <ResearchTab />
       case "calendar-spread-scanner":
         return <CalendarSpreadScanner />
       case "credit-spread-scanner":

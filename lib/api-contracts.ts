@@ -420,6 +420,14 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     tabs: [],
   },
   {
+    path: "/api/research-queue",
+    method: "POST",
+    skip: "Researches a ticker — fetches Polygon price/IV and spends an Opus 5 call — and writes to the caller's queue; a probe would research a throwaway ticker and bill an LLM call each run.",
+    budgetMs: 30000,
+    tabs: [],
+    needsAuth: true,
+  },
+  {
     path: "/api/auth/reset/request",
     method: "POST",
     skip: "Sends a real reset email and mints a token; a probe would spam the member and churn the table.",
