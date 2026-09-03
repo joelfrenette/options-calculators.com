@@ -191,6 +191,24 @@ export async function getSeriesCoverage(
  * table — so `breadthDivergence` needs this path rather than the FRED one.
  * Paginated for the same reason getSeriesHistory is: PostgREST caps a single
  * request at 1000 rows and says nothing about it.
+ *
+ * THE COLUMN IS `pct_above_200dma`. This asked for `pct` — a column that does
+ * not exist — so PostgREST answered 400, `res.ok` was false, and the function
+ * returned null on every call since it was written. Its only consumer, the
+ * Breadth-divergence Trigger row, therefore reported `no-data` permanently
+ * while 1,069 days of breadth sat in the table, and the row's own explanation
+ * ("needs 61 overlapping days; have 0") was accurate about the symptom and
+ * silent about the cause.
+ *
+ * The comments around this signal say `no-data` is expected "for a while"
+ * because breadth needs ~280 days of closes before its first point and 60 more
+ * for the overlap. That reasoning was sound and had been true — which is
+ * exactly why nobody questioned the row. A correct explanation for the wrong
+ * failure is harder to catch than no explanation at all.
+ *
+ * Two sibling call sites had it right the whole time —
+ * app/api/breadth/route.ts and app/api/breadth-backtest/route.ts both select
+ * `pct_above_200dma` — so the schema was never in doubt, only this query.
  */
 export async function getBreadthHistory(limit = 20000): Promise<{ day: string; value: number }[] | null> {
   const cfg = getMeteringSupabaseConfig()
@@ -201,14 +219,14 @@ export async function getBreadthHistory(limit = 20000): Promise<{ day: string; v
     for (let offset = 0; offset < limit; offset += 1000) {
       const size = Math.min(1000, limit - offset)
       const res = await fetch(
-        `${cfg.url}/rest/v1/breadth_daily?select=day,pct&order=day.desc&limit=${size}&offset=${offset}`,
+        `${cfg.url}/rest/v1/breadth_daily?select=day,pct_above_200dma&order=day.desc&limit=${size}&offset=${offset}`,
         { headers, signal: AbortSignal.timeout(15000), cache: "no-store" },
       )
       if (!res.ok) return out.length > 0 ? out : null
-      const rows = (await res.json()) as { day: string; pct: string | number }[]
+      const rows = (await res.json()) as { day: string; pct_above_200dma: string | number }[]
       if (!Array.isArray(rows) || rows.length === 0) break
       for (const r of rows) {
-        const value = Number(r.pct)
+        const value = Number(r.pct_above_200dma)
         if (Number.isFinite(value)) out.push({ day: r.day, value })
       }
       if (rows.length < size) break

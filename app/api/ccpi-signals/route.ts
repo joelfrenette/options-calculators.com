@@ -69,7 +69,7 @@ async function breadthDivergenceRow(): Promise<TriggerRow> {
     id: "breadth-divergence",
     label: "Breadth divergence",
     meaning: "The index is near its high while fewer members hold above their 200-day average.",
-    readingSeries: "breadth_daily.pct",
+    readingSeries: "breadth_daily.pct_above_200dma",
     record: "untested",
   }
 
