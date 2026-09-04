@@ -142,7 +142,8 @@ export function ResearchTab() {
         </CardTitle>
         <p className="text-sm text-slate-600">
           Research any ticker for an options plan — should you run the wheel, sell puts, buy a LEAPS, sell calls against
-          shares, or stand aside. Numbers are computed from live prices and IV; the read is written over them.
+          shares, or stand aside. Numbers are computed from current prices and the options-chain IV (IV rank is an
+          estimate until an IV history builds); the read is written over them.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">

@@ -69,8 +69,8 @@ export async function listQueue(email: string): Promise<ResearchRow[]> {
 export async function enqueueTicker(
   email: string,
   ticker: string,
-  sharesHeld: number,
-  costBasis: number | null,
+  sharesHeld?: number,
+  costBasis?: number | null,
 ): Promise<ResearchRow | null> {
   const c = cfg()
   if (!c) return null
@@ -78,12 +78,17 @@ export async function enqueueTicker(
     const res = await fetch(`${c.url}/rest/v1/${TABLE}?on_conflict=owner_email,ticker`, {
       method: "POST",
       headers: headers(c.key, { Prefer: "resolution=merge-duplicates,return=representation" }),
+      // Only send shares_held/cost_basis when the caller supplied them. A plain
+      // re-research or a one-click ResearchButton (ticker only) must NOT clobber
+      // a position already stored on the row; on a merge, columns absent from the
+      // payload are left untouched, and on a fresh row they take the table
+      // defaults (P2 fix — the CC-vs-exit read depends on shares surviving).
       body: JSON.stringify({
         owner_email: email,
         ticker: ticker.toUpperCase(),
         status: "pending",
-        shares_held: sharesHeld,
-        cost_basis: costBasis,
+        ...(sharesHeld !== undefined ? { shares_held: sharesHeld } : {}),
+        ...(costBasis !== undefined ? { cost_basis: costBasis } : {}),
       }),
       signal: AbortSignal.timeout(8000),
     })
@@ -98,13 +103,16 @@ export async function enqueueTicker(
 /** Store a completed recommendation, carrying the prior one into prev_. */
 export async function saveRecommendation(
   id: number,
+  email: string,
   rec: OptionsRecommendation,
   prev: OptionsRecommendation | null,
 ): Promise<boolean> {
   const c = cfg()
   if (!c) return false
   try {
-    const res = await fetch(`${c.url}/rest/v1/${TABLE}?id=eq.${id}`, {
+    // Scope by owner_email too, so the ownership invariant lives at the data
+    // layer like every other mutation here, not only in the caller (P3 fix).
+    const res = await fetch(`${c.url}/rest/v1/${TABLE}?id=eq.${id}&owner_email=eq.${enc(email)}`, {
       method: "PATCH",
       headers: headers(c.key, { Prefer: "return=minimal" }),
       body: JSON.stringify({

@@ -45,19 +45,40 @@ export async function POST(request: Request) {
 
   const ticker = typeof body.ticker === "string" ? body.ticker.trim().toUpperCase() : ""
   if (!TICKER.test(ticker)) return NextResponse.json({ error: "Ticker must be 1–6 letters" }, { status: 400 })
-  const sharesHeld = Number.isFinite(Number(body.sharesHeld)) ? Math.max(0, Math.floor(Number(body.sharesHeld))) : 0
-  const costBasis = Number.isFinite(Number(body.costBasis)) && Number(body.costBasis) > 0 ? Number(body.costBasis) : null
+  // Only carry shares/cost when the caller actually sent them, so a one-click
+  // research (ticker only) never wipes a position already stored on the row.
+  const sharesHeld =
+    body.sharesHeld === undefined
+      ? undefined
+      : Number.isFinite(Number(body.sharesHeld))
+        ? Math.max(0, Math.floor(Number(body.sharesHeld)))
+        : 0
+  const costBasis =
+    body.costBasis === undefined
+      ? undefined
+      : Number.isFinite(Number(body.costBasis)) && Number(body.costBasis) > 0
+        ? Number(body.costBasis)
+        : null
 
   const row = await enqueueTicker(o.email, ticker, sharesHeld, costBasis)
   if (!row) return NextResponse.json({ error: "Could not queue the ticker (storage unavailable)" }, { status: 502 })
 
-  // Research inline so the caller gets a result. The prior recommendation (if
-  // any) is carried into prev_recommendation for the morning-recap diff.
+  // Research inline so the caller gets a result. Research against the STORED
+  // position (row.sharesHeld), not the request, so the covered-call-vs-exit read
+  // reflects the shares actually on the row. The prior recommendation is carried
+  // into prev_recommendation for the morning-recap diff.
   await setStatus(row.id, o.email, "researching")
   try {
     const profile = await getProfile(o.email)
-    const rec = await researchTicker(ticker, profile, sharesHeld)
-    await saveRecommendation(row.id, rec, row.recommendation)
+    const rec = await researchTicker(ticker, profile, row.sharesHeld)
+    const saved = await saveRecommendation(row.id, o.email, rec, row.recommendation)
+    if (!saved) {
+      await setStatus(row.id, o.email, "failed")
+      return NextResponse.json(
+        { error: "Recommendation computed but could not be saved — try again." },
+        { status: 502 },
+      )
+    }
     return NextResponse.json({ row: { ...row, status: "researched", recommendation: rec } })
   } catch (e) {
     await setStatus(row.id, o.email, "failed")
