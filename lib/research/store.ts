@@ -6,6 +6,8 @@ import { getMeteringSupabaseConfig } from "@/lib/metered-fetch"
 import {
   DEFAULT_WHEEL_PROFILE,
   type OptionsRecommendation,
+  type Recap,
+  type RecapItem,
   type ResearchRow,
   type ResearchStatus,
   type WheelProfile,
@@ -158,6 +160,78 @@ export async function removeTicker(id: number, email: string): Promise<boolean> 
     return res.ok
   } catch {
     return false
+  }
+}
+
+/**
+ * Every non-archived, non-paused row across ALL owners, oldest-first, for the
+ * nightly refresh (Phase 3). The caller groups by owner and caps per owner.
+ */
+export async function listActiveForRefresh(): Promise<ResearchRow[]> {
+  const c = cfg()
+  if (!c) return []
+  try {
+    const res = await fetch(
+      `${c.url}/rest/v1/${TABLE}?status=not.in.(archived,paused)&order=owner_email.asc,created_at.asc`,
+      { headers: headers(c.key), signal: AbortSignal.timeout(10000), cache: "no-store" },
+    )
+    if (!res.ok) return []
+    const rows = (await res.json()) as DbRow[]
+    return Array.isArray(rows) ? rows.map(toRow) : []
+  } catch {
+    return []
+  }
+}
+
+/** Upsert one owner's latest morning recap (one row per owner). */
+export async function saveRecap(
+  email: string,
+  recap: { summary: string; items: RecapItem[]; isLlm: boolean },
+): Promise<boolean> {
+  const c = cfg()
+  if (!c) return false
+  try {
+    const res = await fetch(`${c.url}/rest/v1/research_recap?on_conflict=owner_email`, {
+      method: "POST",
+      headers: headers(c.key, { Prefer: "resolution=merge-duplicates,return=minimal" }),
+      body: JSON.stringify({
+        owner_email: email,
+        generated_at: new Date().toISOString(),
+        summary: recap.summary,
+        items: recap.items,
+        is_llm: recap.isLlm,
+      }),
+      signal: AbortSignal.timeout(8000),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+/** One owner's latest morning recap, or null when none has been written yet. */
+export async function getRecap(email: string): Promise<Recap | null> {
+  const c = cfg()
+  if (!c) return null
+  try {
+    const res = await fetch(`${c.url}/rest/v1/research_recap?owner_email=eq.${enc(email)}&limit=1`, {
+      headers: headers(c.key),
+      signal: AbortSignal.timeout(6000),
+      cache: "no-store",
+    })
+    if (!res.ok) return null
+    const rows = await res.json()
+    if (!Array.isArray(rows) || rows.length === 0) return null
+    const r = rows[0]
+    return {
+      ownerEmail: r.owner_email,
+      generatedAt: r.generated_at,
+      summary: r.summary ?? "",
+      items: Array.isArray(r.items) ? r.items : [],
+      isLlm: !!r.is_llm,
+    }
+  } catch {
+    return null
   }
 }
 

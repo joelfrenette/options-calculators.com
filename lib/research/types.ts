@@ -122,3 +122,21 @@ export const DEFAULT_WHEEL_PROFILE: WheelProfile = {
 
 /** How old a recommendation may be before the tab marks it stale. */
 export const RESEARCH_TTL_MS = 20 * 60 * 60 * 1000 // 20h — one overnight cycle
+
+/** One "what changed overnight" line in the morning recap (Phase 3). */
+export interface RecapItem {
+  ticker: string
+  /** flip = strategy changed · band = CSP band moved · trigger = LEAPS/price trigger in range · new = first read. */
+  kind: "flip" | "band" | "trigger" | "new"
+  detail: string
+}
+
+/** The morning recap for one owner — a research_recap row (Phase 3). */
+export interface Recap {
+  ownerEmail: string
+  generatedAt: string
+  /** Opus 5 narration over the deltas, or the deterministic sentence (see isLlm). */
+  summary: string
+  items: RecapItem[]
+  isLlm: boolean
+}

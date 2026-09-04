@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { FlaskConical, RefreshCw, Trash2, Loader2, PauseCircle } from "lucide-react"
-import { RESEARCH_TTL_MS, type ResearchRow, type OptionsRecommendation, type ResearchStatus } from "@/lib/research/types"
+import { RESEARCH_TTL_MS, type ResearchRow, type OptionsRecommendation, type ResearchStatus, type Recap } from "@/lib/research/types"
 
 /** A researched row is stale once it is older than one overnight refresh cycle. */
 function isStale(row: ResearchRow): boolean {
@@ -78,6 +78,7 @@ function Rec({ r }: { r: OptionsRecommendation }) {
 
 export function ResearchTab() {
   const [queue, setQueue] = useState<ResearchRow[]>([])
+  const [recap, setRecap] = useState<Recap | null>(null)
   const [loading, setLoading] = useState(false)
   const [ticker, setTicker] = useState("")
   const [busy, setBusy] = useState<string | null>(null)
@@ -87,7 +88,11 @@ export function ResearchTab() {
     setLoading(true)
     try {
       const res = await fetch("/api/research-queue")
-      if (res.ok) setQueue((await res.json()).queue ?? [])
+      if (res.ok) {
+        const data = await res.json()
+        setQueue(data.queue ?? [])
+        setRecap(data.recap ?? null)
+      }
     } finally {
       setLoading(false)
     }
@@ -147,6 +152,25 @@ export function ResearchTab() {
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
+        {recap && (
+          <div className="rounded-lg border border-violet-200 bg-violet-50 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-violet-700">Morning recap</span>
+              <span className="text-xs text-slate-500">
+                {new Date(recap.generatedAt).toLocaleString()}
+                {recap.isLlm ? "" : " · computed"}
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-slate-800">{recap.summary}</p>
+            {recap.items.length > 0 && (
+              <ul className="mt-2 space-y-0.5 text-xs text-slate-600">
+                {recap.items.map((it, i) => (
+                  <li key={i}>• {it.detail}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-2">
           <Input
             value={ticker}

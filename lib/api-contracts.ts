@@ -528,6 +528,13 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     tabs: [],
   },
   {
+    path: "/api/cron/research-refresh",
+    method: "GET",
+    skip: "CRON_SECRET-gated nightly Research Queue refresh (Phase 3); a probe would re-research every queued ticker, spending an Opus 5 call each plus a recap narration and emails.",
+    budgetMs: 300000,
+    tabs: [],
+  },
+  {
     path: "/api/cron/quiver-probe",
     method: "GET",
     skip: "CRON_SECRET-gated operator probe; each run spends ~8 metered Quiver calls.",

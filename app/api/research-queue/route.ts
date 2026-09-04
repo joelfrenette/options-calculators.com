@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { getSessionInfo } from "@/lib/auth"
-import { enqueueTicker, listQueue, saveRecommendation, setStatus, removeTicker, getProfile } from "@/lib/research/store"
+import { enqueueTicker, listQueue, saveRecommendation, setStatus, removeTicker, getProfile, getRecap } from "@/lib/research/store"
 import { researchTicker } from "@/lib/research/run"
 import type { ResearchStatus } from "@/lib/research/types"
 
@@ -29,7 +29,8 @@ async function owner(): Promise<{ email: string } | { error: NextResponse }> {
 export async function GET() {
   const o = await owner()
   if ("error" in o) return o.error
-  return NextResponse.json({ queue: await listQueue(o.email) })
+  const [queue, recap] = await Promise.all([listQueue(o.email), getRecap(o.email)])
+  return NextResponse.json({ queue, recap })
 }
 
 export async function POST(request: Request) {

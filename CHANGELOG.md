@@ -18,6 +18,38 @@ entry records what was done, not proof that it still holds.
 
 ---
 
+## 2026-09-04
+
+### Added
+- **Ticker Research Queue (Phase 1+2) shipped to production.** Add any ticker and
+  get one options recommendation — sell puts, run the wheel, buy a LEAPS, sell
+  covered calls, or stand aside — with every number COMPUTED (Polygon price + ATM
+  IV, `lib/black-scholes.ts` deltas/POP/price) and the strategy chosen by ported
+  rules; Opus 5 writes only the rationale over those numbers, never a figure. A
+  missing input is null, never a guessed trade. Ported from the owner's
+  TradingAgents (`options_strategist`, Apache-2.0), collapsing its ~10 LLM calls
+  per ticker to one. `<ResearchButton>` sits on the Sell-Put scanner rows plus a
+  free-form box on the new Research tab; results carry an age stamp and a stale
+  badge past 20h. Queue and profile tables are RLS deny-all + service key.
+
+### Fixed
+- **Session role no longer fails open to admin (P8-2).** `verifyToken` defaulted
+  any unrecognised role to `admin` — a shim so legacy `{exp}`-only tokens kept the
+  owner signed in. Those tokens have all expired (members shipped 08-27, 7-day max
+  age), so an explicit `admin`/`member` role is now required and anything else is
+  rejected rather than granted admin.
+- **Research Queue pre-prod review (P8-3) — three defects caught before shipping.**
+  A failed recommendation write was returned to the client as a 200 with the
+  (unpersisted) result — the "found nothing vs. never looked" collapse on a money
+  surface; it is now a 502 with the row marked failed. `shares_held`/`cost_basis`
+  were clobbered to 0/null on every ticker-only research, making the
+  covered-call-vs-exit branch unreachable and silently wiping stored positions;
+  those columns are now written only when supplied, and research runs against the
+  stored position. Tab copy claimed "live … IV" while IV rank is always an
+  estimate — corrected.
+
+---
+
 ## 2026-08-30
 
 ### Changed
