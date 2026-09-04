@@ -15,6 +15,7 @@ import { getMarketStatus } from "@/lib/market-hours"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { yahooChartUrl } from "@/lib/ticker-links"
+import { ResearchButton } from "@/components/research/research-button"
 import {
   EntryExclusionNotice,
   type EntryExclusion,
@@ -317,14 +318,17 @@ export function CreditSpreadScanner() {
                       )}
                     </div>
                     <div className="text-left">
-                      <a
-                        href={yahooChartUrl(setup.ticker) ?? undefined}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-semibold text-teal-600 hover:text-teal-700 hover:underline"
-                      >
-                        {setup.ticker}
-                      </a>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={yahooChartUrl(setup.ticker) ?? undefined}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-semibold text-teal-600 hover:text-teal-700 hover:underline"
+                        >
+                          {setup.ticker}
+                        </a>
+                        <ResearchButton ticker={setup.ticker} variant="ghost" compact />
+                      </div>
                       <div className="text-xs text-muted-foreground">{setup.company}</div>
                     </div>
                   </div>

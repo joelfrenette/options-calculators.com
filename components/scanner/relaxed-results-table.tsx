@@ -16,6 +16,7 @@ import { stepLabel } from "./steps"
 import { ExportMenu } from "@/components/export-menu"
 import { buildWheelReport } from "@/lib/reports/from-wheel-scanner"
 import { yahooChartUrl } from "@/lib/ticker-links"
+import { ResearchButton } from "@/components/research/research-button"
 
 interface RelaxedResultsTableProps {
   relaxedResults: QualifyingStock[]
@@ -420,14 +421,17 @@ export function RelaxedResultsTable({
                         className={`border-b hover:bg-purple-50 ${index % 2 === 0 ? "bg-white" : "bg-purple-50"}`}
                       >
                         <td className="p-3 font-semibold text-purple-700">
-                          <a
-                            href={yahooChartUrl(stock.ticker) ?? undefined}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="hover:underline"
-                          >
-                            {stock.ticker}
-                          </a>
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={yahooChartUrl(stock.ticker) ?? undefined}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="hover:underline"
+                            >
+                              {stock.ticker}
+                            </a>
+                            <ResearchButton ticker={stock.ticker} variant="ghost" compact />
+                          </div>
                         </td>
                         <td className="text-right p-3">${stock.currentPrice.toFixed(2)}</td>
                         <td className="text-center p-3">{stock.daysToExpiry ?? "N/A"}</td>

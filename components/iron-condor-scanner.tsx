@@ -15,6 +15,7 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/comp
 import { MarketClosedBanner } from "@/components/market-closed-banner"
 import { getMarketStatus } from "@/lib/market-hours"
 import { yahooChartUrl } from "@/lib/ticker-links"
+import { ResearchButton } from "@/components/research/research-button"
 import {
   EntryExclusionNotice,
   type EntryExclusion,
@@ -313,14 +314,17 @@ export function IronCondorScanner() {
                         <Layers className="w-4 h-4 text-purple-600" />
                       </div>
                       <div className="text-left">
-                        <a
-                          href={yahooChartUrl(setup.ticker) ?? undefined}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-semibold text-teal-600 hover:text-teal-700 hover:underline"
-                        >
-                          {setup.ticker}
-                        </a>
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={yahooChartUrl(setup.ticker) ?? undefined}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-semibold text-teal-600 hover:text-teal-700 hover:underline"
+                          >
+                            {setup.ticker}
+                          </a>
+                          <ResearchButton ticker={setup.ticker} variant="ghost" compact />
+                        </div>
                         <div className="text-xs text-muted-foreground">{setup.company}</div>
                       </div>
                     </div>

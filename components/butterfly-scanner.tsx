@@ -16,6 +16,7 @@ import { getMarketStatus } from "@/lib/market-hours"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { yahooChartUrl } from "@/lib/ticker-links"
+import { ResearchButton } from "@/components/research/research-button"
 import {
   EntryExclusionNotice,
   type EntryExclusion,
@@ -240,6 +241,7 @@ export function ButterflyScanner() {
               >
                 {setup.ticker}
               </a>
+              <ResearchButton ticker={setup.ticker} variant="ghost" compact />
               <Badge variant="outline" className={setup.type === "call" ? "text-green-600" : "text-red-600"}>
                 {setup.type.toUpperCase()}
               </Badge>

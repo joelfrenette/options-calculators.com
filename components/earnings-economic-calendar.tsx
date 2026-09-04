@@ -15,6 +15,7 @@ import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DataLoadGate } from "@/components/data-load-gate"
 import { yahooChartUrl } from "@/lib/ticker-links"
+import { ResearchButton } from "@/components/research/research-button"
 
 // Types for dynamic data
 interface EarningsEvent {
@@ -440,14 +441,17 @@ export function EarningsEconomicCalendar() {
                             </div>
                           </td>
                           <td className="px-4 py-3">
-                            <a
-                              href={yahooChartUrl(item.ticker) ?? undefined}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm font-bold text-teal-600 hover:text-teal-700 hover:underline"
-                            >
-                              {item.ticker}
-                            </a>
+                            <div className="flex items-center gap-2">
+                              <a
+                                href={yahooChartUrl(item.ticker) ?? undefined}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm font-bold text-teal-600 hover:text-teal-700 hover:underline"
+                              >
+                                {item.ticker}
+                              </a>
+                              <ResearchButton ticker={item.ticker} variant="ghost" compact />
+                            </div>
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-700 max-w-xs">
                             {item.aiExplainer ? (

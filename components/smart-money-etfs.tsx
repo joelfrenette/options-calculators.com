@@ -12,6 +12,7 @@ import { ExportMenu } from "@/components/export-menu"
 import { buildSmartMoneyReport } from "@/lib/reports/from-copy-pages"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { yahooChartUrl } from "@/lib/ticker-links"
+import { ResearchButton } from "@/components/research/research-button"
 
 interface ETF {
   ticker: string
@@ -171,14 +172,17 @@ export function SmartMoneyEtfs() {
                     <p className="text-xs text-slate-700 leading-relaxed">{etf.summary}</p>
                     <div className="mt-2 flex items-center justify-between">
                       {etf.asOf && <span className="text-[10px] text-slate-400">Close {etf.asOf}</span>}
-                      <a
-                        href={yahooChartUrl(etf.ticker) ?? undefined}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs text-emerald-700 hover:underline"
-                      >
-                        Quote / holdings <ExternalLink className="h-3 w-3" />
-                      </a>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={yahooChartUrl(etf.ticker) ?? undefined}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-emerald-700 hover:underline"
+                        >
+                          Quote / holdings <ExternalLink className="h-3 w-3" />
+                        </a>
+                        <ResearchButton ticker={etf.ticker} variant="ghost" compact />
+                      </div>
                     </div>
                   </div>
                 )

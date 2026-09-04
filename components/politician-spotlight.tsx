@@ -12,6 +12,7 @@ import { ExportMenu } from "@/components/export-menu"
 import { buildPoliticianReport } from "@/lib/reports/from-copy-pages"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { yahooChartUrl } from "@/lib/ticker-links"
+import { ResearchButton } from "@/components/research/research-button"
 
 interface Trade {
   date: string
@@ -255,6 +256,7 @@ export function PoliticianSpotlight() {
                             >
                               <ExternalLink className="h-3 w-3" />
                             </a>
+                            <ResearchButton ticker={t.ticker} variant="ghost" compact />
                           </li>
                         ))}
                       </ul>

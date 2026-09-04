@@ -11,6 +11,7 @@ import { BarChart3 } from "lucide-react"
 import type { QualifyingStock } from "./types"
 import { stepTitled, SCANNER_STEPS } from "./steps"
 import { yahooChartUrl } from "@/lib/ticker-links"
+import { ResearchButton } from "@/components/research/research-button"
 
 interface FundamentalResultsTableProps {
   fundamentalResults: QualifyingStock[]
@@ -218,14 +219,17 @@ export function FundamentalResultsTable({
                     return (
                       <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="py-2 px-3">
-                          <a
-                            href={yahooChartLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-bold text-blue-600 hover:text-blue-800 hover:underline"
-                          >
-                            {stock.ticker}
-                          </a>
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={yahooChartLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-bold text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              {stock.ticker}
+                            </a>
+                            <ResearchButton ticker={stock.ticker} variant="ghost" compact />
+                          </div>
                         </td>
                         <td className="text-right py-2 px-3 text-gray-900">${stock.currentPrice.toFixed(2)}</td>
                         <td className="text-right py-2 px-3 text-gray-600">

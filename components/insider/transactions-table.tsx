@@ -32,6 +32,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/in
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { yahooChartUrl } from "@/lib/ticker-links"
+import { ResearchButton } from "@/components/research/research-button"
 import { formatDateDisplay, type SortField, type Trade } from "./trade-parsing"
 
 export function TransactionsTable({
@@ -341,14 +342,17 @@ export function TransactionsTable({
                           </div>
                         </td>
                         <td className="py-3 px-2">
-                          <a
-                            href={yahooChartUrl(trade.ticker) ?? undefined}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm font-bold text-teal-600 hover:text-teal-700 hover:underline"
-                          >
-                            {trade.ticker}
-                          </a>
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={yahooChartUrl(trade.ticker) ?? undefined}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm font-bold text-teal-600 hover:text-teal-700 hover:underline"
+                            >
+                              {trade.ticker}
+                            </a>
+                            <ResearchButton ticker={trade.ticker} variant="ghost" compact />
+                          </div>
                         </td>
                         <td className="py-3 px-2 text-sm text-gray-900">
                           {trade.shares === "N/A" || trade.shares === "+0" || trade.shares === "-0" ? (

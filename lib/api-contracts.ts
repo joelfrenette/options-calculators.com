@@ -428,6 +428,13 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     needsAuth: true,
   },
   {
+    path: "/api/research-profile",
+    method: "GET",
+    budgetMs: 8000,
+    tabs: [],
+    needsAuth: true,
+  },
+  {
     path: "/api/auth/reset/request",
     method: "POST",
     skip: "Sends a real reset email and mints a token; a probe would spam the member and churn the table.",

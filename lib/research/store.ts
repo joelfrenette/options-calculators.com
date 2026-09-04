@@ -263,3 +263,35 @@ export async function getProfile(email: string): Promise<WheelProfile> {
     return DEFAULT_WHEEL_PROFILE
   }
 }
+
+/** Upsert one owner's wheel profile (one row per owner, keyed by owner_email). */
+export async function saveProfile(email: string, p: WheelProfile): Promise<boolean> {
+  const c = cfg()
+  if (!c) return false
+  try {
+    const res = await fetch(`${c.url}/rest/v1/wheel_profile?on_conflict=owner_email`, {
+      method: "POST",
+      headers: headers(c.key, { Prefer: "resolution=merge-duplicates,return=minimal" }),
+      body: JSON.stringify({
+        owner_email: email,
+        account_type: p.accountType,
+        willing_to_be_assigned: p.willingToBeAssigned,
+        avoid_earnings_within_dte: p.avoidEarningsWithinDte,
+        max_capital_per_trade_usd: p.maxCapitalPerTradeUsd,
+        min_iv_rank_for_premium_sale: p.minIvRankForPremiumSale,
+        target_csp_delta_low: p.targetCspDelta[0],
+        target_csp_delta_high: p.targetCspDelta[1],
+        preferred_dte_low: p.preferredDte[0],
+        preferred_dte_high: p.preferredDte[1],
+        leaps_min_dte: p.leapsMinDte,
+        leaps_target_delta_low: p.leapsTargetDelta[0],
+        leaps_target_delta_high: p.leapsTargetDelta[1],
+        updated_at: new Date().toISOString(),
+      }),
+      signal: AbortSignal.timeout(8000),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { FlaskConical, RefreshCw, Trash2, Loader2, PauseCircle } from "lucide-react"
 import { RESEARCH_TTL_MS, type ResearchRow, type OptionsRecommendation, type ResearchStatus, type Recap } from "@/lib/research/types"
+import { WheelProfileSettings } from "@/components/research/wheel-profile-settings"
 
 /** A researched row is stale once it is older than one overnight refresh cycle. */
 function isStale(row: ResearchRow): boolean {
@@ -189,6 +190,8 @@ export function ResearchTab() {
           </Button>
         </div>
         {error && <p className="text-sm text-red-700">{error}</p>}
+
+        <WheelProfileSettings />
 
         {queue.length === 0 && !loading && (
           <p className="text-sm text-slate-500">Your queue is empty. Research a ticker above, or use the Research button next to any ticker.</p>

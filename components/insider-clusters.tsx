@@ -11,6 +11,7 @@ import { ExportMenu } from "@/components/export-menu"
 import { buildInsiderClustersReport } from "@/lib/reports/from-copy-pages"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { yahooChartUrl } from "@/lib/ticker-links"
+import { ResearchButton } from "@/components/research/research-button"
 
 interface Buyer {
   name: string
@@ -212,6 +213,7 @@ export function InsiderClusters() {
                       >
                         Quote <ExternalLink className="h-3 w-3" />
                       </a>
+                      <ResearchButton ticker={c.ticker} variant="ghost" compact />
                     </td>
                   </tr>
                   {expanded.has(c.ticker) && (

@@ -29,6 +29,7 @@ import { getMarketStatus } from "@/lib/market-hours"
 import { RefreshButton } from "@/components/ui/refresh-button"
 import { TooltipsToggle } from "@/components/ui/tooltips-toggle"
 import { yahooChartUrl } from "@/lib/ticker-links"
+import { ResearchButton } from "@/components/research/research-button"
 import {
   EntryExclusionNotice,
   type EntryExclusion,
@@ -411,6 +412,7 @@ export function CalendarSpreadScanner() {
                           >
                             {setup.ticker}
                           </a>
+                          <ResearchButton ticker={setup.ticker} variant="ghost" compact />
                           {getBetaBadge(setup.beta)}
                         </div>
                         <div className="text-xs text-muted-foreground">{setup.company}</div>
