@@ -22,9 +22,12 @@ function sign(value: string) {
 }
 
 // Token format: "<base64url(payload)>.<hmac>" where payload =
-// { exp: <ms>, role?: "admin" | "member", email?: string }. Tokens minted
-// before the members feature carry only { exp }; they are treated as admin so
-// a deploy never signs the owner out (the only holder of a legacy token).
+// { exp: <ms>, role: "admin" | "member", email?: string }. Every token minted
+// since the members feature carries an explicit role. Legacy { exp }-only tokens
+// (pre-members) once defaulted to admin here so a deploy never signed the owner
+// out; they have all expired (members shipped 2026-08-27, SESSION_MAX_AGE is
+// 7 days, and it is now past 2026-09-03), so a valid-signature token without a
+// recognised role is now rejected rather than granted admin by default (P8-2).
 export type SessionRole = "admin" | "member"
 
 function createToken(role: SessionRole, email: string) {
@@ -63,7 +66,11 @@ function verifyToken(token: string | undefined): SessionPayload | null {
   try {
     const parsed = JSON.parse(Buffer.from(payload, "base64url").toString())
     if (typeof parsed.exp !== "number" || Date.now() >= parsed.exp) return null
-    const role: SessionRole = parsed.role === "member" ? "member" : "admin"
+    // P8-2: require an explicit, recognised role. An unknown/missing role no
+    // longer defaults to admin — such a token is malformed or a tampered legacy
+    // token, and legacy {exp}-only tokens have all expired (see header note).
+    if (parsed.role !== "admin" && parsed.role !== "member") return null
+    const role: SessionRole = parsed.role
     return { exp: parsed.exp, role, email: typeof parsed.email === "string" ? parsed.email : null }
   } catch {
     return null
