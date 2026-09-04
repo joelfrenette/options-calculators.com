@@ -277,6 +277,18 @@ export function useWheelScanner() {
       setCacheStatus("Fundamental scan completed and cached (valid until tomorrow 9:30 AM ET)")
 
       saveToCache(cacheKey, qualified)
+
+      // When strict Step 3 qualifies nothing but near-misses exist, surface the
+      // relaxed pass automatically (owner 2026-09-04) so the user isn't left at a
+      // dead end with priceable candidates one relaxed step away. Pass the fresh
+      // local arrays — React state is not updated yet inside this handler.
+      if (qualified.length === 0 && nearMissStocks.length > 0) {
+        console.log(
+          `[v0] ${stepLabel("fundamentals")} qualified 0; ${nearMissStocks.length} near-misses — auto-running the relaxed pass`,
+        )
+        setShowRelaxedResults(true)
+        runRelaxedPass(qualified, nearMissStocks)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred while scanning")
       console.error("[v0] Scan error:", err)
@@ -514,7 +526,10 @@ export function useWheelScanner() {
   // guardrails by hand, which is what one owner did — to see the relaxed
   // candidates the design already computes. Callers own the market-closed gate
   // and the showRelaxedResults flag; this just does the work.
-  const runRelaxedPass = () => {
+  const runRelaxedPass = (
+    strictResults: QualifyingStock[] = fundamentalResults,
+    nearMisses: QualifyingStock[] = nearMissFundamentals,
+  ) => {
       setIsEnrichingRelaxed(true)
       setStep4Progress(0)
       setStep4CurrentTicker("")
@@ -539,8 +554,18 @@ export function useWheelScanner() {
       //   name — the pullback, not the knife. Shown in the relaxed table.
       //
       //   SOFT (as before): trailed SPY — the Beat-SPY ✓/✗ column, never a gate.
+      // Relax Step 3 as well: the fundamental near-misses (1–2 failed fundamental
+      // filters) are computed by runFundamentalScan and, per its own comment,
+      // "held aside for the relaxed Step 4 fallback" — but they were never priced
+      // here, so when strict Step 3 qualified ZERO the relaxed pass had nothing to
+      // show (owner report 2026-09-04). Price the union of strict survivors AND
+      // the near-misses; the hard entry gates below still apply to both.
+      const strictTickers = new Set(strictResults.map((s) => s.ticker))
+      const nearMissTickers = new Set(nearMisses.map((s) => s.ticker).filter((t) => !strictTickers.has(t)))
+      const relaxedUniverse = [...strictResults, ...nearMisses.filter((s) => !strictTickers.has(s.ticker))]
+
       const { kept: relaxedEligible, excluded: hardExcluded } = partitionByRelaxedEntryExclusions(
-        fundamentalResults,
+        relaxedUniverse,
         technicalFilterSettings,
       )
       setRelaxedHardExcluded(hardExcluded)
@@ -554,7 +579,7 @@ export function useWheelScanner() {
       // SPY. Strict Step 4 never showed these, so they belong in the relaxed
       // table even when they pass every slider criterion.
       const hardExcludedTickers = new Set(hardExcluded.map((e) => e.ticker))
-      const { excluded: fullExcluded } = partitionByEntryExclusions(fundamentalResults, technicalFilterSettings)
+      const { excluded: fullExcluded } = partitionByEntryExclusions(relaxedUniverse, technicalFilterSettings)
       const softOnlyTickers = new Set(
         fullExcluded.map((e) => e.ticker).filter((t) => !hardExcludedTickers.has(t)),
       )
@@ -578,7 +603,11 @@ export function useWheelScanner() {
             // it failed only the soft trailed-SPY gate, in which case Step 4
             // never showed it and the relaxed table is the only place it can
             // appear. (Hard-excluded tickers never reach this filter at all.)
-            if (passesAll && !softOnlyTickers.has(stock.ticker)) {
+            // A strict-passing stock already appears in Step 4 — drop it here,
+            // UNLESS it failed only the soft trailed-SPY gate, OR it is a
+            // fundamental near-miss (never in strict Step 4 to begin with, so the
+            // relaxed table is the only place it can appear).
+            if (passesAll && !softOnlyTickers.has(stock.ticker) && !nearMissTickers.has(stock.ticker)) {
               console.log(
                 `[v0] ${stock.ticker} $${stock.putStrike} - Passes ALL criteria (already in ${stepLabel("technical")}, excluding from ${stepLabel("relaxed")})`,
               )
