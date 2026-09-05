@@ -21,6 +21,7 @@ import { scrapeAAIISentiment, scrapePutCallRatio } from "@/lib/scraping-bee"
 import { fetchFredBuffett } from "./fred-buffett"
 import { fetchSoxIndex } from "./sox-index"
 import { fetchSpxValuation } from "@/lib/spx-valuation"
+import { getPolygonPutCallRatio } from "@/lib/strategy-scanner/market-data"
 import type { Tier } from "@/lib/ccpi/scoring"
 import { type APIStatusTracker, type TierMaps, aiTier, weakerTier } from "./provenance"
 import { fetchNvidiaQuote, fetchEquityFearGreed, fetchFREDIndicators } from "./indicators"
@@ -82,6 +83,7 @@ export async function fetchMarketData() {
     scrapePutCallRatio(),
     scrapeAAIISentiment(),
     fetchSpxValuation(), // P7-75: free multpl first, FMP only for whatever it misses
+    getPolygonPutCallRatio(), // 2026-09-05: real Polygon options put/call — primary over the scrape
   ])
 
   const qqqData = results[0].status === "fulfilled" ? results[0].value : null
@@ -94,6 +96,7 @@ export async function fetchMarketData() {
   const soxMeasured = results[7].status === "fulfilled" ? results[7].value : null
   const putCallScrape = results[8].status === "fulfilled" ? results[8].value : null
   const aaiScrape = results[9].status === "fulfilled" ? results[9].value : null
+  const polyPutCall = results[11].status === "fulfilled" ? results[11].value : null
 
   // --- the gaps, and only the gaps -----------------------------------------
 
@@ -115,7 +118,7 @@ export async function fetchMarketData() {
       askAi(!fredBuffett, getBuffettIndicator),
       // A fulfilled-but-not-live scrape still falls back to the model for both
       // the value and the source label, so "fulfilled" is not the test — "live" is.
-      askAi(putCallScrape?.status !== "live", getPutCallRatio),
+      askAi(!polyPutCall && putCallScrape?.status !== "live", getPutCallRatio),
       askAi(aaiScrape?.status !== "live", getAAIIBullish),
       askAi(!vixFromStore, getVIX),
       askAi(!alphaVantageIsLive || alphaVantageData?.nvidiaPrice == null, getNVIDIAPrice),
@@ -135,7 +138,11 @@ export async function fetchMarketData() {
   console.log(`  NVIDIA Price: ${nvidiaPriceResult.value} (${nvidiaPriceResult.source})`)
   console.log(`  SOX Index: ${soxIndexResult.value} (${soxIndexResult.source})`)
 
-  const putCallData = putCallScrape ?? { ratio: putCallResult.value, status: "baseline" as const }
+  // Polygon options put/call is the primary live source (owner's Options add-on,
+  // 2026-09-05); the ScrapingBee CBOE scrape and the AI estimate are the fallbacks.
+  const putCallData = polyPutCall
+    ? { ratio: polyPutCall.ratio, status: "live" as const }
+    : (putCallScrape ?? { ratio: putCallResult.value, status: "baseline" as const })
   const aaiData =
     aaiScrape ??
     // bearish/neutral/spread were literals — 30, 35, 5 — invented whenever the
@@ -192,7 +199,7 @@ export async function fetchMarketData() {
   }
   apiStatus.putCall = {
     live: putCallData.status === "live",
-    source: putCallData.status === "live" ? "ScrapingBee" : putCallResult.source,
+    source: putCallData.status === "live" ? (polyPutCall ? "Polygon options" : "ScrapingBee") : putCallResult.source,
     lastUpdated: now(),
   }
   apiStatus.aaii = {
@@ -246,8 +253,10 @@ export async function fetchMarketData() {
     riskAppetite: {
       // `status === "live"` used to be trusted outright, which let
       // scrapePutCallRatio self-report an LLM answer and a VIX-derived number as
-      // live — and live scores. The scraper now distinguishes its own tiers, so
-      // only a real CBOE reading claims live.
+      // live — and live scores. As of 2026-09-05 the primary "live" source is
+      // Polygon options (real put/call VOLUME); the CBOE scrape is the fallback,
+      // and it still distinguishes its own tiers. Both are measured — an AI or
+      // VIX-derived value never claims live.
       putCallRatio:
         putCallData.status === "live"
           ? "live"

@@ -166,6 +166,69 @@ export async function getIVData(ticker: string, price: number): Promise<IVSnapsh
   }
 }
 
+/**
+ * A real put/call ratio from Polygon options VOLUME (owner subscribed to the
+ * Options add-on, 2026-09-05), to replace the fragile ScrapingBee CBOE scrape as
+ * the CCPI Risk-Appetite source. Sums put vs call day-volume across a fixed
+ * basket of high-options-volume EQUITIES — an approximation of the CBOE *equity*
+ * put/call the scoring bands are calibrated to (NOT an index put/call, which
+ * sits at a different level). Near-term contracts dominate volume, so the 250-row
+ * snapshot page is representative. Returns null (never a guess) when too few
+ * names respond or call volume is zero.
+ *
+ * The level must be validated against a real CBOE equity reading before this is
+ * trusted to SCORE — it feeds a 37-point CCPI input calibrated to CBOE equity.
+ */
+const PUTCALL_BASKET = [
+  "AAPL", "MSFT", "NVDA", "AMZN", "TSLA", "META", "GOOGL", "AMD", "NFLX", "JPM",
+  "BAC", "F", "INTC", "DIS", "WMT", "XOM", "PLTR", "SOFI", "T", "C",
+] as const
+
+export interface PutCallSnapshot {
+  ratio: number
+  /** How many basket names returned data — a confidence signal for the UI. */
+  sampleSize: number
+  status: "live"
+}
+
+export async function getPolygonPutCallRatio(): Promise<PutCallSnapshot | null> {
+  if (!POLYGON_API_KEY) return null
+  const perName = await Promise.all(
+    PUTCALL_BASKET.map(async (ticker) => {
+      try {
+        const res = await meteredFetch(
+          "polygon",
+          `https://api.polygon.io/v3/snapshot/options/${ticker}?limit=250&apiKey=${POLYGON_API_KEY}`,
+          { next: { revalidate: 900 }, signal: AbortSignal.timeout(8000), routeTag: "ccpi-putcall" },
+        )
+        if (!res.ok) return null
+        const data = await res.json()
+        const contracts: any[] = Array.isArray(data.results) ? data.results : []
+        let putVol = 0
+        let callVol = 0
+        for (const c of contracts) {
+          const vol = Number(c?.day?.volume)
+          if (!Number.isFinite(vol) || vol <= 0) continue
+          const type = c?.details?.contract_type
+          if (type === "put") putVol += vol
+          else if (type === "call") callVol += vol
+        }
+        return { putVol, callVol }
+      } catch {
+        return null
+      }
+    }),
+  )
+  const ok = perName.filter((x): x is { putVol: number; callVol: number } => x !== null)
+  if (ok.length < 5) return null
+  const totalPut = ok.reduce((s, x) => s + x.putVol, 0)
+  const totalCall = ok.reduce((s, x) => s + x.callVol, 0)
+  if (!(totalCall > 0)) return null
+  const ratio = Math.round((totalPut / totalCall) * 100) / 100
+  if (!(ratio > 0) || !Number.isFinite(ratio)) return null
+  return { ratio, sampleSize: ok.length, status: "live" }
+}
+
 // Fetch upcoming earnings from Finnhub
 export async function getUpcomingEarnings(): Promise<any[]> {
   if (!FINNHUB_API_KEY) return []
