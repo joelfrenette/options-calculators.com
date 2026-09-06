@@ -242,6 +242,9 @@ export async function GET() {
 
         // Sentiment & Social
         putCallRatio: data.putCallRatio,
+        // Display-only fear gauge (unscored — §6b walk-forward pending): the 25Δ
+        // put/call IV skew from Polygon options. Positive = downside fear.
+        putSkewPct: data.putSkewPct,
         fearGreedIndex: data.fearGreedIndex,
         etfFlows: data.etfFlows,
         aaiiBullish: data.aaiiBullish,

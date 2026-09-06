@@ -21,7 +21,7 @@ import { scrapeAAIISentiment, scrapePutCallRatio } from "@/lib/scraping-bee"
 import { fetchFredBuffett } from "./fred-buffett"
 import { fetchSoxIndex } from "./sox-index"
 import { fetchSpxValuation } from "@/lib/spx-valuation"
-import { getPolygonPutCallRatio } from "@/lib/strategy-scanner/market-data"
+import { getPolygonPutCallRatio, getPutSkew } from "@/lib/strategy-scanner/market-data"
 import type { Tier } from "@/lib/ccpi/scoring"
 import { type APIStatusTracker, type TierMaps, aiTier, weakerTier } from "./provenance"
 import { fetchNvidiaQuote, fetchEquityFearGreed, fetchFREDIndicators } from "./indicators"
@@ -84,6 +84,7 @@ export async function fetchMarketData() {
     scrapeAAIISentiment(),
     fetchSpxValuation(), // P7-75: free multpl first, FMP only for whatever it misses
     getPolygonPutCallRatio(), // 2026-09-05: real Polygon options put/call — primary over the scrape
+    getPutSkew(), // 2026-09-06: 25Δ put/call IV skew — DISPLAY-ONLY (unscored, §6b)
   ])
 
   const qqqData = results[0].status === "fulfilled" ? results[0].value : null
@@ -97,6 +98,7 @@ export async function fetchMarketData() {
   const putCallScrape = results[8].status === "fulfilled" ? results[8].value : null
   const aaiScrape = results[9].status === "fulfilled" ? results[9].value : null
   const polyPutCall = results[11].status === "fulfilled" ? results[11].value : null
+  const polySkew = results[12].status === "fulfilled" ? results[12].value : null
 
   // --- the gaps, and only the gaps -----------------------------------------
 
@@ -320,6 +322,12 @@ export async function fetchMarketData() {
     // RATIO convention (P3-14): VIX3M / spot VIX; < 1 = backwardation.
     vixTermStructure: vixTermData?.termStructure ?? null,
     vixTermInverted: vixTermData?.isInverted ?? false,
+    // DISPLAY-ONLY fear gauge (unscored — §6b walk-forward pending): the 25-delta
+    // put/call IV skew from Polygon. Positive = the market pays up for downside
+    // protection. This never enters lib/ccpi/scoring.ts.
+    putSkewPct: polySkew?.skewPct ?? null,
+    putSkewPutIvPct: polySkew?.putIvPct ?? null,
+    putSkewCallIvPct: polySkew?.callIvPct ?? null,
     // vxn / rvx / atr / ltv / spotVol / bullishPercent were unsourced baseline
     // constants scored as if they were data — deleted per AUDIT P3-19.
 

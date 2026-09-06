@@ -304,6 +304,47 @@ export async function getOptionChain(
   }
 }
 
+/** Nearest chain contract to a target |delta| that carries a live IV. */
+function nearestByDeltaWithIv(chain: OptionQuote[], targetDelta: number): OptionQuote | null {
+  let best: OptionQuote | null = null
+  for (const c of chain) {
+    if (c.delta === null || c.iv === null) continue
+    if (best === null || Math.abs(Math.abs(c.delta) - targetDelta) < Math.abs(Math.abs(best.delta as number) - targetDelta)) {
+      best = c
+    }
+  }
+  return best
+}
+
+export interface PutSkewSnapshot {
+  /** 25-delta put IV minus 25-delta call IV, in IV percentage points. Positive = downside fear. */
+  skewPct: number
+  putIvPct: number
+  callIvPct: number
+  underlier: string
+}
+
+/**
+ * The 25-delta put/call IV skew — a classic downside-fear gauge (owner's Polygon
+ * Options add-on, 2026-09-05). Positive skew = the market pays up for downside
+ * protection. Measured from SPY by default. DISPLAY-ONLY on the CCPI: it earns no
+ * pillar weight until it clears the §6b walk-forward test (CCPI_DESIGN). Returns
+ * null when either leg lacks a live IV.
+ */
+export async function getPutSkew(underlier = "SPY", minDte = 20, maxDte = 45): Promise<PutSkewSnapshot | null> {
+  const [puts, calls] = await Promise.all([
+    getOptionChain(underlier, "put", minDte, maxDte),
+    getOptionChain(underlier, "call", minDte, maxDte),
+  ])
+  if (!puts || !calls) return null
+  const put25 = nearestByDeltaWithIv(puts, 0.25)
+  const call25 = nearestByDeltaWithIv(calls, 0.25)
+  if (!put25 || put25.iv === null || !call25 || call25.iv === null) return null
+  const putIvPct = Math.round(put25.iv * 1000) / 10
+  const callIvPct = Math.round(call25.iv * 1000) / 10
+  return { skewPct: Math.round((putIvPct - callIvPct) * 10) / 10, putIvPct, callIvPct, underlier }
+}
+
 // Fetch upcoming earnings from Finnhub
 export async function getUpcomingEarnings(): Promise<any[]> {
   if (!FINNHUB_API_KEY) return []
