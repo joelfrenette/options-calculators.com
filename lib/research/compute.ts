@@ -10,6 +10,7 @@ import { resolveApiKey } from "@/lib/api-keys"
 import { getStockPrice, getIVData, getOptionChain, type OptionQuote } from "@/lib/strategy-scanner/market-data"
 import { calculatePutDelta, calculateCallDelta, calculateOptionPrice } from "@/lib/black-scholes"
 import { sma } from "@/lib/indicators"
+import { upsertSeriesPoint, latestWithPercentile } from "@/lib/market-series"
 import type { WheelProfile } from "./types"
 
 const RISK_FREE = 0.045
@@ -187,9 +188,24 @@ export async function computeNumbers(
     return out
   }
 
-  out.ivRank = ivRankEstimate(iv.atmIV, rv)
-  out.ivRankIsEstimate = true
-  out.ivRankNote = "estimate from IV-vs-realized-vol; true IV rank pending an IV history"
+  // True IV rank once a history exists (owner's daily ATM-IV store, 2026-09-06):
+  // store today's ATM IV in market_series (keyed iv:<TICKER>, deduped per day),
+  // then rank it against the trailing stored history. Every research — inline or
+  // the nightly refresh — contributes a point, so coverage accrues on its own.
+  // Until ~60 days accrue, fall back to the labelled IV-vs-realized-vol estimate.
+  const ivPct = Math.round(iv.atmIV * 1000) / 10
+  const today = new Date().toISOString().slice(0, 10)
+  await upsertSeriesPoint(`iv:${ticker}`, today, ivPct).catch(() => false)
+  const ivHist = await latestWithPercentile(`iv:${ticker}`, 60)
+  if (ivHist && ivHist.pct !== null) {
+    out.ivRank = Math.round(ivHist.pct * 100)
+    out.ivRankIsEstimate = false
+    out.ivRankNote = `true IV rank — ${ivPct}% ATM IV ranked over ${ivHist.n} stored days`
+  } else {
+    out.ivRank = ivRankEstimate(iv.atmIV, rv)
+    out.ivRankIsEstimate = true
+    out.ivRankNote = `estimate from IV-vs-realized-vol; true IV rank building (${ivHist?.n ?? 0}/60 days)`
+  }
 
   const cspDte = Math.round((profile.preferredDte[0] + profile.preferredDte[1]) / 2)
 
