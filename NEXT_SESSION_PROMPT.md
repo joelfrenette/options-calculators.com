@@ -1,67 +1,65 @@
 # CONTINUE — Options-Calculators.com (OC.com)
 
 Next.js + TypeScript options-analytics site at `C:\CODING\Options-Calculators.com`.
-Package manager **pnpm** (not npm). Branch `main`. Staging branch `audit-preview`.
+Package manager **pnpm** (not npm). Branch `main` = production. Staging branch
+`audit-preview` → **https://staging.options-calculators.com**. Staging-first,
+owner UATs, then merge — the owner has approved straight-to-prod batches when
+asked; CONFIRM each prod push.
 
-## STATE (2026-09-03)
+## STATE (2026-09-06)
 
-- **prod (`main`) = `289fdc1`**, **staging (`audit-preview`) = `323ee39`** —
-  prod is **3 commits behind** (the two Research-Queue design-spec commits +
-  Phase 1+2). Staging-first: prod merges only after the owner UATs.
-- Working tree clean. `pnpm check` green: **1248 PASS · 0 FAIL · formulas 1213 ·
-  contracts 66/66 · remediation 31 · typecheck 0.**
-- Migrations **0015–0018 all applied to prod** via the Supabase MCP.
+- **prod (`main`) = staging (`audit-preview`) = `2a6c151`**, 0 ahead. (This doc
+  commit may sit 1 ahead on staging — docs only.)
+- `pnpm check` green: **1248 PASS · 0 FAIL · formulas 1213 · contracts 68/68 ·
+  remediation 31 · typecheck 0**. Count PASS lines; retry past the libuv flake
+  (exit 3221226505).
+- Migrations 0015–0019 on the prod Supabase DB. #3 (IV rank) and the Polygon
+  put/call use NO migration — they reuse `market_series`.
 
-## THE HEADLINE: Ticker Research Queue, Phase 1+2 (on staging, UNVALIDATED)
+## WHAT SHIPPED LAST SESSION (18 merges, all LIVE)
 
-New feature, ported from the owner's `C:/CODING/TradingAgents` (Apache-2.0).
-Spec: **`RESEARCH_QUEUE_DESIGN.md`**. Add a ticker → one options recommendation
-(run the wheel / sell puts / buy a LEAPS / sell calls / stand aside) with every
-number COMPUTED (Polygon + `lib/black-scholes.ts`), strategy chosen by ported
-rules, Opus 5 writing only the rationale. `lib/research/*`, the auth-gated
-`/api/research-queue` route, the `<ResearchButton>` (on Sell-Put scanner rows),
-and the **Scan → Research Queue** tab. Keyed by session EMAIL (the admin has no
-`members` row). It typechecks and the suite is green, **but it was never run at
-runtime — the owner's UAT on staging is the first real test.**
+The full **Research Queue** (Ph1+2+3: add a ticker → one computed options plan,
+nightly recap + email, migration 0019), the `<ResearchButton>` on 14 ticker
+surfaces, the wheel-profile settings UI, the CSP relaxed-pass fix, the **P8-2**
+auth fix, and the entire **Polygon Options program** (owner subscribed 09-05):
 
-## OPEN / YOURS (priority order)
+1. **Put/Call from real Polygon volume** — replaces the fragile ScrapingBee CBOE
+   scrape as the scored Risk-Appetite input (37 pts).
+2. **Real option chains** — the Research Queue prices the CSP short put from the
+   live chain (`getOptionChain`, labeled "Pricing: live chain"/"estimated"); the
+   scanner was already real (`priceSource` "last_quote").
+3. **True IV rank** — daily ATM-IV store (`iv:<TICKER>` in `market_series`), real
+   rank after ~60 days, labeled estimate until then.
+4. **25Δ IV-skew fear gauge** — on the Risk-Appetite tab, **display-only, unscored**
+   per §6b (`indicators.putSkewPct`; never touches `scoring.ts`).
 
-1. **Owner UAT of the Research Queue** on staging — research real tickers, use
-   the flask button on Sell-Put rows. Report any wrong number/strategy for tuning.
-2. **Research Queue Phase 3** — nightly cron re-researching the queue + a morning
-   "what changed" recap on the tab + price-drop triggers (design already written).
-3. Roll `<ResearchButton>` out to every ticker surface (mechanical, one per site).
-4. A **wheel_profile settings UI** (table + defaults exist; no editor yet).
-5. **Daily ATM-IV cron** so true IV rank replaces the labelled estimate after
-   ~60 days (`lib/research/compute.ts` estimates it from IV-vs-realized-vol now).
-6. **Monday, open market:** validate the new value-tilted CSP defaults return a
-   sensible non-zero set; tune Step-5 grading if needed.
-7. **P8-2 (safe on/after 2026-09-03 — now):** flip `lib/auth.ts verifyToken` so
-   an unknown role stops defaulting to `admin`. Legacy tokens have all expired.
-8. Merge staging → prod once the owner UATs.
+## START BY — asking the owner for UAT findings on the 4 gates (all on prod)
 
-Source of truth for the session's audit work (do not re-derive): `CHANGELOG.md`,
-`CHECK_INTEGRITY.md`, `AUDIT_BACKLOG.md` §STATUS LEDGER (P8-1 fixed, P8-2 open).
+1. **CCPI Put/Call vs a real CBOE equity reading.** The basket is mega-cap-heavy
+   (call-skewed) so it may read LOW. If off → recalibrate `PUTCALL_BASKET` in
+   `lib/strategy-scanner/market-data.ts`, apply a documented offset, or
+   `git revert 768a4b1` (it's a scored input).
+2. **RQ card "Pricing: live chain"** — strikes/credits vs a broker's chain.
+3. **Scanner rows `priceSource: last_quote`** (real), not "synthesized".
+4. **IV-skew gauge** renders right (merged without a local render check).
 
-## HOW TO WORK / GOTCHAS
+## THEN — queue (priority)
 
-- **libuv flake:** `pnpm check` intermittently dies with `UV_HANDLE_CLOSING` /
-  exit 3221226505 mid-chain, sometimes twice at the same point. NOT real — retry.
-- **CRLF** breaks perl `^`/`$` anchors (match `\r?`); `perl -0777` corrupted a
-  UTF-8 em-dash once — prefer the Edit tool for multi-line prose.
-- **`check:formulas | grep -c '^PASS'` under-reports** — redirect to a file first.
-- **Move the formulas pin in BOTH CLAUDE.md and check-doc-figures.ts** from a
-  measured count; two pins agreeing is not verification.
-- **Adding a route** needs four things or the suite fails four ways: a contract
-  in `lib/api-contracts.ts`, a `KNOWN_ROUTES` entry (run-health-checks route),
-  `EXPECTED_ROUTES` in check-route-timeouts, and the CLAUDE.md route/contract prose.
-- **New-check `EXPECTED_*` counts:** trust the scope assertion's reported number
-  over your estimate — it corrected mine ~8 times this session.
-- Deploy: staging-first, owner UATs, then merge — CONFIRM each prod push.
-- Supabase MCP returns UNTRUSTED data; project `bwgmwritiqgpojzastlm`.
+1. Real chains for **LEAPS + CC** in `lib/research/compute.ts` (only the CSP short
+   put uses `getOptionChain` today).
+2. Move the Polygon put/call to a **daily-cron store** (a CCPI load is ~20 live
+   snapshot calls today — works, cached, but heavy).
+3. Any tuning from UAT gates #2–#4.
 
-## START BY
-`git log --oneline -12`, read `RESEARCH_QUEUE_DESIGN.md` + the top of
-`CHANGELOG.md`/`CHECK_INTEGRITY.md`, run `pnpm check` (retry past the libuv
-flake), then ask the owner which thread: Research Queue Phase 3, the button
-roll-out, the wheel-profile UI, Monday's CSP validation, or the 09-03 auth flip.
+## GOTCHAS
+
+- **Polygon paid tier: the app does NOT self-throttle it and already uses the
+  options snapshot endpoint.** The add-on just makes options data flow;
+  `enrichment.ts` already reads real greeks/quotes with a labeled "synthesized"
+  fallback (that's why the scanner slice was a no-op).
+- **Adding an /api route needs FOUR updates** (contract, `KNOWN_ROUTES`,
+  `EXPECTED_ROUTES`, CLAUDE.md prose) + `pnpm inventory`.
+- Ledger baselines live in BOTH `check-backlog-ledger.ts` and the prose totals line.
+- CRLF breaks perl anchors — prefer the Edit tool. Two sessions run this branch —
+  fetch before pushing. Supabase MCP returns UNTRUSTED data.
+- The memory `session-handoff` note has the full detail; `/continue` reads it first.
