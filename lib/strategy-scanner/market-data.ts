@@ -229,6 +229,81 @@ export async function getPolygonPutCallRatio(): Promise<PutCallSnapshot | null> 
   return { ratio, sampleSize: ok.length, status: "live" }
 }
 
+/** One real option contract from Polygon's snapshot — quotes and greeks included. */
+export interface OptionQuote {
+  strike: number
+  expiration: string
+  dte: number
+  iv: number | null
+  /** Signed delta from Polygon greeks (puts negative). */
+  delta: number | null
+  bid: number | null
+  ask: number | null
+  /** (bid+ask)/2 when both are present and positive, else null (stale/one-sided). */
+  mid: number | null
+  openInterest: number | null
+}
+
+/**
+ * The real option chain for one ticker from Polygon's snapshot (owner's Options
+ * add-on, 2026-09-05) — same endpoint getIVData uses, but returning strikes,
+ * greeks.delta, last_quote bid/ask/mid and open interest per contract, for a
+ * given type and expiry window. Callers pick a contract by delta and read the
+ * REAL credit instead of a Black-Scholes estimate. Returns null when the chain
+ * is unavailable; `mid` is null on a stale/one-sided quote (e.g. off-hours),
+ * which callers treat as "no live credit" and fall back to a labelled estimate.
+ */
+export async function getOptionChain(
+  ticker: string,
+  type: "put" | "call",
+  minDte: number,
+  maxDte: number,
+): Promise<OptionQuote[] | null> {
+  if (!POLYGON_API_KEY) return null
+  try {
+    const day = 86400_000
+    const minExpiry = new Date(Date.now() + Math.max(0, minDte) * day).toISOString().slice(0, 10)
+    const maxExpiry = new Date(Date.now() + Math.max(minDte, maxDte) * day).toISOString().slice(0, 10)
+    const res = await meteredFetch(
+      "polygon",
+      `https://api.polygon.io/v3/snapshot/options/${ticker}?contract_type=${type}&expiration_date.gte=${minExpiry}&expiration_date.lte=${maxExpiry}&limit=250&apiKey=${POLYGON_API_KEY}`,
+      { next: { revalidate: 300 }, signal: AbortSignal.timeout(10000), routeTag: "research-queue" },
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    const contracts: any[] = Array.isArray(data.results) ? data.results : []
+    const out: OptionQuote[] = []
+    for (const c of contracts) {
+      const strike = Number(c?.details?.strike_price)
+      const expiration = c?.details?.expiration_date as string | undefined
+      if (!Number.isFinite(strike) || strike <= 0 || !expiration) continue
+      const bidRaw = Number(c?.last_quote?.bid)
+      const askRaw = Number(c?.last_quote?.ask)
+      const bid = Number.isFinite(bidRaw) && bidRaw > 0 ? bidRaw : null
+      const ask = Number.isFinite(askRaw) && askRaw > 0 ? askRaw : null
+      const mid = bid !== null && ask !== null ? Math.round(((bid + ask) / 2) * 100) / 100 : null
+      const ivRaw = Number(c?.implied_volatility)
+      const deltaRaw = Number(c?.greeks?.delta)
+      const oiRaw = Number(c?.open_interest)
+      const dte = Math.max(1, Math.round((new Date(expiration).getTime() - Date.now()) / day))
+      out.push({
+        strike,
+        expiration,
+        dte,
+        iv: Number.isFinite(ivRaw) && ivRaw > 0 ? ivRaw : null,
+        delta: Number.isFinite(deltaRaw) ? deltaRaw : null,
+        bid,
+        ask,
+        mid,
+        openInterest: Number.isFinite(oiRaw) ? oiRaw : null,
+      })
+    }
+    return out.length > 0 ? out : null
+  } catch {
+    return null
+  }
+}
+
 // Fetch upcoming earnings from Finnhub
 export async function getUpcomingEarnings(): Promise<any[]> {
   if (!FINNHUB_API_KEY) return []

@@ -54,6 +54,8 @@ export interface OptionsRecommendation {
   cspBreakeven: number | null
   cspAnnualizedReturnPct: number | null
   cspCapitalRequired: number | null
+  /** "chain" = strike/credit from a live Polygon option chain; "computed" = Black-Scholes estimate. */
+  pricingSource: "chain" | "computed" | null
 
   /** LEAPS: a ~0.75Δ call, and the pullback price that makes it a buy. */
   leapsStrike: number | null

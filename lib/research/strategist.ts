@@ -137,6 +137,7 @@ export async function decide(
     cspBreakeven: n.cspBreakeven,
     cspAnnualizedReturnPct: n.cspAnnualizedReturnPct,
     cspCapitalRequired: n.cspCapitalRequired,
+    pricingSource: n.pricingSource,
     leapsStrike: n.leapsStrike,
     leapsDte: n.leapsDte,
     leapsBuyBelowPrice: n.leapsBuyBelowPrice,

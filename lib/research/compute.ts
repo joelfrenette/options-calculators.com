@@ -7,7 +7,7 @@
 
 import { meteredFetch } from "@/lib/metered-fetch"
 import { resolveApiKey } from "@/lib/api-keys"
-import { getStockPrice, getIVData } from "@/lib/strategy-scanner/market-data"
+import { getStockPrice, getIVData, getOptionChain, type OptionQuote } from "@/lib/strategy-scanner/market-data"
 import { calculatePutDelta, calculateCallDelta, calculateOptionPrice } from "@/lib/black-scholes"
 import { sma } from "@/lib/indicators"
 import type { WheelProfile } from "./types"
@@ -33,6 +33,8 @@ export interface ComputedNumbers {
   cspBreakeven: number | null
   cspAnnualizedReturnPct: number | null
   cspCapitalRequired: number | null
+  /** "chain" = strike/credit from a live Polygon option chain; "computed" = Black-Scholes estimate. */
+  pricingSource: "chain" | "computed" | null
 
   leapsStrike: number | null
   leapsDte: number | null
@@ -130,6 +132,21 @@ function ivRankEstimate(atmIv: number, rv: number | null): number | null {
   return Math.max(0, Math.min(100, Math.round(est)))
 }
 
+/** The chain contract whose |delta| is closest to targetDelta (a magnitude) and has a live mid. */
+function pickByDelta(chain: OptionQuote[], targetDelta: number): OptionQuote | null {
+  let best: OptionQuote | null = null
+  for (const c of chain) {
+    if (c.delta === null || c.mid === null) continue
+    if (
+      best === null ||
+      Math.abs(Math.abs(c.delta) - targetDelta) < Math.abs(Math.abs(best.delta as number) - targetDelta)
+    ) {
+      best = c
+    }
+  }
+  return best
+}
+
 export async function computeNumbers(
   ticker: string,
   profile: WheelProfile,
@@ -141,6 +158,7 @@ export async function computeNumbers(
     cspStrikeLow: null, cspStrikeHigh: null, cspDte: null, cspCredit: null,
     cspProbabilityOfProfit: null, cspBreakeven: null, cspAnnualizedReturnPct: null, cspCapitalRequired: null,
     leapsStrike: null, leapsDte: null, leapsBuyBelowPrice: null, ccStrike: null, ccCredit: null,
+    pricingSource: null,
   }
 
   const [priceRes, closes] = await Promise.all([getStockPrice(ticker), dailyCloses(ticker)])
@@ -174,30 +192,57 @@ export async function computeNumbers(
   out.ivRankNote = "estimate from IV-vs-realized-vol; true IV rank pending an IV history"
 
   const cspDte = Math.round((profile.preferredDte[0] + profile.preferredDte[1]) / 2)
-  // Low strike = deeper-OTM / safer (lower delta magnitude); High = richer premium.
-  const lowPut = strikeForDelta(price, iv.atmIV, cspDte, profile.targetCspDelta[0], false)
-  const highPut = strikeForDelta(price, iv.atmIV, cspDte, profile.targetCspDelta[1], false)
-  if (lowPut && highPut) {
-    // Floor the safe end at a support level when we have one, so the band is
-    // tied to a technical level rather than delta alone.
+
+  // Prefer the REAL option chain (owner's Polygon Options add-on, 2026-09-05):
+  // pick the puts at the profile's delta band and read the ACTUAL mid credit and
+  // delta. Puts carry a negative delta, so pickByDelta compares magnitudes. Fall
+  // back to the Black-Scholes estimate when the chain or a live quote is missing,
+  // and record which via pricingSource (a label the UI/rationale can show).
+  const putChain = await getOptionChain(ticker, "put", profile.preferredDte[0], profile.preferredDte[1])
+  const realLow = putChain ? pickByDelta(putChain, profile.targetCspDelta[0]) : null
+  const realHigh = putChain ? pickByDelta(putChain, profile.targetCspDelta[1]) : null
+
+  if (realLow && realHigh && realHigh.mid !== null) {
+    // The richer (high-delta) short put is the one actually sold.
     const support = sma200
-    out.cspStrikeLow = support && support < lowPut.strike ? Math.min(lowPut.strike, support) : lowPut.strike
-    out.cspStrikeHigh = highPut.strike
-    out.cspDte = cspDte
-    // Price and credit for the RICHER (high-delta) short put — the one actually sold.
-    const t = cspDte / 365
-    const putPrice = calculateOptionPrice(
-      { stockPrice: price, strikePrice: highPut.strike, timeToExpiry: t, volatility: iv.atmIV, riskFreeRate: RISK_FREE },
-      false,
-    )
-    if (putPrice !== null && putPrice > 0) {
-      out.cspCredit = Math.round(putPrice * 100) / 100
-      out.cspProbabilityOfProfit = Math.round((1 - highPut.delta) * 100)
-      out.cspBreakeven = Math.round((highPut.strike - putPrice) * 100) / 100
-      out.cspCapitalRequired = Math.round(highPut.strike * 100)
-      const premium = putPrice * 100
-      const roc = (premium / (highPut.strike * 100)) * (365 / cspDte) * 100
-      out.cspAnnualizedReturnPct = Math.round(roc * 10) / 10
+    out.cspStrikeLow = support && support < realLow.strike ? Math.min(realLow.strike, support) : realLow.strike
+    out.cspStrikeHigh = realHigh.strike
+    out.cspDte = realHigh.dte
+    out.cspCredit = realHigh.mid
+    out.cspProbabilityOfProfit = realHigh.delta !== null ? Math.round((1 - Math.abs(realHigh.delta)) * 100) : null
+    out.cspBreakeven = Math.round((realHigh.strike - realHigh.mid) * 100) / 100
+    out.cspCapitalRequired = Math.round(realHigh.strike * 100)
+    const roc = ((realHigh.mid * 100) / (realHigh.strike * 100)) * (365 / Math.max(1, realHigh.dte)) * 100
+    out.cspAnnualizedReturnPct = Math.round(roc * 10) / 10
+    out.pricingSource = "chain"
+  } else {
+    // Fallback: Black-Scholes estimate. Low strike = deeper-OTM / safer (lower
+    // delta magnitude); High = richer premium.
+    const lowPut = strikeForDelta(price, iv.atmIV, cspDte, profile.targetCspDelta[0], false)
+    const highPut = strikeForDelta(price, iv.atmIV, cspDte, profile.targetCspDelta[1], false)
+    if (lowPut && highPut) {
+      // Floor the safe end at a support level when we have one, so the band is
+      // tied to a technical level rather than delta alone.
+      const support = sma200
+      out.cspStrikeLow = support && support < lowPut.strike ? Math.min(lowPut.strike, support) : lowPut.strike
+      out.cspStrikeHigh = highPut.strike
+      out.cspDte = cspDte
+      // Price and credit for the RICHER (high-delta) short put — the one actually sold.
+      const t = cspDte / 365
+      const putPrice = calculateOptionPrice(
+        { stockPrice: price, strikePrice: highPut.strike, timeToExpiry: t, volatility: iv.atmIV, riskFreeRate: RISK_FREE },
+        false,
+      )
+      if (putPrice !== null && putPrice > 0) {
+        out.cspCredit = Math.round(putPrice * 100) / 100
+        out.cspProbabilityOfProfit = Math.round((1 - highPut.delta) * 100)
+        out.cspBreakeven = Math.round((highPut.strike - putPrice) * 100) / 100
+        out.cspCapitalRequired = Math.round(highPut.strike * 100)
+        const premium = putPrice * 100
+        const roc = (premium / (highPut.strike * 100)) * (365 / cspDte) * 100
+        out.cspAnnualizedReturnPct = Math.round(roc * 10) / 10
+        out.pricingSource = "computed"
+      }
     }
   }
 

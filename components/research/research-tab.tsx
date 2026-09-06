@@ -64,6 +64,9 @@ function Rec({ r }: { r: OptionsRecommendation }) {
             <span><b>Breakeven:</b> {num(r.cspBreakeven, "$")}</span>
             <span><b>Annualized:</b> {num(r.cspAnnualizedReturnPct, "", "%")}</span>
             <span><b>Capital:</b> {num(r.cspCapitalRequired, "$")}</span>
+            {r.pricingSource && (
+              <span><b>Pricing:</b> {r.pricingSource === "chain" ? "live chain" : "estimated"}</span>
+            )}
           </>
         )}
       </div>
