@@ -105,6 +105,26 @@ export function PillarRiskAppetite({
             </div>
           )}
 
+          {/* 25Δ IV Skew — DISPLAY ONLY, unscored (§6b walk-forward pending) */}
+          {indicators.putSkewPct != null && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium flex items-center gap-2">
+                  IV Skew (25Δ put − call)
+                  <span className="text-[10px] uppercase tracking-wide rounded bg-gray-100 text-gray-500 px-1.5 py-0.5">
+                    display only · unscored
+                  </span>
+                </span>
+                <span className="font-bold">{indicators.putSkewPct.toFixed(1)} pts</span>
+              </div>
+              <p className="text-xs text-gray-600">
+                The extra implied volatility the market pays for 25-delta downside puts over calls (SPY). Positive means
+                demand for crash protection. Shown as a fear signal only — it earns no pillar weight until it clears the
+                walk-forward test.
+              </p>
+            </div>
+          )}
+
           {/* AAII Bullish Sentiment */}
           {indicators.aaiiBullish != null && (
             <div className="space-y-2">
