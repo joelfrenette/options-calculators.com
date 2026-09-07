@@ -20,25 +20,30 @@ export const maxDuration = 120
 const CANDIDATES: { key: string; label: string; url: string }[] = [
   { key: "congresstrading", label: "Congress trading (baseline — known good)", url: "https://api.quiverquant.com/beta/live/congresstrading" },
   { key: "offexchange", label: "Off-exchange short volume (E-8a)", url: "https://api.quiverquant.com/beta/live/offexchange" },
-  { key: "wallstreetbets", label: "WSB mentions (E-8b)", url: "https://api.quiverquant.com/beta/live/wallstreetbets" },
-  { key: "insiders", label: "Insider transactions aggregate (E-8e)", url: "https://api.quiverquant.com/beta/live/insiders" },
-  // "thirteenf" 404'd (name unknown); Django URL resolution 401s on real routes
-  // and 404s on unknown ones, and sec13f/sec13fchanges answer 401 unauthenticated.
-  { key: "sec13f", label: "13F holdings (E-8f)", url: "https://api.quiverquant.com/beta/live/sec13f" },
-  { key: "sec13fchanges", label: "13F position changes (E-8f)", url: "https://api.quiverquant.com/beta/live/sec13fchanges" },
   { key: "govcontracts", label: "Government contracts (E-8g)", url: "https://api.quiverquant.com/beta/live/govcontractsall" },
   { key: "lobbying", label: "Lobbying (E-8g)", url: "https://api.quiverquant.com/beta/live/lobbying" },
-  // ---- E-8h, endpoint name still unresolved --------------------------------
-  // Both of these answered 404 on the PAID plan (2026-08-10). On this API a
-  // 404 means the route does not exist, not that the dataset is unlicensed —
-  // 403 is what "not in plan" looks like, and the four datasets we do hold
-  // return 200. So the name is wrong rather than the entitlement, and it is
-  // worth exhausting the plausible spellings before writing E-8h off.
-  { key: "wikipedia", label: "Wikipedia page views (E-8h)", url: "https://api.quiverquant.com/beta/live/wikipedia" },
-  { key: "wikipedia-historical", label: "Wikipedia page views, historical per-ticker (E-8h)", url: "https://api.quiverquant.com/beta/historical/wikipedia/AAPL" },
-  { key: "wikipediapageviews", label: "E-8h variant: wikipediapageviews", url: "https://api.quiverquant.com/beta/live/wikipediapageviews" },
-  { key: "wikipedia-views", label: "E-8h variant: wikipedia_page_views", url: "https://api.quiverquant.com/beta/live/wikipedia_page_views" },
-  { key: "pageviews", label: "E-8h variant: pageviews", url: "https://api.quiverquant.com/beta/live/pageviews" },
+
+  // ---- Tier map from Quiver's own OpenAPI document (2026-09-07) -------------
+  // https://api.quiverquant.com/docs/schema.json tags every route "Tier 1"
+  // (Hobbyist), "Tier 2" (Trader) or "enterprise" (Commercial). The 2026-08-10
+  // probe saw every Tier 2 route answer 403, i.e. the key in Vercel was a
+  // Tier 1 key on that date. The owner reports paying ~$300/mo, which matches
+  // no self-serve tier, so this list exists to measure the entitlement rather
+  // than infer it. Wikipedia page views (E-8h) is NOT in the schema at all —
+  // the 404s were an absent dataset, not a misspelling.
+  { key: "wallstreetbets", label: "WSB mentions (E-8b) — unlisted in schema, answered 403", url: "https://api.quiverquant.com/beta/live/wallstreetbets" },
+  { key: "insiders", label: "Tier 2: live insider trading (E-8e)", url: "https://api.quiverquant.com/beta/live/insiders" },
+  { key: "sec13f", label: "Tier 2: 13F holdings (E-8f)", url: "https://api.quiverquant.com/beta/live/sec13f" },
+  { key: "sec13fchanges", label: "Tier 2: 13F position changes (E-8f)", url: "https://api.quiverquant.com/beta/live/sec13fchanges" },
+  { key: "quivernews", label: "Tier 2: Quiver newsfeed", url: "https://api.quiverquant.com/beta/live/quivernews" },
+  { key: "topshareholders", label: "Tier 2: top shareholders per ticker", url: "https://api.quiverquant.com/beta/live/topshareholders/AAPL" },
+  { key: "appratings", label: "Tier 2: app ratings", url: "https://api.quiverquant.com/beta/live/appratings" },
+  { key: "patentmomentum", label: "Tier 2: patent momentum", url: "https://api.quiverquant.com/beta/live/patentmomentum" },
+  { key: "executivecompensation", label: "Tier 2: executive compensation per ticker", url: "https://api.quiverquant.com/beta/historical/executivecompensation/AAPL" },
+  { key: "congress_stock_holdings", label: "Tier 1: congress stock holdings", url: "https://api.quiverquant.com/beta/live/congress_stock_holdings" },
+  { key: "senatetrading", label: "Tier 1: senate trading", url: "https://api.quiverquant.com/beta/live/senatetrading" },
+  { key: "legislation", label: "enterprise: recent legislation", url: "https://api.quiverquant.com/beta/live/legislation" },
+  { key: "strategies-holdings", label: "enterprise: Quiver strategies holdings", url: "https://api.quiverquant.com/beta/strategies/holdings" },
 
   // ---- Off-exchange carries a column we do not read yet ---------------------
   // The offexchange rows include a `DPI` field (Quiver's Dark Pool Index)

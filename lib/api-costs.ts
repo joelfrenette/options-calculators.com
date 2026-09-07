@@ -100,7 +100,10 @@ export const API_COSTS: ApiCost[] = [
     status: "eliminate",
     billing: "flat",
     provides: "Yahoo Finance scraping (S&P 500 P/E, P/S)",
-    replacement: "FMP free / Finnhub free / Yahoo proxy",
+    // 2026-09-07: confirmed dead — 0 calls in 30 days, token unset in prod, and
+    // spxPE/spxPS now come from the free multpl.com → FMP chain (P7-75). Owner
+    // cancelling the billing; no code path depends on it.
+    replacement: "RETIRED — free multpl.com → FMP (already active); safe to cancel",
   },
   // Scraping & search
   {

@@ -284,8 +284,8 @@ recomputes it.
 | E-8e | — | wontfix | `insiders` 403 on the paid plan. |
 | E-8f | — | wontfix | `sec13f` / `sec13fchanges` 403 on the paid plan. |
 | E-8g | — | fixed | `/api/federal-money` + the Federal Money Trail tab, display-only. |
-| E-8h | — | open | Wikipedia page views. **404, not 403 — a name problem, not an entitlement problem.** Three endpoint spellings queued for the next authenticated probe. |
-| E-8i | P3 | open | The licensed `DPI` column in `offexchange` that nothing reads. Probe depth first; then it faces the E-6 lead-time gate like everything else. |
+| E-8h | — | wontfix | Wikipedia page views. **Not a naming problem — the dataset is absent from Quiver's OpenAPI schema entirely (all 5 spellings 404, re-probed 2026-09-07).** No such Quiver feed exists. |
+| E-8i | P3 | open | The licensed `DPI` column in `offexchange` that nothing reads. **Depth confirmed 2026-09-07 (`offexchange-historical` = 1,229 rows with DPI).** Now buildable; faces only the §6b lead-time gate. |
 | P6-1 | P1 | fixed | Quiver plan purchased; all four routes answer 200 with real rows. |
 | P6-2 | P3 | fixed | `/api/fmp-proxy` retired (verified 2026-08-11). |
 | P6-3 | P2 | fixed | Health-check canary sends `skipAI=true`; 20.7s → 1.26s. |
@@ -472,7 +472,7 @@ recomputes it.
 
 ### The open list, by severity
 
-297 findings recorded · **259 fixed · 9 wontfix · 2 verified-ok · 27 open.**
+297 findings recorded · **259 fixed · 10 wontfix · 2 verified-ok · 26 open.**
 _(2026-08-11: Phase 7.2 added P7-1…P7-7 — six fixed, one open. The 7.4 confirmation
 pass then closed P3-15, P3-17, P3-18, S-8 and P1-14. The ninth pass closed P7-9 and
 P7-11 and opened P7-12 and P7-13 — the open count going UP is the check working: a rule
@@ -1040,6 +1040,15 @@ Quiver paid-plan probe, 2026-08-10 (authenticated run by the owner):
 | E-8b, E-8e, E-8f | — | **The paid plan does not include them, so the closures stand — but for a better reason than before.** They had been closed on the strength of free-tier 403s; when the owner bought a plan I re-opened them, because a closure resting on a condition that changed is not a closure. The authenticated probe answers: `wallstreetbets` **403**, `insiders` **403**, `sec13f` **403**, `sec13fchanges` **403**. Same verdict, now measured against the tier actually held rather than inferred from an older one. **Included and licensed (200 with rows):** `congresstrading` 1,000 · `offexchange` 5,469 · `govcontracts` 20,000 · `lobbying` 20,000 — exactly the four datasets the shipped tabs run on, so nothing was bought and left unused. | Probe output pasted from an authenticated production run, 2026-08-10T02:33Z. |
 | E-8h | P3 | Both Wikipedia candidates returned **404**, and on this API that distinction matters: **403 is what "not in your plan" looks like** (all four unlicensed datasets above say 403), while 404 means the route does not exist. So E-8h is blocked on the endpoint spelling, not on money — worth exhausting before writing it off. Three more variants added to the probe (`wikipediapageviews`, `wikipedia_page_views`, `pageviews`) for the next authenticated run. | The 403-vs-404 split is visible in the probe output itself: licensed datasets 200, unlicensed 403, unknown routes 404. |
 | E-8i | P3 | **A licensed column nobody reads.** The `offexchange` rows carry `DPI` — Quiver's Dark Pool Index — alongside the `OTC_Short`/`OTC_Total` that E-8a already scores. It is included in the plan and currently discarded. Before anyone designs an indicator around it, the per-ticker history route needs probing for depth (added to the probe as `offexchange-historical`), and then it faces the same E-6 gate as everything else: **display-only until a lead-time backtest earns it scoring weight**. Logged rather than built — an unused column is an idea, not a finding. | `sampleKeys` in the probe output: `["Ticker","Date","OTC_Short","OTC_Total","DPI"]`. |
+
+Quiver re-probe + subscription reconciliation, 2026-09-07 (authenticated run by the owner):
+
+- **The API key is Tier-1 (Hobbyist), confirmed a second time.** Probe results: `congresstrading` 200 (1,000 rows), `offexchange` 200 (5,489), `offexchange-historical` 200 (1,229), `govcontracts` 200 (20,000), `lobbying` 200 (20,000); `wallstreetbets` / `insiders` / `sec13f` / `sec13fchanges` all **403**. Identical entitlement to the 2026-08-10 probe. Cross-referenced against Quiver's own OpenAPI document (`https://api.quiverquant.com/docs/schema.json`, 52 endpoints), the licensed set is exactly the "Tier 1" tag and every 403 is a "Tier 2" tag — so the key behaves as a **$30/mo Hobbyist API key**.
+- **The owner reports paying $300/year for "Trader — Quiver Platform."** That is not the API Trader tier (which is $750/yr = $62.50/mo billed annually); $300/yr matches Quiver's **website Platform** subscription, and Quiver's pricing page states a website subscription does **not** include API access. So the money buys a product the application cannot consume — the app runs on a separate Hobbyist-level API key. **Owner action: ask Quiver support whether the $300/yr includes Trader-tier API access; if it does, the key must be upgraded (it is returning 403 on Tier-2); if it does not, it is a refund candidate because the site uses the API, not the website.**
+- **E-8h Wikipedia is not a naming problem — the dataset does not exist.** All five spellings returned 404, and Wikipedia page views appear **nowhere** in Quiver's OpenAPI schema. Moved to wontfix; the "try more variants" note is retired.
+- **E-8i DPI depth is confirmed:** `offexchange-historical/AAPL` returned 1,229 dated rows carrying `DPI`. The precondition ("probe depth first") is met; E-8i is now buildable and faces only the §6b lead-time gate like every other candidate.
+- **Apify is confirmed dead and is being cancelled.** Zero calls in 30 days, `APIFY_API_TOKEN` unset in production, and its only scored output (S&P 500 P/E and P/S) is fully served by the free `multpl.com → FMP` chain (P7-75). Cost registry already marks it `status: eliminate`; the billing cancellation is the owner's. **No code path depends on it — `fetchApifyYahooFinance` returns `baseline-no-token` and the valuation assembly falls straight through.**
+- **ScrapingBee stays.** It is the sole source for two Risk-Appetite inputs no other held API carries — AAII bull/bear (33 pts) and CNN Fear & Greed (30 pts). Its retired jobs (Buffett → FRED, CBOE put/call → Polygon options) are genuinely gone, but the two survey/proprietary feeds have no substitute. Transport is healthy (28/28 HTTP 200 in 30 days); whether the AAII/F&G values still parse to `live` is a separate maintenance check tied to P7-69.
 
 Size-budget pass, 2026-08-09:
 
