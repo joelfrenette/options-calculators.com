@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input"
 import { FlaskConical, RefreshCw, Trash2, Loader2, PauseCircle } from "lucide-react"
 import { RESEARCH_TTL_MS, type ResearchRow, type OptionsRecommendation, type ResearchStatus, type Recap } from "@/lib/research/types"
 import { WheelProfileSettings } from "@/components/research/wheel-profile-settings"
+import { ExportMenu } from "@/components/export-menu"
+import { buildResearchReport } from "@/lib/reports/from-research-queue"
 
 /** A researched row is stale once it is older than one overnight refresh cycle. */
 function isStale(row: ResearchRow): boolean {
@@ -217,6 +219,9 @@ export function ResearchTab() {
                   )}
                 </div>
                 <div className="flex items-center gap-1">
+                  {row.recommendation && (
+                    <ExportMenu payload={() => buildResearchReport(row)} label="Report" />
+                  )}
                   <Button variant="ghost" size="sm" title="Re-research" onClick={() => research(row.ticker)} disabled={busy === row.ticker}>
                     {busy === row.ticker ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                   </Button>

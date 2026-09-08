@@ -3,6 +3,7 @@ import { getSessionInfo } from "@/lib/auth"
 import { validateReportPayload } from "@/lib/reports/validate"
 import { buildReportExcel } from "@/lib/reports/excel"
 import { buildReportPdf } from "@/lib/reports/pdf"
+import { buildReportPptx } from "@/lib/reports/pptx"
 import { reportSlug } from "@/lib/reports/types"
 
 /**
@@ -32,8 +33,8 @@ export async function POST(request: Request) {
   }
 
   const format = (body as { format?: unknown })?.format
-  if (format !== "pdf" && format !== "xlsx") {
-    return NextResponse.json({ error: "format must be 'pdf' or 'xlsx'" }, { status: 400 })
+  if (format !== "pdf" && format !== "xlsx" && format !== "pptx") {
+    return NextResponse.json({ error: "format must be 'pdf', 'xlsx' or 'pptx'" }, { status: 400 })
   }
 
   const parsed = validateReportPayload(body, { maxRows: MAX_ROWS, maxCols: MAX_COLS })
@@ -50,6 +51,17 @@ export async function POST(request: Request) {
         headers: {
           "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
           "Content-Disposition": `attachment; filename="${slug}.xlsx"`,
+          "Cache-Control": "no-store",
+        },
+      })
+    }
+    if (format === "pptx") {
+      const buf = await buildReportPptx(parsed.payload)
+      return new NextResponse(new Uint8Array(buf), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          "Content-Disposition": `attachment; filename="${slug}.pptx"`,
           "Cache-Control": "no-store",
         },
       })

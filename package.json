@@ -67,6 +67,7 @@
     "next": "15.5.9",
     "next-themes": "^0.4.6",
     "path": "latest",
+    "pptxgenjs": "^4.0.1",
     "react": "19.1.0",
     "react-day-picker": "9.8.0",
     "react-dom": "19.1.0",

@@ -12,7 +12,7 @@
 import { listActiveForRefresh, getProfile, setStatus, saveRecommendation, saveRecap } from "./store"
 import { researchTicker } from "./run"
 import { tickerDeltas, narrateRecap } from "./recap"
-import { sendRecapEmail } from "./recap-email"
+import { sendDigestEmail } from "./digest-email"
 import type { RecapItem, ResearchRow } from "./types"
 
 const MAX_PER_OWNER = 50
@@ -52,12 +52,18 @@ export async function runResearchRefresh(): Promise<RefreshResult> {
   for (const [email, list] of byOwner) {
     const profile = await getProfile(email)
     const items: RecapItem[] = []
+    // The owner's rows carrying their freshest recommendation, for the digest
+    // body (every ticker) and its attachments (changed tickers). A row that
+    // fails to re-research keeps yesterday's recommendation so the digest still
+    // summarises it rather than dropping it.
+    const digestRows: ResearchRow[] = []
     let researchedForOwner = 0
 
     for (const row of list) {
       if (Date.now() - start > SOFT_DEADLINE_MS) {
         res.timedOut = true
-        break
+        digestRows.push(row) // not reached tonight — carry its last known read
+        continue
       }
       const prev = row.recommendation // yesterday's read, or null on a first research
       try {
@@ -67,14 +73,17 @@ export async function runResearchRefresh(): Promise<RefreshResult> {
         if (!saved) {
           await setStatus(row.id, email, "failed")
           res.tickersFailed++
+          digestRows.push(row)
           continue
         }
         res.tickersResearched++
         researchedForOwner++
         items.push(...tickerDeltas(row.ticker, rec, prev))
+        digestRows.push({ ...row, recommendation: rec, researchedAt: new Date().toISOString() })
       } catch {
         await setStatus(row.id, email, "failed")
         res.tickersFailed++
+        digestRows.push(row)
       }
     }
 
@@ -83,7 +92,11 @@ export async function runResearchRefresh(): Promise<RefreshResult> {
     // changed, so the inbox is signal, not a nightly heartbeat.
     const { summary, isLlm } = await narrateRecap(items, researchedForOwner)
     if (await saveRecap(email, { summary, items, isLlm })) res.recapsWritten++
-    if (items.length > 0 && (await sendRecapEmail(email, summary, items))) res.emailsSent++
+    // Email only when something changed, so the inbox stays signal not a nightly
+    // heartbeat — but when it fires, the digest summarises EVERY ticker and
+    // attaches a PDF + PowerPoint for the ones that moved (owner ask 2026-09-07).
+    const changed = new Set(items.map((i) => i.ticker))
+    if (items.length > 0 && (await sendDigestEmail(email, summary, items, digestRows, changed))) res.emailsSent++
 
     if (res.timedOut) break
   }

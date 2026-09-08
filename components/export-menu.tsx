@@ -13,10 +13,10 @@
  */
 
 import { useEffect, useRef, useState } from "react"
-import { Download, FileText, FileSpreadsheet, Mail, Loader2, Check, ChevronDown } from "lucide-react"
+import { Download, FileText, FileSpreadsheet, Presentation, Eye, Mail, Loader2, Check, ChevronDown } from "lucide-react"
 import type { ReportPayload } from "@/lib/reports/types"
 
-type Busy = null | "pdf" | "xlsx" | "email"
+type Busy = null | "pdf" | "xlsx" | "pptx" | "view" | "email"
 
 export function ExportMenu({
   payload,
@@ -49,7 +49,43 @@ export function ExportMenu({
     return `${t || "report"}-${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}-${p(d.getUTCHours())}${p(d.getUTCMinutes())}`
   }
 
-  const download = async (format: "pdf" | "xlsx") => {
+  // Open the PDF inline in a new tab instead of forcing a save — the "View"
+  // action. Same member-gated route and blob flow as download(); the only
+  // difference is window.open over an <a download>.
+  const view = async () => {
+    const data = payload()
+    if (!data) {
+      setNote("Nothing to view yet — load the results first.")
+      return
+    }
+    setBusy("view")
+    setNote(null)
+    setOk(false)
+    try {
+      const res = await fetch("/api/report/download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...data, format: "pdf" }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        setNote(body?.error || `Could not open (HTTP ${res.status})`)
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      window.open(url, "_blank", "noopener")
+      // Revoke after a beat so the new tab has time to load the blob.
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+      setOpen(false)
+    } catch {
+      setNote("Could not reach the export service.")
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const download = async (format: "pdf" | "xlsx" | "pptx") => {
     const data = payload()
     if (!data) {
       setNote("Nothing to export yet — load the results first.")
@@ -140,9 +176,21 @@ export function ExportMenu({
             align === "right" ? "right-0" : "left-0"
           }`}
         >
+          <button type="button" className={item} onClick={view} disabled={busy !== null}>
+            {busy === "view" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4 text-slate-600" />}
+            View PDF
+          </button>
           <button type="button" className={item} onClick={() => download("pdf")} disabled={busy !== null}>
             {busy === "pdf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4 text-red-600" />}
             Download PDF
+          </button>
+          <button type="button" className={item} onClick={() => download("pptx")} disabled={busy !== null}>
+            {busy === "pptx" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Presentation className="h-4 w-4 text-orange-600" />
+            )}
+            Download PowerPoint
           </button>
           <button type="button" className={item} onClick={() => download("xlsx")} disabled={busy !== null}>
             {busy === "xlsx" ? (

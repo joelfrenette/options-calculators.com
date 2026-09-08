@@ -27,6 +27,13 @@ const nextConfig = {
       "./node_modules/.pnpm/pdfkit@*/node_modules/pdfkit/js/**/*",
       "./node_modules/.pnpm/fontkit@*/node_modules/fontkit/**/*",
     ],
+    // The nightly digest renders a PDF per changed ticker too (lib/research/
+    // digest-email.ts -> buildReportPdf), so its cron route needs the same
+    // pdfkit/fontkit data traced in or the PDF build throws at runtime.
+    "/api/cron/research-refresh": [
+      "./node_modules/.pnpm/pdfkit@*/node_modules/pdfkit/js/**/*",
+      "./node_modules/.pnpm/fontkit@*/node_modules/fontkit/**/*",
+    ],
   },
 }
 
