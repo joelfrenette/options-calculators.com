@@ -549,6 +549,13 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     tabs: [],
   },
   {
+    path: "/api/cron/ccpi-health",
+    method: "GET",
+    skip: "CRON_SECRET-gated nightly CCPI health check (Plan A / P7-69); a probe would recompute the full CCPI (the same upstream fan-out as an /api/ccpi load) and could email an alert.",
+    budgetMs: 120000,
+    tabs: [],
+  },
+  {
     path: "/api/cron/budget-guard",
     method: "GET",
     skip: "Vercel Cron endpoint, authenticated with CRON_SECRET rather than the admin cookie — the health check has no way to present it, and a probe could trip the shutoff for real.",

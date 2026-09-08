@@ -12,6 +12,10 @@
     {
       "path": "/api/cron/research-refresh",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/ccpi-health",
+      "schedule": "15 22 * * 1-5"
     }
   ]
 }
