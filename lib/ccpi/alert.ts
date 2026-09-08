@@ -40,6 +40,21 @@ const PILLAR_LABEL: Record<string, string> = {
   macro: "Macro",
 }
 
+/** Friendly names for the scored inputs, so an alert can say WHICH feed failed
+ *  (Plan A workstream 2 — feed reliability), not just which pillar dropped. */
+const INDICATOR_LABEL: Record<string, string> = {
+  qqqDailyReturn: "QQQ daily return", qqqConsecDown: "QQQ consecutive down days",
+  qqqSMA20: "QQQ 20-day MA", qqqSMA50: "QQQ 50-day MA", qqqSMA200: "QQQ 200-day MA",
+  qqqBollinger: "QQQ Bollinger", vix: "VIX", vixTermStructure: "VIX term structure",
+  nvidiaMomentum: "NVIDIA momentum", soxIndex: "SOX index",
+  putCallRatio: "Put/Call ratio", fearGreedIndex: "CNN Fear & Greed", aaiiBullish: "AAII bullish",
+  spxPE: "S&P 500 P/E", spxPS: "S&P 500 P/S", buffettIndicator: "Buffett indicator", equityRiskPremium: "Equity risk premium",
+  dxyIndex: "Dollar index", fedFundsRate: "Fed funds rate", fedReverseRepo: "Reverse repo",
+  junkSpread: "Junk-bond spread", debtToGDP: "Debt/GDP", yieldCurve: "Yield curve",
+}
+
+const label = (key: string): string => INDICATOR_LABEL[key] ?? key
+
 /** Certainty below this (percent of weight backed by live data) is worth a warning. */
 const CERTAINTY_ALERT_BELOW = 60
 
@@ -72,10 +87,15 @@ export async function runCcpiHealthCheck(): Promise<CcpiHealthResult> {
   }
 
   // A pillar that scored null fell below the minimum scored weight — the silent
-  // dropout P7-69 is about.
-  const droppedPillars = Object.entries(pillars)
-    .filter(([, p]) => p.score === null)
-    .map(([k]) => PILLAR_LABEL[k] ?? k)
+  // dropout P7-69 is about. Naming the excluded inputs turns "Risk Appetite is
+  // not scoring" into "…because AAII and Fear & Greed are not live" — the
+  // actionable half (Plan A workstream 2).
+  const dropped = Object.entries(pillars).filter(([, p]) => p.score === null)
+  const droppedPillars = dropped.map(([k]) => PILLAR_LABEL[k] ?? k)
+  const droppedDetail = dropped.map(([k, p]) => {
+    const missing = p.excluded.map(label)
+    return `${PILLAR_LABEL[k] ?? k}${missing.length ? ` (not live: ${missing.join(", ")})` : ""}`
+  })
 
   const baseCCPI = computeBaseCCPI(pillarResults)
   if (baseCCPI === null) {
@@ -125,8 +145,11 @@ export async function runCcpiHealthCheck(): Promise<CcpiHealthResult> {
     regimeWorsened = regime.level > priorRegime.level
   }
 
-  // Store today's score — also begins the daily CCPI history (the route stores none).
+  // Store today's score and certainty — begins the daily CCPI history the route
+  // never kept, and makes data-health (certainty) trackable over time, not just
+  // alertable in the moment.
   await upsertSeriesPoint("calc:ccpi", today, Math.round(finalCCPI * 100) / 100)
+  await upsertSeriesPoint("calc:ccpi_certainty", today, Math.round(certainty * 10) / 10)
 
   const lowCertainty = certainty < CERTAINTY_ALERT_BELOW
   const shouldAlert = droppedPillars.length > 0 || regimeWorsened || lowCertainty
@@ -137,7 +160,7 @@ export async function runCcpiHealthCheck(): Promise<CcpiHealthResult> {
       score: finalCCPI,
       regimeName: regime.name,
       certainty,
-      droppedPillars,
+      droppedPillars: droppedDetail,
       regimeWorsened,
       lowCertainty,
       cashTarget: playbook.allocation.cash,
