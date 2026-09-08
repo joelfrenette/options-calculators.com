@@ -33,7 +33,7 @@
 | `butterfly-scanner` | Butterflies | `ButterflyScanner` | `components/butterfly-scanner.tsx` | 598 | `/api/strategy-scanner` |
 | `leaps-scanner` | LEAPS | `LEAPSScanner` | `components/leaps-scanner.tsx` | 591 | `/api/strategy-scanner` |
 | `zebra-scanner` | ZEBRA | `ZEBRAScanner` | `components/zebra-scanner.tsx` | 561 | `/api/strategy-scanner` |
-| `research-queue` | Research Queue | `ResearchTab` | `components/research/research-tab.tsx` | 245 | `/api/research-queue` |
+| `research-queue` | Research Queue | `ResearchTab` | `components/research/research-tab.tsx` | 258 | `/api/research-queue` |
 
 ### FIND — nav: COPY (9 tabs)
 

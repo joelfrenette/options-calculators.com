@@ -115,6 +115,11 @@ export async function decide(
   sharesHeld: number,
 ): Promise<OptionsRecommendation> {
   const sel = selectStrategy(rating, n, profile, sharesHeld)
+  // Surface assignment-into-a-downtrend as a risk flag on the trade that carries
+  // it (Plan B) — the strike you'd sell sits below the 200-DMA.
+  if (sel.strategy === "CSP" && n.cspStrikeBelow200dma === true) {
+    sel.riskFlags = [...sel.riskFlags, "assignment into a downtrend — the sold-put strike is below the 200-DMA"]
+  }
   const mech = mechanics(sel.strategy)
 
   const base: OptionsRecommendation = {
@@ -138,6 +143,9 @@ export async function decide(
     cspAnnualizedReturnPct: n.cspAnnualizedReturnPct,
     cspCapitalRequired: n.cspCapitalRequired,
     pricingSource: n.pricingSource,
+    cspCushionPct: n.cspCushionPct,
+    cspAssignmentShock: n.cspAssignmentShock,
+    cspStrikeBelow200dma: n.cspStrikeBelow200dma,
     leapsStrike: n.leapsStrike,
     leapsDte: n.leapsDte,
     leapsBuyBelowPrice: n.leapsBuyBelowPrice,

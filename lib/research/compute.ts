@@ -37,6 +37,13 @@ export interface ComputedNumbers {
   /** "chain" = strike/credit from a live Polygon option chain; "computed" = Black-Scholes estimate. */
   pricingSource: "chain" | "computed" | null
 
+  /** % the stock can fall before assignment costs money: (price − breakeven)/price. */
+  cspCushionPct: number | null
+  /** How far underwater (%) if the stock drops 20/30/40% from here — the owner's fear made explicit. */
+  cspAssignmentShock: { drop20: number; drop30: number; drop40: number } | null
+  /** True when the sold-put strike sits below the 200-DMA: assignment into a downtrend. */
+  cspStrikeBelow200dma: boolean | null
+
   leapsStrike: number | null
   leapsDte: number | null
   leapsBuyBelowPrice: number | null
@@ -160,6 +167,7 @@ export async function computeNumbers(
     cspProbabilityOfProfit: null, cspBreakeven: null, cspAnnualizedReturnPct: null, cspCapitalRequired: null,
     leapsStrike: null, leapsDte: null, leapsBuyBelowPrice: null, ccStrike: null, ccCredit: null,
     pricingSource: null,
+    cspCushionPct: null, cspAssignmentShock: null, cspStrikeBelow200dma: null,
   }
 
   const [priceRes, closes] = await Promise.all([getStockPrice(ticker), dailyCloses(ticker)])
@@ -260,6 +268,23 @@ export async function computeNumbers(
         out.pricingSource = "computed"
       }
     }
+  }
+
+  // Assignment-risk (Plan B, 2026-09-07): the "how far underwater if it keeps
+  // falling" numbers the owner's fear is about. Computed from the sold-put
+  // breakeven, current price and the 200-DMA — all already known here. null
+  // whenever the CSP band could not be priced (the P6-34 rule).
+  if (out.cspBreakeven !== null) {
+    const be = out.cspBreakeven
+    out.cspCushionPct = Math.round(((price - be) / price) * 1000) / 10
+    // Underwater % at each shock: how far below breakeven the price lands after
+    // a drop of d from today. 0 when the drop still leaves you above breakeven.
+    const underwaterAt = (d: number) => Math.round(Math.max(0, ((be - price * (1 - d)) / be) * 100) * 10) / 10
+    out.cspAssignmentShock = { drop20: underwaterAt(0.2), drop30: underwaterAt(0.3), drop40: underwaterAt(0.4) }
+    // Selling a put whose strike sits below a (typically falling) 200-DMA is
+    // assignment into a downtrend — the strike closer to the money is the one
+    // actually sold, so it is the one that matters.
+    out.cspStrikeBelow200dma = out.cspStrikeHigh !== null && sma200 !== null ? out.cspStrikeHigh < sma200 : null
   }
 
   // LEAPS — a deep-ITM call at the profile's target delta, and the pullback

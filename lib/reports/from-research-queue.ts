@@ -72,6 +72,14 @@ export function buildResearchReport(row: ResearchRow): ReportPayload | null {
       { metric: "Annualized return", value: pct(r.cspAnnualizedReturnPct) },
       { metric: "Capital required", value: money(r.cspCapitalRequired) },
       { metric: "Pricing source", value: r.pricingSource === "chain" ? "live option chain" : r.pricingSource === "computed" ? "Black-Scholes estimate" : "—" },
+      { metric: "Cushion to breakeven", value: r.cspCushionPct === null ? "—" : `${r.cspCushionPct}%` },
+      {
+        metric: "Underwater if it falls 20/30/40%",
+        value: r.cspAssignmentShock
+          ? `${r.cspAssignmentShock.drop20}% / ${r.cspAssignmentShock.drop30}% / ${r.cspAssignmentShock.drop40}%`
+          : "—",
+      },
+      { metric: "Strike vs 200-DMA", value: r.cspStrikeBelow200dma === null ? "—" : r.cspStrikeBelow200dma ? "below (assignment into a downtrend)" : "above" },
     )
   } else if (r.strategy === "LEAPS" || r.strategy === "PMCC" || r.strategy === "LONG_CALL") {
     rows.push(

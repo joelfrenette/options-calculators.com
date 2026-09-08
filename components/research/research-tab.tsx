@@ -69,9 +69,22 @@ function Rec({ r }: { r: OptionsRecommendation }) {
             {r.pricingSource && (
               <span><b>Pricing:</b> {r.pricingSource === "chain" ? "live chain" : "estimated"}</span>
             )}
+            {r.cspCushionPct !== null && (
+              <span><b>Cushion:</b> {r.cspCushionPct}% to breakeven</span>
+            )}
           </>
         )}
       </div>
+
+      {r.strategy === "CSP" && r.cspAssignmentShock && (
+        <div className="rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
+          <b>If assigned and it keeps falling</b> — underwater vs breakeven:{" "}
+          <span className="font-mono">−20% → {r.cspAssignmentShock.drop20}%</span> ·{" "}
+          <span className="font-mono">−30% → {r.cspAssignmentShock.drop30}%</span> ·{" "}
+          <span className="font-mono">−40% → {r.cspAssignmentShock.drop40}%</span>
+          {r.cspStrikeBelow200dma ? " · strike is below the 200-DMA" : ""}
+        </div>
+      )}
 
       {r.riskFlags.length > 0 && (
         <p className="text-xs text-amber-800"><b>Risks:</b> {r.riskFlags.join(" · ")}</p>

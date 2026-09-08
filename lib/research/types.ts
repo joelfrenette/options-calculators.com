@@ -57,6 +57,14 @@ export interface OptionsRecommendation {
   /** "chain" = strike/credit from a live Polygon option chain; "computed" = Black-Scholes estimate. */
   pricingSource: "chain" | "computed" | null
 
+  // --- assignment risk (Plan B): the "how far underwater if it falls" numbers -
+  /** % the stock can drop before assignment costs money: (price − breakeven)/price. */
+  cspCushionPct: number | null
+  /** Underwater % if the stock drops 20/30/40% from here — the bag-holding scenario, explicit. */
+  cspAssignmentShock: { drop20: number; drop30: number; drop40: number } | null
+  /** True when the sold-put strike sits below the 200-DMA — assignment into a downtrend. */
+  cspStrikeBelow200dma: boolean | null
+
   /** LEAPS: a ~0.75Δ call, and the pullback price that makes it a buy. */
   leapsStrike: number | null
   leapsDte: number | null
