@@ -58,6 +58,16 @@ export interface QualifyingStock {
   bidPrice?: number // Added to match enrichWithOptionsData update
   askPrice?: number // Added to match enrichWithOptionsData update
 
+  // --- assignment risk (Plan B, 2026-09-07): "how far underwater if it falls" -
+  // Computed at enrichment from the sold-put breakeven (strike − premium), the
+  // current price and the 200-DMA. undefined when the option was not priced.
+  /** % the stock can drop before assignment costs money: (price − breakeven)/price. */
+  cushionToBreakevenPct?: number
+  /** Underwater % vs breakeven if the stock drops 20/30/40% from here. */
+  assignmentShock?: { drop20: number; drop30: number; drop40: number }
+  /** True when the sold strike sits below the 200-DMA — assignment into a downtrend. */
+  strikeBelow200dma?: boolean
+
   // Populated during Step 3: the names of fundamental filters this stock *didn't* pass.
   // Empty (or undefined) means strict pass; length 1–2 means "near miss" for the relaxed Step 4 fallback.
   failedFilters?: string[]

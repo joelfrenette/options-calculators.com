@@ -222,7 +222,7 @@ _None._
 | `app/page.tsx` | 728 | 128 |
 | `components/scanner/use-wheel-scanner.ts` | 715 | 115 |
 | `lib/api-contracts.ts` | 682 | 82 |
-| `components/scanner/relaxed-results-table.tsx` | 633 | 33 |
+| `components/scanner/relaxed-results-table.tsx` | 655 | 55 |
 | `components/market-sentiment.tsx` | 624 | 24 |
 | `components/admin/health-check-panel.tsx` | 622 | 22 |
 | `components/earnings-economic-calendar.tsx` | 611 | 11 |

@@ -317,6 +317,12 @@ export function RelaxedResultsTable({
                       IV % {relaxedSortColumn === "iv" && (relaxedSortDirection === "asc" ? "↑" : "↓")}
                     </th>
                     <th
+                      className="text-right p-3 font-semibold text-purple-900"
+                      title="Assignment risk. Cushion = how far the stock can fall before assignment costs money (price to breakeven). Below it, how far underwater vs breakeven if the stock drops 30% from here. A red strike sits below the 200-DMA — assignment into a downtrend."
+                    >
+                      Downside
+                    </th>
+                    <th
                       className="text-center p-3 font-semibold text-purple-900"
                       title="Scheduled events (earnings, CPI, FOMC, jobs report) landing BEFORE this option's expiry. A rich premium may be event-driven — hover for the list and research before selling."
                     >
@@ -484,6 +490,22 @@ export function RelaxedResultsTable({
                           }`}
                         >
                           {stock.iv !== undefined && stock.iv > 0 ? `${stock.iv.toFixed(0)}%` : "-"}
+                        </td>
+                        <td className="text-right p-3">
+                          {stock.cushionToBreakevenPct !== undefined ? (
+                            <div className="leading-tight">
+                              <div className={stock.strikeBelow200dma ? "font-semibold text-red-600" : "font-semibold text-gray-700"}>
+                                {stock.cushionToBreakevenPct}% cushion
+                              </div>
+                              {stock.assignmentShock && (
+                                <div className="text-xs text-amber-700" title={`Underwater vs breakeven if the stock falls: −20% → ${stock.assignmentShock.drop20}%, −30% → ${stock.assignmentShock.drop30}%, −40% → ${stock.assignmentShock.drop40}%`}>
+                                  −30% → {stock.assignmentShock.drop30}% under
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
                         </td>
                         <td className="text-center p-3">
                           {(() => {

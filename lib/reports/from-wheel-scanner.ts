@@ -53,6 +53,8 @@ export function buildWheelReport(results: QualifyingStock[]): ReportPayload | nu
     annualizedYield: yieldOf(s),
     delta: num(s.optionDelta ?? s.delta),
     dte: num(s.optionDaysToExpiry ?? s.daysToExpiry),
+    cushionPct: num(s.cushionToBreakevenPct),
+    under30: s.assignmentShock ? s.assignmentShock.drop30 : null,
     source: s.priceSource === "synthesized" ? "synthesized (est.)" : "live quote",
   }))
 
@@ -94,6 +96,8 @@ export function buildWheelReport(results: QualifyingStock[]): ReportPayload | nu
       { key: "annualizedYield", label: "Annualized Yield", format: "percent" },
       { key: "delta", label: "Delta", format: "number" },
       { key: "dte", label: "DTE", format: "number" },
+      { key: "cushionPct", label: "Cushion %", format: "percent" },
+      { key: "under30", label: "Underwater if −30%", format: "percent" },
       { key: "source", label: "Source", format: "text" },
     ],
     rows,

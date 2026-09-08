@@ -403,6 +403,20 @@ import type { QualifyingStock } from "./types"
                   : undefined,
               priceSource,
               deltaSource: useEstimatedGreeks ? ("estimated" as const) : ("polygon" as const),
+              // Assignment risk (Plan B): the sold-put breakeven and how far
+              // underwater a further drop leaves you. Same math as the Research
+              // Queue, computed here where strike/premium/price/200-DMA exist.
+              ...(() => {
+                const breakeven = strikePrice - premium
+                if (!(breakeven > 0) || !(stock.currentPrice > 0)) return {}
+                const underwaterAt = (d: number) =>
+                  Math.round(Math.max(0, ((breakeven - stock.currentPrice * (1 - d)) / breakeven) * 100) * 10) / 10
+                return {
+                  cushionToBreakevenPct: Math.round(((stock.currentPrice - breakeven) / stock.currentPrice) * 1000) / 10,
+                  assignmentShock: { drop20: underwaterAt(0.2), drop30: underwaterAt(0.3), drop40: underwaterAt(0.4) },
+                  strikeBelow200dma: stock.sma200 != null ? strikePrice < stock.sma200 : undefined,
+                }
+              })(),
             })
           }
 
